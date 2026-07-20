@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.record_type.id_for_label }}">Record Type:</label>
+            {{ form.record_type }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database_instance.id_for_label }}">Database Instance:</label>
+            {{ form.database_instance }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.backup_type.id_for_label }}">Backup Type:</label>
+            {{ form.backup_type }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.backup_used.id_for_label }}">Backup Used:</label>
+            {{ form.backup_used }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.start.id_for_label }}">Start:</label>
+            {{ form.start }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.end.id_for_label }}">End:</label>
+            {{ form.end }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.duration_hrs.id_for_label }}">Duration (hrs):</label>
+            {{ form.duration_hrs }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.size_gb.id_for_label }}">Size (GB):</label>
+            {{ form.size_gb }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.outcome.id_for_label }}">Outcome:</label>
+            {{ form.outcome }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.location.id_for_label }}">Location:</label>
+            {{ form.location }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.verified.id_for_label }}">Verified:</label>
+            {{ form.verified }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.restore_tested.id_for_label }}">Restore Tested:</label>
+            {{ form.restore_tested }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.compression.id_for_label }}">Compression:</label>
+            {{ form.compression }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.retention.id_for_label }}">Retention:</label>
+            {{ form.retention }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.tested_by.id_for_label }}">Tested By:</label>
+            {{ form.tested_by }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.comments.id_for_label }}">Comments:</label>
+            {{ form.comments }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'backup_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

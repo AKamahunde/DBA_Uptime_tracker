@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Register - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 2rem auto; text-align: center;">
+    <div style="margin-bottom: 1.5rem;">
+        <img src="/static/logo.jpg" alt="DBA Operations Tracker Logo" style="max-width: 150px; height: auto;">
+    </div>
+    <h2 style="margin-bottom: 1.5rem; font-family: 'Bookman Old Style', serif;">Register</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+            <label for="password_confirm">Confirm Password:</label>
+            <input type="password" id="password_confirm" name="password_confirm" required>
+        </div>
+        <button type="submit" class="btn btn-success" style="width: 100%;">Register</button>
+    </form>
+    <p style="text-align: center; margin-top: 1rem;">
+        Already have an account? <a href="{% url 'login' %}">Login</a>
+    </p>
+</div>
+{% endblock %}

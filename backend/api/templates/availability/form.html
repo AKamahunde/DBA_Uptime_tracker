@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.month.id_for_label }}">Month:</label>
+            {{ form.month }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database_type.id_for_label }}">Database Type:</label>
+            {{ form.database_type }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.hours_achieved.id_for_label }}">Hours Achieved:</label>
+            {{ form.hours_achieved }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.planned_downtime_hrs.id_for_label }}">Planned Downtime (hrs):</label>
+            {{ form.planned_downtime_hrs }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.unplanned_downtime_hrs.id_for_label }}">Unplanned Downtime (hrs):</label>
+            {{ form.unplanned_downtime_hrs }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.target.id_for_label }}">Target:</label>
+            {{ form.target }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.availability_percent.id_for_label }}">Availability %:</label>
+            {{ form.availability_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.sla_percent.id_for_label }}">SLA %:</label>
+            {{ form.sla_percent }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'availability_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

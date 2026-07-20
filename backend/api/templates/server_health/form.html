@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.server.id_for_label }}">Server:</label>
+            {{ form.server }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.cpu_percent.id_for_label }}">CPU %:</label>
+            {{ form.cpu_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.memory_percent.id_for_label }}">Memory %:</label>
+            {{ form.memory_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.disk_percent.id_for_label }}">Disk %:</label>
+            {{ form.disk_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.tablespace_percent.id_for_label }}">Tablespace %:</label>
+            {{ form.tablespace_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.connections.id_for_label }}">Connections:</label>
+            {{ form.connections }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.slow_queries.id_for_label }}">Slow Queries:</label>
+            {{ form.slow_queries }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.threads.id_for_label }}">Threads:</label>
+            {{ form.threads }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.status.id_for_label }}">Status:</label>
+            {{ form.status }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'server_health_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.ticket.id_for_label }}">Ticket:</label>
+            {{ form.ticket }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.start.id_for_label }}">Start:</label>
+            {{ form.start }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.end.id_for_label }}">End:</label>
+            {{ form.end }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.duration_hrs.id_for_label }}">Duration (hrs):</label>
+            {{ form.duration_hrs }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.planned.id_for_label }}">Planned:</label>
+            {{ form.planned }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.severity.id_for_label }}">Severity:</label>
+            {{ form.severity }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.system.id_for_label }}">System:</label>
+            {{ form.system }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.root_cause.id_for_label }}">Root Cause:</label>
+            {{ form.root_cause }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.business_impact.id_for_label }}">Business Impact:</label>
+            {{ form.business_impact }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.resolved_by.id_for_label }}">Resolved By:</label>
+            {{ form.resolved_by }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.status.id_for_label }}">Status:</label>
+            {{ form.status }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'incident_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

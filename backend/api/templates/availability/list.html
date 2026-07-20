@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load api_extras %}
+
+{% block title %}Availability Calculator - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Availability Calculator</h2>
+        <span style="font-size: 0.85rem; color: #666; font-style: italic;">
+            &#9432; Auto-computed from Incident Register &amp; Maintenance Register
+        </span>
+    </div>
+    <div style="overflow-x: auto;">
+    <table>
+        <thead>
+            <tr>
+                <th>Month-Year</th>
+                <th>Database</th>
+                <th>Target Hours</th>
+                <th>Hours Achieved</th>
+                <th>Planned Downtime (hrs)</th>
+                <th>Unplanned Downtime (hrs)</th>
+                <th>Availability %</th>
+                <th>SLA %</th>
+                <th>SLA Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in availability_records %}
+            {% with status=row|get_item:"SLA Status" avail=row|get_item:"Availability % (Computed)" %}
+            <tr {% if status == 'Missed' %}style="background-color: #ffd6d6;"{% endif %}>
+                <td>{{ row|get_item:"Month-Year" }}</td>
+                <td>{{ row.Database }}</td>
+                <td>{{ row|get_item:"Target Hours" }}</td>
+                <td>{{ row|get_item:"Hours Achieved" }}</td>
+                <td>{{ row|get_item:"Planned Downtime (hrs)" }}</td>
+                <td>{{ row|get_item:"Unplanned Downtime (hrs)" }}</td>
+                <td>
+                    {% if avail != None %}
+                        <span style="font-weight: 600; color: {% if avail >= 99.9 %}#2e7d32{% else %}#c62828{% endif %};">
+                            {{ avail }}%
+                        </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>{{ row|get_item:"SLA %" }}%</td>
+                <td>
+                    {% if status == 'Met' %}
+                        <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:3px;">Met</span>
+                    {% else %}
+                        <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:3px;">Missed</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr>
+                <td colspan="9" style="text-align: center; color: #666; padding: 2rem;">
+                    No availability data yet. Add incidents or maintenance records to see computed availability.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

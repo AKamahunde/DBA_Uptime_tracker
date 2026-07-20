@@ -1,0 +1,457 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.core.exceptions import PermissionDenied
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib import messages
+from django.utils import timezone
+from datetime import timedelta
+from .models import (
+    IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
+    MaintenanceRegister, CapacityPlanning
+)
+from .forms import (
+    IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
+    ServerHealthForm, MaintenanceRegisterForm, CapacityPlanningForm
+)
+from users.models import User
+
+def register(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        password_confirm = request.POST.get('password_confirm')
+        
+        if not username or not password:
+            messages.error(request, 'Username and password are required.')
+            return render(request, 'register.html')
+        
+        if password != password_confirm:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'register.html')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+            return render(request, 'register.html')
+        
+        user = User.objects.create_user(username=username, password=password)
+        user.is_admin = False
+        user.save()
+        messages.success(request, 'Account created successfully. Please login.')
+        return redirect('login')
+    
+    return render(request, 'register.html')
+
+@login_required
+def dashboard(request):
+    # Run all counts in a single DB round-trip by using lazy evaluation
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM incident_register),
+                (SELECT COUNT(*) FROM replication_monitor),
+                (SELECT COUNT(*) FROM backup_recovery),
+                (SELECT COUNT(*) FROM server_health),
+                (SELECT COUNT(*) FROM maintenance_register),
+                (SELECT COUNT(*) FROM capacity_planning)
+        """)
+        row = cursor.fetchone()
+
+    context = {
+        'incident_count': row[0],
+        'replication_count': row[1],
+        'backup_count': row[2],
+        'server_health_count': row[3],
+        'maintenance_count': row[4],
+        'capacity_count': row[5],
+        'is_admin': request.user.is_admin,
+    }
+    return render(request, 'dashboard.html', context)
+
+@login_required
+def incident_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
+        messages.error(request, 'You do not have permission to view incident records.')
+        return redirect('dashboard')
+    incidents = IncidentRegister.objects.all().order_by('-date')
+    return render(request, 'incidents/list.html', {'incidents': incidents, 'is_admin': request.user.is_admin})
+
+@login_required
+def incident_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
+        messages.error(request, 'You do not have permission to create incident records.')
+        return redirect('incident_list')
+        
+    if request.method == 'POST':
+        form = IncidentRegisterForm(request.POST)
+        if form.is_valid():
+            incident = form.save(commit=False)
+            incident.created_by = request.user
+            incident.save()
+            messages.success(request, 'Incident created successfully.')
+            return redirect('incident_list')
+    else:
+        form = IncidentRegisterForm()
+    return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident'})
+
+@login_required
+def incident_edit(request, pk):
+    incident = get_object_or_404(IncidentRegister, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_incidentregister')
+    is_creator_within_time = (incident.created_by == request.user) and ((timezone.now() - incident.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('incident_list')
+    
+    if request.method == 'POST':
+        form = IncidentRegisterForm(request.POST, instance=incident)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Incident updated successfully.')
+            return redirect('incident_list')
+    else:
+        form = IncidentRegisterForm(instance=incident)
+    
+    return render(request, 'incidents/form.html', {
+        'form': form, 
+        'title': 'Edit Incident',
+        'can_edit': True,
+        'incident': incident
+    })
+
+@login_required
+def replication_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_replicationmonitor')):
+        messages.error(request, 'You do not have permission to view replication records.')
+        return redirect('dashboard')
+    replications = ReplicationMonitor.objects.all().order_by('-date')
+    return render(request, 'replication/list.html', {'replications': replications, 'is_admin': request.user.is_admin})
+
+@login_required
+def replication_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_replicationmonitor')):
+        messages.error(request, 'You do not have permission to create replication records.')
+        return redirect('replication_list')
+
+    if request.method == 'POST':
+        form = ReplicationMonitorForm(request.POST)
+        if form.is_valid():
+            replication = form.save(commit=False)
+            replication.created_by = request.user
+            replication.save()
+            messages.success(request, 'Replication record created successfully.')
+            return redirect('replication_list')
+    else:
+        form = ReplicationMonitorForm()
+    return render(request, 'replication/form.html', {'form': form, 'title': 'Create Replication Record'})
+
+@login_required
+def replication_edit(request, pk):
+    replication = get_object_or_404(ReplicationMonitor, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_replicationmonitor')
+    is_creator_within_time = (replication.created_by == request.user) and ((timezone.now() - replication.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('replication_list')
+    
+    if request.method == 'POST':
+        form = ReplicationMonitorForm(request.POST, instance=replication)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Replication record updated successfully.')
+            return redirect('replication_list')
+    else:
+        form = ReplicationMonitorForm(instance=replication)
+    
+    return render(request, 'replication/form.html', {
+        'form': form, 
+        'title': 'Edit Replication Record',
+        'can_edit': True,
+        'replication': replication
+    })
+
+@login_required
+def backup_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_backuprecovery')):
+        messages.error(request, 'You do not have permission to view backup records.')
+        return redirect('dashboard')
+    backups = BackupRecovery.objects.all().order_by('-date')
+    return render(request, 'backups/list.html', {'backups': backups, 'is_admin': request.user.is_admin})
+
+@login_required
+def backup_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_backuprecovery')):
+        messages.error(request, 'You do not have permission to create backup records.')
+        return redirect('backup_list')
+
+    if request.method == 'POST':
+        form = BackupRecoveryForm(request.POST)
+        if form.is_valid():
+            backup = form.save(commit=False)
+            backup.created_by = request.user
+            backup.save()
+            messages.success(request, 'Backup record created successfully.')
+            return redirect('backup_list')
+    else:
+        form = BackupRecoveryForm()
+    return render(request, 'backups/form.html', {'form': form, 'title': 'Create Backup Record'})
+
+@login_required
+def backup_edit(request, pk):
+    backup = get_object_or_404(BackupRecovery, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_backuprecovery')
+    is_creator_within_time = (backup.created_by == request.user) and ((timezone.now() - backup.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('backup_list')
+    
+    if request.method == 'POST':
+        form = BackupRecoveryForm(request.POST, instance=backup)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Backup record updated successfully.')
+            return redirect('backup_list')
+    else:
+        form = BackupRecoveryForm(instance=backup)
+    
+    return render(request, 'backups/form.html', {
+        'form': form, 
+        'title': 'Edit Backup Record',
+        'can_edit': True,
+        'backup': backup
+    })
+
+@login_required
+def server_health_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
+        messages.error(request, 'You do not have permission to view server health records.')
+        return redirect('dashboard')
+    health_records = ServerHealth.objects.all().order_by('-date')
+    return render(request, 'server_health/list.html', {'health_records': health_records, 'is_admin': request.user.is_admin})
+
+@login_required
+def server_health_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_serverhealth')):
+        messages.error(request, 'You do not have permission to create server health records.')
+        return redirect('server_health_list')
+
+    if request.method == 'POST':
+        form = ServerHealthForm(request.POST)
+        if form.is_valid():
+            health = form.save(commit=False)
+            health.created_by = request.user
+            health.save()
+            messages.success(request, 'Server health record created successfully.')
+            return redirect('server_health_list')
+    else:
+        form = ServerHealthForm()
+    return render(request, 'server_health/form.html', {'form': form, 'title': 'Create Server Health Record'})
+
+@login_required
+def server_health_edit(request, pk):
+    health = get_object_or_404(ServerHealth, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_serverhealth')
+    is_creator_within_time = (health.created_by == request.user) and ((timezone.now() - health.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('server_health_list')
+    
+    if request.method == 'POST':
+        form = ServerHealthForm(request.POST, instance=health)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Server health record updated successfully.')
+            return redirect('server_health_list')
+    else:
+        form = ServerHealthForm(instance=health)
+    
+    return render(request, 'server_health/form.html', {
+        'form': form, 
+        'title': 'Edit Server Health Record',
+        'can_edit': True,
+        'health': health
+    })
+
+@login_required
+def maintenance_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
+        messages.error(request, 'You do not have permission to view maintenance records.')
+        return redirect('dashboard')
+    maintenance_records = MaintenanceRegister.objects.all().order_by('-date')
+    return render(request, 'maintenance/list.html', {'maintenance_records': maintenance_records, 'is_admin': request.user.is_admin})
+
+@login_required
+def maintenance_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
+        messages.error(request, 'You do not have permission to create maintenance records.')
+        return redirect('maintenance_list')
+
+    if request.method == 'POST':
+        form = MaintenanceRegisterForm(request.POST)
+        if form.is_valid():
+            maintenance = form.save(commit=False)
+            maintenance.created_by = request.user
+            maintenance.save()
+            messages.success(request, 'Maintenance record created successfully.')
+            return redirect('maintenance_list')
+    else:
+        form = MaintenanceRegisterForm()
+    return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record'})
+
+@login_required
+def maintenance_edit(request, pk):
+    maintenance = get_object_or_404(MaintenanceRegister, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_maintenanceregister')
+    is_creator_within_time = (maintenance.created_by == request.user) and ((timezone.now() - maintenance.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('maintenance_list')
+    
+    if request.method == 'POST':
+        form = MaintenanceRegisterForm(request.POST, instance=maintenance)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Maintenance record updated successfully.')
+            return redirect('maintenance_list')
+    else:
+        form = MaintenanceRegisterForm(instance=maintenance)
+    
+    return render(request, 'maintenance/form.html', {
+        'form': form, 
+        'title': 'Edit Maintenance Record',
+        'can_edit': True,
+        'maintenance': maintenance
+    })
+
+@login_required
+def capacity_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to view capacity planning records.')
+        return redirect('dashboard')
+    capacity_records = CapacityPlanning.objects.all().order_by('-month')
+    return render(request, 'capacity/list.html', {'capacity_records': capacity_records, 'is_admin': request.user.is_admin})
+
+@login_required
+def capacity_create(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_capacityplanning')):
+        messages.error(request, 'You do not have permission to create capacity planning records.')
+        return redirect('capacity_list')
+
+    if request.method == 'POST':
+        form = CapacityPlanningForm(request.POST)
+        if form.is_valid():
+            capacity = form.save(commit=False)
+            capacity.created_by = request.user
+            capacity.save()
+            messages.success(request, 'Capacity planning record created successfully.')
+            return redirect('capacity_list')
+    else:
+        form = CapacityPlanningForm()
+    return render(request, 'capacity/form.html', {'form': form, 'title': 'Create Capacity Planning Record'})
+
+@login_required
+def capacity_edit(request, pk):
+    capacity = get_object_or_404(CapacityPlanning, pk=pk)
+    
+    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_capacityplanning')
+    is_creator_within_time = (capacity.created_by == request.user) and ((timezone.now() - capacity.created_at).total_seconds() < 300)
+    
+    if not (can_edit_always or is_creator_within_time):
+        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        return redirect('capacity_list')
+    
+    if request.method == 'POST':
+        form = CapacityPlanningForm(request.POST, instance=capacity)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Capacity planning record updated successfully.')
+            return redirect('capacity_list')
+    else:
+        form = CapacityPlanningForm(instance=capacity)
+    
+    return render(request, 'capacity/form.html', {
+        'form': form, 
+        'title': 'Edit Capacity Planning Record',
+        'can_edit': True,
+        'capacity': capacity
+    })
+
+# --- DELETE VIEWS ---
+
+@login_required
+@require_POST
+def incident_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_incidentregister')):
+        messages.error(request, 'You do not have permission to delete incident records.')
+        return redirect('incident_list')
+    obj = get_object_or_404(IncidentRegister, pk=pk)
+    obj.delete()
+    messages.success(request, 'Incident record deleted successfully.')
+    return redirect('incident_list')
+
+@login_required
+@require_POST
+def replication_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_replicationmonitor')):
+        messages.error(request, 'You do not have permission to delete replication records.')
+        return redirect('replication_list')
+    obj = get_object_or_404(ReplicationMonitor, pk=pk)
+    obj.delete()
+    messages.success(request, 'Replication record deleted successfully.')
+    return redirect('replication_list')
+
+@login_required
+@require_POST
+def backup_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_backuprecovery')):
+        messages.error(request, 'You do not have permission to delete backup records.')
+        return redirect('backup_list')
+    obj = get_object_or_404(BackupRecovery, pk=pk)
+    obj.delete()
+    messages.success(request, 'Backup record deleted successfully.')
+    return redirect('backup_list')
+
+@login_required
+@require_POST
+def server_health_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_serverhealth')):
+        messages.error(request, 'You do not have permission to delete server health records.')
+        return redirect('server_health_list')
+    obj = get_object_or_404(ServerHealth, pk=pk)
+    obj.delete()
+    messages.success(request, 'Server health record deleted successfully.')
+    return redirect('server_health_list')
+
+@login_required
+@require_POST
+def maintenance_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_maintenanceregister')):
+        messages.error(request, 'You do not have permission to delete maintenance records.')
+        return redirect('maintenance_list')
+    obj = get_object_or_404(MaintenanceRegister, pk=pk)
+    obj.delete()
+    messages.success(request, 'Maintenance record deleted successfully.')
+    return redirect('maintenance_list')
+
+@login_required
+@require_POST
+def capacity_delete(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.delete_capacityplanning')):
+        messages.error(request, 'You do not have permission to delete capacity planning records.')
+        return redirect('capacity_list')
+    obj = get_object_or_404(CapacityPlanning, pk=pk)
+    obj.delete()
+    messages.success(request, 'Capacity planning record deleted successfully.')
+    return redirect('capacity_list')
+

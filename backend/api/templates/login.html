@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<style>
+    .login-spinner-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 66, 132, 0.15);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
+    .login-spinner-overlay.active {
+        display: flex;
+    }
+    .login-spinner {
+        width: 52px;
+        height: 52px;
+        border: 5px solid #e0e7f3;
+        border-top-color: #144284;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    .login-spinner-text {
+        margin-top: 1rem;
+        font-family: 'Bookman Old Style', serif;
+        color: #144284;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="login-spinner-overlay" id="loginSpinner">
+    <div class="login-spinner"></div>
+    <div class="login-spinner-text">Logging in, please wait…</div>
+</div>
+
+<div class="card" style="max-width: 400px; margin: 2rem auto; text-align: center;">
+    <div style="margin-bottom: 1.5rem;">
+        <img src="/static/logo.jpg" alt="DBA Operations Tracker Logo" style="max-width: 150px; height: auto;">
+    </div>
+    <h2 style="margin-bottom: 1.5rem; font-family: 'Bookman Old Style', serif;">Login</h2>
+    <form method="post" id="loginForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginBtn" style="width: 100%;">Login</button>
+    </form>
+    <p style="text-align: center; margin-top: 1rem;">
+        Don't have an account? <a href="{% url 'register' %}">Register</a>
+    </p>
+</div>
+
+<script>
+    document.getElementById('loginForm').addEventListener('submit', function() {
+        document.getElementById('loginSpinner').classList.add('active');
+        document.getElementById('loginBtn').disabled = true;
+        document.getElementById('loginBtn').textContent = 'Logging in…';
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Incident Register - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Incident Register</h2>
+        {% if is_admin or perms.api.add_incidentregister %}
+        <a href="{% url 'incident_create' %}" class="btn btn-success">Create New Incident</a>
+        {% endif %}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Ticket</th>
+                <th>Date</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Database</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for incident in incidents %}
+            <tr {% if incident.status == 'Open' %}style="background-color: #ffd6d6;"{% elif incident.status == 'In Progress' %}style="background-color: #fff3e0;"{% endif %}>
+                <td>{{ incident.ticket }}</td>
+                <td>{{ incident.date }}</td>
+                <td>
+                    {% if incident.severity == 'Critical' %}
+                        <span class="badge-accent">{{ incident.severity }}</span>
+                    {% elif incident.severity == 'High' %}
+                        <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
+                    {% elif incident.severity == 'Medium' %}
+                        <span style="display:inline-block;background:#fb8c00;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
+                    {% else %}
+                        <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if incident.status == 'Resolved' or incident.status == 'Closed' %}
+                        <span style="color: #2e7d32; font-weight: 600;">{{ incident.status }}</span>
+                    {% elif incident.status == 'Open' %}
+                        <span style="color: #c62828; font-weight: 600;">{{ incident.status }}</span>
+                    {% else %}
+                        <span style="color: #ef6c00; font-weight: 600;">{{ incident.status }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ incident.database }}</td>
+                <td>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <a href="{% url 'incident_edit' incident.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                        {% if is_admin or perms.api.delete_incidentregister %}
+                        <form method="post" action="{% url 'incident_delete' incident.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center;">No incidents found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

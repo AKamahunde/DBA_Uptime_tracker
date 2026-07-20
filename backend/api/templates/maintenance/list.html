@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Maintenance Register - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Maintenance Register</h2>
+        {% if is_admin or perms.api.add_maintenanceregister %}
+        <a href="{% url 'maintenance_create' %}" class="btn btn-success">Create New Record</a>
+        {% endif %}
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Change ID</th>
+                <th>Risk</th>
+                <th>Success</th>
+                <th>Database</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for maintenance in maintenance_records %}
+            <tr {% if not maintenance.success %}style="background-color: #ffd6d6;"{% endif %}>
+                <td>{{ maintenance.date }}</td>
+                <td>{{ maintenance.change_id }}</td>
+                <td>
+                    {% if maintenance.risk == 'High' %}
+                        <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ maintenance.risk }}</span>
+                    {% elif maintenance.risk == 'Medium' %}
+                        <span style="display:inline-block;background:#fb8c00;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ maintenance.risk }}</span>
+                    {% else %}
+                        <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ maintenance.risk }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if maintenance.success %}
+                        <span style="color: #2e7d32; font-weight: 600;">Yes</span>
+                    {% else %}
+                        <span style="color: #c62828; font-weight: 600;">No</span>
+                    {% endif %}
+                </td>
+                <td>{{ maintenance.database }}</td>
+                <td>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <a href="{% url 'maintenance_edit' maintenance.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                        {% if is_admin or perms.api.delete_maintenanceregister %}
+                        <form method="post" action="{% url 'maintenance_delete' maintenance.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center;">No maintenance records found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

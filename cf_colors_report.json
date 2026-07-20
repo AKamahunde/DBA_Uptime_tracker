@@ -1,0 +1,1044 @@
+{
+  "Charts": [],
+  "Dashboard": [
+    {
+      "range": "<ConditionalFormatting B6:B8>",
+      "type": "expression",
+      "formula": "['B6>=99']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B6:B8>",
+      "type": "expression",
+      "formula": "['AND(B6>=97,B6<99)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B6:B8>",
+      "type": "expression",
+      "formula": "['B6<97']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "expression",
+      "formula": "['C6<=19.2']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "expression",
+      "formula": "['AND(C6>19.2,C6<=24)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "expression",
+      "formula": "['C6>24']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "cellIs",
+      "formula": "['49']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "cellIs",
+      "formula": "['49']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC0EFCE",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting C6:C8>",
+      "type": "cellIs",
+      "formula": "['49', '54']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting D6:D8>",
+      "type": "expression",
+      "formula": "['D6<=1.6']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting D6:D8>",
+      "type": "expression",
+      "formula": "['AND(D6>1.6,D6<=2)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting D6:D8>",
+      "type": "expression",
+      "formula": "['D6>2']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting E6:E8>",
+      "type": "expression",
+      "formula": "['E6<=4']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting E6:E8>",
+      "type": "expression",
+      "formula": "['AND(E6>4,E6<=5)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting E6:E8>",
+      "type": "expression",
+      "formula": "['E6>5']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F6:F8>",
+      "type": "expression",
+      "formula": "['F6<=96']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F6:F8>",
+      "type": "expression",
+      "formula": "['AND(F6>96,F6<=120)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F6:F8>",
+      "type": "expression",
+      "formula": "['F6>120']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting G6:G8>",
+      "type": "expression",
+      "formula": "['G6=\"No Data\"']",
+      "fill_bg": null,
+      "fill_fg": null,
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting G6:G8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(G6),G6>=95)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting G6:G8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(G6),G6>=90,G6<95)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting G6:G8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(G6),G6<90)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B18:O18>",
+      "type": "cellIs",
+      "formula": "['\"Below SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B18:O18>",
+      "type": "cellIs",
+      "formula": "['\"Marginal\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B18:O18>",
+      "type": "cellIs",
+      "formula": "['\"Meets SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "containsText",
+      "formula": "['NOT(ISERROR(SEARCH(\"No Data\",H6)))']",
+      "fill_bg": "00000000",
+      "fill_fg": "Values must be of type <class 'str'>",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "cellIs",
+      "formula": "['74']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "cellIs",
+      "formula": "['74', '79']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "cellIs",
+      "formula": "['80']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "expression",
+      "formula": "['H6=\"No Data\"']",
+      "fill_bg": null,
+      "fill_fg": null,
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(H6),H6>=95)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(H6),H6>=90,H6<95)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting H6:H8>",
+      "type": "expression",
+      "formula": "['AND(ISNUMBER(H6),H6<90)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B16:O16>",
+      "type": "expression",
+      "formula": "['B$18=\"Below SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B16:O16>",
+      "type": "expression",
+      "formula": "['B$18=\"Marginal\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B16:O16>",
+      "type": "expression",
+      "formula": "['B$18=\"Meets SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting I6:I8>",
+      "type": "cellIs",
+      "formula": "['\"Healthy\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting I6:I8>",
+      "type": "cellIs",
+      "formula": "['\"Degraded\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting I6:I8>",
+      "type": "cellIs",
+      "formula": "['\"Failed\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B25>",
+      "type": "expression",
+      "formula": "['B25=0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting B25>",
+      "type": "expression",
+      "formula": "['B25>0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting J6:J8>",
+      "type": "expression",
+      "formula": "['J6=0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting J6:J8>",
+      "type": "expression",
+      "formula": "['J6>0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F25>",
+      "type": "expression",
+      "formula": "['F25=0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F25>",
+      "type": "expression",
+      "formula": "['F25>0']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A6:J6 F7:F8>",
+      "type": "expression",
+      "formula": "['$A6=$B$2']",
+      "fill_bg": null,
+      "fill_fg": null,
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A7:J7>",
+      "type": "expression",
+      "formula": "['$A7=$B$2']",
+      "fill_bg": null,
+      "fill_fg": null,
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A8:J8>",
+      "type": "expression",
+      "formula": "['$A8=$B$2']",
+      "fill_bg": null,
+      "fill_fg": null,
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting F8>",
+      "type": "containsText",
+      "formula": "['NOT(ISERROR(SEARCH(\"No Data\",F8)))']",
+      "fill_bg": "00000000",
+      "fill_fg": "Values must be of type <class 'str'>",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting J8>",
+      "type": "containsText",
+      "formula": "['NOT(ISERROR(SEARCH(\"No Data\",J8)))']",
+      "fill_bg": "00000000",
+      "fill_fg": "Values must be of type <class 'str'>",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting H6>",
+      "type": "cellIs",
+      "formula": "['80']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting B6:J8>",
+      "type": "containsText",
+      "formula": "['NOT(ISERROR(SEARCH(\"No Data\",B6)))']",
+      "fill_bg": "00000000",
+      "fill_fg": "Values must be of type <class 'str'>",
+      "font_color": "Values must be of type <class 'str'>",
+      "font_bold": false
+    },
+    {
+      "range": "<ConditionalFormatting A33>",
+      "type": "expression",
+      "formula": "['A$18=\"Below SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFC7CE",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A33>",
+      "type": "expression",
+      "formula": "['A$18=\"Marginal\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFEB9C",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A33>",
+      "type": "expression",
+      "formula": "['A$18=\"Meets SLA\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFC6EFCE",
+      "font_color": null,
+      "font_bold": null
+    }
+  ],
+  "Incident Register": [
+    {
+      "range": "<ConditionalFormatting M2:M8>",
+      "type": "expression",
+      "formula": "['$G2=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting M2:M8>",
+      "type": "expression",
+      "formula": "['$G2=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE8CC",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting M2:M8>",
+      "type": "expression",
+      "formula": "['AND($L2=\"Open\",$B2<TODAY()-1)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:L8>",
+      "type": "expression",
+      "formula": "['$G2=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:L8>",
+      "type": "expression",
+      "formula": "['$G2=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE8CC",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:L8>",
+      "type": "expression",
+      "formula": "['AND($L2=\"Open\",$B2<TODAY()-1)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting M9:M99>",
+      "type": "expression",
+      "formula": "['$G9=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting M9:M99>",
+      "type": "expression",
+      "formula": "['$G9=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE8CC",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting M9:M99>",
+      "type": "expression",
+      "formula": "['AND($L9=\"Open\",$B9<TODAY()-1)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A9:L99>",
+      "type": "expression",
+      "formula": "['$G9=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A9:L99>",
+      "type": "expression",
+      "formula": "['$G9=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE8CC",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A9:L99>",
+      "type": "expression",
+      "formula": "['AND($L9=\"Open\",$B9<TODAY()-1)']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    }
+  ],
+  "Replication Monitor": [
+    {
+      "range": "<ConditionalFormatting A2:J200>",
+      "type": "expression",
+      "formula": "['$J2=\"Critical\"']",
+      "fill_bg": "FFFF9999",
+      "fill_fg": "FFFF9999",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:J200>",
+      "type": "expression",
+      "formula": "['$J2=\"Medium\"']",
+      "fill_bg": "FFFFF59D",
+      "fill_fg": "FFFFF59D",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:J200>",
+      "type": "expression",
+      "formula": "['$J2=\"Low\"']",
+      "fill_bg": "FFE2F0D9",
+      "fill_fg": "FFE2F0D9",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:J200>",
+      "type": "expression",
+      "formula": "['$H2=\"Failed\"']",
+      "fill_bg": "FFFF9999",
+      "fill_fg": "FFFF9999",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:J200>",
+      "type": "expression",
+      "formula": "['$H2=\"Degraded\"']",
+      "fill_bg": "FFFFF59D",
+      "fill_fg": "FFFFF59D",
+      "font_color": null,
+      "font_bold": null
+    }
+  ],
+  "Backup & Recovery": [],
+  "Server Health": [
+    {
+      "range": "<ConditionalFormatting K2:K5>",
+      "type": "expression",
+      "formula": "['$J2=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K2:K5>",
+      "type": "expression",
+      "formula": "['$J2=\"Warning\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C2:C5>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting C2:C5>",
+      "type": "cellIs",
+      "formula": "['70', '90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting C2:C5>",
+      "type": "cellIs",
+      "formula": "['70']",
+      "fill_bg": "00000000",
+      "fill_fg": "FF6BCB77",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D2:D5>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D2:D5>",
+      "type": "cellIs",
+      "formula": "['70', '90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting E2:E5>",
+      "type": "cellIs",
+      "formula": "['85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting E2:E5>",
+      "type": "cellIs",
+      "formula": "['70', '85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting F2:F5>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting A2:J5>",
+      "type": "expression",
+      "formula": "['$J2=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A2:J5>",
+      "type": "expression",
+      "formula": "['$J2=\"Warning\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K6:K100>",
+      "type": "expression",
+      "formula": "['$J6=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K6:K100>",
+      "type": "expression",
+      "formula": "['$J6=\"Warning\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting C6:C100>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting C6:C100>",
+      "type": "cellIs",
+      "formula": "['70', '90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting C6:C100>",
+      "type": "cellIs",
+      "formula": "['70']",
+      "fill_bg": "00000000",
+      "fill_fg": "FF6BCB77",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D6:D100>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D6:D100>",
+      "type": "cellIs",
+      "formula": "['70', '90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting E6:E100>",
+      "type": "cellIs",
+      "formula": "['85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting E6:E100>",
+      "type": "cellIs",
+      "formula": "['70', '85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFD93D",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting F6:F100>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting A6:J100>",
+      "type": "expression",
+      "formula": "['$J6=\"Critical\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A6:J100>",
+      "type": "expression",
+      "formula": "['$J6=\"Warning\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    }
+  ],
+  "Availability Calculator": [
+    {
+      "range": "<ConditionalFormatting AK3>",
+      "type": "cellIs",
+      "formula": "['AL3']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting AA4:AA15>",
+      "type": "cellIs",
+      "formula": "['99.9']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting AA3:AA15>",
+      "type": "cellIs",
+      "formula": "['AB3']",
+      "fill_bg": "00000000",
+      "fill_fg": "FF6BCB77",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting AA3:AA15>",
+      "type": "cellIs",
+      "formula": "['AB3']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting Q4:Q15>",
+      "type": "cellIs",
+      "formula": "['99.9']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting Q3:Q15>",
+      "type": "cellIs",
+      "formula": "['R3']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting G4:G15>",
+      "type": "cellIs",
+      "formula": "['99.9']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting G3:G15>",
+      "type": "cellIs",
+      "formula": "['H3']",
+      "fill_bg": "00000000",
+      "fill_fg": "FF6BCB77",
+      "font_color": "FF1A1A1A",
+      "font_bold": true
+    }
+  ],
+  "Maintenance Register": [
+    {
+      "range": "<ConditionalFormatting A3:J101>",
+      "type": "expression",
+      "formula": "['$G3=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting A3:J101>",
+      "type": "expression",
+      "formula": "['$J3=\"No\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K4>",
+      "type": "expression",
+      "formula": "['$G4=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K4>",
+      "type": "expression",
+      "formula": "['$J4=\"No\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K5>",
+      "type": "expression",
+      "formula": "['$G5=\"High\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFF9E5",
+      "font_color": null,
+      "font_bold": null
+    },
+    {
+      "range": "<ConditionalFormatting K5>",
+      "type": "expression",
+      "formula": "['$J5=\"No\"']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFFE5E5",
+      "font_color": null,
+      "font_bold": null
+    }
+  ],
+  "Capacity Planning": [
+    {
+      "range": "<ConditionalFormatting C2:C8>",
+      "type": "cellIs",
+      "formula": "['85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D2:D8>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting C9:C100>",
+      "type": "cellIs",
+      "formula": "['85']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    },
+    {
+      "range": "<ConditionalFormatting D9:D100>",
+      "type": "cellIs",
+      "formula": "['90']",
+      "fill_bg": "00000000",
+      "fill_fg": "FFFF6B6B",
+      "font_color": "FFFFFFFF",
+      "font_bold": true
+    }
+  ]
+}

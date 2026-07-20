@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.change_id.id_for_label }}">Change ID:</label>
+            {{ form.change_id }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.activity.id_for_label }}">Activity:</label>
+            {{ form.activity }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.start.id_for_label }}">Start:</label>
+            {{ form.start }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.end.id_for_label }}">End:</label>
+            {{ form.end }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.duration_hrs.id_for_label }}">Duration (hrs):</label>
+            {{ form.duration_hrs }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.risk.id_for_label }}">Risk:</label>
+            {{ form.risk }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.rollback_plan.id_for_label }}">Rollback Plan:</label>
+            {{ form.rollback_plan }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.approved_by.id_for_label }}">Approved By:</label>
+            {{ form.approved_by }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.success.id_for_label }}">Success:</label>
+            {{ form.success }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'maintenance_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

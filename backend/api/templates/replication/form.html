@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.master.id_for_label }}">Master:</label>
+            {{ form.master }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.replica.id_for_label }}">Replica:</label>
+            {{ form.replica }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.io_thread.id_for_label }}">IO Thread:</label>
+            {{ form.io_thread }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.sql_thread.id_for_label }}">SQL Thread:</label>
+            {{ form.sql_thread }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.seconds_behind.id_for_label }}">Seconds Behind:</label>
+            {{ form.seconds_behind }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.last_error.id_for_label }}">Last Error:</label>
+            {{ form.last_error }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.severity.id_for_label }}">Severity:</label>
+            {{ form.severity }}
+        </div>
+        {% if can_edit == False %}
+        <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
+        {% endif %}
+        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+        <a href="{% url 'replication_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+    </form>
+</div>
+{% endblock %}
