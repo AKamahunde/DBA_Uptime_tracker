@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: atlas_web
+    restart: always
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    volumes:
+      # Mounts the backend directory from the host to /app in the container
+      # This allows you to `git pull` on the host and see changes immediately
+      - ./backend:/app
+    environment:
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      DB_ENGINE: ${DB_ENGINE:-django.db.backends.mysql}
+      DB_NAME: ${DB_NAME:-dba_tracker}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-Adm1n@2020}
+      DB_HOST: ${DB_HOST:-192.168.35.38}
+      DB_PORT: ${DB_PORT:-3306}
