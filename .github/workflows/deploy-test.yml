@@ -34,9 +34,8 @@ jobs:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
         run: |
-          echo "username: $DOCKER_HUB_USERNAME"
-          echo "token length: ${#DOCKER_HUB_TOKEN}"
-          echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
+          docker logout docker.io || true
+          echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin docker.io
 
       - name: Build and push image
         uses: docker/build-push-action@v6
