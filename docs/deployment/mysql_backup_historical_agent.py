@@ -134,8 +134,11 @@ if __name__ == "__main__":
     print("Parsing ALL historical MySQL backups for this month...")
     payloads = parse_all_backups()
     
-    print(f"Found {len(payloads)} backups for this month! Sending them to Uptime Tracker...")
+    print(f"Found {len(payloads)} backups for this month! Sending them to Uptime Tracker...\n")
     for payload in payloads:
+        print(f"--- Sending Payload for {payload['start']} ---")
+        print(json.dumps(payload, indent=2))
         send_to_tracker(payload)
+        print()
         
     print("Historical import complete.")
