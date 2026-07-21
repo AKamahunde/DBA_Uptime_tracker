@@ -73,11 +73,17 @@ def parse_session_block(session_lines, time_pattern):
             else:
                 backup_type = 'Incremental'
                 
-        if "SUCCESS:" in line and "committed to" in line:
+        if "SUCCESS" in line.upper():
             outcome = 'Success'
-            location = line.split("committed to")[-1].strip()
+            if "committed to" in line:
+                location = line.split("committed to")[-1].strip()
+            elif ".gz" in line:
+                words = line.split()
+                for word in words:
+                    if word.endswith('.gz'):
+                        location = word
             
-        if "FAILED:" in line or "ERROR:" in line:
+        if ("FAILED:" in line or "ERROR:" in line) and outcome != 'Success':
             outcome = 'Failed'
             
         if "--- Backup Session Finished ---" in line:
