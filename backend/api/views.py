@@ -592,16 +592,19 @@ def backup_ingest(request):
     try:
         data = json.loads(request.body)
         
+        start_str = data.get('start')
+        start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00')) if start_str else datetime.now()
+        
         backup = BackupRecovery.objects.create(
+            date=start_dt.date(),
             record_type='Backup',
-            database='MySQL',
-            date=timezone.now().date(),
+            database=data.get('database_instance', 'Unknown'),
             database_instance=data.get('database_instance', 'Unknown'),
-            backup_type=data.get('backup_type', 'Full'),
+            backup_type=data.get('backup_type', 'Incremental'),
             backup_used=data.get('backup_used', 'N/A'),
-            start=data.get('start'),
+            start=start_str,
             end=data.get('end'),
-            duration_hrs=data.get('duration_hrs', 0),
+            duration_mins=data.get('duration_mins', 0),
             outcome=data.get('outcome', 'Failed'),
             location=data.get('location', 'Unknown'),
             verified=data.get('verified', False),
