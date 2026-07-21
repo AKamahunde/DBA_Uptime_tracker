@@ -146,6 +146,10 @@ class BackupRecovery(models.Model):
 class ServerHealth(models.Model):
     date = models.DateField()
     server = models.CharField(max_length=100)
+    entered_by = models.CharField(max_length=20, choices=[
+        ('User', 'User'),
+        ('Script', 'Script')
+    ], default='User')
     cpu_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,

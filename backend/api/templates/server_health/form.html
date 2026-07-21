@@ -12,6 +12,10 @@
             {{ form.date }}
         </div>
         <div class="form-group">
+            <label for="{{ form.entered_by.id_for_label }}">Entered By:</label>
+            {{ form.entered_by }}
+        </div>
+        <div class="form-group">
             <label for="{{ form.server.id_for_label }}">Server:</label>
             {{ form.server }}
         </div>

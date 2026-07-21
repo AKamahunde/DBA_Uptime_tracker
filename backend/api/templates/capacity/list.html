@@ -5,7 +5,7 @@
 {% block content %}
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2>Capacity Planning</h2>
+        <h2>Capacity Tracking</h2>
         {% if is_admin or perms.api.add_capacityplanning %}
         <a href="{% url 'capacity_create' %}" class="btn btn-success">Create New Record</a>
         {% endif %}

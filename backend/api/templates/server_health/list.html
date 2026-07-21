@@ -14,6 +14,7 @@
         <thead>
             <tr>
                 <th>Date</th>
+                <th>Entered By</th>
                 <th>Server</th>
                 <th>CPU %</th>
                 <th>Memory %</th>
@@ -26,6 +27,13 @@
             {% for health in health_records %}
             <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
                 <td>{{ health.date }}</td>
+                <td>
+                    {% if health.entered_by == 'Script' %}
+                        <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
+                    {% else %}
+                        <span class="badge-accent" style="background-color: var(--color-primary); color: white;">User</span>
+                    {% endif %}
+                </td>
                 <td>{{ health.server }}</td>
                 <td>{{ health.cpu_percent }}</td>
                 <td>{{ health.memory_percent }}</td>

@@ -43,7 +43,11 @@ class BackupRecoveryForm(forms.ModelForm):
 class ServerHealthForm(forms.ModelForm):
     class Meta:
         model = ServerHealth
-        fields = '__all__'
+        fields = [
+            'date', 'entered_by', 'server', 'cpu_percent', 'memory_percent', 
+            'disk_percent', 'tablespace_percent', 'connections', 'slow_queries', 
+            'threads', 'status', 'database'
+        ]
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
         }

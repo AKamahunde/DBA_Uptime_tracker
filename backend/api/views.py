@@ -16,31 +16,11 @@ from .forms import (
 )
 from users.models import User
 
-def register(request):
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        password_confirm = request.POST.get('password_confirm')
-        
-        if not username or not password:
-            messages.error(request, 'Username and password are required.')
-            return render(request, 'register.html')
-        
-        if password != password_confirm:
-            messages.error(request, 'Passwords do not match.')
-            return render(request, 'register.html')
-        
-        if User.objects.filter(username=username).exists():
-            messages.error(request, 'Username already exists.')
-            return render(request, 'register.html')
-        
-        user = User.objects.create_user(username=username, password=password)
-        user.is_admin = False
-        user.save()
-        messages.success(request, 'Account created successfully. Please login.')
-        return redirect('login')
-    
-    return render(request, 'register.html')
+@login_required
+def about(request):
+    return render(request, 'about.html')
+
+
 
 @login_required
 def dashboard(request):

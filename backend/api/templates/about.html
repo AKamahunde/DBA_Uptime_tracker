@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}About - Atlas{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">About Atlas</h2>
+    
+    <div style="line-height: 1.6; color: #444;">
+        <p style="margin-bottom: 1rem;">
+            <strong>Atlas</strong> is the central operations hub and logging platform for Database Administrators. 
+            It is designed to track, monitor, and report on the critical infrastructure that keeps the organization's data running.
+        </p>
+
+        <h3 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--color-primary);">Modules</h3>
+        <ul style="margin-left: 2rem; margin-bottom: 1.5rem;">
+            <li style="margin-bottom: 0.5rem;"><strong>Incidents:</strong> Log and track database incidents and outages.</li>
+            <li style="margin-bottom: 0.5rem;"><strong>Replication:</strong> Monitor master-replica replication health.</li>
+            <li style="margin-bottom: 0.5rem;"><strong>Backup & Restore Register:</strong> Track all database backup and recovery operations.</li>
+            <li style="margin-bottom: 0.5rem;"><strong>Server Health Registry:</strong> Monitor server CPU, memory, disk, and connection metrics.</li>
+            <li style="margin-bottom: 0.5rem;"><strong>Maintenance:</strong> Log scheduled maintenance activities and change records.</li>
+            <li style="margin-bottom: 0.5rem;"><strong>Capacity Tracking:</strong> Track database growth, disk usage, and future planning.</li>
+        </ul>
+
+        <h3 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--color-primary);">System Information</h3>
+        <p style="margin-bottom: 0.5rem;"><strong>Version:</strong> 1.0.0</p>
+        <p style="margin-bottom: 0.5rem;"><strong>Architecture:</strong> Django 6.0.7 / MySQL</p>
+        <p style="margin-bottom: 1rem;"><strong>Integrations:</strong> Built with an extensible ETL pipeline for Kafka and REST APIs.</p>
+        
+        <div style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.9rem; color: #777;">
+            <p>Atlas &copy; 2026. Internal use only.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
-# DataPulse (formerly DBA Operations Tracker)
+# Atlas (formerly DBA Operations Tracker)
 
-A robust Django web application for tracking database administration operations. DataPulse acts as the central heartbeat monitor for your infrastructure, tracking incidents, replication health, backup recovery, server capacity, and scheduled maintenance.
+A robust Django web application for tracking database administration operations. Atlas acts as the central heartbeat monitor for your infrastructure, tracking incidents, replication health, backup recovery, server capacity, and scheduled maintenance.
 
 ## Features
 
@@ -15,14 +15,14 @@ A robust Django web application for tracking database administration operations.
 
 ## User Roles & Security
 
-DataPulse implements a strict security and permissioning model:
+Atlas implements a strict security and permissioning model:
 - **Admin Users**: Full access to view, create, edit, and safely delete all records.
 - **Regular Users (Data Entrants)**: Can create new records, but can only edit them within a strict **5-minute window** of creation. They cannot delete records.
 - **Permission Walls**: Users are strictly blocked from accessing views they lack permissions for via soft-error redirects and hidden UI elements.
 
 ## Architecture & Integration (ETL)
 
-DataPulse is designed to act not just as a manual data entry tool, but as a centralized operations hub. 
+Atlas is designed to act not just as a manual data entry tool, but as a centralized operations hub. 
 - **ETL Scaffolding**: The `etl/` Django app provides a structured foundation for integrating with external REST APIs and Kafka message streams to automate data ingestion from other databases and monitoring tools.
 - **Documentation**: See `docs/architecture.md` for a deeper dive into the system's design.
 

@@ -1,38 +1,44 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - DBA Operations Tracker{% endblock %}
+{% block title %}Dashboard - Atlas{% endblock %}
 
 {% block content %}
 <h2 style="margin-bottom: 1.5rem;">Dashboard</h2>
 <div class="dashboard-grid">
-    <div class="stat-card">
+    <div class="stat-card" title="Overview of all operations and quick stats">
         <h3>{{ incident_count }}</h3>
-        <p>Incidents</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Incidents</p>
+        <p style="font-size: 0.8rem; color: #777;">Log and track database incidents and outages</p>
         <a href="{% url 'incident_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Monitor master-replica replication health">
         <h3>{{ replication_count }}</h3>
-        <p>Replication Records</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Replication Records</p>
+        <p style="font-size: 0.8rem; color: #777;">Monitor master-replica replication health</p>
         <a href="{% url 'replication_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Track all database backup and recovery operations">
         <h3>{{ backup_count }}</h3>
-        <p>Backup Records</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Backup & Restore Register</p>
+        <p style="font-size: 0.8rem; color: #777;">Track all database backup and recovery operations</p>
         <a href="{% url 'backup_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Monitor server CPU, memory, disk, and connection metrics">
         <h3>{{ server_health_count }}</h3>
-        <p>Server Health Records</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Server Health Registry</p>
+        <p style="font-size: 0.8rem; color: #777;">Monitor server CPU, memory, disk, and connection metrics</p>
         <a href="{% url 'server_health_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Log scheduled maintenance activities and change records">
         <h3>{{ maintenance_count }}</h3>
-        <p>Maintenance Records</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Maintenance Records</p>
+        <p style="font-size: 0.8rem; color: #777;">Log scheduled maintenance activities and change records</p>
         <a href="{% url 'maintenance_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
-    <div class="stat-card">
+    <div class="stat-card" title="Track database growth, disk usage, and future planning">
         <h3>{{ capacity_count }}</h3>
-        <p>Capacity Planning Records</p>
+        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Capacity Tracking</p>
+        <p style="font-size: 0.8rem; color: #777;">Track database growth, disk usage, and future planning</p>
         <a href="{% url 'capacity_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
     </div>
 </div>
