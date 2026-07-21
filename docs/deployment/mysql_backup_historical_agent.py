@@ -77,11 +77,13 @@ def parse_session_block(session_lines, time_pattern):
             outcome = 'Success'
             if "committed to" in line:
                 location = line.split("committed to")[-1].strip()
-            elif ".gz" in line:
-                words = line.split()
-                for word in words:
-                    if word.endswith('.gz'):
-                        location = word
+        
+        if ".gz" in line or ".zip" in line:
+            words = line.split()
+            for word in words:
+                clean_word = word.strip(',;"\'')
+                if clean_word.endswith('.gz') or clean_word.endswith('.zip') or clean_word.endswith('.gz.tmp'):
+                    location = clean_word.replace('.tmp', '')
             
         if ("FAILED:" in line or "ERROR:" in line) and outcome != 'Success':
             outcome = 'Failed'
