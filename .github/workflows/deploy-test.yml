@@ -28,11 +28,15 @@ jobs:
           echo "username length: ${#DOCKER_HUB_USERNAME}"
           echo "token length: ${#DOCKER_HUB_TOKEN}"
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      - name: Docker login with shell
+        shell: bash
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+        run: |
+          echo "username: $DOCKER_HUB_USERNAME"
+          echo "token length: ${#DOCKER_HUB_TOKEN}"
+          echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
 
       - name: Build and push image
         uses: docker/build-push-action@v6
