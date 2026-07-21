@@ -118,7 +118,6 @@ class BackupRecovery(models.Model):
     start = models.DateTimeField()
     end = models.DateTimeField()
     duration_hrs = models.DecimalField(max_digits=10, decimal_places=2)
-    size_gb = models.DecimalField(max_digits=10, decimal_places=2)
     outcome = models.CharField(max_length=20, choices=[
         ('Success', 'Success'),
         ('Failed', 'Failed'),

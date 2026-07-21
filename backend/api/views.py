@@ -602,7 +602,6 @@ def backup_ingest(request):
             start=data.get('start'),
             end=data.get('end'),
             duration_hrs=data.get('duration_hrs', 0),
-            size_gb=data.get('size_gb', 0),
             outcome=data.get('outcome', 'Failed'),
             location=data.get('location', 'Unknown'),
             verified=data.get('verified', False),
