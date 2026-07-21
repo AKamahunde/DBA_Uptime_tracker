@@ -18,10 +18,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Debug Docker Hub secret lengths
+        shell: bash
         env:
           DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
           DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
         run: |
+          echo "STEP: debug"
+          env | grep DOCKER_HUB
           echo "username length: ${#DOCKER_HUB_USERNAME}"
           echo "token length: ${#DOCKER_HUB_TOKEN}"
 
