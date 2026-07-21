@@ -43,4 +43,7 @@ urlpatterns = [
     path('capacity/create/', views.capacity_create, name='capacity_create'),
     path('capacity/<int:pk>/edit/', views.capacity_edit, name='capacity_edit'),
     path('capacity/<int:pk>/delete/', views.capacity_delete, name='capacity_delete'),
+    
+    # API endpoints for remote ingestion
+    path('api/replication/ingest/', views.replication_ingest, name='replication_ingest'),
 ]

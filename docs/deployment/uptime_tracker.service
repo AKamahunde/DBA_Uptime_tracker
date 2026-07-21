@@ -1,0 +1,16 @@
+[Unit]
+Description=Gunicorn daemon for Uptime Tracker
+After=network.target
+
+[Service]
+User=atimadmin
+Group=www-data
+WorkingDirectory=/opt/Uptime_tracker/backend
+ExecStart=/opt/Uptime_tracker/backend/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/run/gunicorn.sock \
+          dba_tracker.wsgi:application
+
+[Install]
+WantedBy=multi-user.target

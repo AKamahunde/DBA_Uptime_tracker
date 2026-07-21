@@ -1,6 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
+import os
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
@@ -435,3 +439,39 @@ def capacity_delete(request, pk):
     messages.success(request, 'Capacity planning record deleted successfully.')
     return redirect('capacity_list')
 
+
+@csrf_exempt
+@require_POST
+def replication_ingest(request):
+    api_key = request.headers.get('X-API-KEY')
+    expected_key = os.environ.get('REPLICATION_API_KEY')
+    
+    if not expected_key or api_key != expected_key:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        
+        # Determine severity based on threads and delay
+        severity = 'Low'
+        if data.get('io_thread') != 'Yes' or data.get('sql_thread') != 'Yes':
+            severity = 'Critical'
+        elif data.get('seconds_behind', 0) > 300:
+            severity = 'High'
+        elif data.get('seconds_behind', 0) > 60:
+            severity = 'Medium'
+            
+        replication = ReplicationMonitor.objects.create(
+            date=timezone.now().date(),
+            master=data.get('master', 'Unknown'),
+            replica=data.get('replica', 'Unknown'),
+            io_thread=data.get('io_thread', 'No'),
+            sql_thread=data.get('sql_thread', 'No'),
+            seconds_behind=data.get('seconds_behind', 0),
+            last_error=data.get('last_error', ''),
+            database='MySQL',
+            severity=severity
+        )
+        return JsonResponse({'status': 'success', 'id': replication.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
