@@ -14,8 +14,12 @@
     <!-- Filter Bar -->
     <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Month</label>
-            <input type="date" id="date" name="date" value="{{ current_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
+            <label for="start_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">From Month</label>
+            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label for="end_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">To Month</label>
+            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
         </div>
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
             <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
@@ -82,16 +86,16 @@
         </div>
         <div style="display: flex; gap: 0.5rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
             {% else %}
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
             {% else %}
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>

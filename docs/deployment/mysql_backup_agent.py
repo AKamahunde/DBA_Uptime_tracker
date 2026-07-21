@@ -93,8 +93,8 @@ def parse_latest_backup():
         "outcome": outcome,
         "location": location,
         "verified": outcome == 'Success',
-        "compression": location.endswith('.gz') or location.endswith('.zip'),
-        "retention": "7 Days"
+        "compression": location.endswith('.gz') or location.endswith('.zip') or location.endswith('.gz.tmp'),
+        "retention": "180 Days" if backup_type == 'Full' else "7 Days"
     }
 
 def send_to_tracker(payload):

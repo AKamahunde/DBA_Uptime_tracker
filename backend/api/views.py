@@ -62,11 +62,14 @@ def incident_list(request):
     queryset = IncidentRegister.objects.all().order_by('-date')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        queryset = queryset.filter(date=current_date)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -76,7 +79,8 @@ def incident_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -132,11 +136,14 @@ def replication_list(request):
     queryset = ReplicationMonitor.objects.all().order_by('-date')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        queryset = queryset.filter(date=current_date)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -146,7 +153,8 @@ def replication_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -202,11 +210,14 @@ def backup_list(request):
     queryset = BackupRecovery.objects.all().order_by('-date')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        queryset = queryset.filter(date=current_date)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -216,7 +227,8 @@ def backup_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -272,11 +284,14 @@ def server_health_list(request):
     queryset = ServerHealth.objects.all().order_by('-date')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        queryset = queryset.filter(date=current_date)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -286,7 +301,8 @@ def server_health_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -342,11 +358,14 @@ def maintenance_list(request):
     queryset = MaintenanceRegister.objects.all().order_by('-date')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        queryset = queryset.filter(date=current_date)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -356,7 +375,8 @@ def maintenance_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -412,12 +432,14 @@ def capacity_list(request):
     queryset = CapacityPlanning.objects.all().order_by('-month')
     
     current_db = request.GET.get('database', '')
-    current_date = request.GET.get('date', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if current_date:
-        # For capacity, we are matching 'month' field which is a DateField
-        queryset = queryset.filter(month=current_date)
+    if start_date:
+        queryset = queryset.filter(month__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(month__lte=end_date)
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -427,7 +449,8 @@ def capacity_list(request):
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
-        'current_date': current_date
+        'start_date': start_date,
+        'end_date': end_date
     })
 
 @login_required
@@ -612,5 +635,46 @@ def backup_ingest(request):
             retention=data.get('retention', '7 Days')
         )
         return JsonResponse({'status': 'success', 'id': backup.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@require_POST
+def server_health_ingest(request):
+    api_key = request.headers.get('X-API-KEY')
+    expected_key = os.environ.get('REPLICATION_API_KEY')
+    
+    if not expected_key or api_key != expected_key:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        
+        # Calculate status based on thresholds
+        cpu = float(data.get('cpu_percent', 0))
+        memory = float(data.get('memory_percent', 0))
+        disk = float(data.get('disk_percent', 0))
+        
+        status = 'Healthy'
+        if cpu > 90 or memory > 90 or disk > 90:
+            status = 'Critical'
+        elif cpu > 75 or memory > 80 or disk > 80:
+            status = 'Warning'
+            
+        health = ServerHealth.objects.create(
+            date=datetime.now().date(),
+            server=data.get('server', 'Unknown'),
+            entered_by='Script',
+            cpu_percent=cpu,
+            memory_percent=memory,
+            disk_percent=disk,
+            tablespace_percent=float(data.get('tablespace_percent', 0)),
+            connections=int(data.get('connections', 0)),
+            slow_queries=int(data.get('slow_queries', 0)),
+            threads=int(data.get('threads', 0)),
+            status=status,
+            database=data.get('database', 'MySQL')
+        )
+        return JsonResponse({'status': 'success', 'id': health.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
