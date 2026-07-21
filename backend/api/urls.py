@@ -46,4 +46,5 @@ urlpatterns = [
     
     # API endpoints for remote ingestion
     path('api/replication/ingest/', views.replication_ingest, name='replication_ingest'),
+    path('api/backup/ingest/', views.backup_ingest, name='backup_ingest'),
 ]

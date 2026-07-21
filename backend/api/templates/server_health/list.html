@@ -10,61 +10,116 @@
         <a href="{% url 'server_health_create' %}" class="btn btn-success">Create New Record</a>
         {% endif %}
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Entered By</th>
-                <th>Server</th>
-                <th>CPU %</th>
-                <th>Memory %</th>
-                <th>Status</th>
-                <th>Database</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for health in health_records %}
-            <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
-                <td>{{ health.date }}</td>
-                <td>
-                    {% if health.entered_by == 'Script' %}
-                        <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
-                    {% else %}
-                        <span class="badge-accent" style="background-color: var(--color-primary); color: white;">User</span>
-                    {% endif %}
-                </td>
-                <td>{{ health.server }}</td>
-                <td>{{ health.cpu_percent }}</td>
-                <td>{{ health.memory_percent }}</td>
-                <td>
-                    {% if health.status == 'Healthy' %}
-                        <span style="color: #2e7d32; font-weight: 600;">{{ health.status }}</span>
-                    {% elif health.status == 'Critical' %}
-                        <span style="color: #c62828; font-weight: 600;">{{ health.status }}</span>
-                    {% else %}
-                        <span style="color: #ef6c00; font-weight: 600;">{{ health.status }}</span>
-                    {% endif %}
-                </td>
-                <td>{{ health.database }}</td>
-                <td>
-                    <div style="display: flex; gap: 0.25rem;">
-                        <a href="{% url 'server_health_edit' health.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                        {% if is_admin or perms.api.delete_serverhealth %}
-                        <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                        </form>
+
+    <!-- Filter Bar -->
+    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label for="date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Date</label>
+            <input type="date" id="date" name="date" value="{{ current_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
+            <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
+                <option value="">All Databases</option>
+                <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                <option value="PostgreSQL" {% if current_db == 'PostgreSQL' %}selected{% endif %}>PostgreSQL</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
+            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
+        </div>
+    </form>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Entered By</th>
+                    <th>Server</th>
+                    <th>CPU %</th>
+                    <th>Memory %</th>
+                    <th>Status</th>
+                    <th>Database</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for health in page_obj %}
+                <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
+                    <td>{{ health.date }}</td>
+                    <td>
+                        {% if health.entered_by == 'Script' %}
+                            <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
+                        {% else %}
+                            <span class="badge-accent" style="background-color: var(--color-primary); color: white;">User</span>
                         {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" style="text-align: center;">No server health records found.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                    </td>
+                    <td>{{ health.server }}</td>
+                    <td>{{ health.cpu_percent }}</td>
+                    <td>{{ health.memory_percent }}</td>
+                    <td>
+                        {% if health.status == 'Healthy' %}
+                            <span style="color: #2e7d32; font-weight: 600;">{{ health.status }}</span>
+                        {% elif health.status == 'Critical' %}
+                            <span style="color: #c62828; font-weight: 600;">{{ health.status }}</span>
+                        {% else %}
+                            <span style="color: #ef6c00; font-weight: 600;">{{ health.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ health.database }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.25rem;">
+                            {% if health.created_by %}
+                                <a href="{% url 'server_health_edit' health.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                            {% else %}
+                                <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
+                            {% endif %}
+                            {% if is_admin or perms.api.delete_serverhealth %}
+                            <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align: center;">No server health records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+        <div style="color: #64748b; font-size: 0.875rem;">
+            Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+            {% else %}
+                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
+                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
+            {% endif %}
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+            {% else %}
+                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
+                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

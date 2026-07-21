@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
@@ -58,8 +59,25 @@ def incident_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
-    incidents = IncidentRegister.objects.all().order_by('-date')
-    return render(request, 'incidents/list.html', {'incidents': incidents, 'is_admin': request.user.is_admin})
+    queryset = IncidentRegister.objects.all().order_by('-date')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        queryset = queryset.filter(date=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'incidents/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def incident_create(request):
@@ -111,8 +129,25 @@ def replication_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_replicationmonitor')):
         messages.error(request, 'You do not have permission to view replication records.')
         return redirect('dashboard')
-    replications = ReplicationMonitor.objects.all().order_by('-date')
-    return render(request, 'replication/list.html', {'replications': replications, 'is_admin': request.user.is_admin})
+    queryset = ReplicationMonitor.objects.all().order_by('-date')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        queryset = queryset.filter(date=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'replication/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def replication_create(request):
@@ -164,8 +199,25 @@ def backup_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_backuprecovery')):
         messages.error(request, 'You do not have permission to view backup records.')
         return redirect('dashboard')
-    backups = BackupRecovery.objects.all().order_by('-date')
-    return render(request, 'backups/list.html', {'backups': backups, 'is_admin': request.user.is_admin})
+    queryset = BackupRecovery.objects.all().order_by('-date')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        queryset = queryset.filter(date=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'backups/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def backup_create(request):
@@ -217,8 +269,25 @@ def server_health_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
-    health_records = ServerHealth.objects.all().order_by('-date')
-    return render(request, 'server_health/list.html', {'health_records': health_records, 'is_admin': request.user.is_admin})
+    queryset = ServerHealth.objects.all().order_by('-date')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        queryset = queryset.filter(date=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'server_health/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def server_health_create(request):
@@ -270,8 +339,25 @@ def maintenance_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-    maintenance_records = MaintenanceRegister.objects.all().order_by('-date')
-    return render(request, 'maintenance/list.html', {'maintenance_records': maintenance_records, 'is_admin': request.user.is_admin})
+    queryset = MaintenanceRegister.objects.all().order_by('-date')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        queryset = queryset.filter(date=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'maintenance/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def maintenance_create(request):
@@ -323,8 +409,26 @@ def capacity_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
         messages.error(request, 'You do not have permission to view capacity planning records.')
         return redirect('dashboard')
-    capacity_records = CapacityPlanning.objects.all().order_by('-month')
-    return render(request, 'capacity/list.html', {'capacity_records': capacity_records, 'is_admin': request.user.is_admin})
+    queryset = CapacityPlanning.objects.all().order_by('-month')
+    
+    current_db = request.GET.get('database', '')
+    current_date = request.GET.get('date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if current_date:
+        # For capacity, we are matching 'month' field which is a DateField
+        queryset = queryset.filter(month=current_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'capacity/list.html', {
+        'page_obj': page_obj, 
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'current_date': current_date
+    })
 
 @login_required
 def capacity_create(request):
@@ -473,5 +577,38 @@ def replication_ingest(request):
             severity=severity
         )
         return JsonResponse({'status': 'success', 'id': replication.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@require_POST
+def backup_ingest(request):
+    api_key = request.headers.get('X-API-KEY')
+    expected_key = os.environ.get('REPLICATION_API_KEY')  # We can reuse the same API key
+    
+    if not expected_key or api_key != expected_key:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        
+        backup = BackupRecovery.objects.create(
+            record_type='Backup',
+            database='MySQL',
+            date=timezone.now().date(),
+            database_instance=data.get('database_instance', 'Unknown'),
+            backup_type=data.get('backup_type', 'Full'),
+            backup_used=data.get('backup_used', 'N/A'),
+            start=data.get('start'),
+            end=data.get('end'),
+            duration_hrs=data.get('duration_hrs', 0),
+            size_gb=data.get('size_gb', 0),
+            outcome=data.get('outcome', 'Failed'),
+            location=data.get('location', 'Unknown'),
+            verified=data.get('verified', False),
+            compression=data.get('compression', True),
+            retention=data.get('retention', '7 Days')
+        )
+        return JsonResponse({'status': 'success', 'id': backup.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
