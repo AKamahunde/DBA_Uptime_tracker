@@ -48,10 +48,12 @@ def parse_latest_backup():
             
         timestamp = match.group(1)
         
-        if "Starting DAILY" in line:
+        if "Starting " in line and " backup" in line.lower():
             start_time_str = timestamp
             if "FULL" in line.upper():
                 backup_type = 'Full'
+            else:
+                backup_type = 'Incremental'
                 
         if "SUCCESS:" in line and "committed to" in line:
             outcome = 'Success'
@@ -71,7 +73,7 @@ def parse_latest_backup():
     fmt = "%Y-%m-%d %H:%M:%S"
     start_dt = datetime.strptime(start_time_str, fmt)
     end_dt = datetime.strptime(end_time_str, fmt)
-    duration_hrs = (end_dt - start_dt).total_seconds() / 3600.0
+    duration_mins = (end_dt - start_dt).total_seconds() / 60.0
 
     return {
         "database_instance": DATABASE_INSTANCE,
@@ -79,7 +81,7 @@ def parse_latest_backup():
         "backup_used": os.path.basename(location) if location != 'Unknown' else 'N/A',
         "start": start_dt.isoformat(),
         "end": end_dt.isoformat(),
-        "duration_hrs": round(duration_hrs, 4),
+        "duration_mins": round(duration_mins, 4),
         "outcome": outcome,
         "location": location,
         "verified": outcome == 'Success',

@@ -34,15 +34,16 @@
     </form>
 
     <div style="overflow-x: auto;">
-        <table>
+        <table style="min-width: 1400px; white-space: nowrap;">
             <thead>
                 <tr>
-                    <th>Date / Time</th>
+                    <th>Date</th>
+                    <th>Time</th>
                     <th>Record Type</th>
                     <th>Database</th>
                     <th>Backup Type</th>
                     <th>Backup Name</th>
-                    <th>Duration (Hrs)</th>
+                    <th>Duration (Mins)</th>
                     <th>Compression</th>
                     <th>Retention</th>
                     <th>Outcome</th>
@@ -53,21 +54,15 @@
             <tbody>
                 {% for backup in page_obj %}
                 <tr {% if backup.outcome == 'Failed' %}style="background-color: #ffd6d6;"{% elif backup.outcome == 'Partial' %}style="background-color: #fff3e0;"{% endif %}>
+                    <td>{{ backup.date }}</td>
                     <td>
-                        {{ backup.date }}
-                        {% if backup.start %}<br><span style="color: #666; font-size: 0.85em;">{{ backup.start|date:"H:i" }} - {{ backup.end|date:"H:i" }}</span>{% endif %}
+                        {% if backup.start %}{{ backup.start|date:"H:i" }} - {{ backup.end|date:"H:i" }}{% endif %}
                     </td>
                     <td>{{ backup.record_type }}</td>
                     <td>{{ backup.database }}</td>
-                    <td>
-                        {% if backup.backup_type == 'Full' %}
-                            <span class="badge-accent">{{ backup.backup_type }}</span>
-                        {% else %}
-                            <span style="display:inline-block;background:#fb8c00;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ backup.backup_type }}</span>
-                        {% endif %}
-                    </td>
-                    <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 200px; word-wrap: break-word;">{{ backup.backup_used }}</td>
-                    <td>{{ backup.duration_hrs }}</td>
+                    <td>{{ backup.backup_type }}</td>
+                    <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">{{ backup.backup_used }}</td>
+                    <td>{{ backup.duration_mins }}</td>
                     <td>
                         {% if backup.compression %}
                             <span style="color: #2e7d32; font-weight: 600;">Yes</span>
@@ -110,7 +105,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" style="text-align: center;">No backup records found.</td>
+                    <td colspan="12" style="text-align: center;">No backup records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
