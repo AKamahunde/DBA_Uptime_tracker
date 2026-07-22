@@ -732,10 +732,16 @@ def capacity_edit(request, pk):
 @login_required
 @require_POST
 def incident_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_incidentregister')):
-        messages.error(request, 'You do not have permission to delete incident records.')
-        return redirect('incident_list')
     obj = get_object_or_404(IncidentRegister, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None:
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('incident_list')
+        if not request.user.has_perm('api.delete_incidentregister'):
+            messages.error(request, 'You do not have permission to delete incident records.')
+            return redirect('incident_list')
+            
     obj.delete()
     messages.success(request, 'Incident record deleted successfully.')
     return redirect('incident_list')
@@ -743,10 +749,16 @@ def incident_delete(request, pk):
 @login_required
 @require_POST
 def replication_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_replicationmonitor')):
-        messages.error(request, 'You do not have permission to delete replication records.')
-        return redirect('replication_list')
     obj = get_object_or_404(ReplicationMonitor, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None:
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('replication_list')
+        if not request.user.has_perm('api.delete_replicationmonitor'):
+            messages.error(request, 'You do not have permission to delete replication records.')
+            return redirect('replication_list')
+            
     obj.delete()
     messages.success(request, 'Replication record deleted successfully.')
     return redirect('replication_list')
@@ -754,10 +766,16 @@ def replication_delete(request, pk):
 @login_required
 @require_POST
 def backup_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_backuprecovery')):
-        messages.error(request, 'You do not have permission to delete backup records.')
-        return redirect('backup_list')
     obj = get_object_or_404(BackupRecovery, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None:
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('backup_list')
+        if not request.user.has_perm('api.delete_backuprecovery'):
+            messages.error(request, 'You do not have permission to delete backup records.')
+            return redirect('backup_list')
+            
     obj.delete()
     messages.success(request, 'Backup record deleted successfully.')
     return redirect('backup_list')
@@ -765,10 +783,16 @@ def backup_delete(request, pk):
 @login_required
 @require_POST
 def server_health_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_serverhealth')):
-        messages.error(request, 'You do not have permission to delete server health records.')
-        return redirect('server_health_list')
     obj = get_object_or_404(ServerHealth, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None or obj.entered_by == 'Script':
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('server_health_list')
+        if not request.user.has_perm('api.delete_serverhealth'):
+            messages.error(request, 'You do not have permission to delete server health records.')
+            return redirect('server_health_list')
+            
     obj.delete()
     messages.success(request, 'Server health record deleted successfully.')
     return redirect('server_health_list')
@@ -776,10 +800,16 @@ def server_health_delete(request, pk):
 @login_required
 @require_POST
 def maintenance_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_maintenanceregister')):
-        messages.error(request, 'You do not have permission to delete maintenance records.')
-        return redirect('maintenance_list')
     obj = get_object_or_404(MaintenanceRegister, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None:
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('maintenance_list')
+        if not request.user.has_perm('api.delete_maintenanceregister'):
+            messages.error(request, 'You do not have permission to delete maintenance records.')
+            return redirect('maintenance_list')
+            
     obj.delete()
     messages.success(request, 'Maintenance record deleted successfully.')
     return redirect('maintenance_list')
@@ -787,10 +817,16 @@ def maintenance_delete(request, pk):
 @login_required
 @require_POST
 def capacity_delete(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.delete_capacityplanning')):
-        messages.error(request, 'You do not have permission to delete capacity planning records.')
-        return redirect('capacity_list')
     obj = get_object_or_404(CapacityPlanning, pk=pk)
+    
+    if not request.user.is_admin:
+        if obj.created_by is None:
+            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
+            return redirect('capacity_list')
+        if not request.user.has_perm('api.delete_capacityplanning'):
+            messages.error(request, 'You do not have permission to delete capacity planning records.')
+            return redirect('capacity_list')
+            
     obj.delete()
     messages.success(request, 'Capacity planning record deleted successfully.')
     return redirect('capacity_list')
