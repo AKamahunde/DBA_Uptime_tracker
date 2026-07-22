@@ -7,18 +7,14 @@ import socket
 import argparse
 import sys
 
-# Configuration
-# Change this to the URL of your Atlas application
-ATLAS_API_URL = "http://localhost:8000/api/etl/replication/"
+# Change this to the URL of your Uptime Tracker application
+UPTIME_TRACKER_API_URL = "http://192.168.35.38:90/api/etl/replication/"
 
-def get_replication_status(mysql_user, mysql_password):
-    """Executes SHOW REPLICA STATUS and parses the output."""
-    cmd = [
-        "mysql",
-        "-u", mysql_user,
-        f"-p{mysql_password}",
-        "-e", "SHOW REPLICA STATUS\\G"
-    ]
+def get_replication_status(mysql_user=None, mysql_password=None):
+    cmd = ["mysql"]
+    if mysql_user and mysql_password:
+        cmd.extend(["-u", mysql_user, f"-p{mysql_password}"])
+    cmd.extend(["-e", "SHOW REPLICA STATUS\\G"])
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -34,41 +30,40 @@ def get_replication_status(mysql_user, mysql_password):
         print("No replication status found. Is this server configured as a replica?")
         return None
 
-    # Parse the output into a dictionary
     status = {}
     for line in output.splitlines():
         line = line.strip()
         if ":" in line and not line.startswith("*"):
             key, val = line.split(":", 1)
             status[key.strip()] = val.strip()
-
     return status
 
-def map_to_atlas_payload(status_dict):
-    """Maps the raw MySQL output to the Atlas JSON payload format."""
+def map_to_payload(status_dict):
     try:
-        seconds_behind = int(status_dict.get('Seconds_Behind_Source', 0))
+        sb_val = status_dict.get('Seconds_Behind_Source') or status_dict.get('Seconds_Behind_Master')
+        if sb_val is None or str(sb_val).strip().upper() == 'NULL':
+            seconds_behind = None
+        else:
+            seconds_behind = int(sb_val)
     except (ValueError, TypeError):
-        seconds_behind = 0
+        seconds_behind = None
 
-    # Get the local hostname for the replica name
     replica_name = socket.gethostname()
 
     payload = {
-        "master": status_dict.get('Source_Host', 'Unknown'),
+        "master": status_dict.get('Source_Host') or status_dict.get('Master_Host', 'Unknown'),
         "replica": replica_name,
-        "io_thread": status_dict.get('Replica_IO_Running', 'No'),
-        "sql_thread": status_dict.get('Replica_SQL_Running', 'No'),
+        "io_thread": status_dict.get('Replica_IO_Running') or status_dict.get('Slave_IO_Running', 'No'),
+        "sql_thread": status_dict.get('Replica_SQL_Running') or status_dict.get('Slave_SQL_Running', 'No'),
         "seconds_behind": seconds_behind,
-        "last_error": status_dict.get('Last_Error', '') or status_dict.get('Last_SQL_Error', '')
+        "last_error": status_dict.get('Last_Error') or status_dict.get('Last_SQL_Error', '')
     }
     return payload
 
-def send_to_atlas(payload):
-    """Sends the JSON payload to the Atlas API endpoint."""
+def send_to_tracker(payload):
     data = json.dumps(payload).encode('utf-8')
     req = urllib.request.Request(
-        ATLAS_API_URL, 
+        UPTIME_TRACKER_API_URL, 
         data=data, 
         headers={'Content-Type': 'application/json', 'Accept': 'application/json'}
     )
@@ -79,23 +74,19 @@ def send_to_atlas(payload):
             print(f"Success: {response.status} - {res_body}")
     except urllib.error.HTTPError as e:
         print(f"HTTP Error: {e.code} - {e.read().decode('utf-8')}")
-    except urllib.error.URLError as e:
-        print(f"Connection Error: {e.reason}")
     except Exception as e:
         print(f"Unknown Error: {str(e)}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Atlas MySQL Replication Agent")
-    parser.add_argument("-u", "--user", required=True, help="MySQL Replication Check User")
-    parser.add_argument("-p", "--password", required=True, help="MySQL Password")
+    parser = argparse.ArgumentParser(description="Uptime Tracker MySQL Replication Agent")
+    parser.add_argument("-u", "--user", required=False, help="MySQL Check User")
+    parser.add_argument("-p", "--password", required=False, help="MySQL Password")
     args = parser.parse_args()
 
-    print("Fetching MySQL replication status...")
     status = get_replication_status(args.user, args.password)
     
     if status:
-        payload = map_to_atlas_payload(status)
-        print(f"Sending payload to Atlas: {json.dumps(payload, indent=2)}")
-        send_to_atlas(payload)
+        payload = map_to_payload(status)
+        send_to_tracker(payload)
     else:
         sys.exit(1)
