@@ -90,7 +90,7 @@
                         <td style="padding: 0.75rem; border: 1px solid #ccc; text-align: left;">{{ row.database }}</td>
                         
                         <!-- Availability -->
-                        {% if row.availability in ['No Data', 'N/A'] %}
+                        {% if row.availability == 'No Data' or row.availability == 'N/A' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.availability }}</td>
                         {% elif '100.0' in row.availability or '99.' in row.availability %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.availability }}</td>
@@ -124,14 +124,14 @@
                         {% endif %}
 
                         <!-- MTTR -->
-                        {% if row.mttr_mins in ['No Data', 'N/A'] %}
+                        {% if row.mttr_mins == 'No Data' or row.mttr_mins == 'N/A' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.mttr_mins }}</td>
                         {% else %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.mttr_mins }}</td>
                         {% endif %}
 
                         <!-- Backup Success -->
-                        {% if row.backup_success in ['No Data', 'N/A'] %}
+                        {% if row.backup_success == 'No Data' or row.backup_success == 'N/A' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.backup_success }}</td>
                         {% elif '100' in row.backup_success %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.backup_success }}</td>
@@ -142,7 +142,7 @@
                         {% endif %}
 
                         <!-- Restore Success -->
-                        {% if row.restore_success in ['No Data', 'N/A'] %}
+                        {% if row.restore_success == 'No Data' or row.restore_success == 'N/A' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.restore_success }}</td>
                         {% elif '100' in row.restore_success %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.restore_success }}</td>
@@ -153,7 +153,7 @@
                         {% endif %}
 
                         <!-- Replication Status -->
-                        {% if row.replication_status in ['No Data', 'N/A'] %}
+                        {% if row.replication_status == 'No Data' or row.replication_status == 'N/A' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.replication_status }}</td>
                         {% elif row.replication_status == 'Healthy' %}
                             <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">Healthy</td>
