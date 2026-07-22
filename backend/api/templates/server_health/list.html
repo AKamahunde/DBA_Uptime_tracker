@@ -42,14 +42,14 @@
             <thead>
                 <tr>
                     <th>Date</th>
+                    <th>Time</th>
                     <th>Entered By</th>
                     <th>Server</th>
                     <th>CPU %</th>
                     <th>Memory %</th>
                     <th>Disk %</th>
-                    <th>Active Sessions</th>
                     <th>Running Threads</th>
-                    <th>DB Alerts</th>
+                    <th>Slow Queries</th>
                     <th>Status</th>
                     <th>Database</th>
                     <th>Actions</th>
@@ -59,6 +59,7 @@
                 {% for health in page_obj %}
                 <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
                     <td>{{ health.date }}</td>
+                    <td>{{ health.created_at|time:"H:i" }}</td>
                     <td>
                         {% if health.entered_by == 'Script' %}
                             <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
@@ -70,7 +71,6 @@
                     <td>{{ health.cpu_percent }}</td>
                     <td>{{ health.memory_percent }}</td>
                     <td>{{ health.disk_percent }}</td>
-                    <td>{{ health.connections }}</td>
                     <td>{{ health.threads }}</td>
                     <td>{{ health.slow_queries }}</td>
                     <td>
