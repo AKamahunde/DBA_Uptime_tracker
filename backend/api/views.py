@@ -55,6 +55,7 @@ def dashboard(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
+    selected_db = request.GET.get('database_select', 'All Databases')
     db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
     dashboard_data = []
 
@@ -83,6 +84,9 @@ def dashboard(request):
             th = TargetHours.objects.filter(
                 database_type__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
             ).aggregate(Sum('target_hours'))['target_hours__sum']
+        
+        if not th:
+            th = 730
 
         if th and th > 0:
             avail = ((float(th) - float(unplanned)) / float(th)) * 100
@@ -107,8 +111,10 @@ def dashboard(request):
         success_restores = restores.filter(outcome='Success').count()
         restore_success_pct = f"{round((success_restores/total_restores)*100, 1)}%" if total_restores > 0 else 'No Data'
 
-        # Replication Status (Latest record overall, ignore month for current status)
-        latest_rep = ReplicationMonitor.objects.filter(database__iexact=db_type).order_by('-date', '-created_at').first()
+        # Replication Status (Latest record for this month)
+        latest_rep = ReplicationMonitor.objects.filter(
+            database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
+        ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
 
         dashboard_data.append({
@@ -124,6 +130,137 @@ def dashboard(request):
             'failed_backups': failed_backups
         })
 
+    database_detail = None
+    if selected_db in db_types:
+        row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
+        if row_data:
+            # Query additional details for SLA table
+            # Last Full Backup
+            last_full = BackupRecovery.objects.filter(
+                database__iexact=selected_db, record_type='Backup', backup_type='Full', outcome='Success'
+            ).order_by('-date').first()
+            last_full_str = last_full.date.strftime('%m/%d/%Y') if last_full else 'No Data'
+            
+            # Last Incremental Backup
+            last_inc = BackupRecovery.objects.filter(
+                database__iexact=selected_db, record_type='Backup', backup_type='Incremental', outcome='Success'
+            ).order_by('-date').first()
+            last_inc_str = last_inc.date.strftime('%m/%d/%Y') if last_inc else 'No Data'
+            
+            # Last DR Test
+            last_dr = BackupRecovery.objects.filter(
+                database__iexact=selected_db, record_type='Recovery', outcome='Success'
+            ).order_by('-date').first()
+            last_dr_str = last_dr.date.strftime('%m/%d/%Y') if last_dr else 'No Data'
+            
+            # Failed Restore Tests
+            failed_restores = BackupRecovery.objects.filter(
+                database__iexact=selected_db, record_type='Recovery', date__year=reporting_month.year, date__month=reporting_month.month, outcome='Failed'
+            ).count()
+            
+            # Replication Lag
+            latest_rep_detail = ReplicationMonitor.objects.filter(
+                database__iexact=selected_db, date__year=reporting_month.year, date__month=reporting_month.month
+            ).order_by('-date', '-created_at').first()
+            
+            rep_lag = latest_rep_detail.seconds_behind if latest_rep_detail and latest_rep_detail.seconds_behind is not None else 'No Data'
+            if rep_lag != 'No Data':
+                rep_lag_mins = round(rep_lag / 60, 2)
+                rep_lag_str = f"{rep_lag_mins} mins" if rep_lag_mins > 0 else "0 mins"
+            else:
+                rep_lag_str = "No Data"
+
+            def get_status(current, target_val, operator):
+                if current == 'No Data' or current is None:
+                    return 'Below SLA'
+                try:
+                    if isinstance(current, str) and '%' in current:
+                        current = float(current.replace('%', ''))
+                    else:
+                        current = float(current)
+                    
+                    if operator == '>=':
+                        return 'Meets SLA' if current >= target_val else 'Below SLA'
+                    elif operator == '<=':
+                        return 'Meets SLA' if current <= target_val else 'Below SLA'
+                except:
+                    return 'Below SLA'
+
+            # Calculate Statuses
+            avail_status = get_status(row_data['availability'], 99.50, '>=')
+            planned_status = get_status(row_data['planned_downtime'], 48.0, '<=')
+            unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=')
+            incidents_status = get_status(row_data['total_incidents'], 4, '<=')
+            mttr_status = get_status(row_data['mttr_mins'], 240, '<=') # 4 hrs = 240 mins
+            backup_status = get_status(row_data['backup_success'], 95.0, '>=')
+            restore_status = get_status(row_data['restore_success'], 80.0, '>=')
+            rep_status_check = 'Meets SLA' if row_data['replication_status'] == 'Healthy' else 'Below SLA'
+            
+            # Date checks
+            now = timezone.now().date()
+            if last_full:
+                days_since_full = (now - last_full.date).days
+                full_status = 'Meets SLA' if days_since_full < 7 else 'Below SLA'
+            else:
+                full_status = 'Below SLA'
+                
+            if last_inc:
+                days_since_inc = (now - last_inc.date).days
+                inc_status = 'Meets SLA' if days_since_inc <= 1 else 'Below SLA' # 24 hrs
+            else:
+                inc_status = 'Below SLA'
+                
+            if last_dr:
+                months_since_dr = (now.year - last_dr.date.year) * 12 + now.month - last_dr.date.month
+                dr_status = 'Meets SLA' if months_since_dr < 6 else 'Below SLA'
+            else:
+                dr_status = 'Below SLA'
+
+            failed_backup_status = 'Meets SLA' if row_data['failed_backups'] == 0 else 'Below SLA'
+            failed_restore_status = 'Meets SLA' if failed_restores == 0 else 'Below SLA'
+            
+            rep_lag_status = 'Below SLA'
+            if rep_lag != 'No Data':
+                rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
+            elif row_data['replication_status'] == 'No Data':
+                 rep_lag_status = 'No Data' # If no replication setup, maybe it shouldn't fail SLA? We'll just say Below SLA as requested.
+
+            database_detail = {
+                'database': selected_db,
+                'current': {
+                    'availability': row_data['availability'],
+                    'planned_downtime': row_data['planned_downtime'],
+                    'unplanned_downtime': row_data['unplanned_downtime'],
+                    'total_incidents': row_data['total_incidents'],
+                    'mttr_mins': row_data['mttr_mins'],
+                    'backup_success': row_data['backup_success'],
+                    'restore_success': row_data['restore_success'],
+                    'replication_status': row_data['replication_status'],
+                    'last_full': last_full_str,
+                    'last_inc': last_inc_str,
+                    'last_dr': last_dr_str,
+                    'failed_backups': row_data['failed_backups'],
+                    'failed_restores': failed_restores,
+                    'replication_lag': rep_lag_str
+                },
+                'status': {
+                    'availability': avail_status,
+                    'planned_downtime': planned_status,
+                    'unplanned_downtime': unplanned_status,
+                    'total_incidents': incidents_status,
+                    'mttr_mins': mttr_status,
+                    'backup_success': backup_status,
+                    'restore_success': restore_status,
+                    'replication_status': rep_status_check,
+                    'last_full': full_status,
+                    'last_inc': inc_status,
+                    'last_dr': dr_status,
+                    'failed_backups': failed_backup_status,
+                    'failed_restores': failed_restore_status,
+                    'replication_lag': rep_lag_status
+                }
+            }
+
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -133,6 +270,8 @@ def dashboard(request):
         'capacity_count': row[5],
         'is_admin': request.user.is_admin,
         'dashboard_data': dashboard_data,
+        'database_detail': database_detail,
+        'selected_db': selected_db,
         'reporting_month': reporting_month.strftime('%Y-%m'),
     }
     return render(request, 'dashboard.html', context)
@@ -142,7 +281,7 @@ def incident_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
-    queryset = IncidentRegister.objects.all().order_by('-date')
+    queryset = IncidentRegister.objects.all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
@@ -216,17 +355,24 @@ def replication_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_replicationmonitor')):
         messages.error(request, 'You do not have permission to view replication records.')
         return redirect('dashboard')
-    queryset = ReplicationMonitor.objects.all().order_by('-date')
+    queryset = ReplicationMonitor.objects.all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+    
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if start_date:
-        queryset = queryset.filter(date__gte=start_date)
-    if end_date:
-        queryset = queryset.filter(date__lte=end_date)
+        
+    try:
+        if start_date:
+            parsed_start = datetime.strptime(start_date, '%Y-%m-%d').date()
+            queryset = queryset.filter(date__gte=parsed_start)
+        if end_date:
+            parsed_end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            queryset = queryset.filter(date__lte=parsed_end)
+    except ValueError:
+        pass
         
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
@@ -290,7 +436,7 @@ def backup_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_backuprecovery')):
         messages.error(request, 'You do not have permission to view backup records.')
         return redirect('dashboard')
-    queryset = BackupRecovery.objects.all().order_by('-date')
+    queryset = BackupRecovery.objects.all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
