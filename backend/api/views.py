@@ -14,13 +14,14 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning
+    MaintenanceRegister, CapacityPlanning, TargetHours
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
     ServerHealthForm, MaintenanceRegisterForm, CapacityPlanningForm
 )
 from users.models import User
+from django.db.models import Sum, Count, Avg
 
 @login_required
 def about(request):
@@ -44,6 +45,85 @@ def dashboard(request):
         """)
         row = cursor.fetchone()
 
+    # Get reporting month
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
+    dashboard_data = []
+
+    for db_type in db_types:
+        # Planned Downtime
+        planned = MaintenanceRegister.objects.filter(
+            database__iexact=db_type, success=True, date__year=reporting_month.year, date__month=reporting_month.month
+        ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
+
+        # Unplanned Downtime & MTTR & Incidents
+        incidents = IncidentRegister.objects.filter(
+            database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
+        )
+        total_incidents = incidents.count()
+        unplanned = incidents.aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
+        mttr_hrs = incidents.aggregate(Avg('duration_hrs'))['duration_hrs__avg'] or 0
+        mttr_mins = round(float(mttr_hrs) * 60, 2) if mttr_hrs else 'No Data'
+
+        # Target Hours (Availability)
+        th = TargetHours.objects.filter(
+            database_type__iexact=db_type.replace(' ', ''), month__year=reporting_month.year, month__month=reporting_month.month
+        ).aggregate(Sum('target_hours'))['target_hours__sum']
+        
+        # fallback to standard hours if no target hours are set
+        if not th:
+            th = TargetHours.objects.filter(
+                database_type__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
+            ).aggregate(Sum('target_hours'))['target_hours__sum']
+
+        if th and th > 0:
+            avail = ((float(th) - float(unplanned)) / float(th)) * 100
+            avail_str = f"{round(avail, 2)}%"
+        else:
+            avail_str = 'No Data'
+
+        # Backups
+        backups = BackupRecovery.objects.filter(
+            database__iexact=db_type, record_type='Backup', date__year=reporting_month.year, date__month=reporting_month.month
+        )
+        total_backups = backups.count()
+        success_backups = backups.filter(outcome='Success').count()
+        failed_backups = backups.filter(outcome='Failed').count()
+        backup_success_pct = f"{round((success_backups/total_backups)*100, 1)}%" if total_backups > 0 else 'No Data'
+
+        # Restores
+        restores = BackupRecovery.objects.filter(
+            database__iexact=db_type, record_type='Recovery', date__year=reporting_month.year, date__month=reporting_month.month
+        )
+        total_restores = restores.count()
+        success_restores = restores.filter(outcome='Success').count()
+        restore_success_pct = f"{round((success_restores/total_restores)*100, 1)}%" if total_restores > 0 else 'No Data'
+
+        # Replication Status (Latest record overall, ignore month for current status)
+        latest_rep = ReplicationMonitor.objects.filter(database__iexact=db_type).order_by('-date', '-created_at').first()
+        rep_status = latest_rep.status if latest_rep else 'No Data'
+
+        dashboard_data.append({
+            'database': db_type,
+            'availability': avail_str,
+            'planned_downtime': round(planned, 2),
+            'unplanned_downtime': round(unplanned, 2),
+            'total_incidents': total_incidents,
+            'mttr_mins': mttr_mins,
+            'backup_success': backup_success_pct,
+            'restore_success': restore_success_pct,
+            'replication_status': rep_status,
+            'failed_backups': failed_backups
+        })
+
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -52,6 +132,8 @@ def dashboard(request):
         'maintenance_count': row[4],
         'capacity_count': row[5],
         'is_admin': request.user.is_admin,
+        'dashboard_data': dashboard_data,
+        'reporting_month': reporting_month.strftime('%Y-%m'),
     }
     return render(request, 'dashboard.html', context)
 
