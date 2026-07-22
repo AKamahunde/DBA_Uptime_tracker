@@ -201,7 +201,7 @@ def dashboard(request):
             backup_status = get_status(row_data['backup_success'], 95.0, '>=')
             restore_status = get_status(row_data['restore_success'], 80.0, '>=')
             
-            if row_data['replication_status'] == 'No Data':
+            if row_data['replication_status'] in ['No Data', 'N/A']:
                 rep_status_check = 'N/A'
             else:
                 rep_status_check = 'Meets SLA' if row_data['replication_status'] == 'Healthy' else 'Below SLA'
@@ -230,9 +230,9 @@ def dashboard(request):
             failed_restore_status = 'Meets SLA' if failed_restores == 0 else 'Below SLA'
             
             rep_lag_status = 'Below SLA'
-            if rep_lag != 'No Data':
+            if rep_lag not in ['No Data', 'N/A']:
                 rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
-            elif row_data['replication_status'] == 'No Data':
+            elif row_data['replication_status'] in ['No Data', 'N/A']:
                  rep_lag_status = 'N/A'
 
             database_detail = {
