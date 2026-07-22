@@ -72,7 +72,7 @@ def dashboard(request):
         total_incidents = incidents.count()
         unplanned = incidents.aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
         mttr_hrs = incidents.aggregate(Avg('duration_hrs'))['duration_hrs__avg'] or 0
-        mttr_mins = round(float(mttr_hrs) * 60, 2) if mttr_hrs else 'No Data'
+        mttr_mins = round(float(mttr_hrs) * 60, 2)
 
         # Target Hours (Availability)
         th = TargetHours.objects.filter(
@@ -116,6 +116,9 @@ def dashboard(request):
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
+        
+        if db_type in ['MS SQL Server', 'PostgreSQL']:
+            rep_status = 'N/A'
 
         dashboard_data.append({
             'database': db_type,
@@ -169,10 +172,13 @@ def dashboard(request):
                 rep_lag_str = f"{rep_lag_mins} mins" if rep_lag_mins > 0 else "0 mins"
             else:
                 rep_lag_str = "No Data"
+                
+            if selected_db in ['MS SQL Server', 'PostgreSQL']:
+                rep_lag_str = 'N/A'
 
             def get_status(current, target_val, operator):
                 if current == 'No Data' or current is None:
-                    return 'Below SLA'
+                    return 'N/A'
                 try:
                     if isinstance(current, str) and '%' in current:
                         current = float(current.replace('%', ''))
@@ -184,7 +190,7 @@ def dashboard(request):
                     elif operator == '<=':
                         return 'Meets SLA' if current <= target_val else 'Below SLA'
                 except:
-                    return 'Below SLA'
+                    return 'N/A'
 
             # Calculate Statuses
             avail_status = get_status(row_data['availability'], 99.50, '>=')
@@ -194,7 +200,11 @@ def dashboard(request):
             mttr_status = get_status(row_data['mttr_mins'], 240, '<=') # 4 hrs = 240 mins
             backup_status = get_status(row_data['backup_success'], 95.0, '>=')
             restore_status = get_status(row_data['restore_success'], 80.0, '>=')
-            rep_status_check = 'Meets SLA' if row_data['replication_status'] == 'Healthy' else 'Below SLA'
+            
+            if row_data['replication_status'] == 'No Data':
+                rep_status_check = 'N/A'
+            else:
+                rep_status_check = 'Meets SLA' if row_data['replication_status'] == 'Healthy' else 'Below SLA'
             
             # Date checks
             now = timezone.now().date()
@@ -202,19 +212,19 @@ def dashboard(request):
                 days_since_full = (now - last_full.date).days
                 full_status = 'Meets SLA' if days_since_full < 7 else 'Below SLA'
             else:
-                full_status = 'Below SLA'
+                full_status = 'N/A'
                 
             if last_inc:
                 days_since_inc = (now - last_inc.date).days
                 inc_status = 'Meets SLA' if days_since_inc <= 1 else 'Below SLA' # 24 hrs
             else:
-                inc_status = 'Below SLA'
+                inc_status = 'N/A'
                 
             if last_dr:
                 months_since_dr = (now.year - last_dr.date.year) * 12 + now.month - last_dr.date.month
                 dr_status = 'Meets SLA' if months_since_dr < 6 else 'Below SLA'
             else:
-                dr_status = 'Below SLA'
+                dr_status = 'N/A'
 
             failed_backup_status = 'Meets SLA' if row_data['failed_backups'] == 0 else 'Below SLA'
             failed_restore_status = 'Meets SLA' if failed_restores == 0 else 'Below SLA'
@@ -223,7 +233,7 @@ def dashboard(request):
             if rep_lag != 'No Data':
                 rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
             elif row_data['replication_status'] == 'No Data':
-                 rep_lag_status = 'No Data' # If no replication setup, maybe it shouldn't fail SLA? We'll just say Below SLA as requested.
+                 rep_lag_status = 'N/A'
 
             database_detail = {
                 'database': selected_db,
