@@ -44,8 +44,10 @@
                     <th>Month</th>
                     <th>Database</th>
                     <th>Database Size (GB)</th>
+                    <th>Growth (GB)</th>
                     <th>Disk Used %</th>
                     <th>Tablespace Used %</th>
+                    <th>Largest Table</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -55,11 +57,23 @@
                     <td>{{ capacity.month|date:"F Y" }}</td>
                     <td>{{ capacity.database }}</td>
                     <td>{{ capacity.database_size_gb }}</td>
+                    <td>
+                        {% if capacity.growth_gb > 0 %}
+                            <span style="color: #c62828; font-weight: 600;">+{{ capacity.growth_gb }}</span>
+                        {% else %}
+                            <span style="color: #2e7d32; font-weight: 600;">{{ capacity.growth_gb }}</span>
+                        {% endif %}
+                    </td>
                     <td>{{ capacity.disk_used_percent }}</td>
                     <td>{{ capacity.tablespace_used_percent }}</td>
+                    <td>{{ capacity.largest_table }}</td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">
-                            <a href="{% url 'capacity_edit' capacity.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                            {% if capacity.created_by %}
+                                <a href="{% url 'capacity_edit' capacity.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                            {% else %}
+                                <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
+                            {% endif %}
                             {% if is_admin or perms.api.delete_capacityplanning %}
                             <form method="post" action="{% url 'capacity_delete' capacity.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
                                 {% csrf_token %}
@@ -71,7 +85,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="text-align: center;">No capacity tracking records found.</td>
+                    <td colspan="8" style="text-align: center;">No capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
