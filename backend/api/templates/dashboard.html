@@ -51,8 +51,12 @@
         <form method="GET" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; font-weight: bold;">
             <div>
                 <label for="database_select">Select Database:</label>
-                <select id="database_select" disabled style="padding: 0.25rem; font-weight: bold;">
-                    <option>All Databases</option>
+                <select id="database_select" name="database_select" onchange="this.form.submit()" style="padding: 0.25rem; font-weight: bold;">
+                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                    <option value="PostgreSQL" {% if selected_db == 'PostgreSQL' %}selected{% endif %}>PostgreSQL</option>
                 </select>
             </div>
             <div style="color: #1f497d;">
@@ -164,6 +168,92 @@
                 </tbody>
             </table>
         </div>
+
+        {% if database_detail %}
+        <div style="margin-top: 3rem;">
+            <h3 style="margin-bottom: 0.5rem; color: #333;">Database Detail</h3>
+            <h4 style="margin-bottom: 1rem; color: #333;">Showing: {{ database_detail.database }}</h4>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="background-color: #1f497d; color: white;">
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Metric</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Overall Availability</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Planned Downtime (hrs)</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Unplanned Downtime (hrs)</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Total Incidents</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">MTTR (mins)</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Backup Success Rate</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Restore Success Rate</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Replication Status</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Last Successful Full Backup</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Last Successful Incremental Backup</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Last DR Test</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Failed Backups</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Failed Restore Tests</th>
+                            <th style="padding: 0.75rem; border: 1px solid #ccc;">Replication Lag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Current Row -->
+                        <tr style="background-color: #f8f9fa;">
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; font-weight: bold; background-color: #1f497d; color: white; text-align: left;">Current</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.availability == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.availability == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.availability }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.planned_downtime == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.planned_downtime == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.planned_downtime }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.unplanned_downtime }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.total_incidents == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.total_incidents == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.total_incidents }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.mttr_mins == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.mttr_mins == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.mttr_mins }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.backup_success == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.backup_success == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.backup_success }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.restore_success == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.restore_success == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.restore_success }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.replication_status == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.replication_status == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.replication_status }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_full == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_full == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.last_full }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_inc == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_inc == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.last_inc }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_dr == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_dr == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.last_dr }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.failed_backups == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.failed_backups == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.failed_backups }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.failed_restores == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.failed_restores == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.failed_restores }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.replication_lag == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.replication_lag == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.current.replication_lag }}</td>
+                        </tr>
+                        <!-- Target Row -->
+                        <tr style="background-color: #fff;">
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; font-weight: bold; background-color: #1f497d; color: white; text-align: left;">Target</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&ge; 99.50%</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&le; 48 hrs</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&le; 2 hrs</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&le; 4/month</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&le; 240 mins</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&ge; 95%</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&ge; 80%</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">Healthy</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&lt; 7 days</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&le; 24 hrs</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&lt; 6 months</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">0</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">0</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc;">&lt; 2 minutes</td>
+                        </tr>
+                        <!-- Status Row -->
+                        <tr style="background-color: #f8f9fa;">
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; font-weight: bold; background-color: #1f497d; color: white; text-align: left;">Status</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.availability == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.availability == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.availability }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.planned_downtime == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.planned_downtime == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.planned_downtime }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.unplanned_downtime }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.total_incidents == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.total_incidents == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.total_incidents }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.mttr_mins == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.mttr_mins == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.mttr_mins }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.backup_success == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.backup_success == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.backup_success }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.restore_success == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.restore_success == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.restore_success }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.replication_status == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.replication_status == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.replication_status }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_full == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_full == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.last_full }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_inc == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_inc == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.last_inc }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.last_dr == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.last_dr == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.last_dr }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.failed_backups == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.failed_backups == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.failed_backups }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.failed_restores == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.failed_restores == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.failed_restores }}</td>
+                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if database_detail.status.replication_lag == 'Meets SLA' %}#c6efce{% else %}#ffc7ce{% endif %}; color: {% if database_detail.status.replication_lag == 'Meets SLA' %}#006100{% else %}#9c0006{% endif %};">{{ database_detail.status.replication_lag }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
