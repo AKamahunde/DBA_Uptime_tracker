@@ -11,6 +11,7 @@ UPTIME_TRACKER_API_URL = "http://192.168.35.38:90/api/health/ingest/"
 API_KEY = "uptimetracker_api_9f2c1d8e45x9"
 SERVER_NAME = "nickledbnew"
 DATABASE_TYPE = "MySQL"
+MYSQL_CNF_FILE = "~/.my.cnf"  # Path to your .my.cnf file containing user/password
 
 def get_cpu_percent():
     """Extracts CPU utilization using top command."""
@@ -56,7 +57,8 @@ def get_disk_percent():
 def get_mysql_status(variable_name):
     """Executes a MySQL query to get a specific global status variable."""
     try:
-        cmd = f"mysql -u root -e \"SHOW GLOBAL STATUS LIKE '{variable_name}';\" -B -N"
+        # We use --defaults-extra-file to securely pass the .my.cnf file
+        cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"SHOW GLOBAL STATUS LIKE '{variable_name}';\" -B -N"
         output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
         if output:
             return int(output.split('\t')[1])

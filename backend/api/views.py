@@ -11,6 +11,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta, datetime
+from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
     MaintenanceRegister, CapacityPlanning
@@ -676,5 +677,39 @@ def server_health_ingest(request):
             database=data.get('database', 'MySQL')
         )
         return JsonResponse({'status': 'success', 'id': health.id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@csrf_exempt
+@require_POST
+def capacity_ingest(request):
+    api_key = request.headers.get('X-API-KEY')
+    expected_key = os.environ.get('REPLICATION_API_KEY')
+    
+    if not expected_key or api_key != expected_key:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        
+        database_instance = data.get('database', 'MySQL')
+        incoming_size = Decimal(str(data.get('database_size_gb', 0)))
+        
+        # Calculate growth by finding the most recent record for this database
+        most_recent = CapacityPlanning.objects.filter(database=database_instance).order_by('-month').first()
+        growth = Decimal('0.00')
+        if most_recent:
+            growth = incoming_size - most_recent.database_size_gb
+            
+        capacity = CapacityPlanning.objects.create(
+            month=datetime.now().date(),
+            database_size_gb=incoming_size,
+            disk_used_percent=Decimal(str(data.get('disk_percent', 0))),
+            tablespace_used_percent=Decimal(str(data.get('tablespace_percent', 0))),
+            largest_table=data.get('largest_table', 'Unknown'),
+            growth_gb=growth,
+            database=database_instance
+        )
+        return JsonResponse({'status': 'success', 'id': capacity.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
