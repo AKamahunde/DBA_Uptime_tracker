@@ -233,7 +233,7 @@ def dashboard(request):
             if rep_lag not in ['No Data', 'N/A']:
                 rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
             elif row_data['replication_status'] in ['No Data', 'N/A']:
-                 rep_lag_status = 'N/A'
+                rep_lag_status = 'N/A'
 
             database_detail = {
                 'database': selected_db,
@@ -486,7 +486,7 @@ def backup_create(request):
             return redirect('backup_list')
     else:
         form = BackupRecoveryForm()
-    return render(request, 'backups/form.html', {'form': form, 'title': 'Create Backup Record'})
+    return render(request, 'backups/form.html', {'form': form, 'title': 'Create Backup Record', 'can_edit': True})
 
 @login_required
 def backup_edit(request, pk):
@@ -520,7 +520,7 @@ def server_health_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
-    queryset = ServerHealth.objects.all().order_by('-date')
+    queryset = ServerHealth.objects.all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
@@ -594,7 +594,7 @@ def maintenance_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-    queryset = MaintenanceRegister.objects.all().order_by('-date')
+    queryset = MaintenanceRegister.objects.all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
