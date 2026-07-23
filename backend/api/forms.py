@@ -38,7 +38,15 @@ class BackupRecoveryForm(forms.ModelForm):
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'comments': forms.Textarea(attrs={'rows': 3}),
+            'location': forms.HiddenInput(),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['backup_type'].required = False
+        self.fields['backup_used'].required = False
+        self.fields['location'].required = False
+        self.fields['retention'].required = False
 
 class ServerHealthForm(forms.ModelForm):
     class Meta:
