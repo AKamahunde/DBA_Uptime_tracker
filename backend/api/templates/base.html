@@ -424,6 +424,15 @@
                 if (plannedDowntime) plannedDowntime.addEventListener('input', calculateAvailability);
                 if (unplannedDowntime) unplannedDowntime.addEventListener('input', calculateAvailability);
             }
+
+            // Auto-refresh the page every hour (3600000 ms) to show new records
+            // Safely disabled on pages with POST forms to prevent wiping user data during entry
+            const hasPostForm = Array.from(document.forms).some(f => f.method && f.method.toUpperCase() === 'POST');
+            if (!hasPostForm) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3600000);
+            }
         });
     </script>
 

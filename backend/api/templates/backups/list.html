@@ -47,7 +47,6 @@
                     <th>Database</th>
                     <th>Backup Type</th>
                     <th>Backup/Restore Used</th>
-                    <th>Location</th>
                     <th>Duration (Hrs)</th>
                     <th>Compression</th>
                     <th>Retention</th>
@@ -67,7 +66,6 @@
                     <td>{{ backup.database }}</td>
                     <td>{{ backup.backup_type }}</td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">{{ backup.backup_used }}</td>
-                    <td>{{ backup.location }}</td>
                     <td>{{ backup.duration_mins }}</td>
                     <td>
                         {% if backup.compression %}
