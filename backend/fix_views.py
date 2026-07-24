@@ -12,7 +12,9 @@ tables = [
     'backup_recovery',
     'server_health',
     'maintenance_register',
-    'capacity_planning',
+    'capacity_planning'
+]
+
 columns_to_exclude = ['id', 'created_by_id', 'created_at', 'updated_at', 'tested_by']
 
 print("Recreating database views to fix Power BI / Excel connections without the ID column...")
