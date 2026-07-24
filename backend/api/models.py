@@ -30,6 +30,7 @@ class IncidentRegister(models.Model):
         ('MS SQL Server', 'MS SQL Server'),
         ('PostgreSQL', 'PostgreSQL'),
     ])
+    assigned_to = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -41,6 +42,23 @@ class IncidentRegister(models.Model):
 
     def __str__(self):
         return f"{self.ticket} - {self.date}"
+
+class IncidentChangeLog(models.Model):
+    incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
+    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=50)
+    old_status = models.CharField(max_length=50, blank=True)
+    new_status = models.CharField(max_length=50, blank=True)
+    assigned_to = models.CharField(max_length=100, blank=True)
+    comment = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'incident_change_log'
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f"{self.incident.ticket} - {self.action} on {self.changed_at}"
 
 class ReplicationMonitor(models.Model):
     date = models.DateField()

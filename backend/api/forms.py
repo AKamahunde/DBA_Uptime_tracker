@@ -5,6 +5,12 @@ from .models import (
 )
 
 class IncidentRegisterForm(forms.ModelForm):
+    change_comment = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional reason for change (e.g., Escalating to senior dev)'}),
+        required=False,
+        label="Change Comment / Reason"
+    )
+
     class Meta:
         model = IncidentRegister
         fields = '__all__'

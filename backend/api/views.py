@@ -14,7 +14,7 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning, TargetHours
+    MaintenanceRegister, CapacityPlanning, TargetHours, IncidentChangeLog
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
@@ -327,6 +327,14 @@ def incident_create(request):
             incident = form.save(commit=False)
             incident.created_by = request.user
             incident.save()
+            IncidentChangeLog.objects.create(
+                incident=incident,
+                changed_by=request.user,
+                action='Created',
+                new_status=incident.status,
+                assigned_to=incident.assigned_to,
+                comment=form.cleaned_data.get('change_comment', '')
+            )
             messages.success(request, 'Incident created successfully.')
             return redirect('incident_list')
     else:
@@ -345,9 +353,36 @@ def incident_edit(request, pk):
         return redirect('incident_list')
     
     if request.method == 'POST':
+        old_status = incident.status
+        old_assigned = incident.assigned_to
+        
         form = IncidentRegisterForm(request.POST, instance=incident)
         if form.is_valid():
-            form.save()
+            incident = form.save()
+            
+            new_status = incident.status
+            new_assigned = incident.assigned_to
+            comment = form.cleaned_data.get('change_comment', '')
+            
+            if old_status != new_status or old_assigned != new_assigned or comment:
+                action_parts = []
+                if old_status != new_status:
+                    action_parts.append(f"Status changed from {old_status} to {new_status}")
+                if old_assigned != new_assigned:
+                    action_parts.append(f"Assigned to {new_assigned}")
+                
+                action = " | ".join(action_parts) if action_parts else "Update Logged"
+                
+                IncidentChangeLog.objects.create(
+                    incident=incident,
+                    changed_by=request.user,
+                    action=action,
+                    old_status=old_status,
+                    new_status=new_status,
+                    assigned_to=new_assigned,
+                    comment=comment
+                )
+            
             messages.success(request, 'Incident updated successfully.')
             return redirect('incident_list')
     else:
@@ -357,7 +392,8 @@ def incident_edit(request, pk):
         'form': form, 
         'title': 'Edit Incident',
         'can_edit': True,
-        'incident': incident
+        'incident': incident,
+        'change_logs': incident.change_logs.all()
     })
 
 @login_required
