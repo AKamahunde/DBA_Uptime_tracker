@@ -70,9 +70,18 @@ def dashboard(request):
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         )
         total_incidents = incidents.count()
-        unplanned = incidents.aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
-        mttr_hrs = incidents.aggregate(Avg('duration_hrs'))['duration_hrs__avg'] or 0
-        mttr_mins = round(float(mttr_hrs) * 60, 2)
+        
+        unplanned = 0
+        now = timezone.now()
+        for inc in incidents:
+            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
+                diff = now - inc.start
+                unplanned += float(diff.total_seconds() / 3600.0)
+            elif inc.duration_hrs:
+                unplanned += float(inc.duration_hrs)
+                
+        mttr_hrs = (unplanned / total_incidents) if total_incidents > 0 else 0
+        mttr_mins = round(mttr_hrs * 60, 2)
 
         # Target Hours (Availability)
         th = TargetHours.objects.filter(

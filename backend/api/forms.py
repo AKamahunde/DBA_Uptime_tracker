@@ -13,7 +13,7 @@ class IncidentRegisterForm(forms.ModelForm):
 
     class Meta:
         model = IncidentRegister
-        fields = '__all__'
+        exclude = ['planned', 'duration_hrs']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),

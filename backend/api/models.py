@@ -1,12 +1,13 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 
 class IncidentRegister(models.Model):
     ticket = models.CharField(max_length=50)
     date = models.DateField()
-    start = models.DateTimeField()
-    end = models.DateTimeField()
-    duration_hrs = models.DecimalField(max_digits=10, decimal_places=2)
+    start = models.DateTimeField(null=True, blank=True)
+    end = models.DateTimeField(null=True, blank=True)
+    duration_hrs = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     planned = models.BooleanField(default=False)
     severity = models.CharField(max_length=20, choices=[
         ('Low', 'Low'),
@@ -15,9 +16,9 @@ class IncidentRegister(models.Model):
         ('Critical', 'Critical')
     ])
     system = models.CharField(max_length=100)
-    root_cause = models.TextField()
-    business_impact = models.TextField()
-    resolved_by = models.CharField(max_length=100)
+    root_cause = models.TextField(blank=True)
+    business_impact = models.TextField(blank=True)
+    resolved_by = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=20, choices=[
         ('Open', 'Open'),
         ('In Progress', 'In Progress'),
@@ -39,6 +40,24 @@ class IncidentRegister(models.Model):
         db_table = 'incident_register'
         verbose_name = 'Incident Register'
         verbose_name_plural = 'Incident Registers'
+
+    def save(self, *args, **kwargs):
+        if not self.start:
+            self.start = timezone.now()
+
+        if self.status in ['Resolved', 'Closed'] and not self.end:
+            self.end = timezone.now()
+
+        if self.end and self.start:
+            diff = self.end - self.start
+            self.duration_hrs = round(diff.total_seconds() / 3600.0, 2)
+        elif self.start and self.status not in ['Resolved', 'Closed']:
+            diff = timezone.now() - self.start
+            self.duration_hrs = round(diff.total_seconds() / 3600.0, 2)
+        else:
+            self.duration_hrs = 0
+            
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.ticket} - {self.date}"
