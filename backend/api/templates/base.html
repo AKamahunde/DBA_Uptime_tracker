@@ -300,6 +300,7 @@
     </style>
 </head>
 <body>
+    {% block navbar %}
     <nav class="navbar">
         <div class="navbar-inner">
             <a href="/" class="navbar-brand">
@@ -341,6 +342,7 @@
             </div>
         </div>
     </nav>
+    {% endblock %}
 
     <div class="container">
                 {% if messages %}
