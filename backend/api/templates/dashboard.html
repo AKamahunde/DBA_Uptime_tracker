@@ -321,7 +321,7 @@
         }
     });
 
-    // Format the month input value (YYYY-MM) to a readable string e.g. "July 2026"
+    // Format YYYY-MM to readable e.g. "July 2026"
     function formatMonth(raw) {
         if (!raw) return 'All Months';
         var parts = raw.split('-');
@@ -330,38 +330,57 @@
         return d.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
 
-    // PDF export using html2pdf.js
     function exportPDF(sectionId, filename) {
         document.querySelectorAll('.table-menu-dropdown').forEach(el => el.classList.remove('open'));
 
-        var element = document.getElementById(sectionId);
+        var source = document.getElementById(sectionId);
 
-        // Get reporting month from the month input
+        // Get reporting month
         var monthInput = document.getElementById('month_filter');
-        var monthRaw = monthInput ? monthInput.value : '';
+        var monthRaw   = monthInput ? monthInput.value : '';
         var monthLabel = formatMonth(monthRaw);
         var now = new Date().toLocaleString('default', {
             day: '2-digit', month: 'long', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         });
 
-        // Populate and show the PDF header
-        element.querySelectorAll('.pdf-month-label').forEach(el => el.textContent = monthLabel);
-        element.querySelectorAll('.pdf-generated-label').forEach(el => el.textContent = now);
-        element.querySelectorAll('.pdf-report-header').forEach(el => el.style.display = 'block');
+        // Clone into a fresh unrestricted wrapper (no overflow clipping)
+        var clone = source.cloneNode(true);
+        clone.style.overflow  = 'visible';
+        clone.style.width     = 'auto';
+        clone.style.maxWidth  = 'none';
+        clone.style.position  = 'absolute';
+        clone.style.left      = '-9999px';
+        clone.style.top       = '0';
+        clone.style.padding   = '1rem';
+        clone.style.background = '#ffffff';
+
+        // Show the PDF header inside the clone
+        clone.querySelectorAll('.pdf-report-header').forEach(el => {
+            el.style.display = 'block';
+        });
+        clone.querySelectorAll('.pdf-month-label').forEach(el => el.textContent = monthLabel);
+        clone.querySelectorAll('.pdf-generated-label').forEach(el => el.textContent = now);
+
+        // Remove overflow on any inner scrollable divs in the clone
+        clone.querySelectorAll('*').forEach(function(el) {
+            el.style.overflow  = 'visible';
+            el.style.maxWidth  = 'none';
+        });
+
+        document.body.appendChild(clone);
 
         var opt = {
-            margin:       [10, 8, 10, 8],
-            filename:     filename + '_' + (monthRaw || 'All') + '.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
-            pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            margin:      [12, 8, 12, 8],
+            filename:    filename + '_' + (monthRaw || 'All') + '.pdf',
+            image:       { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+            jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
+            pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] }
         };
 
-        html2pdf().set(opt).from(element).save().then(function() {
-            // Hide the header again after export
-            element.querySelectorAll('.pdf-report-header').forEach(el => el.style.display = 'none');
+        html2pdf().set(opt).from(clone).save().then(function() {
+            document.body.removeChild(clone);
         });
     }
 </script>
