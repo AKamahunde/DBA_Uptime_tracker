@@ -42,11 +42,14 @@
         <thead>
             <tr>
                 <th>Ticket</th>
+                <th>System</th>
                 <th>Date</th>
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Duration (hrs)</th>
                 <th>Database</th>
+                <th>Root Cause</th>
+                <th>Business Impact</th>
                 <th>Logged By</th>
                 <th>Actions</th>
             </tr>
@@ -55,6 +58,7 @@
             {% for incident in page_obj %}
             <tr {% if incident.status == 'Open' %}style="background-color: #ffd6d6;"{% elif incident.status == 'In Progress' %}style="background-color: #fff3e0;"{% endif %}>
                 <td>{{ incident.ticket }}</td>
+                <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ incident.system }}">{{ incident.system }}</td>
                 <td>{{ incident.date }}</td>
                 <td>
                     {% if incident.severity == 'Critical' %}
@@ -78,6 +82,8 @@
                 </td>
                 <td>{{ incident.duration_hrs }}</td>
                 <td>{{ incident.database }}</td>
+                <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ incident.root_cause }}">{{ incident.root_cause|default:"-" }}</td>
+                <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ incident.business_impact }}">{{ incident.business_impact|default:"-" }}</td>
                 <td>
                     {% if incident.created_by %}
                         {{ incident.created_by.username }}
