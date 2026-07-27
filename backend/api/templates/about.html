@@ -4,61 +4,19 @@
 
 {% block content %}
 <style>
-    /* Premium Styling for About Page with Tabbed Navigation */
-
-    /* Tabbed Navigation Container */
-    .about-tabs {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 1.5rem;
-        border-bottom: 2px solid #e2e8f0;
-        padding-bottom: 2px;
-        overflow-x: auto;
-    }
-
-    .tab-btn {
-        background: none;
-        border: none;
-        padding: 0.75rem 1.25rem;
-        font-size: 1rem;
-        font-weight: 600;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border-bottom: 3px solid transparent;
-        white-space: nowrap;
-        font-family: inherit;
-    }
-
-    .tab-btn:hover {
-        color: #002569;
-        background-color: #f1f5f9;
-        border-radius: 6px 6px 0 0;
-    }
-
-    .tab-btn.active {
-        color: #002569;
-        border-bottom-color: #F1AB00;
-    }
-
-    /* Tab Content Styling */
-    .tab-content {
-        display: none;
-        animation: fadeIn 0.3s ease;
-    }
-
-    .tab-content.active {
-        display: block;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(5px); }
-        to { opacity: 1; transform: translateY(0); }
+    /* Clean, Simple Single-Page Design */
+    .about-lead {
+        font-size: 1.15rem;
+        line-height: 1.7;
+        color: #1e293b;
+        margin-bottom: 2rem;
+        max-width: 1000px;
+        font-weight: 500;
     }
 
     .about-grid-two-col {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1.2fr 1fr;
         gap: 1.5rem;
     }
 
@@ -71,11 +29,13 @@
     .about-section-title {
         color: #002569;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 1.3rem;
-        margin-bottom: 1rem;
+        font-size: 1.25rem;
+        margin-bottom: 1.25rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 0.5rem;
     }
 
     .about-section-title svg {
@@ -91,32 +51,40 @@
         margin-bottom: 1.5rem;
     }
 
-    .about-card h4 {
-        color: #002569;
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
     .about-card p {
         color: #334155;
         font-size: 0.95rem;
         line-height: 1.6;
-        margin: 0;
+        margin-bottom: 1rem;
+    }
+    
+    .about-card p:last-child {
+        margin-bottom: 0;
     }
 
-    .audience-tag {
-        display: inline-block;
-        background: #e0e7ff;
-        color: #3730a3;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
+    /* Modules List styling */
+    .module-item {
+        border-left: 3px solid #002569;
+        padding-left: 1rem;
+        margin-bottom: 1.25rem;
+    }
+    
+    .module-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .module-item h5 {
+        color: #002569;
+        font-size: 1.05rem;
+        margin-bottom: 0.25rem;
         font-weight: 600;
-        margin-right: 0.5rem;
-        margin-top: 0.5rem;
+    }
+
+    .module-item p {
+        color: #334155;
+        font-size: 0.925rem;
+        line-height: 1.5;
+        margin: 0;
     }
 
     .security-badge-admin {
@@ -136,214 +104,86 @@
         font-weight: bold;
         font-size: 0.8rem;
     }
-
-    .best-practices-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-    }
-
-    @media (max-width: 600px) {
-        .best-practices-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .practice-item {
-        background: #f8fafc;
-        border-left: 3px solid #76B900;
-        padding: 0.75rem 1rem;
-        border-radius: 0 6px 6px 0;
-        font-size: 0.95rem;
-        color: #334155;
-        line-height: 1.4;
-    }
-
-    /* Modules List styling */
-    .module-item {
-        border-left: 3px solid #002569;
-        padding-left: 1rem;
-        margin-bottom: 1.25rem;
-    }
-
-    .module-item h5 {
-        color: #002569;
-        font-size: 1.05rem;
-        margin-bottom: 0.25rem;
-        font-weight: 600;
-    }
-
-    .module-item p {
-        color: #475569;
-        font-size: 0.925rem;
-        line-height: 1.5;
-        margin: 0;
-    }
 </style>
 
-<h2 style="margin-bottom: 1.25rem;">About</h2>
-<p style="font-size: 1.1rem; line-height: 1.7; color: #334155; margin-bottom: 2rem; max-width: 950px;">
+<h2 style="margin-bottom: 1rem;">About</h2>
+<p class="about-lead">
     The Database Management Hub was developed to assist Database Administrators (DBAs) in reporting on key database performance metrics like uptime, for compliance and auditing purposes, and general improved reporting across Oracle, MySQL, PostgreSQL, and Microsoft SQL Server environments.
 </p>
 
-<!-- Tab Navigation buttons -->
-<div class="about-tabs">
-    <button class="tab-btn active" onclick="openTab(event, 'tab-overview')">System Overview</button>
-    <button class="tab-btn" onclick="openTab(event, 'tab-modules')">Operational Modules</button>
-    <button class="tab-btn" onclick="openTab(event, 'tab-security')">Security & Permissions</button>
-</div>
-
-<!-- Tab Content: System Overview -->
-<div id="tab-overview" class="tab-content active">
-    <div class="about-grid-two-col">
-        <div>
-            <!-- Operational Hub -->
-            <div class="about-card" style="margin-bottom: 1.5rem;">
-                <h3 class="about-section-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    Operational Hub
-                </h3>
-                <p style="margin-bottom: 1rem;">
-                    The platform combines manually entered operational logs with automatically collected infrastructure metrics to establish a unified operational dashboard. 
-                    All operational metrics and SLA calculations are run dynamically to assist DBAs, system engineers, and IT administrators.
-                </p>
-                <div style="border-top: 1px solid #f1f5f9; padding-top: 1rem; margin-top: 1rem;">
-                    <h5 style="color: #64748b; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.5px;">Intended Audience</h5>
-                    <span class="audience-tag">Database Administrators</span>
-                    <span class="audience-tag">ICT Support Teams</span>
-                    <span class="audience-tag">System Administrators</span>
-                </div>
+<div class="about-grid-two-col">
+    <!-- Left Column: Core Modules -->
+    <div>
+        <div class="about-card">
+            <h3 class="about-section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                System Modules
+            </h3>
+            
+            <div class="module-item">
+                <h5>Dashboard Overview</h5>
+                <p>Consolidated operational view tracking overall availability, MTTR, planned/unplanned downtime, replication status, and SLA compliance metrics.</p>
             </div>
-
-            <!-- System Information -->
-            <div class="about-card">
-                <h3 class="about-section-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="22" y2="7"></line><line x1="2" y1="17" x2="22" y2="17"></line></svg>
-                    System Information
-                </h3>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem;">
-                    <p><strong>Version:</strong> 2.3.0</p>
-                    <p><strong>Architecture:</strong> Django 6.0.7 / MySQL</p>
-                    <p><strong>Integrations:</strong> Built with an extensible ETL pipeline for Kafka and REST APIs.</p>
-                </div>
+            <div class="module-item">
+                <h5>Incident Register</h5>
+                <p>Records unplanned outages. Ongoing incident durations are calculated automatically in the background until resolved, preventing human tracking gaps.</p>
+            </div>
+            <div class="module-item">
+                <h5>Backup & Recovery</h5>
+                <p>Tracks backup success rates, backup storage types, and recovery test results to validate disaster recovery (DR) preparedness and database durability.</p>
+            </div>
+            <div class="module-item">
+                <h5>Maintenance Register</h5>
+                <p>Records planned maintenance such as upgrades, patching, OS reboots, or hardware migrations without contributing to unplanned outage metrics.</p>
+            </div>
+            <div class="module-item">
+                <h5>Capacity Tracking</h5>
+                <p>Tracks database storage growth trends, identifies the largest tables, and calculates projected storage exhaustion dates for proactive scaling.</p>
+            </div>
+            <div class="module-item">
+                <h5>Replication & Health</h5>
+                <p>Monitors lag times and CPU/Memory/Disk performance stats across the Oracle, MySQL, MS SQL, and PostgreSQL environment fleets.</p>
             </div>
         </div>
-        <div>
-            <!-- Integrations & Reporting -->
-            <div class="about-card" style="height: 100%;">
-                <h3 class="about-section-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                    Integrations & Reporting
-                </h3>
-                
-                <h4 style="color: #002569; font-size: 1.05rem; margin-bottom: 0.4rem; font-weight: 600; margin-top: 0.5rem;">Automated Data Collection (ETL)</h4>
-                <p style="margin-bottom: 1.25rem; font-size: 0.95rem;">
-                    Scheduled target monitoring scripts collect operational parameters (replica lag, CPU/Memory/Disk utilization) and report directly to the Hub API. These are logged under <strong>Script</strong> users.
-                </p>
-                
-                <h4 style="color: #002569; font-size: 1.05rem; margin-bottom: 0.4rem; font-weight: 600;">Excel & ODBC Support</h4>
-                <p style="font-size: 0.95rem;">
-                    Exposed database views allow Microsoft Excel to connect directly to the MySQL database backend via an ODBC connection for advanced reporting, analysis, and custom visualization.
-                </p>
+    </div>
+
+    <!-- Right Column: Security Rules & System Info -->
+    <div>
+        <!-- Security & User Permissions -->
+        <div class="about-card">
+            <h3 class="about-section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Security & Data Integrity
+            </h3>
+            
+            <div style="margin-bottom: 1.25rem;">
+                <h5 style="margin-bottom: 0.4rem;"><span class="security-badge-standard">Standard Users</span></h5>
+                <p>Can view dashboards, create operational records, and view the audit trail. Handled by a strict <strong>5-minute edit rule</strong> to protect logs (records become read-only after five minutes).</p>
+            </div>
+            
+            <div style="margin-bottom: 1.25rem;">
+                <h5 style="margin-bottom: 0.4rem;"><span class="security-badge-admin">Administrators</span></h5>
+                <p>Retain full create, edit, delete, and role management permissions. Can override the five-minute edit window to modify historical logs when necessary.</p>
+            </div>
+
+            <div style="border-top: 1px solid #f1f5f9; padding-top: 1rem; margin-top: 1rem;">
+                <h5 style="color: #002569; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem;">Immutable Change Timeline</h5>
+                <p>Every single modification made to an incident is permanently logged in the <strong>History Timeline</strong> (captures editor, timestamps, status transition, and comments). Change history cannot be modified or deleted.</p>
+            </div>
+        </div>
+
+        <!-- System Information -->
+        <div class="about-card">
+            <h3 class="about-section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="22" y2="7"></line><line x1="2" y1="17" x2="22" y2="17"></line></svg>
+                System Information
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.95rem;">
+                <p><strong>Version:</strong> 2.3.0</p>
+                <p><strong>Architecture:</strong> Django 6.0.7 / MySQL</p>
+                <p><strong>Integrations:</strong> Built with an extensible ETL pipeline for Kafka and REST APIs.</p>
             </div>
         </div>
     </div>
 </div>
-
-<!-- Tab Content: Operational Modules -->
-<div id="tab-modules" class="tab-content">
-    <div class="about-card">
-        <h3 class="about-section-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            System Modules
-        </h3>
-        <div class="about-grid-two-col">
-            <div>
-                <div class="module-item">
-                    <h5>Dashboard Overview</h5>
-                    <p>Consolidated operational view tracking overall availability, MTTR, planned/unplanned downtime, replication status, and SLA compliance metrics.</p>
-                </div>
-                <div class="module-item">
-                    <h5>Incident Register</h5>
-                    <p>Records unplanned outages. Ongoing incident durations are calculated automatically in the background until resolved, preventing human tracking gaps.</p>
-                </div>
-                <div class="module-item">
-                    <h5>Backup & Recovery</h5>
-                    <p>Tracks backup success rates, backup storage types, and recovery test results to validate disaster recovery (DR) preparedness and database durability.</p>
-                </div>
-            </div>
-            <div>
-                <div class="module-item">
-                    <h5>Maintenance Register</h5>
-                    <p>Records planned maintenance such as upgrades, patching, OS reboots, or hardware migrations without contributing to unplanned outage metrics.</p>
-                </div>
-                <div class="module-item">
-                    <h5>Capacity Tracking</h5>
-                    <p>Tracks database storage growth trends, identifies the largest tables, and calculates projected storage exhaustion dates for proactive scaling.</p>
-                </div>
-                <div class="module-item">
-                    <h5>Replication & Health</h5>
-                    <p>Monitors lag times and CPU/Memory/Disk performance stats across the Oracle, MySQL, MS SQL, and PostgreSQL environment fleets.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Tab Content: Security & Permissions -->
-<div id="tab-security" class="tab-content">
-    <div class="about-grid-two-col">
-        <div>
-            <div class="about-card" style="height: 100%;">
-                <h3 class="about-section-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                    Role-Based Access Control
-                </h3>
-                <div style="margin-bottom: 1.25rem;">
-                    <h5 style="margin-bottom: 0.25rem;"><span class="security-badge-standard">Standard Users</span></h5>
-                    <p style="font-size: 0.9rem;">Can view dashboards, create operational records, and view the audit trail. Handled by a strict <strong>5-minute edit rule</strong> to protect logs (records become read-only after five minutes).</p>
-                </div>
-                <div>
-                    <h5 style="margin-bottom: 0.25rem;"><span class="security-badge-admin">Administrators</span></h5>
-                    <p style="font-size: 0.9rem;">Retain full create, edit, delete, and role management permissions. Can override the five-minute edit window to modify historical logs when necessary.</p>
-                </div>
-            </div>
-        </div>
-        <div>
-            <div class="about-card" style="height: 100%; border-left: 4px solid var(--color-primary);">
-                <h3 class="about-section-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                    Audit Integrity
-                </h3>
-                <p style="margin-bottom: 1rem;">
-                    Every single change made to a record is permanently logged in the <strong>History Timeline</strong>. The timeline tracks the editor, timestamps, status transition, assignment details, and comments. 
-                </p>
-                <p style="font-style: italic;">
-                    To protect regulatory compliance, the historical change logs and automated ETL-ingested metrics are completely immutable and cannot be edited or deleted by standard users.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Tab switching controller
-    function openTab(evt, tabId) {
-        // Hide all tab contents
-        const tabcontents = document.getElementsByClassName("tab-content");
-        for (let i = 0; i < tabcontents.length; i++) {
-            tabcontents[i].classList.remove("active");
-        }
-
-        // Deactivate all tab buttons
-        const tablinks = document.getElementsByClassName("tab-btn");
-        for (let i = 0; i < tablinks.length; i++) {
-            tablinks[i].classList.remove("active");
-        }
-
-        // Show current tab and set active button
-        document.getElementById(tabId).classList.add("active");
-        evt.currentTarget.classList.add("active");
-    }
-</script>
 {% endblock %}
