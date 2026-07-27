@@ -6,49 +6,20 @@
 
 {% block content %}
 <style>
-    /* Full Dark Mode Override for Login Page */
+    /* Premium Light-Themed Login Page */
     body {
-        background: radial-gradient(circle at 20% 20%, #001a4e 0%, #000c25 100%) !important;
-        color: #f8fafc !important;
+        background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%) !important;
+        color: #1e293b !important;
         position: relative;
         min-height: 100vh;
-        overflow-x: hidden;
-    }
-
-    body::before {
-        content: '';
-        position: absolute;
-        top: -15%;
-        left: -10%;
-        width: 500px;
-        height: 500px;
-        background: radial-gradient(circle, rgba(241, 171, 0, 0.08) 0%, rgba(0,0,0,0) 70%);
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 1;
-    }
-
-    body::after {
-        content: '';
-        position: absolute;
-        bottom: -15%;
-        right: -10%;
-        width: 600px;
-        height: 600px;
-        background: radial-gradient(circle, rgba(118, 185, 0, 0.05) 0%, rgba(0,0,0,0) 70%);
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 1;
     }
 
     .login-container {
-        position: relative;
-        z-index: 10;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        min-height: 80vh;
+        min-height: 85vh;
         padding: 2rem 1rem;
     }
 
@@ -56,13 +27,13 @@
         display: none;
         position: fixed;
         inset: 0;
-        background: rgba(0, 12, 37, 0.7);
+        background: rgba(255, 255, 255, 0.85);
         z-index: 9999;
         justify-content: center;
         align-items: center;
         flex-direction: column;
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
     }
     .login-spinner-overlay.active {
         display: flex;
@@ -70,18 +41,17 @@
     .login-spinner {
         width: 52px;
         height: 52px;
-        border: 4px solid rgba(255, 255, 255, 0.1);
-        border-top-color: #F1AB00;
+        border: 4px solid #e2e8f0;
+        border-top-color: #002569;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
     }
     .login-spinner-text {
         margin-top: 1rem;
         font-family: 'Segoe UI', sans-serif;
-        color: #f8fafc;
-        font-size: 1.1rem;
-        font-weight: 500;
-        letter-spacing: 0.5px;
+        color: #002569;
+        font-size: 1.05rem;
+        font-weight: 600;
     }
     @keyframes spin {
         to { transform: rotate(360deg); }
@@ -93,23 +63,20 @@
         font-size: 2.3rem;
         font-weight: 300;
         letter-spacing: 1.5px;
-        color: #ffffff !important;
+        color: #002569 !important;
         margin-bottom: 2rem;
-        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     }
     .login-title span {
         color: #F1AB00;
         font-weight: 800;
     }
 
-    /* Glassmorphic Login Card */
+    /* Premium Light Card */
     .login-card {
-        background: rgba(255, 255, 255, 0.03) !important;
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
         border-radius: 12px !important;
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4) !important;
+        box-shadow: 0 10px 30px rgba(0, 37, 105, 0.08) !important;
         padding: 2.5rem 2.25rem !important;
         width: 100%;
         max-width: 420px;
@@ -118,22 +85,18 @@
     }
 
     .logo-container {
-        background: #ffffff;
-        padding: 0.6rem 1.2rem;
-        border-radius: 8px;
-        display: inline-block;
         margin-bottom: 1.75rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     .logo-container img {
-        max-width: 130px;
+        max-width: 140px;
         height: auto;
         display: block;
+        margin: 0 auto;
     }
 
     .login-card h2 {
-        color: #ffffff !important;
+        color: #002569 !important;
         font-size: 1.4rem !important;
         margin-bottom: 1.5rem !important;
         font-weight: 600 !important;
@@ -148,17 +111,17 @@
     }
 
     .form-group label {
-        color: rgba(248, 250, 252, 0.8) !important;
-        font-weight: 500 !important;
+        color: #475569 !important;
+        font-weight: 600 !important;
         display: block !important;
         margin-bottom: 0.4rem !important;
         font-size: 0.9rem !important;
     }
 
     .form-group input {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.15) !important;
-        color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #1e293b !important;
         border-radius: 6px !important;
         padding: 0.7rem 0.9rem !important;
         width: 100% !important;
@@ -168,44 +131,33 @@
     }
 
     .form-group input:focus {
-        border-color: #F1AB00 !important;
-        box-shadow: 0 0 10px rgba(241, 171, 0, 0.25) !important;
-        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #002569 !important;
+        box-shadow: 0 0 0 3px rgba(0, 37, 105, 0.12) !important;
     }
 
     .btn-login {
-        background: linear-gradient(135deg, #F1AB00 0%, #d99a00 100%) !important;
-        color: #000c25 !important;
+        background: #002569 !important;
+        color: #ffffff !important;
         border: none !important;
-        font-weight: 700 !important;
+        font-weight: 600 !important;
         padding: 0.75rem 1rem !important;
         border-radius: 6px !important;
         font-size: 1rem !important;
         cursor: pointer !important;
         transition: all 0.2s ease !important;
-        box-shadow: 0 4px 15px rgba(241, 171, 0, 0.2) !important;
+        box-shadow: 0 4px 12px rgba(0, 37, 105, 0.15) !important;
         width: 100%;
         margin-top: 0.5rem;
     }
 
     .btn-login:hover {
+        background: #003388 !important;
         transform: translateY(-1px);
-        box-shadow: 0 6px 18px rgba(241, 171, 0, 0.35) !important;
-        filter: brightness(1.05);
+        box-shadow: 0 6px 16px rgba(0, 37, 105, 0.25) !important;
     }
 
     .btn-login:active {
         transform: translateY(0);
-    }
-
-    /* Footer Override */
-    .footer {
-        background: transparent !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
-        color: rgba(248, 250, 252, 0.4) !important;
-    }
-    .footer a {
-        color: #F1AB00 !important;
     }
 </style>
 
@@ -235,8 +187,8 @@
             <button type="submit" class="btn-login" id="loginBtn">Login</button>
         </form>
         
-        <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 1rem;">
-            <a href="{% url 'about' %}" style="color: rgba(255, 255, 255, 0.5); text-decoration: none; font-size: 0.85rem; transition: color 0.2s;" onmouseover="this.style.color='#F1AB00'" onmouseout="this.style.color='rgba(255, 255, 255, 0.5)'">
+        <div style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1.1rem;">
+            <a href="{% url 'about' %}" style="color: #002569; text-decoration: none; font-size: 0.9rem; font-weight: 600; transition: color 0.2s;" onmouseover="this.style.color='#F1AB00'" onmouseout="this.style.color='#002569'">
                 About Database Management Hub
             </a>
         </div>
