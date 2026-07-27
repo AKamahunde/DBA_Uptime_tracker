@@ -87,7 +87,11 @@
                 <tbody>
                     {% for row in dashboard_data %}
                     <tr>
-                        <td style="padding: 0.75rem; border: 1px solid #ccc; text-align: left;">{{ row.database }}</td>
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; text-align: left;">
+                            <a href="?database_select={{ row.database }}{% if reporting_month %}&month={{ reporting_month }}{% endif %}" style="color: var(--color-primary); text-decoration: none; font-weight: bold;">
+                                {{ row.database }}
+                            </a>
+                        </td>
                         
                         <!-- Availability -->
                         {% if row.availability == 'No Data' or row.availability == 'N/A' %}
