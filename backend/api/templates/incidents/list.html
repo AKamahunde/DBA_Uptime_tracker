@@ -102,6 +102,11 @@
                             <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"M d, Y - H:i" }}</div>
                             <div style="font-weight: 500;">{{ log.action }}</div>
                             <div style="font-size: 0.9rem; color: #444;">By: {{ log.changed_by.username|default:"System" }}</div>
+                            {% if log.assigned_to %}
+                            <div style="font-size: 0.85rem; color: #475569; margin-top: 0.25rem;">
+                                <span style="font-weight: 600;">Assigned to:</span> {{ log.assigned_to }}
+                            </div>
+                            {% endif %}
                             {% if log.comment %}
                             <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-left: 3px solid #ddd; font-style: italic; font-size: 0.9rem;">
                                 "{{ log.comment }}"
