@@ -430,9 +430,10 @@
             }
 
             // Auto-refresh the page every 10 minutes (600000 ms) to show new records
-            // Safely disabled on pages with POST forms to prevent wiping user data during entry
-            const hasPostForm = Array.from(document.forms).some(f => f.method && f.method.toUpperCase() === 'POST');
-            if (!hasPostForm) {
+            // Safely disabled on data entry (create/edit) and login pages to prevent wiping user progress
+            const path = window.location.pathname;
+            const isDataEntryPage = path.includes('/create/') || path.includes('/edit/') || path.includes('/login/');
+            if (!isDataEntryPage) {
                 setTimeout(() => {
                     window.location.reload();
                 }, 600000);
