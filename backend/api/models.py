@@ -257,6 +257,15 @@ class MaintenanceRegister(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        if self.start and self.end:
+            delta = self.end - self.start
+            # Convert timedelta to hours
+            self.duration_hrs = round(delta.total_seconds() / 3600, 2)
+        elif not self.duration_hrs:
+            self.duration_hrs = 0
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'maintenance_register'
         verbose_name = 'Maintenance Register'
