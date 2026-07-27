@@ -52,7 +52,6 @@ class BackupRecoveryForm(forms.ModelForm):
         self.fields['backup_type'].required = False
         self.fields['backup_used'].required = False
         self.fields['location'].required = False
-        self.fields['retention'].required = False
         self.fields['comments'].required = False
         self.fields['tested_by'].required = False
 

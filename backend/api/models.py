@@ -164,7 +164,6 @@ class BackupRecovery(models.Model):
     verified = models.BooleanField(default=False)
     restore_tested = models.BooleanField(default=False)
     compression = models.BooleanField(default=False)
-    retention = models.CharField(max_length=50)
     tested_by = models.CharField(max_length=100, blank=True)
     comments = models.TextField(blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
@@ -277,6 +276,7 @@ class MaintenanceRegister(models.Model):
 class CapacityPlanning(models.Model):
     month = models.DateField()
     database_size_gb = models.DecimalField(max_digits=15, decimal_places=2)
+    available_capacity_gb = models.DecimalField(max_digits=15, decimal_places=2, default=0.00)
     disk_used_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,

@@ -47,7 +47,9 @@
                     <th>Growth (GB)</th>
                     <th>Disk Used %</th>
                     <th>Tablespace Used %</th>
+                    <th>Available (GB)</th>
                     <th>Largest Table</th>
+                    <th>Logged By</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -66,7 +68,15 @@
                     </td>
                     <td>{{ capacity.disk_used_percent }}</td>
                     <td>{{ capacity.tablespace_used_percent }}</td>
+                    <td>{{ capacity.available_capacity_gb|default:"0.00" }}</td>
                     <td>{{ capacity.largest_table }}</td>
+                    <td>
+                        {% if capacity.created_by %}
+                            {{ capacity.created_by.username }}
+                        {% else %}
+                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">
                             {% if capacity.created_by %}
@@ -85,7 +95,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" style="text-align: center;">No capacity tracking records found.</td>
+                    <td colspan="10" style="text-align: center;">No capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

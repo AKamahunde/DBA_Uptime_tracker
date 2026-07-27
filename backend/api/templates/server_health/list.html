@@ -43,7 +43,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Time</th>
-                    <th>Entered By</th>
+                    <th>Logged By</th>
                     <th>Server</th>
                     <th>CPU %</th>
                     <th>Memory %</th>
@@ -61,10 +61,10 @@
                     <td>{{ health.date }}</td>
                     <td>{{ health.created_at|time:"H:i" }}</td>
                     <td>
-                        {% if health.entered_by == 'Script' %}
-                            <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
+                        {% if health.created_by %}
+                            {{ health.created_by.username }}
                         {% else %}
-                            <span class="badge-accent" style="background-color: var(--color-primary); color: white;">User</span>
+                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
                         {% endif %}
                     </td>
                     <td>{{ health.server }}</td>

@@ -51,6 +51,7 @@
                 <th>Status</th>
                 <th>Database</th>
                 <th>Severity</th>
+                <th>Logged By</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -83,6 +84,13 @@
                         <span style="display:inline-block;background:#fb8c00;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ replication.severity }}</span>
                     {% else %}
                         <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ replication.severity }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if replication.created_by %}
+                        {{ replication.created_by.username }}
+                    {% else %}
+                        <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
                     {% endif %}
                 </td>
                 <td>

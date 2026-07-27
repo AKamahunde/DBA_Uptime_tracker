@@ -49,9 +49,9 @@
                     <th>Backup/Restore Used</th>
                     <th>Duration (Hrs)</th>
                     <th>Compression</th>
-                    <th>Retention</th>
                     <th>Outcome</th>
                     <th>Verified</th>
+                    <th>Logged By</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -74,7 +74,8 @@
                             <span style="color: #c62828;">No</span>
                         {% endif %}
                     </td>
-                    <td>{{ backup.retention }}</td>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if backup.outcome == 'Success' %}
                             <span style="color: #2e7d32; font-weight: 600;">{{ backup.outcome }}</span>
@@ -89,6 +90,13 @@
                             <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Yes</span>
                         {% else %}
                             <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">No</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if backup.created_by %}
+                            {{ backup.created_by.username }}
+                        {% else %}
+                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
                         {% endif %}
                     </td>
                     <td>

@@ -46,6 +46,7 @@
                     <th>Risk</th>
                     <th>Success</th>
                     <th>Database</th>
+                    <th>Logged By</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -72,13 +73,24 @@
                     </td>
                     <td>{{ maintenance.database }}</td>
                     <td>
+                        {% if maintenance.created_by %}
+                            {{ maintenance.created_by.username }}
+                        {% else %}
+                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         <div style="display: flex; gap: 0.25rem;">
-                            <a href="{% url 'maintenance_edit' maintenance.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                            {% if is_admin or perms.api.delete_maintenanceregister %}
-                            <form method="post" action="{% url 'maintenance_delete' maintenance.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                            </form>
+                            {% if maintenance.created_by %}
+                                <a href="{% url 'maintenance_edit' maintenance.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                                {% if is_admin or perms.api.delete_maintenanceregister %}
+                                <form method="post" action="{% url 'maintenance_delete' maintenance.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                                </form>
+                                {% endif %}
+                            {% else %}
+                                <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
                             {% endif %}
                         </div>
                     </td>
