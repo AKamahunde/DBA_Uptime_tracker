@@ -23,7 +23,6 @@ from .forms import (
 from users.models import User
 from django.db.models import Sum, Count, Avg
 
-@login_required
 def about(request):
     return render(request, 'about.html')
 
