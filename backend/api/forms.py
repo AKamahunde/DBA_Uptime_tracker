@@ -13,7 +13,7 @@ class IncidentRegisterForm(forms.ModelForm):
 
     class Meta:
         model = IncidentRegister
-        exclude = ['planned', 'duration_hrs']
+        exclude = ['planned', 'duration_hrs', 'created_by']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
@@ -38,7 +38,7 @@ class ReplicationMonitorForm(forms.ModelForm):
 class BackupRecoveryForm(forms.ModelForm):
     class Meta:
         model = BackupRecovery
-        fields = '__all__'
+        exclude = ['created_by']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
@@ -70,7 +70,7 @@ class ServerHealthForm(forms.ModelForm):
 class MaintenanceRegisterForm(forms.ModelForm):
     class Meta:
         model = MaintenanceRegister
-        fields = '__all__'
+        exclude = ['created_by']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
@@ -82,7 +82,7 @@ class MaintenanceRegisterForm(forms.ModelForm):
 class CapacityPlanningForm(forms.ModelForm):
     class Meta:
         model = CapacityPlanning
-        fields = '__all__'
+        exclude = ['created_by']
         widgets = {
             'month': forms.DateInput(attrs={'type': 'month'}),
         }
