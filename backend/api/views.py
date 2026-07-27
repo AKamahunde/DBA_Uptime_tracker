@@ -948,7 +948,7 @@ def backup_ingest(request):
         backup = BackupRecovery.objects.create(
             date=start_dt.date(),
             record_type='Backup',
-            database=data.get('database_instance', 'Unknown'),
+            database=data.get('database', 'MySQL'),
             database_instance=data.get('database_instance', 'Unknown'),
             backup_type=data.get('backup_type', 'Incremental'),
             backup_used=data.get('backup_used', 'N/A'),
