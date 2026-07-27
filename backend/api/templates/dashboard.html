@@ -131,7 +131,14 @@
             Side-by-side comparison across all monitored databases, with detail for the selected database below.
         </p>
 
-        <div id="summary-table-section" style="overflow-x: auto;">
+        <div id="summary-table-section" style="overflow-x: auto; padding: 0.5rem;">
+            <!-- PDF header: visible in export only -->
+            <div class="pdf-report-header" style="display:none; margin-bottom: 1.25rem; border-bottom: 3px solid #002569; padding-bottom: 0.75rem;">
+                <div style="font-size: 1.3rem; font-weight: 700; color: #002569;">Database Management Hub</div>
+                <div style="font-size: 1rem; font-weight: 600; color: #333; margin-top: 0.2rem;">Database Summary Report</div>
+                <div style="font-size: 0.85rem; color: #555; margin-top: 0.2rem;">Reporting Month: <span class="pdf-month-label"></span></div>
+                <div style="font-size: 0.8rem; color: #888; margin-top: 0.1rem;">Generated: <span class="pdf-generated-label"></span></div>
+            </div>
             <table style="width: 100%; border-collapse: collapse; text-align: center;">
                 <thead>
                     <tr style="background-color: var(--color-primary); color: white;">
@@ -206,7 +213,14 @@
                     </div>
                 </div>
             </div>
-            <div id="detail-table-section" style="overflow-x: auto;">
+            <div id="detail-table-section" style="overflow-x: auto; padding: 0.5rem;">
+                <!-- PDF header: visible in export only -->
+                <div class="pdf-report-header" style="display:none; margin-bottom: 1.25rem; border-bottom: 3px solid #002569; padding-bottom: 0.75rem;">
+                    <div style="font-size: 1.3rem; font-weight: 700; color: #002569;">Database Management Hub</div>
+                    <div style="font-size: 1rem; font-weight: 600; color: #333; margin-top: 0.2rem;">Database Detail Report &mdash; {{ database_detail.database }}</div>
+                    <div style="font-size: 0.85rem; color: #555; margin-top: 0.2rem;">Reporting Month: <span class="pdf-month-label"></span></div>
+                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.1rem;">Generated: <span class="pdf-generated-label"></span></div>
+                </div>
                 <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9rem;">
                     <thead>
                         <tr style="background-color: var(--color-primary); color: white;">
@@ -306,19 +320,49 @@
             });
         }
     });
+
+    // Format the month input value (YYYY-MM) to a readable string e.g. "July 2026"
+    function formatMonth(raw) {
+        if (!raw) return 'All Months';
+        var parts = raw.split('-');
+        if (parts.length < 2) return raw;
+        var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+        return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
+
     // PDF export using html2pdf.js
     function exportPDF(sectionId, filename) {
         document.querySelectorAll('.table-menu-dropdown').forEach(el => el.classList.remove('open'));
+
         var element = document.getElementById(sectionId);
+
+        // Get reporting month from the month input
+        var monthInput = document.getElementById('month_filter');
+        var monthRaw = monthInput ? monthInput.value : '';
+        var monthLabel = formatMonth(monthRaw);
+        var now = new Date().toLocaleString('default', {
+            day: '2-digit', month: 'long', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        // Populate and show the PDF header
+        element.querySelectorAll('.pdf-month-label').forEach(el => el.textContent = monthLabel);
+        element.querySelectorAll('.pdf-generated-label').forEach(el => el.textContent = now);
+        element.querySelectorAll('.pdf-report-header').forEach(el => el.style.display = 'block');
+
         var opt = {
             margin:       [10, 8, 10, 8],
-            filename:     filename + '.pdf',
+            filename:     filename + '_' + (monthRaw || 'All') + '.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
             pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
         };
-        html2pdf().set(opt).from(element).save();
+
+        html2pdf().set(opt).from(element).save().then(function() {
+            // Hide the header again after export
+            element.querySelectorAll('.pdf-report-header').forEach(el => el.style.display = 'none');
+        });
     }
 </script>
 {% endblock %}
