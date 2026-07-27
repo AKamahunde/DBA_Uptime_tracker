@@ -84,7 +84,7 @@
                             {% else %}
                                 <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
                             {% endif %}
-                            {% if is_admin or perms.api.delete_capacityplanning %}
+                            {% if is_admin or perms.api.delete_capacityplanning or capacity.created_by == request.user %}
                             <form method="post" action="{% url 'capacity_delete' capacity.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>

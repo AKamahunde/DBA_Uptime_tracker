@@ -358,7 +358,7 @@ def incident_create(request):
 def incident_edit(request, pk):
     incident = get_object_or_404(IncidentRegister, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_incidentregister')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (incident.created_by == request.user) and ((timezone.now() - incident.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -470,7 +470,7 @@ def replication_create(request):
 def replication_edit(request, pk):
     replication = get_object_or_404(ReplicationMonitor, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_replicationmonitor')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (replication.created_by == request.user) and ((timezone.now() - replication.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -544,7 +544,7 @@ def backup_create(request):
 def backup_edit(request, pk):
     backup = get_object_or_404(BackupRecovery, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_backuprecovery')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (backup.created_by == request.user) and ((timezone.now() - backup.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -618,7 +618,7 @@ def server_health_create(request):
 def server_health_edit(request, pk):
     health = get_object_or_404(ServerHealth, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_serverhealth')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (health.created_by == request.user) and ((timezone.now() - health.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -692,7 +692,7 @@ def maintenance_create(request):
 def maintenance_edit(request, pk):
     maintenance = get_object_or_404(MaintenanceRegister, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_maintenanceregister')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (maintenance.created_by == request.user) and ((timezone.now() - maintenance.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -766,7 +766,7 @@ def capacity_create(request):
 def capacity_edit(request, pk):
     capacity = get_object_or_404(CapacityPlanning, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.has_perm('api.change_capacityplanning')
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (capacity.created_by == request.user) and ((timezone.now() - capacity.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -796,13 +796,12 @@ def capacity_edit(request, pk):
 def incident_delete(request, pk):
     obj = get_object_or_404(IncidentRegister, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None:
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('incident_list')
-        if not request.user.has_perm('api.delete_incidentregister'):
-            messages.error(request, 'You do not have permission to delete incident records.')
-            return redirect('incident_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('incident_list')
             
     obj.delete()
     messages.success(request, 'Incident record deleted successfully.')
@@ -813,13 +812,12 @@ def incident_delete(request, pk):
 def replication_delete(request, pk):
     obj = get_object_or_404(ReplicationMonitor, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None:
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('replication_list')
-        if not request.user.has_perm('api.delete_replicationmonitor'):
-            messages.error(request, 'You do not have permission to delete replication records.')
-            return redirect('replication_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('replication_list')
             
     obj.delete()
     messages.success(request, 'Replication record deleted successfully.')
@@ -830,13 +828,12 @@ def replication_delete(request, pk):
 def backup_delete(request, pk):
     obj = get_object_or_404(BackupRecovery, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None:
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('backup_list')
-        if not request.user.has_perm('api.delete_backuprecovery'):
-            messages.error(request, 'You do not have permission to delete backup records.')
-            return redirect('backup_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('backup_list')
             
     obj.delete()
     messages.success(request, 'Backup record deleted successfully.')
@@ -847,13 +844,12 @@ def backup_delete(request, pk):
 def server_health_delete(request, pk):
     obj = get_object_or_404(ServerHealth, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None or obj.entered_by == 'Script':
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('server_health_list')
-        if not request.user.has_perm('api.delete_serverhealth'):
-            messages.error(request, 'You do not have permission to delete server health records.')
-            return redirect('server_health_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('server_health_list')
             
     obj.delete()
     messages.success(request, 'Server health record deleted successfully.')
@@ -864,13 +860,12 @@ def server_health_delete(request, pk):
 def maintenance_delete(request, pk):
     obj = get_object_or_404(MaintenanceRegister, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None:
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('maintenance_list')
-        if not request.user.has_perm('api.delete_maintenanceregister'):
-            messages.error(request, 'You do not have permission to delete maintenance records.')
-            return redirect('maintenance_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('maintenance_list')
             
     obj.delete()
     messages.success(request, 'Maintenance record deleted successfully.')
@@ -881,13 +876,12 @@ def maintenance_delete(request, pk):
 def capacity_delete(request, pk):
     obj = get_object_or_404(CapacityPlanning, pk=pk)
     
-    if not request.user.is_admin:
-        if obj.created_by is None:
-            messages.error(request, 'Non-admin users cannot delete records coming from external data sources.')
-            return redirect('capacity_list')
-        if not request.user.has_perm('api.delete_capacityplanning'):
-            messages.error(request, 'You do not have permission to delete capacity planning records.')
-            return redirect('capacity_list')
+    can_delete_always = request.user.is_admin
+    is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
+    
+    if not (can_delete_always or is_creator_within_time):
+        messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
+        return redirect('capacity_list')
             
     obj.delete()
     messages.success(request, 'Capacity planning record deleted successfully.')
