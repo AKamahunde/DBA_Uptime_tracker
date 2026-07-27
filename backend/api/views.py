@@ -336,10 +336,14 @@ def incident_create(request):
             incident = form.save(commit=False)
             incident.created_by = request.user
             incident.save()
+            action_text = 'Created'
+            if incident.assigned_to:
+                action_text += f' and assigned to {incident.assigned_to}'
+                
             IncidentChangeLog.objects.create(
                 incident=incident,
                 changed_by=request.user,
-                action='Created',
+                action=action_text,
                 new_status=incident.status,
                 assigned_to=incident.assigned_to,
                 comment=form.cleaned_data.get('change_comment', '')
@@ -378,7 +382,10 @@ def incident_edit(request, pk):
                 if old_status != new_status:
                     action_parts.append(f"Status changed from {old_status} to {new_status}")
                 if old_assigned != new_assigned:
-                    action_parts.append(f"Assigned to {new_assigned}")
+                    if old_assigned:
+                        action_parts.append(f"Escalated to {new_assigned}")
+                    else:
+                        action_parts.append(f"Assigned to {new_assigned}")
                 
                 action = " | ".join(action_parts) if action_parts else "Update Logged"
                 
