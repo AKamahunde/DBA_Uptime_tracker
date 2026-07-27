@@ -300,7 +300,7 @@ def incident_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
-    queryset = IncidentRegister.objects.all().order_by('-date', '-created_at')
+    queryset = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')

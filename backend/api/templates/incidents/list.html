@@ -77,6 +77,7 @@
                 <td>{{ incident.database }}</td>
                 <td>
                     <div style="display: flex; gap: 0.25rem;">
+                        <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; background: #e2e8f0; color: #333;" onclick="document.getElementById('history-modal-{{ incident.pk }}').style.display='block'">History</button>
                         <a href="{% url 'incident_edit' incident.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
                         {% if is_admin or perms.api.delete_incidentregister %}
                         <form method="post" action="{% url 'incident_delete' incident.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
@@ -87,6 +88,34 @@
                     </div>
                 </td>
             </tr>
+
+            <!-- History Modal -->
+            <div id="history-modal-{{ incident.pk }}" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+                <div style="background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; margin: 10vh auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <button type="button" onclick="document.getElementById('history-modal-{{ incident.pk }}').style.display='none'" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+                    <h3 style="margin-bottom: 1.5rem; border-left: 4px solid var(--color-accent); padding-left: 0.6rem; margin-top: 0;">History: {{ incident.ticket }}</h3>
+                    {% if incident.change_logs.all %}
+                    <div class="timeline" style="border-left: 2px solid var(--color-primary); padding-left: 1.5rem; margin-left: 1rem;">
+                        {% for log in incident.change_logs.all %}
+                        <div class="timeline-item" style="position: relative; margin-bottom: 1.5rem;">
+                            <div style="position: absolute; left: -2rem; top: 0.25rem; width: 12px; height: 12px; background: var(--color-accent); border-radius: 50%; border: 2px solid white;"></div>
+                            <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"M d, Y - H:i" }}</div>
+                            <div style="font-weight: 500;">{{ log.action }}</div>
+                            <div style="font-size: 0.9rem; color: #444;">By: {{ log.changed_by.username|default:"System" }}</div>
+                            {% if log.comment %}
+                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-left: 3px solid #ddd; font-style: italic; font-size: 0.9rem;">
+                                "{{ log.comment }}"
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p style="color: #666; font-style: italic;">No history recorded for this incident yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
             {% empty %}
             <tr>
                 <td colspan="6" style="text-align: center;">No incidents found.</td>
