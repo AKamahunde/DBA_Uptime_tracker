@@ -28,9 +28,27 @@ def about(request):
     return render(request, 'about.html')
 
 
+def auto_close_incidents():
+    # Auto-closes incidents resolved for more than 24 hours (1 day)
+    cutoff = timezone.now() - timedelta(days=1)
+    resolved_incidents = IncidentRegister.objects.filter(
+        status='Resolved',
+        end__lte=cutoff
+    )
+    for incident in resolved_incidents:
+        incident.status = 'Closed'
+        incident.save()
+        IncidentChangeLog.objects.create(
+            incident=incident,
+            changed_by=None,  # System
+            action="Auto-closed by system after 24 hours of resolution",
+            new_status="Closed"
+        )
 
 @login_required
 def dashboard(request):
+    auto_close_incidents()
+    
     # Run all counts in a single DB round-trip by using lazy evaluation
     from django.db import connection
     with connection.cursor() as cursor:
@@ -297,6 +315,8 @@ def dashboard(request):
 
 @login_required
 def incident_list(request):
+    auto_close_incidents()
+    
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
