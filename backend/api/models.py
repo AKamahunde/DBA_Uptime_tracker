@@ -40,6 +40,7 @@ class IncidentRegister(models.Model):
         db_table = 'incident_register'
         verbose_name = 'Incident Register'
         verbose_name_plural = 'Incident Registers'
+        default_permissions = ('add', 'view')
 
     def save(self, *args, **kwargs):
         if not self.start:
@@ -129,6 +130,7 @@ class ReplicationMonitor(models.Model):
         db_table = 'replication_monitor'
         verbose_name = 'Replication Monitor'
         verbose_name_plural = 'Replication Monitors'
+        default_permissions = ('add', 'view')
 
     def __str__(self):
         return f"{self.master} -> {self.replica} - {self.date}"
@@ -174,6 +176,7 @@ class BackupRecovery(models.Model):
         db_table = 'backup_recovery'
         verbose_name = 'Backup & Recovery'
         verbose_name_plural = 'Backup & Recovery'
+        default_permissions = ('add', 'view')
 
     def __str__(self):
         return f"{self.record_type} - {self.database} - {self.date}"
@@ -227,6 +230,7 @@ class ServerHealth(models.Model):
         db_table = 'server_health'
         verbose_name = 'Server Health'
         verbose_name_plural = 'Server Health'
+        default_permissions = ('add', 'view')
 
     def __str__(self):
         return f"{self.server} - {self.date}"
@@ -269,6 +273,7 @@ class MaintenanceRegister(models.Model):
         db_table = 'maintenance_register'
         verbose_name = 'Maintenance Register'
         verbose_name_plural = 'Maintenance Registers'
+        default_permissions = ('add', 'view')
 
     def __str__(self):
         return f"{self.change_id} - {self.date}"
@@ -303,6 +308,7 @@ class CapacityPlanning(models.Model):
         db_table = 'capacity_planning'
         verbose_name = 'Capacity Planning'
         verbose_name_plural = 'Capacity Planning'
+        default_permissions = ('add', 'view')
 
     def __str__(self):
         return f"{self.database} - {self.month}"
