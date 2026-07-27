@@ -94,76 +94,28 @@
                         </td>
                         
                         <!-- Availability -->
-                        {% if row.availability == 'No Data' or row.availability == 'N/A' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.availability }}</td>
-                        {% elif '100.0' in row.availability or '99.' in row.availability %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.availability }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.availability }}</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.availability_status == 'Meets SLA' %}#c6efce{% elif row.availability_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.availability_status == 'Meets SLA' %}#006100{% elif row.availability_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.availability }}</td>
 
                         <!-- Planned Downtime -->
-                        {% if row.planned_downtime == 'N/A' or row.planned_downtime == 'No Data' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.planned_downtime }}</td>
-                        {% elif row.planned_downtime > 0 %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.planned_downtime }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc;">0.00</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.planned_downtime_status == 'Meets SLA' %}#c6efce{% elif row.planned_downtime_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.planned_downtime_status == 'Meets SLA' %}#006100{% elif row.planned_downtime_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.planned_downtime|floatformat:2 }}</td>
 
                         <!-- Unplanned Downtime -->
-                        {% if row.unplanned_downtime == 'N/A' or row.unplanned_downtime == 'No Data' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.unplanned_downtime }}</td>
-                        {% elif row.unplanned_downtime > 0 %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.unplanned_downtime }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">0.00</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.unplanned_downtime_status == 'Meets SLA' %}#c6efce{% elif row.unplanned_downtime_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.unplanned_downtime_status == 'Meets SLA' %}#006100{% elif row.unplanned_downtime_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.unplanned_downtime|floatformat:2 }}</td>
 
                         <!-- Total Incidents -->
-                        {% if row.total_incidents > 0 %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffeb9c; color: #9c6500;">{{ row.total_incidents }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">0</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.total_incidents_status == 'Meets SLA' %}#c6efce{% elif row.total_incidents_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.total_incidents_status == 'Meets SLA' %}#006100{% elif row.total_incidents_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.total_incidents }}</td>
 
                         <!-- MTTR -->
-                        {% if row.mttr_mins == 'No Data' or row.mttr_mins == 'N/A' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.mttr_mins }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.mttr_mins }}</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.mttr_mins_status == 'Meets SLA' %}#c6efce{% elif row.mttr_mins_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.mttr_mins_status == 'Meets SLA' %}#006100{% elif row.mttr_mins_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.mttr_mins }}</td>
 
                         <!-- Backup Success -->
-                        {% if row.backup_success == 'No Data' or row.backup_success == 'N/A' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.backup_success }}</td>
-                        {% elif '100' in row.backup_success %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.backup_success }}</td>
-                        {% elif '0.0' in row.backup_success %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.backup_success }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.backup_success }}</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.backup_success_status == 'Meets SLA' %}#c6efce{% elif row.backup_success_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.backup_success_status == 'Meets SLA' %}#006100{% elif row.backup_success_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.backup_success }}</td>
 
                         <!-- Restore Success -->
-                        {% if row.restore_success == 'No Data' or row.restore_success == 'N/A' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.restore_success }}</td>
-                        {% elif '100' in row.restore_success %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">{{ row.restore_success }}</td>
-                        {% elif '0.0' in row.restore_success %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.restore_success }}</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffeb9c; color: #9c6500;">{{ row.restore_success }}</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.restore_success_status == 'Meets SLA' %}#c6efce{% elif row.restore_success_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.restore_success_status == 'Meets SLA' %}#006100{% elif row.restore_success_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.restore_success }}</td>
 
                         <!-- Replication Status -->
-                        {% if row.replication_status == 'No Data' or row.replication_status == 'N/A' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #e9ecef; color: #495057;">{{ row.replication_status }}</td>
-                        {% elif row.replication_status == 'Healthy' %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #c6efce; color: #006100;">Healthy</td>
-                        {% else %}
-                            <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: #ffc7ce; color: #9c0006;">{{ row.replication_status }}</td>
-                        {% endif %}
+                        <td style="padding: 0.75rem; border: 1px solid #ccc; background-color: {% if row.replication_status_status == 'Meets SLA' %}#c6efce{% elif row.replication_status_status == 'N/A' %}#e9ecef{% else %}#ffc7ce{% endif %}; color: {% if row.replication_status_status == 'Meets SLA' %}#006100{% elif row.replication_status_status == 'N/A' %}#495057{% else %}#9c0006{% endif %};">{{ row.replication_status }}</td>
 
                         <!-- Failed Backups -->
                         {% if row.failed_backups > 0 %}

@@ -75,6 +75,23 @@ def dashboard(request):
 
     selected_db = request.GET.get('database_select', 'All Databases')
     db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
+
+    def get_status(current, target_val, operator):
+        if current == 'No Data' or current is None or current == 'N/A':
+            return 'N/A'
+        try:
+            if isinstance(current, str) and '%' in current:
+                current = float(current.replace('%', ''))
+            else:
+                current = float(current)
+            
+            if operator == '>=':
+                return 'Meets SLA' if current >= target_val else 'Below SLA'
+            elif operator == '<=':
+                return 'Meets SLA' if current <= target_val else 'Below SLA'
+        except:
+            return 'N/A'
+
     dashboard_data = []
 
     for db_type in db_types:
@@ -150,13 +167,21 @@ def dashboard(request):
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
+            'availability_status': get_status(avail_str, 99.50, '>='),
             'planned_downtime': round(planned, 2),
+            'planned_downtime_status': get_status(planned, 48.0, '<='),
             'unplanned_downtime': round(unplanned, 2),
+            'unplanned_downtime_status': get_status(unplanned, 2.0, '<='),
             'total_incidents': total_incidents,
+            'total_incidents_status': get_status(total_incidents, 4, '<='),
             'mttr_mins': mttr_mins,
+            'mttr_mins_status': get_status(mttr_mins, 240, '<='),
             'backup_success': backup_success_pct,
+            'backup_success_status': get_status(backup_success_pct, 95.0, '>='),
             'restore_success': restore_success_pct,
+            'restore_success_status': get_status(restore_success_pct, 80.0, '>='),
             'replication_status': rep_status,
+            'replication_status_status': 'N/A' if rep_status in ['No Data', 'N/A'] else ('Meets SLA' if rep_status == 'Healthy' else 'Below SLA'),
             'failed_backups': failed_backups
         })
 
@@ -203,21 +228,7 @@ def dashboard(request):
             if selected_db in ['MS SQL Server', 'PostgreSQL']:
                 rep_lag_str = 'N/A'
 
-            def get_status(current, target_val, operator):
-                if current == 'No Data' or current is None:
-                    return 'N/A'
-                try:
-                    if isinstance(current, str) and '%' in current:
-                        current = float(current.replace('%', ''))
-                    else:
-                        current = float(current)
-                    
-                    if operator == '>=':
-                        return 'Meets SLA' if current >= target_val else 'Below SLA'
-                    elif operator == '<=':
-                        return 'Meets SLA' if current <= target_val else 'Below SLA'
-                except:
-                    return 'N/A'
+
 
             # Calculate Statuses
             avail_status = get_status(row_data['availability'], 99.50, '>=')
