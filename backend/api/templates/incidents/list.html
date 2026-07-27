@@ -45,6 +45,7 @@
                 <th>Date</th>
                 <th>Severity</th>
                 <th>Status</th>
+                <th>Duration (hrs)</th>
                 <th>Database</th>
                 <th>Actions</th>
             </tr>
@@ -74,6 +75,7 @@
                         <span style="color: #ef6c00; font-weight: 600;">{{ incident.status }}</span>
                     {% endif %}
                 </td>
+                <td>{{ incident.duration_hrs }}</td>
                 <td>{{ incident.database }}</td>
                 <td>
                     <div style="display: flex; gap: 0.25rem;">
