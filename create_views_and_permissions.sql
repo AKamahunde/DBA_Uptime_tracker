@@ -21,7 +21,7 @@ INSERT IGNORE INTO uganda_holidays (holiday_date, name) VALUES
 DELIMITER //
 
 DROP FUNCTION IF EXISTS FN_GET_WORKING_SECONDS //
-CREATE FUNCTION FN_GET_WORKING_SECONDS(start_dt DATETIME, end_dt DATETIME)
+CREATE FUNCTION FN_GET_WORKING_SECONDS(start_dt DATETIME, end_dt DATETIME, db_name VARCHAR(50))
 RETURNS INT
 DETERMINISTIC
 READS SQL DATA
@@ -33,6 +33,7 @@ BEGIN
     DECLARE is_holiday INT;
     DECLARE w_start DATETIME;
     DECLARE w_end DATETIME;
+    DECLARE is_weekend INT;
     
     IF start_dt IS NULL OR end_dt IS NULL OR start_dt >= end_dt THEN
         RETURN 0;
@@ -50,27 +51,40 @@ BEGIN
         END IF;
         
         SELECT COUNT(*) INTO is_holiday FROM uganda_holidays WHERE holiday_date = DATE(curr_dt);
+        SET is_weekend = CASE WHEN WEEKDAY(curr_dt) >= 5 THEN 1 ELSE 0 END;
         
         IF is_holiday = 0 THEN
-            -- Window 1: 00:00 to 05:00
-            SET w_start = CONCAT(DATE(curr_dt), ' 00:00:00');
-            SET w_end = CONCAT(DATE(curr_dt), ' 05:00:00');
-            IF curr_dt < w_end AND step_end > w_start THEN
-                SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
-            END IF;
-            
-            -- Window 2: 08:00 to 17:00
-            SET w_start = CONCAT(DATE(curr_dt), ' 08:00:00');
-            SET w_end = CONCAT(DATE(curr_dt), ' 17:00:00');
-            IF curr_dt < w_end AND step_end > w_start THEN
-                SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
-            END IF;
-            
-            -- Window 3: 20:00 to 24:00
-            SET w_start = CONCAT(DATE(curr_dt), ' 20:00:00');
-            SET w_end = next_day;
-            IF curr_dt < w_end AND step_end > w_start THEN
-                SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
+            IF db_name = 'Oracle' THEN
+                -- Oracle: Two shifts, 7 days/week (excluding holidays). Total 18 hrs/day
+                -- Window 1: 00:00 to 05:00
+                SET w_start = CONCAT(DATE(curr_dt), ' 00:00:00');
+                SET w_end = CONCAT(DATE(curr_dt), ' 05:00:00');
+                IF curr_dt < w_end AND step_end > w_start THEN
+                    SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
+                END IF;
+                
+                -- Window 2: 08:00 to 17:00
+                SET w_start = CONCAT(DATE(curr_dt), ' 08:00:00');
+                SET w_end = CONCAT(DATE(curr_dt), ' 17:00:00');
+                IF curr_dt < w_end AND step_end > w_start THEN
+                    SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
+                END IF;
+                
+                -- Window 3: 20:00 to 24:00
+                SET w_start = CONCAT(DATE(curr_dt), ' 20:00:00');
+                SET w_end = next_day;
+                IF curr_dt < w_end AND step_end > w_start THEN
+                    SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
+                END IF;
+            ELSE
+                -- Non-Oracle: 1 shift, 8:00 to 17:00, 5 days/week (excluding weekends & holidays)
+                IF is_weekend = 0 THEN
+                    SET w_start = CONCAT(DATE(curr_dt), ' 08:00:00');
+                    SET w_end = CONCAT(DATE(curr_dt), ' 17:00:00');
+                    IF curr_dt < w_end AND step_end > w_start THEN
+                        SET total_sec = total_sec + TIMESTAMPDIFF(SECOND, GREATEST(curr_dt, w_start), LEAST(step_end, w_end));
+                    END IF;
+                END IF;
             END IF;
         END IF;
         
@@ -81,7 +95,7 @@ BEGIN
 END //
 
 DROP FUNCTION IF EXISTS FN_GET_MONTH_TARGET_HOURS //
-CREATE FUNCTION FN_GET_MONTH_TARGET_HOURS(ym_str VARCHAR(7))
+CREATE FUNCTION FN_GET_MONTH_TARGET_HOURS(ym_str VARCHAR(7), db_name VARCHAR(50))
 RETURNS INT
 DETERMINISTIC
 READS SQL DATA
@@ -90,15 +104,23 @@ BEGIN
     DECLARE curr_dt DATE;
     DECLARE end_dt DATE;
     DECLARE is_holiday INT;
+    DECLARE is_weekend INT;
     
     SET curr_dt = STR_TO_DATE(CONCAT(ym_str, '-01'), '%Y-%m-%d');
     SET end_dt = DATE_ADD(curr_dt, INTERVAL 1 MONTH);
     
     WHILE curr_dt < end_dt DO
         SELECT COUNT(*) INTO is_holiday FROM uganda_holidays WHERE holiday_date = curr_dt;
+        SET is_weekend = CASE WHEN WEEKDAY(curr_dt) >= 5 THEN 1 ELSE 0 END;
         
         IF is_holiday = 0 THEN
-            SET total_hrs = total_hrs + 18;
+            IF db_name = 'Oracle' THEN
+                SET total_hrs = total_hrs + 18;
+            ELSE
+                IF is_weekend = 0 THEN
+                    SET total_hrs = total_hrs + 9;
+                END IF;
+            END IF;
         END IF;
         
         SET curr_dt = DATE_ADD(curr_dt, INTERVAL 1 DAY);
