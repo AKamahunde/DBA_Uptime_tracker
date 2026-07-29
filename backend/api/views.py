@@ -983,7 +983,6 @@ def backup_ingest(request):
             location=data.get('location', 'Unknown'),
             verified=data.get('verified', False),
             compression=data.get('compression', True),
-            retention=data.get('retention', '7 Days')
         )
         return JsonResponse({'status': 'success', 'id': backup.id})
     except Exception as e:
