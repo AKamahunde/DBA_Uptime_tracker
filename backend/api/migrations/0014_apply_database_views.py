@@ -26,13 +26,43 @@ def apply_sql_views(apps, schema_editor):
     # Strip line comments
     raw_sql = re.sub(r'--[^\n]*', '', raw_sql)
     
-    # Split queries by semicolon
-    statements = [s.strip() for s in raw_sql.split(';') if s.strip()]
+    # Parse SQL file handling DELIMITER changes (e.g. for functions)
+    statements = []
+    current_delimiter = ';'
+    current_statement = []
+    
+    for line in raw_sql.splitlines():
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+            
+        # Check for DELIMITER change command
+        if line_stripped.upper().startswith('DELIMITER'):
+            parts = line_stripped.split()
+            if len(parts) > 1:
+                current_delimiter = parts[1]
+            continue
+            
+        # If the line ends with the active delimiter, end the statement
+        if line_stripped.endswith(current_delimiter):
+            line_without_delimiter = line_stripped[:-len(current_delimiter)]
+            current_statement.append(line_without_delimiter)
+            stmt = '\n'.join(current_statement).strip()
+            if stmt:
+                statements.append(stmt)
+            current_statement = []
+        else:
+            current_statement.append(line)
+            
+    # Add any remaining statement
+    stmt = '\n'.join(current_statement).strip()
+    if stmt:
+        statements.append(stmt)
 
     with schema_editor.connection.cursor() as cursor:
         for stmt in statements:
-            # Skip client-side DELIMITER commands
-            if stmt.upper().startswith('DELIMITER'):
+            # Skip empty statements or USE commands
+            if not stmt or stmt.upper().startswith('USE '):
                 continue
             cursor.execute(stmt)
 
