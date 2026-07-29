@@ -1,6 +1,6 @@
 -- ============================================================
 -- DBA Operations Uptime Tracker — MySQL Views for Excel
--- Version 4.4  |  sla_config support & 99.95% SLA
+-- Version 4.5  |  sla_config support, capacity planning views & 99.95% SLA
 -- ============================================================
 
 USE dba_tracker;
@@ -234,7 +234,11 @@ SELECT
     DATE_FORMAT(month, '%Y-%m')                                         AS `Month-Year`,
     database_size_gb                                                    AS `Database Size (GB)`,
     disk_used_percent                                                   AS `Disk Used %`,
-    tablespace_used_percent                                             AS `Tablespace Used %`,
+    CASE 
+        WHEN `database` IN ('MS SQL Server', 'PostgreSQL') THEN 'N/A'
+        ELSE CAST(tablespace_used_percent AS CHAR)
+    END                                                                 AS `Tablespace Used %`,
+    available_capacity_gb                                               AS `Available (GB)`,
     largest_table                                                       AS `Largest Table`,
     growth_gb                                                           AS `Growth (GB)`,
     `database`                                                          AS `Database`
@@ -245,12 +249,23 @@ FROM capacity_planning;
 -- VIEW 7 — AVAILABILITY CALCULATOR
 -- ============================================================
 CREATE OR REPLACE VIEW vw_availability_calculator AS
-WITH months_and_dbs AS (
-    SELECT DISTINCT DATE_FORMAT(date, '%Y-%m') AS ym, `database`
-    FROM incident_register
+WITH distinct_months AS (
+    SELECT DISTINCT DATE_FORMAT(month, '%Y-%m') AS ym FROM sla_config
     UNION
-    SELECT DISTINCT DATE_FORMAT(date, '%Y-%m') AS ym, `database`
-    FROM maintenance_register
+    SELECT DISTINCT DATE_FORMAT(date, '%Y-%m') AS ym FROM incident_register
+    UNION
+    SELECT DISTINCT DATE_FORMAT(date, '%Y-%m') AS ym FROM maintenance_register
+),
+all_dbs AS (
+    SELECT 'MySQL' AS `database`
+    UNION SELECT 'Oracle'
+    UNION SELECT 'MS SQL Server'
+    UNION SELECT 'PostgreSQL'
+),
+months_and_dbs AS (
+    SELECT m.ym, d.`database`
+    FROM distinct_months m
+    CROSS JOIN all_dbs d
 ),
 planned_downtime AS (
     SELECT `database`,
