@@ -173,13 +173,11 @@ SELECT
     TIME(start)                                                         AS `Start Time`,
     TIME(end)                                                           AS `End Time`,
     GREATEST(ROUND(TIMESTAMPDIFF(SECOND, start, end) / 3600.0, 4), 0)  AS `Duration (hrs)`,
-    size_gb                                                             AS `Size (GB)`,
     outcome                                                             AS `Outcome`,
     location                                                            AS `Location`,
     CASE WHEN verified       = 1 THEN 'Yes' ELSE 'No' END              AS `Verified`,
     CASE WHEN restore_tested = 1 THEN 'Yes' ELSE 'No' END              AS `Restore Tested`,
     CASE WHEN compression    = 1 THEN 'Yes' ELSE 'No' END              AS `Compression`,
-    retention                                                           AS `Retention`,
     tested_by                                                           AS `Tested By`,
     COALESCE(comments, '')                                              AS `Comments`
 FROM backup_recovery;
