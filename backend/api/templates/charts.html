@@ -1,85 +1,224 @@
 {% extends 'base.html' %}
 
-{% block title %}Charts & Analytics - DBA Operations Tracker{% endblock %}
+{% block title %}Operational Insights - Uptime Tracker{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h2 style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-weight: 300; margin: 0; color: #1e293b;">
-        Operational <strong style="font-weight: 700; color: #0f172a;">Charts & Analytics</strong>
-    </h2>
+<!-- Import Google Fonts (Outfit) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    /* Dark Theme Override for Charts Page */
+    body {
+        background-color: #080c14 !important;
+        color: #f1f5f9 !important;
+        font-family: 'Outfit', sans-serif !important;
+    }
+
+    .container {
+        max-width: 1300px;
+        padding-top: 1.5rem;
+    }
+
+    /* Glassmorphism Card Style */
+    .glass-card {
+        background: rgba(17, 24, 39, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 16px;
+        padding: 1.75rem;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
+    }
     
-    <!-- Filter Form -->
-    <form method="get" style="display: flex; gap: 1rem; background: #ffffff; padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <label for="month" style="font-size: 0.85rem; font-weight: 600; color: #475569;">Month:</label>
-            <select id="month" name="month" style="padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.875rem;">
+    .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .glass-header {
+        font-size: 1.15rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        color: #f8fafc;
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .glass-header::before {
+        content: '';
+        display: inline-block;
+        width: 4px;
+        height: 18px;
+        border-radius: 2px;
+    }
+
+    .availability-indicator::before { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+    .health-indicator::before { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .capacity-indicator::before { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+    .incident-db-indicator::before { background: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; }
+    .incident-sev-indicator::before { background: #ec4899; box-shadow: 0 0 8px #ec4899; }
+
+    /* Modern Glass Filter Form */
+    .filter-bar {
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 0.6rem 1.2rem;
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
+        backdrop-filter: blur(8px);
+    }
+
+    .filter-bar select {
+        background: #0f172a;
+        color: #e2e8f0;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 0.4rem 1.5rem 0.4rem 0.6rem;
+        font-family: inherit;
+        font-size: 0.875rem;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .filter-bar select:focus {
+        border-color: #3b82f6;
+    }
+
+    .filter-bar button {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 0.45rem 1.25rem;
+        font-weight: 500;
+        font-family: inherit;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+        transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .filter-bar button:hover {
+        opacity: 0.9;
+    }
+    
+    .filter-bar button:active {
+        transform: scale(0.97);
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    
+    .chart-container-large {
+        position: relative;
+        height: 350px;
+        width: 100%;
+    }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div>
+        <h2 style="font-family: 'Outfit', sans-serif; font-weight: 300; margin: 0; color: #94a3b8; font-size: 1.1rem; letter-spacing: 1px; text-transform: uppercase;">
+            Performance Center
+        </h2>
+        <h1 style="font-family: 'Outfit', sans-serif; font-weight: 800; margin: 0.2rem 0 0 0; color: #f8fafc; font-size: 2.2rem; letter-spacing: -0.5px;">
+            Operational Analytics
+        </h1>
+    </div>
+    
+    <!-- Glass Filter Bar -->
+    <form method="get" class="filter-bar">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 0.85rem; font-weight: 500; color: #94a3b8;">Month</span>
+            <select id="month" name="month">
                 {% for m_num, m_name in months %}
                     <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>{{ m_name }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <label for="year" style="font-size: 0.85rem; font-weight: 600; color: #475569;">Year:</label>
-            <select id="year" name="year" style="padding: 0.35rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.875rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 0.85rem; font-weight: 500; color: #94a3b8;">Year</span>
+            <select id="year" name="year">
                 {% for y in years %}
                     <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn btn-primary" style="padding: 0.35rem 1rem; font-size: 0.875rem;">Apply</button>
+        <button type="submit">Update Dashboard</button>
     </form>
 </div>
 
 <!-- Chart Grid -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 3rem;">
     
     <!-- Card 1: Availability -->
-    <div class="card" style="margin: 0; padding: 1.5rem; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);">
-        <h3 style="font-family: inherit; margin-top: 0; margin-bottom: 1.5rem; color: #0f172a; font-size: 1.1rem; border-left: 4px solid #3b82f6; padding-left: 0.75rem;">
-            Database Availability vs SLA Target (%)
+    <div class="glass-card">
+        <h3 class="glass-header availability-indicator">
+            Database Availability Trend vs SLA Target
         </h3>
-        <div style="position: relative; height: 320px; width: 100%;">
+        <div class="chart-container">
             <canvas id="availabilityChart"></canvas>
         </div>
     </div>
     
     <!-- Card 2: Server Health -->
-    <div class="card" style="margin: 0; padding: 1.5rem; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);">
-        <h3 style="font-family: inherit; margin-top: 0; margin-bottom: 1.5rem; color: #0f172a; font-size: 1.1rem; border-left: 4px solid #10b981; padding-left: 0.75rem;">
-            Server Resource Average Loads (%)
+    <div class="glass-card">
+        <h3 class="glass-header health-indicator">
+            Server Resource Average Utilization (CPU / RAM / Disk)
         </h3>
-        <div style="position: relative; height: 320px; width: 100%;">
+        <div class="chart-container">
             <canvas id="healthChart"></canvas>
         </div>
     </div>
     
-    <!-- Card 3: Capacity Trend -->
-    <div class="card" style="margin: 0; padding: 1.5rem; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); grid-column: span 2;">
-        <h3 style="font-family: inherit; margin-top: 0; margin-bottom: 1.5rem; color: #0f172a; font-size: 1.1rem; border-left: 4px solid #f59e0b; padding-left: 0.75rem;">
-            Database Capacity Trend (Last 6 Months in GB)
+    <!-- Card 3: Capacity Trend (Large) -->
+    <div class="glass-card" style="grid-column: span 2;">
+        <h3 class="glass-header capacity-indicator">
+            Database Allocation & Space Usage History (Last 6 Months)
         </h3>
-        <div style="position: relative; height: 350px; width: 100%;">
+        <div class="chart-container-large">
             <canvas id="capacityChart"></canvas>
         </div>
     </div>
     
-    <!-- Card 4: Incidents Pie Chart -->
-    <div class="card" style="margin: 0; padding: 1.5rem; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);">
-        <h3 style="font-family: inherit; margin-top: 0; margin-bottom: 1.5rem; color: #0f172a; font-size: 1.1rem; border-left: 4px solid #8b5cf6; padding-left: 0.75rem;">
-            Incidents Distribution by Database
+    <!-- Card 4: Incidents by DB -->
+    <div class="glass-card">
+        <h3 class="glass-header incident-db-indicator">
+            Incident Breakdown by Database Target
         </h3>
-        <div style="position: relative; height: 280px; width: 100%; display: flex; justify-content: center;">
-            <canvas id="incidentsDbChart"></canvas>
+        <div class="chart-container" style="display: flex; justify-content: center; align-items: center;">
+            <div style="position: relative; width: 240px; height: 240px;">
+                <canvas id="incidentsDbChart"></canvas>
+                <!-- Central Counter -->
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                    <div id="totalIncidentsCount" style="font-size: 2.2rem; font-weight: 800; color: #f8fafc; line-height: 1;">0</div>
+                    <div style="font-size: 0.75rem; font-weight: 500; color: #64748b; text-transform: uppercase; margin-top: 2px;">Incidents</div>
+                </div>
+            </div>
         </div>
     </div>
     
     <!-- Card 5: Incidents Severity -->
-    <div class="card" style="margin: 0; padding: 1.5rem; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);">
-        <h3 style="font-family: inherit; margin-top: 0; margin-bottom: 1.5rem; color: #0f172a; font-size: 1.1rem; border-left: 4px solid #ec4899; padding-left: 0.75rem;">
-            Incidents Breakdown by Severity
+    <div class="glass-card">
+        <h3 class="glass-header incident-sev-indicator">
+            Incident Breakdown by Alarm Severity
         </h3>
-        <div style="position: relative; height: 280px; width: 100%; display: flex; justify-content: center;">
-            <canvas id="incidentsSeverityChart"></canvas>
+        <div class="chart-container" style="display: flex; justify-content: center; align-items: center;">
+            <div style="position: relative; width: 240px; height: 240px;">
+                <canvas id="incidentsSeverityChart"></canvas>
+            </div>
         </div>
     </div>
     
@@ -90,15 +229,30 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Parse injected JSON data
+        // Parse JSON payloads
         const availData = JSON.parse('{{ availability_data|safe }}');
         const healthData = JSON.parse('{{ health_stats|safe }}');
         const capacityData = JSON.parse('{{ capacity_trend_data|safe }}');
         const incDbData = JSON.parse('{{ incident_counts|safe }}');
         const incSevData = JSON.parse('{{ severity_counts|safe }}');
 
-        // 1. Availability Chart
+        // Font Config Override for Chart.js
+        Chart.defaults.font.family = "'Outfit', sans-serif";
+        Chart.defaults.font.size = 11;
+        Chart.defaults.color = '#94a3b8';
+
+        // Helper to generate neon linear gradients
+        function createGradient(ctx, colorStart, colorEnd) {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        }
+
+        // 1. AVAILABILITY CHART (Neon Line Chart)
         const availCtx = document.getElementById('availabilityChart').getContext('2d');
+        const blueGrad = createGradient(availCtx, 'rgba(59, 130, 246, 0.4)', 'rgba(59, 130, 246, 0.0)');
+        
         new Chart(availCtx, {
             type: 'line',
             data: {
@@ -107,121 +261,136 @@
                     {
                         label: 'Actual Availability %',
                         data: availData.map(d => d.availability),
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.15)',
-                        borderWidth: 3,
-                        tension: 0.2,
+                        borderColor: '#3b82f6',
+                        borderWidth: 4,
+                        tension: 0.3,
                         fill: true,
-                        pointRadius: 5,
-                        pointBackgroundColor: '#2563eb',
-                        pointHoverRadius: 7
+                        backgroundColor: blueGrad,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#60a5fa',
+                        pointBorderColor: '#0b0f19',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#93c5fd'
                     },
                     {
                         label: 'SLA Target %',
                         data: availData.map(d => d.target),
                         borderColor: '#ef4444',
-                        borderWidth: 2.5,
-                        borderDash: [6, 4],
+                        borderWidth: 2,
+                        borderDash: [8, 4],
                         fill: false,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#ef4444'
+                        pointRadius: 0
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { boxWidth: 15, padding: 15 }
+                    }
+                },
                 scales: {
+                    x: {
+                        grid: { display: false }
+                    },
                     y: {
                         min: 90,
                         max: 100,
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         ticks: {
-                            callback: function(value) { return value + "%" }
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.raw.toFixed(2) + '%';
-                            }
+                            callback: function(val) { return val + "%" }
                         }
                     }
                 }
             }
         });
 
-        // 2. Server Health Chart
+        // 2. SERVER HEALTH (Resource Bar Chart with Gradients)
         const healthCtx = document.getElementById('healthChart').getContext('2d');
+        const cpuGrad = createGradient(healthCtx, '#10b981', 'rgba(16, 185, 129, 0.3)');
+        const memGrad = createGradient(healthCtx, '#8b5cf6', 'rgba(139, 92, 246, 0.3)');
+        const diskGrad = createGradient(healthCtx, '#6b7280', 'rgba(107, 114, 128, 0.3)');
+
         new Chart(healthCtx, {
             type: 'bar',
             data: {
                 labels: healthData.map(d => d.database),
                 datasets: [
                     {
-                        label: 'CPU Avg (%)',
+                        label: 'CPU Load (%)',
                         data: healthData.map(d => d.cpu),
-                        backgroundColor: 'rgba(16, 185, 129, 0.85)',
-                        borderColor: '#059669',
+                        backgroundColor: cpuGrad,
+                        borderColor: '#10b981',
                         borderWidth: 1,
-                        borderRadius: 4
+                        borderRadius: 6
                     },
                     {
-                        label: 'RAM Avg (%)',
+                        label: 'Memory Load (%)',
                         data: healthData.map(d => d.memory),
-                        backgroundColor: 'rgba(245, 158, 11, 0.85)',
-                        borderColor: '#d97706',
+                        backgroundColor: memGrad,
+                        borderColor: '#8b5cf6',
                         borderWidth: 1,
-                        borderRadius: 4
+                        borderRadius: 6
                     },
                     {
-                        label: 'Disk Avg (%)',
+                        label: 'Disk Usage (%)',
                         data: healthData.map(d => d.disk),
-                        backgroundColor: 'rgba(107, 114, 128, 0.85)',
-                        borderColor: '#4b5563',
+                        backgroundColor: diskGrad,
+                        borderColor: '#6b7280',
                         borderWidth: 1,
-                        borderRadius: 4
+                        borderRadius: 6
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { boxWidth: 12 }
+                    }
+                },
                 scales: {
+                    x: { grid: { display: false } },
                     y: {
                         min: 0,
                         max: 100,
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         ticks: {
-                            callback: function(value) { return value + "%" }
+                            callback: function(val) { return val + "%" }
                         }
                     }
                 }
             }
         });
 
-        // 3. Capacity Trend Chart
+        // 3. CAPACITY TREND (Multi-Line Chart with glowing series)
         const capCtx = document.getElementById('capacityChart').getContext('2d');
-        const capTrendLabels = capacityData.months;
-        const capDatasets = [];
-        
-        // Define colors for each database
         const dbColors = {
             'MySQL': '#3b82f6',
             'Oracle': '#f59e0b',
             'MS SQL Server': '#ef4444',
             'PostgreSQL': '#10b981'
         };
+        const capDatasets = [];
 
         for (const db in capacityData.series) {
             capDatasets.push({
                 label: db,
                 data: capacityData.series[db],
-                borderColor: dbColors[db] || '#6b7280',
+                borderColor: dbColors[db],
                 backgroundColor: 'transparent',
-                borderWidth: 2.5,
-                tension: 0.2,
+                borderWidth: 3.5,
+                tension: 0.25,
                 pointRadius: 4,
+                pointBackgroundColor: dbColors[db],
+                pointBorderWidth: 1.5,
+                pointBorderColor: '#0b0f19',
                 pointHoverRadius: 6
             });
         }
@@ -229,26 +398,38 @@
         new Chart(capCtx, {
             type: 'line',
             data: {
-                labels: capTrendLabels,
+                labels: capacityData.months,
                 datasets: capDatasets
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { boxWidth: 15, padding: 15 }
+                    }
+                },
                 scales: {
+                    x: { grid: { display: false } },
                     y: {
                         beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         title: {
                             display: true,
-                            text: 'Database Size (GB)',
-                            font: { weight: 'bold' }
+                            text: 'Size (GB)',
+                            color: '#94a3b8'
                         }
                     }
                 }
             }
         });
 
-        // 4. Incidents by Database Chart
+        // Calculate total incident count
+        const totalIncidents = incDbData.reduce((acc, curr) => acc + curr.count, 0);
+        document.getElementById('totalIncidentsCount').textContent = totalIncidents;
+
+        // 4. INCIDENTS BY TARGET (Donut Chart 75% cutout)
         const incDbCtx = document.getElementById('incidentsDbChart').getContext('2d');
         new Chart(incDbCtx, {
             type: 'doughnut',
@@ -256,25 +437,26 @@
                 labels: incDbData.map(d => d.database),
                 datasets: [{
                     data: incDbData.map(d => d.count),
-                    backgroundColor: [
-                        '#3b82f6', '#f59e0b', '#ef4444', '#10b981'
-                    ],
+                    backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'],
                     borderWidth: 2,
-                    hoverOffset: 4
+                    borderColor: '#0b0f19',
+                    hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '75%',
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: { boxWidth: 10, padding: 10 }
                     }
                 }
             }
         });
 
-        // 5. Incidents by Severity Chart
+        // 5. INCIDENTS BY SEVERITY (Donut Chart 75% cutout)
         const incSevCtx = document.getElementById('incidentsSeverityChart').getContext('2d');
         new Chart(incSevCtx, {
             type: 'doughnut',
@@ -282,19 +464,20 @@
                 labels: incSevData.map(d => d.severity),
                 datasets: [{
                     data: incSevData.map(d => d.count),
-                    backgroundColor: [
-                        '#dc2626', '#f97316', '#eab308', '#3b82f6'
-                    ],
+                    backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
                     borderWidth: 2,
-                    hoverOffset: 4
+                    borderColor: '#0b0f19',
+                    hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '75%',
                 plugins: {
                     legend: {
-                        position: 'bottom'
+                        position: 'bottom',
+                        labels: { boxWidth: 10, padding: 10 }
                     }
                 }
             }
