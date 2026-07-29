@@ -1241,3 +1241,159 @@ def holiday_delete(request, pk):
     holiday.delete()
     messages.success(request, 'Public Holiday deleted successfully.')
     return redirect(request.META.get('HTTP_REFERER', 'holiday_list'))
+
+@login_required
+def charts_view(request):
+    from datetime import date
+    
+    # Retrieve current year and month from query params, or default to current date
+    now = datetime.now()
+    year_str = request.GET.get('year', str(now.year))
+    month_str = request.GET.get('month', str(now.month))
+    
+    try:
+        year = int(year_str)
+        month = int(month_str)
+    except ValueError:
+        year = now.year
+        month = now.month
+        
+    # Helper to calculate target hours dynamically if SLAConfig is not yet created
+    def get_target_hours_for_month(y, m, db):
+        sla = SLAConfig.objects.filter(month=date(y, m, 1), database=db).first()
+        if sla:
+            return float(sla.target_hours), float(sla.sla_percent)
+            
+        import calendar
+        from api.models import UgandaHoliday
+        holidays = set(UgandaHoliday.objects.filter(
+            holiday_date__year=y,
+            holiday_date__month=m
+        ).values_list('holiday_date', flat=True))
+        
+        _, num_days = calendar.monthrange(y, m)
+        calculated_val = 0
+        for day in range(1, num_days + 1):
+            d = date(y, m, day)
+            is_holiday = d in holidays
+            is_weekend = d.weekday() >= 5
+            if not is_holiday:
+                if db == 'Oracle':
+                    calculated_val += 18
+                else:
+                    if not is_weekend:
+                        calculated_val += 9
+        return float(calculated_val), 99.95
+
+    # 1. Availability Comparison Data
+    databases = ['MySQL', 'Oracle', 'MS SQL Server', 'PostgreSQL']
+    availability_data = []
+    
+    for db in databases:
+        target_hrs, sla_pct = get_target_hours_for_month(year, month, db)
+        
+        unplanned_downtime_hrs = IncidentRegister.objects.filter(
+            database=db,
+            date__year=year,
+            date__month=month,
+            planned=False
+        ).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+        
+        unplanned_hrs = float(unplanned_downtime_hrs)
+        if target_hrs > 0:
+            avail_pct = round(((target_hrs - unplanned_hrs) / target_hrs) * 100, 2)
+        else:
+            avail_pct = 100.00
+            
+        availability_data.append({
+            'database': db,
+            'availability': avail_pct,
+            'target': sla_pct
+        })
+        
+    # 2. Server Health (Average CPU, Memory, Disk for this month)
+    health_stats = []
+    for db in databases:
+        avg_stats = ServerHealth.objects.filter(
+            database=db,
+            date__year=year,
+            date__month=month
+        ).aggregate(
+            avg_cpu=Avg('cpu_percent'),
+            avg_mem=Avg('memory_percent'),
+            avg_disk=Avg('disk_percent')
+        )
+        health_stats.append({
+            'database': db,
+            'cpu': round(float(avg_stats['avg_cpu'] or 0.0), 2),
+            'memory': round(float(avg_stats['avg_mem'] or 0.0), 2),
+            'disk': round(float(avg_stats['avg_disk'] or 0.0), 2),
+        })
+
+    # 3. Capacity Trend (Database Size history for the last 6 months)
+    months_list = []
+    for i in range(5, -1, -1):
+        m = (month - i - 1) % 12 + 1
+        y = year + (month - i - 1) // 12
+        months_list.append(date(y, m, 1))
+        
+    capacity_trend_data = {
+        'months': [m.strftime('%B %Y') for m in months_list],
+        'series': {}
+    }
+    
+    for db in databases:
+        capacity_trend_data['series'][db] = []
+        for m in months_list:
+            cap = CapacityPlanning.objects.filter(
+                database=db,
+                month__year=m.year,
+                month__month=m.month
+            ).order_by('-month').first()
+            size = float(cap.database_size_gb) if cap else 0.0
+            capacity_trend_data['series'][db].append(size)
+
+    # 4. Incidents Breakdown
+    incident_counts = []
+    for db in databases:
+        count = IncidentRegister.objects.filter(
+            database=db,
+            date__year=year,
+            date__month=month
+        ).count()
+        incident_counts.append({
+            'database': db,
+            'count': count
+        })
+        
+    severities = ['Critical', 'Major', 'Minor', 'Low']
+    severity_counts = []
+    for sev in severities:
+        count = IncidentRegister.objects.filter(
+            severity=sev,
+            date__year=year,
+            date__month=month
+        ).count()
+        severity_counts.append({
+            'severity': sev,
+            'count': count
+        })
+        
+    years = range(now.year - 3, now.year + 2)
+    months = [
+        (1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'),
+        (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'),
+        (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')
+    ]
+
+    return render(request, 'charts.html', {
+        'year': year,
+        'month': month,
+        'years': years,
+        'months': months,
+        'availability_data': json.dumps(availability_data),
+        'health_stats': json.dumps(health_stats),
+        'capacity_trend_data': json.dumps(capacity_trend_data),
+        'incident_counts': json.dumps(incident_counts),
+        'severity_counts': json.dumps(severity_counts),
+    })

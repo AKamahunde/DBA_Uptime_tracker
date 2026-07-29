@@ -392,6 +392,7 @@
                     {% if user.is_admin or perms.api.view_capacityplanning %}
                     <a href="{% url 'capacity_list' %}">Capacity</a>
                     {% endif %}
+                    <a href="{% url 'charts_view' %}">Charts</a>
                     {% if user.is_admin %}
                     <div class="nav-dropdown">
                         <button class="nav-dropdown-trigger">Admin ▾</button>
