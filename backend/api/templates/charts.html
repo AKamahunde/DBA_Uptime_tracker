@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
-    /* Executive Light Theme Styling */
+    /* Executive Light Theme Layout */
     body {
         background-color: #f5f5f5 !important;
         color: #334155 !important;
@@ -25,15 +25,15 @@
     .dashboard-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        border-radius: 14px;
+        padding: 1.75rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     
     .dashboard-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.06);
     }
 
     .card-header-title {
@@ -42,7 +42,7 @@
         letter-spacing: 0.2px;
         color: #0f172a;
         margin-top: 0;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.75rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -71,7 +71,7 @@
         display: flex;
         gap: 1.5rem;
         align-items: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
 
     .filter-bar select {
@@ -231,10 +231,31 @@
         // Font Config Override for Chart.js
         Chart.defaults.font.family = "'Outfit', sans-serif";
         Chart.defaults.font.size = 11;
-        Chart.defaults.color = '#475569'; // Slate-600
+        Chart.defaults.color = '#64748b'; // Slate-500
 
-        // 1. AVAILABILITY CHART (Clean Line Chart - No Fill, Tension 0)
+        // Custom Tooltip Styling config
+        const customTooltipConfig = {
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#ffffff',
+            titleFont: { size: 13, weight: 'bold' },
+            bodyColor: '#e2e8f0',
+            bodyFont: { size: 12 },
+            padding: 12,
+            cornerRadius: 8,
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            displayColors: true,
+            boxWidth: 8,
+            boxHeight: 8,
+            usePointStyle: true
+        };
+
+        // 1. AVAILABILITY CHART (Column chart with vertical gradients)
         const availCtx = document.getElementById('availabilityChart').getContext('2d');
+        const availGradient = availCtx.createLinearGradient(0, 0, 0, 300);
+        availGradient.addColorStop(0, '#2563eb'); // Royal Blue
+        availGradient.addColorStop(1, '#60a5fa'); // Light Blue
+
         new Chart(availCtx, {
             type: 'bar',
             data: {
@@ -243,11 +264,10 @@
                     {
                         label: 'Actual Availability %',
                         data: availData.map(d => d.availability),
-                        backgroundColor: 'rgba(37, 99, 235, 0.85)', // Corporate Blue
-                        borderColor: '#1d4ed8',
-                        borderWidth: 1.5,
-                        borderRadius: 6,
-                        barPercentage: 0.5
+                        backgroundColor: availGradient,
+                        borderRadius: { topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0 },
+                        borderSkipped: false,
+                        barPercentage: 0.4
                     },
                     {
                         label: 'SLA Target %',
@@ -268,7 +288,8 @@
                     legend: {
                         position: 'top',
                         labels: { boxWidth: 15, padding: 15 }
-                    }
+                    },
+                    tooltip: customTooltipConfig
                 },
                 scales: {
                     x: {
@@ -277,7 +298,7 @@
                     y: {
                         min: 90,
                         max: 100,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.04)', drawBorder: false },
                         ticks: {
                             callback: function(val) { return val + "%" }
                         }
@@ -286,8 +307,20 @@
             }
         });
 
-        // 2. SERVER HEALTH (Resource Bar Chart)
+        // 2. SERVER HEALTH (Resource Bar Chart with Gradients)
         const healthCtx = document.getElementById('healthChart').getContext('2d');
+        const cpuGrad = healthCtx.createLinearGradient(0, 0, 0, 300);
+        cpuGrad.addColorStop(0, '#10b981'); // Emerald
+        cpuGrad.addColorStop(1, '#34d399');
+        
+        const memGrad = healthCtx.createLinearGradient(0, 0, 0, 300);
+        memGrad.addColorStop(0, '#8b5cf6'); // Violet
+        memGrad.addColorStop(1, '#c084fc');
+
+        const diskGrad = healthCtx.createLinearGradient(0, 0, 0, 300);
+        diskGrad.addColorStop(0, '#475569'); // Slate
+        diskGrad.addColorStop(1, '#94a3b8');
+
         new Chart(healthCtx, {
             type: 'bar',
             data: {
@@ -296,26 +329,23 @@
                     {
                         label: 'CPU Load (%)',
                         data: healthData.map(d => d.cpu),
-                        backgroundColor: '#10b981', // Emerald
-                        borderColor: '#059669',
-                        borderWidth: 1,
-                        borderRadius: 4
+                        backgroundColor: cpuGrad,
+                        borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+                        barPercentage: 0.7
                     },
                     {
                         label: 'Memory Load (%)',
                         data: healthData.map(d => d.memory),
-                        backgroundColor: '#8b5cf6', // Violet
-                        borderColor: '#7c3aed',
-                        borderWidth: 1,
-                        borderRadius: 4
+                        backgroundColor: memGrad,
+                        borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+                        barPercentage: 0.7
                     },
                     {
                         label: 'Disk Usage (%)',
                         data: healthData.map(d => d.disk),
-                        backgroundColor: '#64748b', // Slate
-                        borderColor: '#475569',
-                        borderWidth: 1,
-                        borderRadius: 4
+                        backgroundColor: diskGrad,
+                        borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+                        barPercentage: 0.7
                     }
                 ]
             },
@@ -326,14 +356,15 @@
                     legend: {
                         position: 'top',
                         labels: { boxWidth: 12 }
-                    }
+                    },
+                    tooltip: customTooltipConfig
                 },
                 scales: {
                     x: { grid: { display: false } },
                     y: {
                         min: 0,
                         max: 100,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.04)', drawBorder: false },
                         ticks: {
                             callback: function(val) { return val + "%" }
                         }
@@ -342,7 +373,7 @@
             }
         });
 
-        // 3. CAPACITY TREND (Multi-Line Chart - No Fills, Tension 0)
+        // 3. CAPACITY TREND (Multi-Line Chart with high-contrast targets)
         const capCtx = document.getElementById('capacityChart').getContext('2d');
         const dbColors = {
             'MySQL': '#1d4ed8',       // Dark Blue
@@ -360,11 +391,11 @@
                 backgroundColor: 'transparent',
                 borderWidth: 3,
                 tension: 0, // Straight lines
-                fill: false, // No fill
+                fill: false,
                 pointRadius: 5,
                 pointBackgroundColor: dbColors[db] || '#4b5563',
-                pointBorderWidth: 1.5,
-                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointBorderColor: '#ffffff', // High contrast ring
                 pointHoverRadius: 7
             });
         }
@@ -382,13 +413,14 @@
                     legend: {
                         position: 'top',
                         labels: { boxWidth: 15, padding: 15 }
-                    }
+                    },
+                    tooltip: customTooltipConfig
                 },
                 scales: {
                     x: { grid: { display: false } },
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.04)', drawBorder: false },
                         title: {
                             display: true,
                             text: 'Size (GB)',
@@ -403,7 +435,7 @@
         const totalIncidents = incDbData.reduce((acc, curr) => acc + curr.count, 0);
         document.getElementById('totalIncidentsCount').textContent = totalIncidents;
 
-        // 4. INCIDENTS BY TARGET (Donut Chart)
+        // 4. INCIDENTS BY TARGET (Thin donut rings with spacing)
         const incDbCtx = document.getElementById('incidentsDbChart').getContext('2d');
         new Chart(incDbCtx, {
             type: 'doughnut',
@@ -412,25 +444,28 @@
                 datasets: [{
                     data: incDbData.map(d => d.count),
                     backgroundColor: ['#1d4ed8', '#c2410c', '#b91c1c', '#047857'],
-                    borderWidth: 2,
+                    borderWidth: 3,
                     borderColor: '#ffffff',
+                    spacing: 4,      // Modern gaps between segments
+                    borderRadius: 4, // Rounded ring edges
                     hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '70%',
+                cutout: '82%', // Slimmer ring
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: { boxWidth: 10, padding: 10 }
-                    }
+                    },
+                    tooltip: customTooltipConfig
                 }
             }
         });
 
-        // 5. INCIDENTS BY SEVERITY (Donut Chart)
+        // 5. INCIDENTS BY SEVERITY (Thin donut rings with spacing)
         const incSevCtx = document.getElementById('incidentsSeverityChart').getContext('2d');
         new Chart(incSevCtx, {
             type: 'doughnut',
@@ -439,20 +474,23 @@
                 datasets: [{
                     data: incSevData.map(d => d.count),
                     backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
-                    borderWidth: 2,
+                    borderWidth: 3,
                     borderColor: '#ffffff',
+                    spacing: 4,      // Modern gaps between segments
+                    borderRadius: 4, // Rounded ring edges
                     hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '70%',
+                cutout: '82%', // Slimmer ring
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: { boxWidth: 10, padding: 10 }
-                    }
+                    },
+                    tooltip: customTooltipConfig
                 }
             }
         });
