@@ -307,18 +307,19 @@ unplanned_downtime AS (
 SELECT 
     m.ym AS `Month-Year`,
     m.`database` AS `Database`,
-    COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) AS `Target Hours`,
-    ROUND(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
+    COALESCE(th.target_hours, 0) AS `Target Hours`,
+    ROUND(COALESCE(th.target_hours, 0) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
     ROUND(COALESCE(p.total_hrs, 0), 4) AS `Planned Downtime (hrs)`,
     ROUND(COALESCE(u.total_hrs, 0), 4) AS `Unplanned Downtime (hrs)`,
     ROUND(
-        (COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0)) 
-        / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)), 0) * 100, 
+        IF(COALESCE(th.target_hours, 0) = 0, 0,
+           (th.target_hours - COALESCE(u.total_hrs, 0)) / th.target_hours * 100
+        ),
     4) AS `Availability %`,
     COALESCE(th.sla_percent, 99.95) AS `SLA %`,
     CASE 
-        WHEN ROUND((COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0)) / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)), 0) * 100, 4) >= COALESCE(th.sla_percent, 99.95)
-        THEN 'Met'
+        WHEN COALESCE(th.target_hours, 0) = 0 THEN 'N/A'
+        WHEN ROUND((th.target_hours - COALESCE(u.total_hrs, 0)) / th.target_hours * 100, 4) >= COALESCE(th.sla_percent, 99.95) THEN 'Met'
         ELSE 'Missed'
     END AS `SLA Status`
 FROM months_and_dbs m

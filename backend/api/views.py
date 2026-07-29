@@ -1258,52 +1258,33 @@ def charts_view(request):
         year = now.year
         month = now.month
         
-    # Helper to calculate target hours dynamically if SLAConfig is not yet created
-    def get_target_hours_for_month(y, m, db):
-        sla = SLAConfig.objects.filter(month=date(y, m, 1), database=db).first()
-        if sla:
-            return float(sla.target_hours), float(sla.sla_percent)
-            
-        import calendar
-        from api.models import UgandaHoliday
-        holidays = set(UgandaHoliday.objects.filter(
-            holiday_date__year=y,
-            holiday_date__month=m
-        ).values_list('holiday_date', flat=True))
-        
-        _, num_days = calendar.monthrange(y, m)
-        calculated_val = 0
-        for day in range(1, num_days + 1):
-            d = date(y, m, day)
-            is_holiday = d in holidays
-            is_weekend = d.weekday() >= 5
-            if not is_holiday:
-                if db == 'Oracle':
-                    calculated_val += 18
-                else:
-                    if not is_weekend:
-                        calculated_val += 9
-        return float(calculated_val), 99.95
-
     # 1. Availability Comparison Data
     databases = ['MySQL', 'Oracle', 'MS SQL Server', 'PostgreSQL']
     availability_data = []
     
     for db in databases:
-        target_hrs, sla_pct = get_target_hours_for_month(year, month, db)
+        # Check if SLAConfig exists for this month and database
+        sla = SLAConfig.objects.filter(month=date(year, month, 1), database=db).first()
         
-        unplanned_downtime_hrs = IncidentRegister.objects.filter(
-            database=db,
-            date__year=year,
-            date__month=month,
-            planned=False
-        ).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
-        
-        unplanned_hrs = float(unplanned_downtime_hrs)
-        if target_hrs > 0:
-            avail_pct = round(((target_hrs - unplanned_hrs) / target_hrs) * 100, 2)
+        if sla:
+            target_hrs = float(sla.target_hours)
+            sla_pct = float(sla.sla_percent)
+            
+            unplanned_downtime_hrs = IncidentRegister.objects.filter(
+                database=db,
+                date__year=year,
+                date__month=month,
+                planned=False
+            ).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+            
+            unplanned_hrs = float(unplanned_downtime_hrs)
+            if target_hrs > 0:
+                avail_pct = round(((target_hrs - unplanned_hrs) / target_hrs) * 100, 2)
+            else:
+                avail_pct = 0.00
         else:
-            avail_pct = 100.00
+            avail_pct = 0.00
+            sla_pct = 99.95
             
         availability_data.append({
             'database': db,
