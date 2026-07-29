@@ -236,29 +236,25 @@
         // 1. AVAILABILITY CHART (Clean Line Chart - No Fill, Tension 0)
         const availCtx = document.getElementById('availabilityChart').getContext('2d');
         new Chart(availCtx, {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels: availData.map(d => d.database),
                 datasets: [
                     {
                         label: 'Actual Availability %',
                         data: availData.map(d => d.availability),
-                        borderColor: '#2563eb', // Clean Royal Blue
-                        borderWidth: 3,
-                        tension: 0, // Straight lines
-                        fill: false, // No fill
-                        pointRadius: 6,
-                        pointBackgroundColor: '#2563eb',
-                        pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2,
-                        pointHoverRadius: 8,
-                        pointHoverBackgroundColor: '#1d4ed8'
+                        backgroundColor: 'rgba(37, 99, 235, 0.85)', // Corporate Blue
+                        borderColor: '#1d4ed8',
+                        borderWidth: 1.5,
+                        borderRadius: 6,
+                        barPercentage: 0.5
                     },
                     {
                         label: 'SLA Target %',
                         data: availData.map(d => d.target),
+                        type: 'line',
                         borderColor: '#ef4444', // Red
-                        borderWidth: 2,
+                        borderWidth: 2.5,
                         borderDash: [6, 4],
                         fill: false,
                         pointRadius: 0
