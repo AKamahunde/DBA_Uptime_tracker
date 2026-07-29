@@ -95,6 +95,12 @@ class TargetHoursForm(forms.ModelForm):
         ('MS SQL Server', 'MS SQL Server'),
         ('PostgreSQL', 'PostgreSQL'),
     ])
+    target_hours = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        help_text="Leave blank to auto-calculate based on working hours (18 hrs/day, excluding public holidays)."
+    )
 
     class Meta:
         model = TargetHours
@@ -115,6 +121,29 @@ class TargetHoursForm(forms.ModelForm):
                 raise forms.ValidationError("Enter a valid month (YYYY-MM).")
         return m_str
 
+    def clean(self):
+        cleaned_data = super().clean()
+        month_val = cleaned_data.get('month')
+        target_hours = cleaned_data.get('target_hours')
+        
+        if month_val and target_hours is None:
+            import calendar
+            from .models import UgandaHoliday
+            
+            year = month_val.year
+            month = month_val.month
+            _, num_days = calendar.monthrange(year, month)
+            
+            holidays_count = UgandaHoliday.objects.filter(
+                holiday_date__year=year,
+                holiday_date__month=month
+            ).count()
+            
+            calculated_val = 18 * (num_days - holidays_count)
+            cleaned_data['target_hours'] = calculated_val
+            
+        return cleaned_data
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         db_map = {
@@ -125,6 +154,7 @@ class TargetHoursForm(forms.ModelForm):
         }
         db_val = self.cleaned_data.get('database')
         instance.database_type = db_map.get(db_val, 'MYSQL')
+        instance.target_hours = self.cleaned_data.get('target_hours')
         if commit:
             instance.save()
         return instance

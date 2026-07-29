@@ -26,10 +26,13 @@
         <div class="form-group">
             <label for="{{ form.database.id_for_label }}">Database:</label>
             {{ form.database }}
-            <small style="color: #64748b; display: block; margin-top: 0.25rem;">Should match the database name in incidents/maintenance exactly (e.g. MySQL, PostgreSQL).</small>
+        </div>
         <div class="form-group">
             <label for="{{ form.target_hours.id_for_label }}">Target Hours:</label>
             {{ form.target_hours }}
+            {% if form.target_hours.help_text %}
+            <small style="color: #64748b; display: block; margin-top: 0.25rem;">{{ form.target_hours.help_text }}</small>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.sla_percent.id_for_label }}">SLA Target %:</label>

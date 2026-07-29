@@ -74,17 +74,18 @@
         
         .nav-links {
             display: flex;
-            gap: 0.25rem;
+            gap: 0.15rem;
             align-items: center;
             font-family: 'Bookman Old Style', serif;
         }
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 0.5rem 0.9rem;
+            padding: 0.4rem 0.65rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
             font-family: 'Bookman Old Style', serif;
+            font-size: 0.92rem;
         }
         .nav-links a:hover, .nav-links a.active {
             background-color: var(--color-accent);
@@ -97,8 +98,9 @@
             border: none;
             color: white;
             font: inherit;
+            font-size: 0.92rem;
             cursor: pointer;
-            padding: 0.5rem 0.9rem;
+            padding: 0.4rem 0.65rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
         }
@@ -321,24 +323,24 @@
                     <a href="{% url 'replication_list' %}">Replication</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_backuprecovery %}
-                    <a href="{% url 'backup_list' %}">Backup & Restore Register</a>
+                    <a href="{% url 'backup_list' %}">Backups</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_serverhealth %}
-                    <a href="{% url 'server_health_list' %}">Server Health Registry</a>
+                    <a href="{% url 'server_health_list' %}">Server Health</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_maintenanceregister %}
                     <a href="{% url 'maintenance_list' %}">Maintenance</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_capacityplanning %}
-                    <a href="{% url 'capacity_list' %}">Capacity Tracking</a>
+                    <a href="{% url 'capacity_list' %}">Capacity</a>
                     {% endif %}
                     {% if user.is_admin %}
-                    <a href="{% url 'target_hours_list' %}">Target Hours</a>
-                    <a href="{% url 'holiday_list' %}">Public Holidays</a>
+                    <a href="{% url 'target_hours_list' %}">Targets</a>
+                    <a href="{% url 'holiday_list' %}">Holidays</a>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}" style="display:inline;">
                         {% csrf_token %}
-                        <button type="submit" class="nav-logout-btn">Logout ({{ user.username }})</button>
+                        <button type="submit" class="nav-logout-btn">Logout</button>
                     </form>
                 {% else %}
                     <a href="{% url 'login' %}">Login</a>
