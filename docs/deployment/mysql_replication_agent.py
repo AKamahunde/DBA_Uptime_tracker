@@ -9,11 +9,13 @@ import sys
 # Configuration
 # Replace with the actual URL/IP of your Uptime Tracker server
 UPTIME_TRACKER_API_URL = "http://192.168.35.38:90/api/replication/ingest/"
-API_KEY = "YOUR-GENERATED-API-KEY-HERE"
+API_KEY = "uptimetracker_api_9f2c1d8e45x9"
 
-def get_replication_status(user, password):
+def get_replication_status(user=None, password=None):
     """Runs SHOW REPLICA STATUS and parses the output."""
-    cmd = ["mysql", "-u", user]
+    cmd = ["mysql"]
+    if user:
+        cmd.extend(["-u", user])
     if password:
         cmd.append(f"-p{password}")
     cmd.extend(["-e", "SHOW REPLICA STATUS\\G"])
@@ -57,7 +59,7 @@ def send_to_tracker(payload):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MySQL Replication Monitoring Agent")
-    parser.add_argument("-u", "--user", required=True, help="MySQL user")
+    parser.add_argument("-u", "--user", required=False, default=None, help="MySQL user (uses .my.cnf if not provided)")
     parser.add_argument("-p", "--password", required=False, default="", help="MySQL password")
     
     args = parser.parse_args()
