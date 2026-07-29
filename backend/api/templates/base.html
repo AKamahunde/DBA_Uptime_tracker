@@ -332,13 +332,11 @@
                     {% if user.is_admin or perms.api.view_capacityplanning %}
                     <a href="{% url 'capacity_list' %}">Capacity Tracking</a>
                     {% endif %}
-                    <a href="{% url 'about' %}">About</a>
                     <form method="post" action="{% url 'logout' %}" style="display:inline;">
                         {% csrf_token %}
                         <button type="submit" class="nav-logout-btn">Logout ({{ user.username }})</button>
                     </form>
                 {% else %}
-                    <a href="{% url 'about' %}">About</a>
                     <a href="{% url 'login' %}">Login</a>
                 {% endif %}
             </div>
