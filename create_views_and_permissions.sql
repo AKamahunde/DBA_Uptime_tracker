@@ -1,6 +1,6 @@
 -- ============================================================
 -- DBA Operations Uptime Tracker — MySQL Views for Excel
--- Version 4.5  |  sla_config support, capacity planning views & 99.95% SLA
+-- Version 4.6  |  sla_config support, capacity planning views & database-specific working hours
 -- ============================================================
 
 USE dba_tracker;
@@ -119,7 +119,7 @@ SELECT
     DATE(date)                                                          AS `Date`,
     TIME(start)                                                         AS `Start`,
     TIME(end)                                                           AS `End`,
-    GREATEST(ROUND(FN_GET_WORKING_SECONDS(start, end) / 3600.0, 4), 0)  AS `Duration (hrs)`,
+    GREATEST(ROUND(FN_GET_WORKING_SECONDS(start, end, `database`) / 3600.0, 4), 0)  AS `Duration (hrs)`,
     CASE WHEN planned = 1 THEN 'Yes' ELSE 'No' END                     AS `Planned`,
     severity                                                            AS `Severity`,
     `system`                                                            AS `System`,
@@ -217,7 +217,7 @@ SELECT
     activity                                                            AS `Activity`,
     TIME(start)                                                         AS `Start`,
     TIME(end)                                                           AS `End`,
-    GREATEST(ROUND(FN_GET_WORKING_SECONDS(start, end) / 3600.0, 4), 0)  AS `Duration (hrs)`,
+    GREATEST(ROUND(FN_GET_WORKING_SECONDS(start, end, `database`) / 3600.0, 4), 0)  AS `Duration (hrs)`,
     risk                                                                AS `Risk`,
     rollback_plan                                                       AS `Rollback Plan`,
     approved_by                                                         AS `Approved By`,
@@ -270,14 +270,14 @@ months_and_dbs AS (
 planned_downtime AS (
     SELECT `database`,
            DATE_FORMAT(date, '%Y-%m') AS ym,
-           SUM(FN_GET_WORKING_SECONDS(start, end) / 3600.0) AS total_hrs
+           SUM(FN_GET_WORKING_SECONDS(start, end, `database`) / 3600.0) AS total_hrs
     FROM maintenance_register
     GROUP BY `database`, DATE_FORMAT(date, '%Y-%m')
 ),
 unplanned_downtime AS (
     SELECT `database`,
            DATE_FORMAT(date, '%Y-%m') AS ym,
-           SUM(FN_GET_WORKING_SECONDS(start, COALESCE(end, NOW())) / 3600.0) AS total_hrs
+           SUM(FN_GET_WORKING_SECONDS(start, COALESCE(end, NOW()), `database`) / 3600.0) AS total_hrs
     FROM incident_register
     WHERE planned = 0
     GROUP BY `database`, DATE_FORMAT(date, '%Y-%m')
@@ -285,17 +285,17 @@ unplanned_downtime AS (
 SELECT 
     m.ym AS `Month-Year`,
     m.`database` AS `Database`,
-    COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) AS `Target Hours`,
-    ROUND(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
+    COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) AS `Target Hours`,
+    ROUND(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
     ROUND(COALESCE(p.total_hrs, 0), 4) AS `Planned Downtime (hrs)`,
     ROUND(COALESCE(u.total_hrs, 0), 4) AS `Unplanned Downtime (hrs)`,
     ROUND(
-        (COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0)) 
-        / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)), 0) * 100, 
+        (COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0)) 
+        / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)), 0) * 100, 
     4) AS `Availability %`,
     COALESCE(th.sla_percent, 99.95) AS `SLA %`,
     CASE 
-        WHEN ROUND((COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0)) / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)), 0) * 100, 4) >= COALESCE(th.sla_percent, 99.95)
+        WHEN ROUND((COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)) - COALESCE(u.total_hrs, 0)) / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym, m.`database`)), 0) * 100, 4) >= COALESCE(th.sla_percent, 99.95)
         THEN 'Met'
         ELSE 'Missed'
     END AS `SLA Status`
