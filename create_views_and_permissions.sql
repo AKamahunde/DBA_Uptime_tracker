@@ -169,7 +169,7 @@ SELECT
     DATE(date)                                                          AS `Backup Date`,
     database_instance                                                   AS `Instance`,
     backup_type                                                         AS `Backup Type`,
-    backup_used                                                         AS `Tool Used`,
+    backup_used                                                         AS `Backup File / Reference`,
     TIME(start)                                                         AS `Start Time`,
     TIME(end)                                                           AS `End Time`,
     GREATEST(ROUND(TIMESTAMPDIFF(SECOND, start, end) / 3600.0, 4), 0)  AS `Duration (hrs)`,
