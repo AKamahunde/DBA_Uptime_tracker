@@ -99,7 +99,7 @@ class SLAConfigForm(forms.ModelForm):
         required=False,
         max_digits=10,
         decimal_places=2,
-        help_text="Leave blank to auto-calculate based on working hours (18 hrs/day, excluding public holidays)."
+        help_text="Leave blank to auto-calculate (Oracle: 18 hrs/day, 7 days/wk; Others: 9 hrs/day, 5 days/wk, excluding weekends and public holidays)."
     )
 
     class Meta:
@@ -128,18 +128,36 @@ class SLAConfigForm(forms.ModelForm):
         
         if month_val and target_hours is None:
             import calendar
+            from datetime import date
             from .models import UgandaHoliday
             
             year = month_val.year
             month = month_val.month
-            _, num_days = calendar.monthrange(year, month)
+            db = cleaned_data.get('database')
             
-            holidays_count = UgandaHoliday.objects.filter(
+            # Fetch all holiday dates for this month as a set
+            holidays = set(UgandaHoliday.objects.filter(
                 holiday_date__year=year,
                 holiday_date__month=month
-            ).count()
+            ).values_list('holiday_date', flat=True))
             
-            calculated_val = 18 * (num_days - holidays_count)
+            _, num_days = calendar.monthrange(year, month)
+            calculated_val = 0
+            
+            for day in range(1, num_days + 1):
+                d = date(year, month, day)
+                is_holiday = d in holidays
+                is_weekend = d.weekday() >= 5  # 5 is Saturday, 6 is Sunday
+                
+                if not is_holiday:
+                    if db == 'Oracle':
+                        # Oracle: 18 hours/day, 7 days/week
+                        calculated_val += 18
+                    else:
+                        # Non-Oracle: 9 hours/day, 5 days/week (Monday to Friday)
+                        if not is_weekend:
+                            calculated_val += 9
+            
             cleaned_data['target_hours'] = calculated_val
             
         return cleaned_data

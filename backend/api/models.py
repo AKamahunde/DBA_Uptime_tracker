@@ -363,14 +363,32 @@ from django.db.models import F
 def update_target_hours_on_holiday_save(sender, instance, created, **kwargs):
     if created:
         first_day_of_month = instance.holiday_date.replace(day=1)
-        SLAConfig.objects.filter(month=first_day_of_month).update(
+        is_weekend = instance.holiday_date.weekday() >= 5
+        
+        # Oracle: always subtract 18 hours for a holiday
+        SLAConfig.objects.filter(month=first_day_of_month, database='Oracle').update(
             target_hours=F('target_hours') - 18
         )
+        
+        # Non-Oracle (MySQL, MSSQL, Postgres): only subtract 9 hours if it falls on a weekday
+        if not is_weekend:
+            SLAConfig.objects.filter(month=first_day_of_month).exclude(database='Oracle').update(
+                target_hours=F('target_hours') - 9
+            )
 
 @receiver(post_delete, sender=UgandaHoliday)
 def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
     first_day_of_month = instance.holiday_date.replace(day=1)
-    SLAConfig.objects.filter(month=first_day_of_month).update(
+    is_weekend = instance.holiday_date.weekday() >= 5
+    
+    # Oracle: always add 18 hours for a holiday
+    SLAConfig.objects.filter(month=first_day_of_month, database='Oracle').update(
         target_hours=F('target_hours') + 18
     )
+    
+    # Non-Oracle: only add 9 hours if it fell on a weekday
+    if not is_weekend:
+        SLAConfig.objects.filter(month=first_day_of_month).exclude(database='Oracle').update(
+            target_hours=F('target_hours') + 9
+        )
 
