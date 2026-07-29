@@ -13,7 +13,6 @@ def apply_sql_views(apps, schema_editor):
     if not os.path.exists(sql_file_path):
         sql_file_path = os.path.join(base_dir, 'create_views_and_permissions.sql')
     if not os.path.exists(sql_file_path):
-        # Look in the parent of windsurf-project if nested
         sql_file_path = os.path.join(os.path.dirname(base_dir), 'create_views_and_permissions.sql')
 
     if not os.path.exists(sql_file_path):
@@ -54,7 +53,7 @@ def rollback_sql_views(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0007_backuprecovery_schema_update'),
+        ('api', '0013_alter_backuprecovery_options_and_more'),
     ]
 
     operations = [
