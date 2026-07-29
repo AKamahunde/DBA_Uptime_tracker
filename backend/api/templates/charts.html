@@ -9,10 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
-    /* Dark Theme Override for Charts Page */
+    /* Executive Light Theme Styling */
     body {
-        background-color: #080c14 !important;
-        color: #f1f5f9 !important;
+        background-color: #f5f5f5 !important;
+        color: #334155 !important;
         font-family: 'Outfit', sans-serif !important;
     }
 
@@ -21,29 +21,26 @@
         padding-top: 1.5rem;
     }
 
-    /* Glassmorphism Card Style */
-    .glass-card {
-        background: rgba(17, 24, 39, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 16px;
-        padding: 1.75rem;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
+    /* Clean Card Style */
+    .dashboard-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     
-    .glass-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.15);
-        border-color: rgba(59, 130, 246, 0.3);
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
     }
 
-    .glass-header {
-        font-size: 1.15rem;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        color: #f8fafc;
+    .card-header-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: #0f172a;
         margin-top: 0;
         margin-bottom: 1.5rem;
         display: flex;
@@ -51,36 +48,36 @@
         gap: 0.5rem;
     }
 
-    .glass-header::before {
+    .card-header-title::before {
         content: '';
         display: inline-block;
         width: 4px;
-        height: 18px;
+        height: 16px;
         border-radius: 2px;
     }
 
-    .availability-indicator::before { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
-    .health-indicator::before { background: #10b981; box-shadow: 0 0 8px #10b981; }
-    .capacity-indicator::before { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
-    .incident-db-indicator::before { background: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; }
-    .incident-sev-indicator::before { background: #ec4899; box-shadow: 0 0 8px #ec4899; }
+    .availability-indicator::before { background: #2563eb; }
+    .health-indicator::before { background: #10b981; }
+    .capacity-indicator::before { background: #f59e0b; }
+    .incident-db-indicator::before { background: #8b5cf6; }
+    .incident-sev-indicator::before { background: #ec4899; }
 
-    /* Modern Glass Filter Form */
+    /* Filter Bar Styling */
     .filter-bar {
-        background: rgba(15, 23, 42, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
         padding: 0.6rem 1.2rem;
         display: flex;
         gap: 1.5rem;
         align-items: center;
-        backdrop-filter: blur(8px);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
     .filter-bar select {
-        background: #0f172a;
-        color: #e2e8f0;
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: #ffffff;
+        color: #334155;
+        border: 1px solid #cbd5e1;
         border-radius: 6px;
         padding: 0.4rem 1.5rem 0.4rem 0.6rem;
         font-family: inherit;
@@ -91,28 +88,23 @@
     }
 
     .filter-bar select:focus {
-        border-color: #3b82f6;
+        border-color: #2563eb;
     }
 
     .filter-bar button {
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        background: #2563eb;
         color: white;
         border: none;
         border-radius: 6px;
         padding: 0.45rem 1.25rem;
-        font-weight: 500;
+        font-weight: 600;
         font-family: inherit;
         cursor: pointer;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-        transition: opacity 0.2s, transform 0.1s;
+        transition: background-color 0.2s;
     }
 
     .filter-bar button:hover {
-        opacity: 0.9;
-    }
-    
-    .filter-bar button:active {
-        transform: scale(0.97);
+        background: #1d4ed8;
     }
 
     .chart-container {
@@ -130,18 +122,18 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <div>
-        <h2 style="font-family: 'Outfit', sans-serif; font-weight: 300; margin: 0; color: #94a3b8; font-size: 1.1rem; letter-spacing: 1px; text-transform: uppercase;">
-            Performance Center
+        <h2 style="font-family: 'Outfit', sans-serif; font-weight: 600; margin: 0; color: #64748b; font-size: 0.95rem; letter-spacing: 0.8px; text-transform: uppercase;">
+            Performance Metrics
         </h2>
-        <h1 style="font-family: 'Outfit', sans-serif; font-weight: 800; margin: 0.2rem 0 0 0; color: #f8fafc; font-size: 2.2rem; letter-spacing: -0.5px;">
+        <h1 style="font-family: 'Outfit', sans-serif; font-weight: 800; margin: 0.1rem 0 0 0; color: #0f172a; font-size: 2rem; letter-spacing: -0.5px;">
             Operational Analytics
         </h1>
     </div>
     
-    <!-- Glass Filter Bar -->
+    <!-- Filter Bar -->
     <form method="get" class="filter-bar">
         <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 0.85rem; font-weight: 500; color: #94a3b8;">Month</span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Month:</span>
             <select id="month" name="month">
                 {% for m_num, m_name in months %}
                     <option value="{{ m_num }}" {% if m_num == month %}selected{% endif %}>{{ m_name }}</option>
@@ -149,33 +141,33 @@
             </select>
         </div>
         <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 0.85rem; font-weight: 500; color: #94a3b8;">Year</span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Year:</span>
             <select id="year" name="year">
                 {% for y in years %}
                     <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit">Update Dashboard</button>
+        <button type="submit">Update Report</button>
     </form>
 </div>
 
 <!-- Chart Grid -->
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 3rem;">
     
-    <!-- Card 1: Availability -->
-    <div class="glass-card">
-        <h3 class="glass-header availability-indicator">
-            Database Availability Trend vs SLA Target
+    <!-- Card 1: Availability (Large) -->
+    <div class="dashboard-card" style="grid-column: span 2;">
+        <h3 class="card-header-title availability-indicator">
+            Database Availability vs SLA Target
         </h3>
-        <div class="chart-container">
+        <div class="chart-container-large">
             <canvas id="availabilityChart"></canvas>
         </div>
     </div>
     
     <!-- Card 2: Server Health -->
-    <div class="glass-card">
-        <h3 class="glass-header health-indicator">
+    <div class="dashboard-card">
+        <h3 class="card-header-title health-indicator">
             Server Resource Average Utilization (CPU / RAM / Disk)
         </h3>
         <div class="chart-container">
@@ -183,19 +175,19 @@
         </div>
     </div>
     
-    <!-- Card 3: Capacity Trend (Large) -->
-    <div class="glass-card" style="grid-column: span 2;">
-        <h3 class="glass-header capacity-indicator">
-            Database Allocation & Space Usage History (Last 6 Months)
+    <!-- Card 3: Capacity Trend -->
+    <div class="dashboard-card">
+        <h3 class="card-header-title capacity-indicator">
+            Database Capacity Trend (Last 6 Months)
         </h3>
-        <div class="chart-container-large">
+        <div class="chart-container">
             <canvas id="capacityChart"></canvas>
         </div>
     </div>
     
     <!-- Card 4: Incidents by DB -->
-    <div class="glass-card">
-        <h3 class="glass-header incident-db-indicator">
+    <div class="dashboard-card">
+        <h3 class="card-header-title incident-db-indicator">
             Incident Breakdown by Database Target
         </h3>
         <div class="chart-container" style="display: flex; justify-content: center; align-items: center;">
@@ -203,17 +195,17 @@
                 <canvas id="incidentsDbChart"></canvas>
                 <!-- Central Counter -->
                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
-                    <div id="totalIncidentsCount" style="font-size: 2.2rem; font-weight: 800; color: #f8fafc; line-height: 1;">0</div>
-                    <div style="font-size: 0.75rem; font-weight: 500; color: #64748b; text-transform: uppercase; margin-top: 2px;">Incidents</div>
+                    <div id="totalIncidentsCount" style="font-size: 2.4rem; font-weight: 800; color: #0f172a; line-height: 1;">0</div>
+                    <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; margin-top: 2px;">Incidents</div>
                 </div>
             </div>
         </div>
     </div>
     
     <!-- Card 5: Incidents Severity -->
-    <div class="glass-card">
-        <h3 class="glass-header incident-sev-indicator">
-            Incident Breakdown by Alarm Severity
+    <div class="dashboard-card">
+        <h3 class="card-header-title incident-sev-indicator">
+            Incident Breakdown by Severity
         </h3>
         <div class="chart-container" style="display: flex; justify-content: center; align-items: center;">
             <div style="position: relative; width: 240px; height: 240px;">
@@ -239,20 +231,10 @@
         // Font Config Override for Chart.js
         Chart.defaults.font.family = "'Outfit', sans-serif";
         Chart.defaults.font.size = 11;
-        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.color = '#475569'; // Slate-600
 
-        // Helper to generate neon linear gradients
-        function createGradient(ctx, colorStart, colorEnd) {
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, colorStart);
-            gradient.addColorStop(1, colorEnd);
-            return gradient;
-        }
-
-        // 1. AVAILABILITY CHART (Neon Line Chart)
+        // 1. AVAILABILITY CHART (Clean Line Chart - No Fill, Tension 0)
         const availCtx = document.getElementById('availabilityChart').getContext('2d');
-        const blueGrad = createGradient(availCtx, 'rgba(59, 130, 246, 0.4)', 'rgba(59, 130, 246, 0.0)');
-        
         new Chart(availCtx, {
             type: 'line',
             data: {
@@ -261,24 +243,23 @@
                     {
                         label: 'Actual Availability %',
                         data: availData.map(d => d.availability),
-                        borderColor: '#3b82f6',
-                        borderWidth: 4,
-                        tension: 0.3,
-                        fill: true,
-                        backgroundColor: blueGrad,
+                        borderColor: '#2563eb', // Clean Royal Blue
+                        borderWidth: 3,
+                        tension: 0, // Straight lines
+                        fill: false, // No fill
                         pointRadius: 6,
-                        pointBackgroundColor: '#60a5fa',
-                        pointBorderColor: '#0b0f19',
+                        pointBackgroundColor: '#2563eb',
+                        pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                         pointHoverRadius: 8,
-                        pointHoverBackgroundColor: '#93c5fd'
+                        pointHoverBackgroundColor: '#1d4ed8'
                     },
                     {
                         label: 'SLA Target %',
                         data: availData.map(d => d.target),
-                        borderColor: '#ef4444',
+                        borderColor: '#ef4444', // Red
                         borderWidth: 2,
-                        borderDash: [8, 4],
+                        borderDash: [6, 4],
                         fill: false,
                         pointRadius: 0
                     }
@@ -300,7 +281,7 @@
                     y: {
                         min: 90,
                         max: 100,
-                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
                         ticks: {
                             callback: function(val) { return val + "%" }
                         }
@@ -309,12 +290,8 @@
             }
         });
 
-        // 2. SERVER HEALTH (Resource Bar Chart with Gradients)
+        // 2. SERVER HEALTH (Resource Bar Chart)
         const healthCtx = document.getElementById('healthChart').getContext('2d');
-        const cpuGrad = createGradient(healthCtx, '#10b981', 'rgba(16, 185, 129, 0.3)');
-        const memGrad = createGradient(healthCtx, '#8b5cf6', 'rgba(139, 92, 246, 0.3)');
-        const diskGrad = createGradient(healthCtx, '#6b7280', 'rgba(107, 114, 128, 0.3)');
-
         new Chart(healthCtx, {
             type: 'bar',
             data: {
@@ -323,26 +300,26 @@
                     {
                         label: 'CPU Load (%)',
                         data: healthData.map(d => d.cpu),
-                        backgroundColor: cpuGrad,
-                        borderColor: '#10b981',
+                        backgroundColor: '#10b981', // Emerald
+                        borderColor: '#059669',
                         borderWidth: 1,
-                        borderRadius: 6
+                        borderRadius: 4
                     },
                     {
                         label: 'Memory Load (%)',
                         data: healthData.map(d => d.memory),
-                        backgroundColor: memGrad,
-                        borderColor: '#8b5cf6',
+                        backgroundColor: '#8b5cf6', // Violet
+                        borderColor: '#7c3aed',
                         borderWidth: 1,
-                        borderRadius: 6
+                        borderRadius: 4
                     },
                     {
                         label: 'Disk Usage (%)',
                         data: healthData.map(d => d.disk),
-                        backgroundColor: diskGrad,
-                        borderColor: '#6b7280',
+                        backgroundColor: '#64748b', // Slate
+                        borderColor: '#475569',
                         borderWidth: 1,
-                        borderRadius: 6
+                        borderRadius: 4
                     }
                 ]
             },
@@ -360,7 +337,7 @@
                     y: {
                         min: 0,
                         max: 100,
-                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
                         ticks: {
                             callback: function(val) { return val + "%" }
                         }
@@ -369,13 +346,13 @@
             }
         });
 
-        // 3. CAPACITY TREND (Multi-Line Chart with glowing series)
+        // 3. CAPACITY TREND (Multi-Line Chart - No Fills, Tension 0)
         const capCtx = document.getElementById('capacityChart').getContext('2d');
         const dbColors = {
-            'MySQL': '#3b82f6',
-            'Oracle': '#f59e0b',
-            'MS SQL Server': '#ef4444',
-            'PostgreSQL': '#10b981'
+            'MySQL': '#1d4ed8',       // Dark Blue
+            'Oracle': '#c2410c',      // Deep Orange
+            'MS SQL Server': '#b91c1c', // Crimson
+            'PostgreSQL': '#047857'    // Emerald Green
         };
         const capDatasets = [];
 
@@ -383,15 +360,16 @@
             capDatasets.push({
                 label: db,
                 data: capacityData.series[db],
-                borderColor: dbColors[db],
+                borderColor: dbColors[db] || '#4b5563',
                 backgroundColor: 'transparent',
-                borderWidth: 3.5,
-                tension: 0.25,
-                pointRadius: 4,
-                pointBackgroundColor: dbColors[db],
+                borderWidth: 3,
+                tension: 0, // Straight lines
+                fill: false, // No fill
+                pointRadius: 5,
+                pointBackgroundColor: dbColors[db] || '#4b5563',
                 pointBorderWidth: 1.5,
-                pointBorderColor: '#0b0f19',
-                pointHoverRadius: 6
+                pointBorderColor: '#ffffff',
+                pointHoverRadius: 7
             });
         }
 
@@ -414,11 +392,11 @@
                     x: { grid: { display: false } },
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
                         title: {
                             display: true,
                             text: 'Size (GB)',
-                            color: '#94a3b8'
+                            color: '#475569'
                         }
                     }
                 }
@@ -429,7 +407,7 @@
         const totalIncidents = incDbData.reduce((acc, curr) => acc + curr.count, 0);
         document.getElementById('totalIncidentsCount').textContent = totalIncidents;
 
-        // 4. INCIDENTS BY TARGET (Donut Chart 75% cutout)
+        // 4. INCIDENTS BY TARGET (Donut Chart)
         const incDbCtx = document.getElementById('incidentsDbChart').getContext('2d');
         new Chart(incDbCtx, {
             type: 'doughnut',
@@ -437,16 +415,16 @@
                 labels: incDbData.map(d => d.database),
                 datasets: [{
                     data: incDbData.map(d => d.count),
-                    backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#10b981'],
+                    backgroundColor: ['#1d4ed8', '#c2410c', '#b91c1c', '#047857'],
                     borderWidth: 2,
-                    borderColor: '#0b0f19',
+                    borderColor: '#ffffff',
                     hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '75%',
+                cutout: '70%',
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -456,7 +434,7 @@
             }
         });
 
-        // 5. INCIDENTS BY SEVERITY (Donut Chart 75% cutout)
+        // 5. INCIDENTS BY SEVERITY (Donut Chart)
         const incSevCtx = document.getElementById('incidentsSeverityChart').getContext('2d');
         new Chart(incSevCtx, {
             type: 'doughnut',
@@ -466,14 +444,14 @@
                     data: incSevData.map(d => d.count),
                     backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
                     borderWidth: 2,
-                    borderColor: '#0b0f19',
+                    borderColor: '#ffffff',
                     hoverOffset: 6
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '75%',
+                cutout: '70%',
                 plugins: {
                     legend: {
                         position: 'bottom',
