@@ -856,11 +856,11 @@ def incident_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('incident_list')
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
             
     obj.delete()
     messages.success(request, 'Incident record deleted successfully.')
-    return redirect('incident_list')
+    return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
 
 @login_required
 @require_POST
@@ -872,11 +872,11 @@ def replication_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('replication_list')
+        return redirect(request.META.get('HTTP_REFERER', 'replication_list'))
             
     obj.delete()
     messages.success(request, 'Replication record deleted successfully.')
-    return redirect('replication_list')
+    return redirect(request.META.get('HTTP_REFERER', 'replication_list'))
 
 @login_required
 @require_POST
@@ -888,11 +888,11 @@ def backup_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('backup_list')
+        return redirect(request.META.get('HTTP_REFERER', 'backup_list'))
             
     obj.delete()
     messages.success(request, 'Backup record deleted successfully.')
-    return redirect('backup_list')
+    return redirect(request.META.get('HTTP_REFERER', 'backup_list'))
 
 @login_required
 @require_POST
@@ -904,11 +904,11 @@ def server_health_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('server_health_list')
+        return redirect(request.META.get('HTTP_REFERER', 'server_health_list'))
             
     obj.delete()
     messages.success(request, 'Server health record deleted successfully.')
-    return redirect('server_health_list')
+    return redirect(request.META.get('HTTP_REFERER', 'server_health_list'))
 
 @login_required
 @require_POST
@@ -920,11 +920,11 @@ def maintenance_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('maintenance_list')
+        return redirect(request.META.get('HTTP_REFERER', 'maintenance_list'))
             
     obj.delete()
     messages.success(request, 'Maintenance record deleted successfully.')
-    return redirect('maintenance_list')
+    return redirect(request.META.get('HTTP_REFERER', 'maintenance_list'))
 
 @login_required
 @require_POST
@@ -936,11 +936,11 @@ def capacity_delete(request, pk):
     
     if not (can_delete_always or is_creator_within_time):
         messages.error(request, 'You can only delete your own records within 5 minutes of creation.')
-        return redirect('capacity_list')
+        return redirect(request.META.get('HTTP_REFERER', 'capacity_list'))
             
     obj.delete()
     messages.success(request, 'Capacity planning record deleted successfully.')
-    return redirect('capacity_list')
+    return redirect(request.META.get('HTTP_REFERER', 'capacity_list'))
 
 
 @csrf_exempt
@@ -1036,8 +1036,16 @@ def server_health_ingest(request):
         elif cpu > 75 or memory > 80 or disk > 80:
             status = 'Warning'
             
+        # Check for optional custom date override (for backfilling)
+        date_str = data.get('date')
+        if date_str:
+            health_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+          
+        else:
+            health_date = datetime.now().date()
+            
         health = ServerHealth.objects.create(
-            date=datetime.now().date(),
+            date=health_date,
             server=data.get('server', 'Unknown'),
             entered_by='Script',
             cpu_percent=cpu,
@@ -1154,7 +1162,7 @@ def sla_config_delete(request, pk):
     target = get_object_or_404(SLAConfig, pk=pk)
     target.delete()
     messages.success(request, 'SLA Configuration deleted successfully.')
-    return redirect('sla_config_list')
+    return redirect(request.META.get('HTTP_REFERER', 'sla_config_list'))
 
 
 # --- UGANDA HOLIDAYS VIEWS ---
@@ -1220,8 +1228,8 @@ def holiday_delete(request, pk):
     holiday = get_object_or_404(UgandaHoliday, pk=pk)
     if holiday.is_fixed:
         messages.error(request, 'Standard public holidays cannot be deleted.')
-        return redirect('holiday_list')
+        return redirect(request.META.get('HTTP_REFERER', 'holiday_list'))
         
     holiday.delete()
     messages.success(request, 'Public Holiday deleted successfully.')
-    return redirect('holiday_list')
+    return redirect(request.META.get('HTTP_REFERER', 'holiday_list'))
