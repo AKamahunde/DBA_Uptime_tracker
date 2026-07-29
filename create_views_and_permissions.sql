@@ -1,6 +1,6 @@
 -- ============================================================
 -- DBA Operations Uptime Tracker — MySQL Views for Excel
--- Version 4.0  |  Working Hours Logic + Pure Views
+-- Version 4.1  |  Real-time Target Hours & 99.95% SLA
 -- ============================================================
 
 USE dba_tracker;
@@ -264,36 +264,37 @@ planned_downtime AS (
 unplanned_downtime AS (
     SELECT `database`,
            DATE_FORMAT(date, '%Y-%m') AS ym,
-           SUM(FN_GET_WORKING_SECONDS(start, end) / 3600.0) AS total_hrs
+           SUM(FN_GET_WORKING_SECONDS(start, COALESCE(end, NOW())) / 3600.0) AS total_hrs
     FROM incident_register
     WHERE planned = 0
     GROUP BY `database`, DATE_FORMAT(date, '%Y-%m')
 )
 SELECT 
     m.ym AS `Month-Year`,
-    'N/A' AS `Database Type`,
+    COALESCE(th.database_type, 'N/A') AS `Database Type`,
     m.`database` AS `Database`,
-    FN_GET_MONTH_TARGET_HOURS(m.ym) AS `Target Hours`,
-    ROUND(FN_GET_MONTH_TARGET_HOURS(m.ym) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
+    COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) AS `Target Hours`,
+    ROUND(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0), 4) AS `Hours Achieved`,
     ROUND(COALESCE(p.total_hrs, 0), 4) AS `Planned Downtime (hrs)`,
     ROUND(COALESCE(u.total_hrs, 0), 4) AS `Unplanned Downtime (hrs)`,
     ROUND(
-        (FN_GET_MONTH_TARGET_HOURS(m.ym) - COALESCE(u.total_hrs, 0)) 
-        / NULLIF(FN_GET_MONTH_TARGET_HOURS(m.ym), 0) * 100, 
+        (COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0)) 
+        / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)), 0) * 100, 
     4) AS `Availability % (Stored)`,
     ROUND(
-        (FN_GET_MONTH_TARGET_HOURS(m.ym) - COALESCE(u.total_hrs, 0)) 
-        / NULLIF(FN_GET_MONTH_TARGET_HOURS(m.ym), 0) * 100, 
+        (COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0)) 
+        / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)), 0) * 100, 
     4) AS `Availability % (Computed)`,
-    99.90 AS `SLA %`,
+    COALESCE(th.sla_percent, 99.95) AS `SLA %`,
     CASE 
-        WHEN ROUND((FN_GET_MONTH_TARGET_HOURS(m.ym) - COALESCE(u.total_hrs, 0)) / NULLIF(FN_GET_MONTH_TARGET_HOURS(m.ym), 0) * 100, 4) >= 99.90
+        WHEN ROUND((COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)) - COALESCE(u.total_hrs, 0)) / NULLIF(COALESCE(th.target_hours, FN_GET_MONTH_TARGET_HOURS(m.ym)), 0) * 100, 4) >= COALESCE(th.sla_percent, 99.95)
         THEN 'Met'
         ELSE 'Missed'
     END AS `SLA Status`
 FROM months_and_dbs m
 LEFT JOIN planned_downtime p ON m.ym = p.ym AND m.`database` = p.`database`
-LEFT JOIN unplanned_downtime u ON m.ym = u.ym AND m.`database` = u.`database`;
+LEFT JOIN unplanned_downtime u ON m.ym = u.ym AND m.`database` = u.`database`
+LEFT JOIN target_hours th ON m.ym = DATE_FORMAT(th.month, '%Y-%m') AND m.`database` = th.database;
 
 
 -- ============================================================

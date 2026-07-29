@@ -14,11 +14,12 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning, TargetHours, IncidentChangeLog
+    MaintenanceRegister, CapacityPlanning, TargetHours, IncidentChangeLog, UgandaHoliday
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
-    ServerHealthForm, MaintenanceRegisterForm, CapacityPlanningForm
+    ServerHealthForm, MaintenanceRegisterForm, CapacityPlanningForm,
+    TargetHoursForm, UgandaHolidayForm
 )
 from users.models import User
 from django.db.models import Sum, Count, Avg
@@ -166,7 +167,7 @@ def dashboard(request):
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
-            'availability_status': get_status(avail_str, 99.50, '>='),
+            'availability_status': get_status(avail_str, 99.95, '>='),
             'planned_downtime': round(planned, 2),
             'planned_downtime_status': get_status(planned, 48.0, '<='),
             'unplanned_downtime': round(unplanned, 2),
@@ -230,7 +231,7 @@ def dashboard(request):
 
 
             # Calculate Statuses
-            avail_status = get_status(row_data['availability'], 99.50, '>=')
+            avail_status = get_status(row_data['availability'], 99.95, '>=')
             planned_status = get_status(row_data['planned_downtime'], 48.0, '<=')
             unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=')
             incidents_status = get_status(row_data['total_incidents'], 4, '<=')
@@ -1062,3 +1063,132 @@ def capacity_ingest(request):
         return JsonResponse({'status': 'success', 'id': capacity.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+# --- TARGET HOURS VIEWS ---
+
+@login_required
+def target_hours_list(request):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Target Hours.')
+        return redirect('dashboard')
+    
+    query = request.GET.get('database', '')
+    targets = TargetHours.objects.all().order_by('-month', 'database')
+    if query:
+        targets = targets.filter(database__icontains=query)
+        
+    paginator = Paginator(targets, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'target_hours/list.html', {'page_obj': page_obj, 'query': query})
+
+@login_required
+def target_hours_create(request):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Target Hours.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        form = TargetHoursForm(request.POST)
+        if form.is_valid():
+            target = form.save(commit=False)
+            target.created_by = request.user
+            target.save()
+            messages.success(request, 'Target Hours record created successfully.')
+            return redirect('target_hours_list')
+    else:
+        form = TargetHoursForm()
+    return render(request, 'target_hours/form.html', {'form': form, 'title': 'Create Target Hours Record'})
+
+@login_required
+def target_hours_edit(request, pk):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Target Hours.')
+        return redirect('dashboard')
+        
+    target = get_object_or_404(TargetHours, pk=pk)
+    if request.method == 'POST':
+        form = TargetHoursForm(request.POST, instance=target)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Target Hours record updated successfully.')
+            return redirect('target_hours_list')
+    else:
+        form = TargetHoursForm(instance=target)
+    return render(request, 'target_hours/form.html', {'form': form, 'title': 'Edit Target Hours Record', 'target': target})
+
+@login_required
+@require_POST
+def target_hours_delete(request, pk):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Target Hours.')
+        return redirect('dashboard')
+        
+    target = get_object_or_404(TargetHours, pk=pk)
+    target.delete()
+    messages.success(request, 'Target Hours record deleted successfully.')
+    return redirect('target_hours_list')
+
+
+# --- UGANDA HOLIDAYS VIEWS ---
+
+@login_required
+def holiday_list(request):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Public Holidays.')
+        return redirect('dashboard')
+        
+    holidays = UgandaHoliday.objects.all().order_by('-holiday_date')
+    paginator = Paginator(holidays, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'holidays/list.html', {'page_obj': page_obj})
+
+@login_required
+def holiday_create(request):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Public Holidays.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        form = UgandaHolidayForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Public Holiday created successfully.')
+            return redirect('holiday_list')
+    else:
+        form = UgandaHolidayForm()
+    return render(request, 'holidays/form.html', {'form': form, 'title': 'Create Public Holiday'})
+
+@login_required
+def holiday_edit(request, pk):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Public Holidays.')
+        return redirect('dashboard')
+        
+    # pk will be a date string, e.g., '2026-06-03'
+    holiday = get_object_or_404(UgandaHoliday, pk=pk)
+    if request.method == 'POST':
+        form = UgandaHolidayForm(request.POST, instance=holiday)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Public Holiday updated successfully.')
+            return redirect('holiday_list')
+    else:
+        form = UgandaHolidayForm(instance=holiday)
+    return render(request, 'holidays/form.html', {'form': form, 'title': 'Edit Public Holiday', 'holiday': holiday})
+
+@login_required
+@require_POST
+def holiday_delete(request, pk):
+    if not request.user.is_admin:
+        messages.error(request, 'Only administrators can manage Public Holidays.')
+        return redirect('dashboard')
+        
+    holiday = get_object_or_404(UgandaHoliday, pk=pk)
+    holiday.delete()
+    messages.success(request, 'Public Holiday deleted successfully.')
+    return redirect('holiday_list')

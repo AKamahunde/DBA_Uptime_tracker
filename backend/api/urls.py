@@ -44,6 +44,18 @@ urlpatterns = [
     path('capacity/<int:pk>/edit/', views.capacity_edit, name='capacity_edit'),
     path('capacity/<int:pk>/delete/', views.capacity_delete, name='capacity_delete'),
     
+    # Target Hours
+    path('target-hours/', views.target_hours_list, name='target_hours_list'),
+    path('target-hours/create/', views.target_hours_create, name='target_hours_create'),
+    path('target-hours/<int:pk>/edit/', views.target_hours_edit, name='target_hours_edit'),
+    path('target-hours/<int:pk>/delete/', views.target_hours_delete, name='target_hours_delete'),
+    
+    # Public Holidays
+    path('holidays/', views.holiday_list, name='holiday_list'),
+    path('holidays/create/', views.holiday_create, name='holiday_create'),
+    path('holidays/<str:pk>/edit/', views.holiday_edit, name='holiday_edit'),
+    path('holidays/<str:pk>/delete/', views.holiday_delete, name='holiday_delete'),
+    
     # API endpoints for remote ingestion
     path('api/replication/ingest/', views.replication_ingest, name='replication_ingest'),
     path('api/backup/ingest/', views.backup_ingest, name='backup_ingest'),

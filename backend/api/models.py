@@ -323,7 +323,7 @@ class TargetHours(models.Model):
         ('MS SQL SERVER', 'MS SQL Server'),
         ('POSTGRESQL', 'PostgreSQL'),
     ])
-    sla_percent = models.DecimalField(max_digits=5, decimal_places=2, default=99.9)
+    sla_percent = models.DecimalField(max_digits=5, decimal_places=2, default=99.95)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -336,4 +336,17 @@ class TargetHours(models.Model):
 
     def __str__(self):
         return f"{self.database} - {self.month} - {self.target_hours} hrs"
+
+class UgandaHoliday(models.Model):
+    holiday_date = models.DateField(primary_key=True)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'uganda_holidays'
+        verbose_name = 'Uganda Holiday'
+        verbose_name_plural = 'Uganda Holidays'
+        default_permissions = ('add', 'view')
+
+    def __str__(self):
+        return f"{self.name} - {self.holiday_date}"
 

@@ -1,7 +1,7 @@
 from django import forms
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning
+    MaintenanceRegister, CapacityPlanning, TargetHours, UgandaHoliday
 )
 
 class IncidentRegisterForm(forms.ModelForm):
@@ -85,4 +85,34 @@ class CapacityPlanningForm(forms.ModelForm):
         exclude = ['created_by']
         widgets = {
             'month': forms.DateInput(attrs={'type': 'month'}),
+        }
+
+class TargetHoursForm(forms.ModelForm):
+    month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
+
+    class Meta:
+        model = TargetHours
+        exclude = ['created_by']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.month:
+            self.fields['month'].initial = self.instance.month.strftime('%Y-%m')
+
+    def clean_month(self):
+        m_str = self.cleaned_data.get('month')
+        if m_str:
+            from datetime import datetime
+            try:
+                return datetime.strptime(f"{m_str}-01", "%Y-%m-%d").date()
+            except ValueError:
+                raise forms.ValidationError("Enter a valid month (YYYY-MM).")
+        return m_str
+
+class UgandaHolidayForm(forms.ModelForm):
+    class Meta:
+        model = UgandaHoliday
+        fields = ['holiday_date', 'name']
+        widgets = {
+            'holiday_date': forms.DateInput(attrs={'type': 'date'}),
         }

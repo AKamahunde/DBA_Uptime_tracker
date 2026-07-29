@@ -332,6 +332,10 @@
                     {% if user.is_admin or perms.api.view_capacityplanning %}
                     <a href="{% url 'capacity_list' %}">Capacity Tracking</a>
                     {% endif %}
+                    {% if user.is_admin %}
+                    <a href="{% url 'target_hours_list' %}">Target Hours</a>
+                    <a href="{% url 'holiday_list' %}">Public Holidays</a>
+                    {% endif %}
                     <form method="post" action="{% url 'logout' %}" style="display:inline;">
                         {% csrf_token %}
                         <button type="submit" class="nav-logout-btn">Logout ({{ user.username }})</button>

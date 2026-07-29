@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Target Hours - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Target Hours Configurations</h2>
+        <a href="{% url 'target_hours_create' %}" class="btn btn-success">Add Target Hours</a>
+    </div>
+
+    <!-- Search/Filter Bar -->
+    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Search Database</label>
+            <input type="text" id="database" name="database" value="{{ query }}" placeholder="e.g. MySQL" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Search</button>
+            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
+        </div>
+    </form>
+
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Database</th>
+                    <th>Database Type</th>
+                    <th>Target Hours</th>
+                    <th>SLA Target %</th>
+                    <th>Logged By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for target in page_obj %}
+                <tr>
+                    <td>{{ target.month|date:"F Y" }}</td>
+                    <td>{{ target.database }}</td>
+                    <td>{{ target.database_type }}</td>
+                    <td>{{ target.target_hours }} hrs</td>
+                    <td>{{ target.sla_percent }}%</td>
+                    <td>{{ target.created_by.username|default:"System" }}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <a href="{% url 'target_hours_edit' target.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                            <form method="post" action="{% url 'target_hours_delete' target.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this target configuration?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center;">No target hours configurations found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+        <div style="color: #64748b; font-size: 0.875rem;">
+            Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+        </div>
+        <div style="display: flex; gap: 0.25rem;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if query %}&database={{ query }}{% endif %}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Previous</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if query %}&database={{ query }}{% endif %}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Next</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
