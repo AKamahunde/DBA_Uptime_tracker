@@ -21,6 +21,11 @@ def apply_sql_views(apps, schema_editor):
     with open(sql_file_path, encoding='utf-8') as f:
         raw_sql = f.read()
 
+    # Check if target_hours table exists in MySQL instead of sla_config
+    table_names = schema_editor.connection.introspection.table_names()
+    if 'target_hours' in table_names and 'sla_config' not in table_names:
+        raw_sql = raw_sql.replace('sla_config', 'target_hours')
+
     # Strip block comments
     raw_sql = re.sub(r'/\*.*?\*/', '', raw_sql, flags=re.DOTALL)
     # Strip line comments
