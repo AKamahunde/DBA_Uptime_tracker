@@ -1,6 +1,6 @@
 -- ============================================================
 -- DBA Operations Uptime Tracker — MySQL Views for Excel
--- Version 4.3  |  Clean Replication/Health Columns & 99.95% SLA
+-- Version 4.4  |  sla_config support & 99.95% SLA
 -- ============================================================
 
 USE dba_tracker;
@@ -287,7 +287,7 @@ SELECT
 FROM months_and_dbs m
 LEFT JOIN planned_downtime p ON m.ym = p.ym AND m.`database` = p.`database`
 LEFT JOIN unplanned_downtime u ON m.ym = u.ym AND m.`database` = u.`database`
-LEFT JOIN target_hours th ON m.ym = DATE_FORMAT(th.month, '%Y-%m') AND m.`database` = th.database;
+LEFT JOIN sla_config th ON m.ym = DATE_FORMAT(th.month, '%Y-%m') AND m.`database` = th.database;
 
 
 -- ============================================================

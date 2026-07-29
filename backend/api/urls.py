@@ -44,11 +44,11 @@ urlpatterns = [
     path('capacity/<int:pk>/edit/', views.capacity_edit, name='capacity_edit'),
     path('capacity/<int:pk>/delete/', views.capacity_delete, name='capacity_delete'),
     
-    # Target Hours
-    path('target-hours/', views.target_hours_list, name='target_hours_list'),
-    path('target-hours/create/', views.target_hours_create, name='target_hours_create'),
-    path('target-hours/<int:pk>/edit/', views.target_hours_edit, name='target_hours_edit'),
-    path('target-hours/<int:pk>/delete/', views.target_hours_delete, name='target_hours_delete'),
+    # SLA Configuration
+    path('sla-config/', views.sla_config_list, name='sla_config_list'),
+    path('sla-config/create/', views.sla_config_create, name='sla_config_create'),
+    path('sla-config/<int:pk>/edit/', views.sla_config_edit, name='sla_config_edit'),
+    path('sla-config/<int:pk>/delete/', views.sla_config_delete, name='sla_config_delete'),
     
     # Public Holidays
     path('holidays/', views.holiday_list, name='holiday_list'),

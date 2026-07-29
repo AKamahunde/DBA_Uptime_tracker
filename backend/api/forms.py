@@ -1,7 +1,7 @@
 from django import forms
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning, TargetHours, UgandaHoliday
+    MaintenanceRegister, CapacityPlanning, SLAConfig, UgandaHoliday
 )
 
 class IncidentRegisterForm(forms.ModelForm):
@@ -87,7 +87,7 @@ class CapacityPlanningForm(forms.ModelForm):
             'month': forms.DateInput(attrs={'type': 'month'}),
         }
 
-class TargetHoursForm(forms.ModelForm):
+class SLAConfigForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
     database = forms.ChoiceField(choices=[
         ('MySQL', 'MySQL'),
@@ -103,8 +103,8 @@ class TargetHoursForm(forms.ModelForm):
     )
 
     class Meta:
-        model = TargetHours
-        exclude = ['created_by', 'database_type']
+        model = SLAConfig
+        exclude = ['created_by']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,14 +146,7 @@ class TargetHoursForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        db_map = {
-            'MySQL': 'MYSQL',
-            'Oracle': 'ORACLE',
-            'MS SQL Server': 'MS SQL SERVER',
-            'PostgreSQL': 'POSTGRESQL',
-        }
-        db_val = self.cleaned_data.get('database')
-        instance.database_type = db_map.get(db_val, 'MYSQL')
+        instance.database = self.cleaned_data.get('database')
         instance.target_hours = self.cleaned_data.get('target_hours')
         if commit:
             instance.save()

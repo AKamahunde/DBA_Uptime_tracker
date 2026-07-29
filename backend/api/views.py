@@ -14,12 +14,12 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning, TargetHours, IncidentChangeLog, UgandaHoliday
+    MaintenanceRegister, CapacityPlanning, SLAConfig, IncidentChangeLog, UgandaHoliday
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
     ServerHealthForm, MaintenanceRegisterForm, CapacityPlanningForm,
-    TargetHoursForm, UgandaHolidayForm
+    SLAConfigForm, UgandaHolidayForm
 )
 from users.models import User
 from django.db.models import Sum, Count, Avg
@@ -149,15 +149,9 @@ def dashboard(request):
         mttr_mins = round(mttr_hrs * 60, 2)
 
         # Target Hours (Availability)
-        th = TargetHours.objects.filter(
-            database_type__iexact=db_type.replace(' ', ''), month__year=reporting_month.year, month__month=reporting_month.month
+        th = SLAConfig.objects.filter(
+            database__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
         ).aggregate(Sum('target_hours'))['target_hours__sum']
-        
-        # fallback to standard hours if no target hours are set
-        if not th:
-            th = TargetHours.objects.filter(
-                database_type__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
-            ).aggregate(Sum('target_hours'))['target_hours__sum']
         
         if not th:
             th = 730
@@ -1098,13 +1092,13 @@ def capacity_ingest(request):
 # --- TARGET HOURS VIEWS ---
 
 @login_required
-def target_hours_list(request):
+def sla_config_list(request):
     if not request.user.is_admin:
-        messages.error(request, 'Only administrators can manage Target Hours.')
+        messages.error(request, 'Only administrators can manage SLA Configurations.')
         return redirect('dashboard')
     
     query = request.GET.get('database', '')
-    targets = TargetHours.objects.all().order_by('-month', 'database')
+    targets = SLAConfig.objects.all().order_by('-month', 'database')
     if query:
         targets = targets.filter(database__icontains=query)
         
@@ -1112,54 +1106,54 @@ def target_hours_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    return render(request, 'target_hours/list.html', {'page_obj': page_obj, 'query': query})
+    return render(request, 'sla_config/list.html', {'page_obj': page_obj, 'query': query})
 
 @login_required
-def target_hours_create(request):
+def sla_config_create(request):
     if not request.user.is_admin:
-        messages.error(request, 'Only administrators can manage Target Hours.')
+        messages.error(request, 'Only administrators can manage SLA Configurations.')
         return redirect('dashboard')
         
     if request.method == 'POST':
-        form = TargetHoursForm(request.POST)
+        form = SLAConfigForm(request.POST)
         if form.is_valid():
             target = form.save(commit=False)
             target.created_by = request.user
             target.save()
-            messages.success(request, 'Target Hours record created successfully.')
-            return redirect('target_hours_list')
+            messages.success(request, 'SLA Configuration created successfully.')
+            return redirect('sla_config_list')
     else:
-        form = TargetHoursForm()
-    return render(request, 'target_hours/form.html', {'form': form, 'title': 'Create Target Hours Record'})
+        form = SLAConfigForm()
+    return render(request, 'sla_config/form.html', {'form': form, 'title': 'Create SLA Configuration'})
 
 @login_required
-def target_hours_edit(request, pk):
+def sla_config_edit(request, pk):
     if not request.user.is_admin:
-        messages.error(request, 'Only administrators can manage Target Hours.')
+        messages.error(request, 'Only administrators can manage SLA Configurations.')
         return redirect('dashboard')
         
-    target = get_object_or_404(TargetHours, pk=pk)
+    target = get_object_or_404(SLAConfig, pk=pk)
     if request.method == 'POST':
-        form = TargetHoursForm(request.POST, instance=target)
+        form = SLAConfigForm(request.POST, instance=target)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Target Hours record updated successfully.')
-            return redirect('target_hours_list')
+            messages.success(request, 'SLA Configuration updated successfully.')
+            return redirect('sla_config_list')
     else:
-        form = TargetHoursForm(instance=target)
-    return render(request, 'target_hours/form.html', {'form': form, 'title': 'Edit Target Hours Record', 'target': target})
+        form = SLAConfigForm(instance=target)
+    return render(request, 'sla_config/form.html', {'form': form, 'title': 'Edit SLA Configuration', 'target': target})
 
 @login_required
 @require_POST
-def target_hours_delete(request, pk):
+def sla_config_delete(request, pk):
     if not request.user.is_admin:
-        messages.error(request, 'Only administrators can manage Target Hours.')
+        messages.error(request, 'Only administrators can manage SLA Configurations.')
         return redirect('dashboard')
         
-    target = get_object_or_404(TargetHours, pk=pk)
+    target = get_object_or_404(SLAConfig, pk=pk)
     target.delete()
-    messages.success(request, 'Target Hours record deleted successfully.')
-    return redirect('target_hours_list')
+    messages.success(request, 'SLA Configuration deleted successfully.')
+    return redirect('sla_config_list')
 
 
 # --- UGANDA HOLIDAYS VIEWS ---

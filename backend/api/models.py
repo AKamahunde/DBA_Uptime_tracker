@@ -313,26 +313,25 @@ class CapacityPlanning(models.Model):
     def __str__(self):
         return f"{self.database} - {self.month}"
 
-class TargetHours(models.Model):
+class SLAConfig(models.Model):
     month = models.DateField()
-    database = models.CharField(max_length=50)
-    target_hours = models.DecimalField(max_digits=10, decimal_places=2)
-    database_type = models.CharField(max_length=20, choices=[
-        ('ORACLE', 'Oracle'),
-        ('MYSQL', 'MySQL'),
-        ('MS SQL SERVER', 'MS SQL Server'),
-        ('POSTGRESQL', 'PostgreSQL'),
+    database = models.CharField(max_length=50, choices=[
+        ('MySQL', 'MySQL'),
+        ('Oracle', 'Oracle'),
+        ('MS SQL Server', 'MS SQL Server'),
+        ('PostgreSQL', 'PostgreSQL'),
     ])
+    target_hours = models.DecimalField(max_digits=10, decimal_places=2)
     sla_percent = models.DecimalField(max_digits=5, decimal_places=2, default=99.95)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'target_hours'
-        verbose_name = 'Target Hours'
-        verbose_name_plural = 'Target Hours'
-        unique_together = ['month', 'database', 'database_type']
+        db_table = 'sla_config'
+        verbose_name = 'SLA Configuration'
+        verbose_name_plural = 'SLA Configurations'
+        unique_together = ['month', 'database']
 
     def __str__(self):
         return f"{self.database} - {self.month} - {self.target_hours} hrs"
@@ -364,14 +363,14 @@ from django.db.models import F
 def update_target_hours_on_holiday_save(sender, instance, created, **kwargs):
     if created:
         first_day_of_month = instance.holiday_date.replace(day=1)
-        TargetHours.objects.filter(month=first_day_of_month).update(
+        SLAConfig.objects.filter(month=first_day_of_month).update(
             target_hours=F('target_hours') - 18
         )
 
 @receiver(post_delete, sender=UgandaHoliday)
 def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
     first_day_of_month = instance.holiday_date.replace(day=1)
-    TargetHours.objects.filter(month=first_day_of_month).update(
+    SLAConfig.objects.filter(month=first_day_of_month).update(
         target_hours=F('target_hours') + 18
     )
 
