@@ -10,6 +10,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterUniqueTogether(
+            name='targethours',
+            unique_together={('month', 'database')},
+        ),
+        migrations.RemoveField(
+            model_name='targethours',
+            name='database_type',
+        ),
         migrations.RenameModel(
             old_name='TargetHours',
             new_name='SLAConfig',
@@ -18,17 +26,9 @@ class Migration(migrations.Migration):
             name='slaconfig',
             table='sla_config',
         ),
-        migrations.RemoveField(
-            model_name='slaconfig',
-            name='database_type',
-        ),
         migrations.AlterField(
             model_name='slaconfig',
             name='database',
             field=models.CharField(choices=[('MySQL', 'MySQL'), ('Oracle', 'Oracle'), ('MS SQL Server', 'MS SQL Server'), ('PostgreSQL', 'PostgreSQL')], max_length=50),
-        ),
-        migrations.AlterUniqueTogether(
-            name='slaconfig',
-            unique_together={('month', 'database')},
         ),
     ]
