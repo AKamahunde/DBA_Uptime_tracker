@@ -356,3 +356,22 @@ class UgandaHoliday(models.Model):
             (1, 1), (1, 26), (2, 16), (3, 8), (5, 1), (6, 3), (6, 9), (10, 9), (12, 25), (12, 26)
         ]
 
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.db.models import F
+
+@receiver(post_save, sender=UgandaHoliday)
+def update_target_hours_on_holiday_save(sender, instance, created, **kwargs):
+    if created:
+        first_day_of_month = instance.holiday_date.replace(day=1)
+        TargetHours.objects.filter(month=first_day_of_month).update(
+            target_hours=F('target_hours') - 18
+        )
+
+@receiver(post_delete, sender=UgandaHoliday)
+def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
+    first_day_of_month = instance.holiday_date.replace(day=1)
+    TargetHours.objects.filter(month=first_day_of_month).update(
+        target_hours=F('target_hours') + 18
+    )
+
