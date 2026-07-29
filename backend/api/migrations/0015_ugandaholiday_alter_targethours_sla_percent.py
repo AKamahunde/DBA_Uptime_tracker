@@ -10,18 +10,23 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='UgandaHoliday',
-            fields=[
-                ('holiday_date', models.DateField(primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.CreateModel(
+                    name='UgandaHoliday',
+                    fields=[
+                        ('holiday_date', models.DateField(primary_key=True, serialize=False)),
+                        ('name', models.CharField(max_length=100)),
+                    ],
+                    options={
+                        'verbose_name': 'Uganda Holiday',
+                        'verbose_name_plural': 'Uganda Holidays',
+                        'db_table': 'uganda_holidays',
+                        'default_permissions': ('add', 'view'),
+                    },
+                ),
             ],
-            options={
-                'verbose_name': 'Uganda Holiday',
-                'verbose_name_plural': 'Uganda Holidays',
-                'db_table': 'uganda_holidays',
-                'default_permissions': ('add', 'view'),
-            },
+            database_operations=[],  # Table already exists in DB from SQL views script
         ),
         migrations.AlterField(
             model_name='targethours',
