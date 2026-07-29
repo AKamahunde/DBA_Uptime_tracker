@@ -100,26 +100,28 @@
         // 1. Availability Chart
         const availCtx = document.getElementById('availabilityChart').getContext('2d');
         new Chart(availCtx, {
-            type: 'bar',
+            type: 'line',
             data: {
                 labels: availData.map(d => d.database),
                 datasets: [
                     {
                         label: 'Actual Availability %',
                         data: availData.map(d => d.availability),
-                        backgroundColor: 'rgba(59, 130, 246, 0.85)',
                         borderColor: '#2563eb',
-                        borderWidth: 1.5,
-                        borderRadius: 6,
-                        barPercentage: 0.6
+                        backgroundColor: 'rgba(37, 99, 235, 0.15)',
+                        borderWidth: 3,
+                        tension: 0.2,
+                        fill: true,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#2563eb',
+                        pointHoverRadius: 7
                     },
                     {
                         label: 'SLA Target %',
                         data: availData.map(d => d.target),
-                        type: 'line',
                         borderColor: '#ef4444',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
+                        borderWidth: 2.5,
+                        borderDash: [6, 4],
                         fill: false,
                         pointRadius: 4,
                         pointBackgroundColor: '#ef4444'
