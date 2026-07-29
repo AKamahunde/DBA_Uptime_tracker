@@ -1,6 +1,6 @@
 -- ============================================================
 -- DBA Operations Uptime Tracker — MySQL Views for Excel
--- Version 4.2  |  Clean Columns & 99.95% SLA
+-- Version 4.3  |  Clean Replication/Health Columns & 99.95% SLA
 -- ============================================================
 
 USE dba_tracker;
@@ -153,7 +153,6 @@ SELECT
         WHEN seconds_behind  < 60      THEN 'Degraded (<1 min)'
         ELSE                                'Critical Lag'
     END                                                                 AS `Health Status`,
-    status                                                              AS `Stored Status`,
     `database`                                                          AS `Database`,
     severity                                                            AS `Severity`
 FROM replication_monitor;
@@ -204,7 +203,6 @@ SELECT
           OR disk_percent >= 70 OR tablespace_percent >= 70            THEN 'Warning'
         ELSE                                                                 'Healthy'
     END                                                                 AS `Health Status`,
-    status                                                              AS `Stored Status`,
     `database`                                                          AS `Database`
 FROM server_health;
 

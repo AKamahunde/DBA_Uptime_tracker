@@ -350,3 +350,9 @@ class UgandaHoliday(models.Model):
     def __str__(self):
         return f"{self.name} - {self.holiday_date}"
 
+    @property
+    def is_fixed(self):
+        return (self.holiday_date.month, self.holiday_date.day) in [
+            (1, 1), (1, 26), (2, 16), (3, 8), (5, 1), (6, 3), (6, 9), (10, 9), (12, 25), (12, 26)
+        ]
+

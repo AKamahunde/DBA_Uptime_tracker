@@ -89,10 +89,16 @@ class CapacityPlanningForm(forms.ModelForm):
 
 class TargetHoursForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
+    database = forms.ChoiceField(choices=[
+        ('MySQL', 'MySQL'),
+        ('Oracle', 'Oracle'),
+        ('MS SQL Server', 'MS SQL Server'),
+        ('PostgreSQL', 'PostgreSQL'),
+    ])
 
     class Meta:
         model = TargetHours
-        exclude = ['created_by']
+        exclude = ['created_by', 'database_type']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -108,6 +114,20 @@ class TargetHoursForm(forms.ModelForm):
             except ValueError:
                 raise forms.ValidationError("Enter a valid month (YYYY-MM).")
         return m_str
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        db_map = {
+            'MySQL': 'MYSQL',
+            'Oracle': 'ORACLE',
+            'MS SQL Server': 'MS SQL SERVER',
+            'PostgreSQL': 'POSTGRESQL',
+        }
+        db_val = self.cleaned_data.get('database')
+        instance.database_type = db_map.get(db_val, 'MYSQL')
+        if commit:
+            instance.save()
+        return instance
 
 class UgandaHolidayForm(forms.ModelForm):
     class Meta:

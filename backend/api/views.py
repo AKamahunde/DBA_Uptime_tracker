@@ -45,8 +45,38 @@ def auto_close_incidents():
             new_status="Closed"
         )
 
+def autopopulate_fixed_holidays():
+    from datetime import date
+    current_year = date.today().year
+    years_to_check = [current_year, current_year + 1]
+    
+    fixed_holidays = [
+        ((1, 1), 'New Year'),
+        ((1, 26), 'NRM Liberation'),
+        ((2, 16), 'Luwum Day'),
+        ((3, 8), 'Women Day'),
+        ((5, 1), 'Labour Day'),
+        ((6, 3), 'Martyr Day'),
+        ((6, 9), 'Heroes Day'),
+        ((10, 9), 'Independence Day'),
+        ((12, 25), 'Christmas'),
+        ((12, 26), 'Boxing Day')
+    ]
+    
+    for y in years_to_check:
+        for (month, day), name in fixed_holidays:
+            try:
+                h_date = date(y, month, day)
+                UgandaHoliday.objects.get_or_create(
+                    holiday_date=h_date,
+                    defaults={'name': name}
+                )
+            except Exception as e:
+                pass
+
 @login_required
 def dashboard(request):
+    autopopulate_fixed_holidays()
     auto_close_incidents()
     
     # Run all counts in a single DB round-trip by using lazy evaluation
@@ -1140,6 +1170,7 @@ def holiday_list(request):
         messages.error(request, 'Only administrators can manage Public Holidays.')
         return redirect('dashboard')
         
+    autopopulate_fixed_holidays()
     holidays = UgandaHoliday.objects.all().order_by('-holiday_date')
     paginator = Paginator(holidays, 20)
     page_number = request.GET.get('page')
@@ -1169,8 +1200,11 @@ def holiday_edit(request, pk):
         messages.error(request, 'Only administrators can manage Public Holidays.')
         return redirect('dashboard')
         
-    # pk will be a date string, e.g., '2026-06-03'
     holiday = get_object_or_404(UgandaHoliday, pk=pk)
+    if holiday.is_fixed:
+        messages.error(request, 'Standard public holidays cannot be edited.')
+        return redirect('holiday_list')
+        
     if request.method == 'POST':
         form = UgandaHolidayForm(request.POST, instance=holiday)
         if form.is_valid():
@@ -1189,6 +1223,10 @@ def holiday_delete(request, pk):
         return redirect('dashboard')
         
     holiday = get_object_or_404(UgandaHoliday, pk=pk)
+    if holiday.is_fixed:
+        messages.error(request, 'Standard public holidays cannot be deleted.')
+        return redirect('holiday_list')
+        
     holiday.delete()
     messages.success(request, 'Public Holiday deleted successfully.')
     return redirect('holiday_list')
