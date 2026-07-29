@@ -74,18 +74,18 @@
         
         .nav-links {
             display: flex;
-            gap: 0.15rem;
+            gap: 0.25rem;
             align-items: center;
             font-family: 'Bookman Old Style', serif;
         }
         .nav-links a {
             color: white;
             text-decoration: none;
-            padding: 0.4rem 0.65rem;
+            padding: 0.5rem 0.9rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
             font-family: 'Bookman Old Style', serif;
-            font-size: 0.92rem;
+            font-size: 1rem;
         }
         .nav-links a:hover, .nav-links a.active {
             background-color: var(--color-accent);
@@ -98,9 +98,9 @@
             border: none;
             color: white;
             font: inherit;
-            font-size: 0.92rem;
+            font-size: 1rem;
             cursor: pointer;
-            padding: 0.4rem 0.65rem;
+            padding: 0.5rem 0.9rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
         }
@@ -108,6 +108,63 @@
             background-color: var(--color-accent);
             color: #222;
             font-weight: 600;
+        }
+
+        /* Dropdown Styles */
+        .nav-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .nav-dropdown-trigger {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 0.9rem;
+            border-radius: 4px;
+            transition: background-color 0.2s, color 0.2s;
+            font-family: 'Bookman Old Style', serif;
+            font-size: 1rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .nav-dropdown-trigger:hover, .nav-dropdown-trigger.active {
+            background-color: var(--color-accent);
+            color: #222;
+            font-weight: 600;
+        }
+        .nav-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #0b2545;
+            min-width: 170px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            z-index: 1000;
+            border: 1px solid #134074;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+        .nav-dropdown-content a {
+            color: white;
+            padding: 0.6rem 1rem !important;
+            text-decoration: none;
+            display: block;
+            font-family: 'Bookman Old Style', serif;
+            font-size: 0.95rem;
+            transition: background-color 0.2s, color 0.2s;
+            border-radius: 0;
+        }
+        .nav-dropdown-content a:hover {
+            background-color: var(--color-accent);
+            color: #222;
+            font-weight: 600;
+        }
+        .nav-dropdown:hover .nav-dropdown-content {
+            display: block;
         }
 
         /* ── Container & Card ── */
@@ -323,7 +380,7 @@
                     <a href="{% url 'replication_list' %}">Replication</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_backuprecovery %}
-                    <a href="{% url 'backup_list' %}">Backups</a>
+                    <a href="{% url 'backup_list' %}">Backup Register</a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_serverhealth %}
                     <a href="{% url 'server_health_list' %}">Server Health</a>
@@ -335,8 +392,13 @@
                     <a href="{% url 'capacity_list' %}">Capacity</a>
                     {% endif %}
                     {% if user.is_admin %}
-                    <a href="{% url 'target_hours_list' %}">Targets</a>
-                    <a href="{% url 'holiday_list' %}">Holidays</a>
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-trigger">Admin ▾</button>
+                        <div class="nav-dropdown-content">
+                            <a href="{% url 'target_hours_list' %}">Target Hours</a>
+                            <a href="{% url 'holiday_list' %}">Public Holidays</a>
+                        </div>
+                    </div>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}" style="display:inline;">
                         {% csrf_token %}
