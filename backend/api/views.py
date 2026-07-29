@@ -847,8 +847,9 @@ def capacity_edit(request, pk):
 # --- DELETE VIEWS ---
 
 @login_required
-@require_POST
 def incident_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('incident_list')
     obj = get_object_or_404(IncidentRegister, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -863,8 +864,9 @@ def incident_delete(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
 
 @login_required
-@require_POST
 def replication_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('replication_list')
     obj = get_object_or_404(ReplicationMonitor, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -879,8 +881,9 @@ def replication_delete(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'replication_list'))
 
 @login_required
-@require_POST
 def backup_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('backup_list')
     obj = get_object_or_404(BackupRecovery, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -895,8 +898,9 @@ def backup_delete(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'backup_list'))
 
 @login_required
-@require_POST
 def server_health_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('server_health_list')
     obj = get_object_or_404(ServerHealth, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -911,8 +915,9 @@ def server_health_delete(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'server_health_list'))
 
 @login_required
-@require_POST
 def maintenance_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('maintenance_list')
     obj = get_object_or_404(MaintenanceRegister, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -927,8 +932,9 @@ def maintenance_delete(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'maintenance_list'))
 
 @login_required
-@require_POST
 def capacity_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('capacity_list')
     obj = get_object_or_404(CapacityPlanning, pk=pk)
     
     can_delete_always = request.user.is_admin
@@ -1153,8 +1159,9 @@ def sla_config_edit(request, pk):
     return render(request, 'sla_config/form.html', {'form': form, 'title': 'Edit SLA Configuration', 'target': target})
 
 @login_required
-@require_POST
 def sla_config_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('sla_config_list')
     if not request.user.is_admin:
         messages.error(request, 'Only administrators can manage SLA Configurations.')
         return redirect('dashboard')
@@ -1219,8 +1226,9 @@ def holiday_edit(request, pk):
     return render(request, 'holidays/form.html', {'form': form, 'title': 'Edit Public Holiday', 'holiday': holiday})
 
 @login_required
-@require_POST
 def holiday_delete(request, pk):
+    if request.method != 'POST':
+        return redirect('holiday_list')
     if not request.user.is_admin:
         messages.error(request, 'Only administrators can manage Public Holidays.')
         return redirect('dashboard')
