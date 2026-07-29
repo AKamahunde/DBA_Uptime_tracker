@@ -1080,6 +1080,7 @@ def capacity_ingest(request):
             database_size_gb=incoming_size,
             disk_used_percent=Decimal(str(data.get('disk_percent', 0))),
             tablespace_used_percent=Decimal(str(data.get('tablespace_percent', 0))),
+            available_capacity_gb=Decimal(str(data.get('available_capacity_gb', 0))),
             largest_table=data.get('largest_table', 'Unknown'),
             growth_gb=growth,
             database=database_instance
