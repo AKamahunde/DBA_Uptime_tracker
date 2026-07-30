@@ -153,7 +153,7 @@ class BackupRecovery(models.Model):
         ('Incremental', 'Incremental'),
         ('Differential', 'Differential')
     ])
-    backup_used = models.CharField(max_length=50)
+    backup_used = models.CharField(max_length=255)
     start = models.DateTimeField()
     end = models.DateTimeField()
     duration_mins = models.DecimalField(max_digits=10, decimal_places=2)

@@ -123,6 +123,16 @@ try {
         $sizeGb = [Math]::Round($reader["backup_size_bytes"] / 1GB, 3)
         $sizeStr = "$sizeGb GB"
         
+        $rawLoc = $reader["location"].ToString()
+        $fileName = $rawLoc
+        if ($rawLoc -like "*\*") {
+            $fileName = Split-Path -Leaf $rawLoc
+        }
+        $backupUsed = "$fileName ($sizeStr)"
+        if ($backupUsed.Length -gt 255) {
+            $backupUsed = $backupUsed.Substring(0, 255)
+        }
+        
         $startTime = [DateTime]$reader["start_time"]
         $endTime = [DateTime]$reader["end_time"]
         
@@ -134,7 +144,7 @@ try {
             database          = "MS SQL Server"
             database_instance = $reader["database_instance"].ToString()
             backup_type       = $reader["backup_type"].ToString()
-            backup_used       = $sizeStr
+            backup_used       = $backupUsed
             start             = $startTime.ToString("yyyy-MM-ddTHH:mm:ssK")
             end               = $endTime.ToString("yyyy-MM-ddTHH:mm:ssK")
             duration_mins     = [int]$reader["duration_mins"]
