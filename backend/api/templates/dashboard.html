@@ -4,62 +4,61 @@
 
 {% block content %}
 <style>
-    /* Modern Dashboard Table Styling */
+    /* Premium Dashboard Table Styling */
     .modern-table {
         width: 100%;
         border-collapse: collapse;
-        text-align: left;
+        text-align: center;
         font-size: 0.9rem;
+        background-color: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        overflow: hidden;
     }
     .modern-table th {
-        background-color: #f8fafc;
-        color: #1e293b;
+        background-color: #f1f5f9;
+        color: #334155;
         font-weight: 700;
         text-transform: uppercase;
         font-size: 0.75rem;
         letter-spacing: 0.5px;
-        padding: 0.85rem 0.75rem;
+        padding: 0.95rem 0.75rem;
         border-bottom: 2.5px solid #cbd5e1;
-        text-align: center;
+        border-right: 1px solid #e2e8f0;
+    }
+    .modern-table th:last-child {
+        border-right: none;
     }
     .modern-table th:first-child, .modern-table td:first-child {
         text-align: left;
+        font-weight: 700;
     }
     .modern-table td {
-        padding: 0.9rem 0.75rem;
-        border-bottom: 1px solid #f1f5f9;
-        color: #1e293b;
-        text-align: center;
+        padding: 0.85rem 0.75rem;
+        border-bottom: 1px solid #cbd5e1;
+        border-right: 1px solid #e2e8f0;
+        font-weight: 600;
         vertical-align: middle;
+    }
+    .modern-table td:last-child {
+        border-right: none;
     }
     .modern-table tr:hover {
         background-color: #f8fafc;
     }
     
-    /* Status Pill Badges */
-    .badge-status {
-        display: inline-block;
-        padding: 0.35rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        font-weight: 700;
-        text-align: center;
-        min-width: 90px;
+    /* Cell Status Color Overrides (Pastel Fills) */
+    .cell-meets {
+        background-color: #dcfce7 !important;
+        color: #15803d !important;
     }
-    .badge-meets {
-        background-color: #dcfce7;
-        color: #15803d;
-        border: 1px solid #bbf7d0;
+    .cell-misses {
+        background-color: #fee2e2 !important;
+        color: #b91c1c !important;
     }
-    .badge-misses {
-        background-color: #fee2e2;
-        color: #b91c1c;
-        border: 1px solid #fecaca;
-    }
-    .badge-na {
-        background-color: #f1f5f9;
-        color: #475569;
-        border: 1px solid #e2e8f0;
+    .cell-na {
+        background-color: #f1f5f9 !important;
+        color: #475569 !important;
     }
 </style>
 
@@ -154,68 +153,48 @@
                         </td>
                         
                         <!-- Availability -->
-                        <td>
-                            <span class="badge-status {% if row.availability_status == 'Meets SLA' %}badge-meets{% elif row.availability_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.availability }}
-                            </span>
+                        <td class="{% if row.availability_status == 'Meets SLA' %}cell-meets{% elif row.availability_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.availability }}
                         </td>
 
                         <!-- Planned Downtime -->
-                        <td>
-                            <span class="badge-status {% if row.planned_downtime_status == 'Meets SLA' %}badge-meets{% elif row.planned_downtime_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.planned_downtime|floatformat:2 }}
-                            </span>
+                        <td class="{% if row.planned_downtime_status == 'Meets SLA' %}cell-meets{% elif row.planned_downtime_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.planned_downtime|floatformat:2 }}
                         </td>
 
                         <!-- Unplanned Downtime -->
-                        <td>
-                            <span class="badge-status {% if row.unplanned_downtime_status == 'Meets SLA' %}badge-meets{% elif row.unplanned_downtime_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.unplanned_downtime|floatformat:2 }}
-                            </span>
+                        <td class="{% if row.unplanned_downtime_status == 'Meets SLA' %}cell-meets{% elif row.unplanned_downtime_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.unplanned_downtime|floatformat:2 }}
                         </td>
 
                         <!-- Total Incidents -->
-                        <td>
-                            <span class="badge-status {% if row.total_incidents_status == 'Meets SLA' %}badge-meets{% elif row.total_incidents_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.total_incidents }}
-                            </span>
+                        <td class="{% if row.total_incidents_status == 'Meets SLA' %}cell-meets{% elif row.total_incidents_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.total_incidents }}
                         </td>
 
                         <!-- MTTR -->
-                        <td>
-                            <span class="badge-status {% if row.mttr_mins_status == 'Meets SLA' %}badge-meets{% elif row.mttr_mins_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.mttr_mins }}
-                            </span>
+                        <td class="{% if row.mttr_mins_status == 'Meets SLA' %}cell-meets{% elif row.mttr_mins_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.mttr_mins }}
                         </td>
 
                         <!-- Backup Success -->
-                        <td>
-                            <span class="badge-status {% if row.backup_success_status == 'Meets SLA' %}badge-meets{% elif row.backup_success_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.backup_success }}
-                            </span>
+                        <td class="{% if row.backup_success_status == 'Meets SLA' %}cell-meets{% elif row.backup_success_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.backup_success }}
                         </td>
 
                         <!-- Restore Success -->
-                        <td>
-                            <span class="badge-status {% if row.restore_success_status == 'Meets SLA' %}badge-meets{% elif row.restore_success_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.restore_success }}
-                            </span>
+                        <td class="{% if row.restore_success_status == 'Meets SLA' %}cell-meets{% elif row.restore_success_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.restore_success }}
                         </td>
 
                         <!-- Replication Status -->
-                        <td>
-                            <span class="badge-status {% if row.replication_status_status == 'Meets SLA' %}badge-meets{% elif row.replication_status_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                {{ row.replication_status }}
-                            </span>
+                        <td class="{% if row.replication_status_status == 'Meets SLA' %}cell-meets{% elif row.replication_status_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            {{ row.replication_status }}
                         </td>
 
                         <!-- Failed Backups -->
-                        <td>
-                            {% if row.failed_backups > 0 %}
-                                <span class="badge-status badge-misses">{{ row.failed_backups }}</span>
-                            {% else %}
-                                <span class="badge-status badge-meets">0</span>
-                            {% endif %}
+                        <td class="{% if row.failed_backups > 0 %}cell-misses{% else %}cell-meets{% endif %}">
+                            {% if row.failed_backups > 0 %}{{ row.failed_backups }}{% else %}0{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -264,9 +243,9 @@
                             <td>{{ database_detail.current.backup_success }}</td>
                             <td>{{ database_detail.current.restore_success }}</td>
                             <td>{{ database_detail.current.replication_status }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b;">{{ database_detail.current.last_full }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b;">{{ database_detail.current.last_inc }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b;">{{ database_detail.current.last_dr }}</td>
+                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_full }}</td>
+                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_inc }}</td>
+                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_dr }}</td>
                             <td>{{ database_detail.current.failed_backups }}</td>
                             <td>{{ database_detail.current.failed_restores }}</td>
                             <td>{{ database_detail.current.replication_lag }}</td>
@@ -292,75 +271,47 @@
                         <!-- Status Row -->
                         <tr>
                             <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">Status</td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.availability == 'Meets SLA' %}badge-meets{% elif database_detail.status.availability == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.availability }}
-                                </span>
+                            <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.availability }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.planned_downtime == 'Meets SLA' %}badge-meets{% elif database_detail.status.planned_downtime == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.planned_downtime }}
-                                </span>
+                            <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.planned_downtime }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}badge-meets{% elif database_detail.status.unplanned_downtime == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.unplanned_downtime }}
-                                </span>
+                            <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.unplanned_downtime }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.total_incidents == 'Meets SLA' %}badge-meets{% elif database_detail.status.total_incidents == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.total_incidents }}
-                                </span>
+                            <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.total_incidents }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.mttr_mins == 'Meets SLA' %}badge-meets{% elif database_detail.status.mttr_mins == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.mttr_mins }}
-                                </span>
+                            <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.mttr_mins }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.backup_success == 'Meets SLA' %}badge-meets{% elif database_detail.status.backup_success == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.backup_success }}
-                                </span>
+                            <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.backup_success }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.restore_success == 'Meets SLA' %}badge-meets{% elif database_detail.status.restore_success == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.restore_success }}
-                                </span>
+                            <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.restore_success }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.replication_status == 'Meets SLA' %}badge-meets{% elif database_detail.status.replication_status == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.replication_status }}
-                                </span>
+                            <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.replication_status }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.last_full == 'Meets SLA' %}badge-meets{% elif database_detail.status.last_full == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.last_full }}
-                                </span>
+                            <td class="{% if database_detail.status.last_full == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_full == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.last_full }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.last_inc == 'Meets SLA' %}badge-meets{% elif database_detail.status.last_inc == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.last_inc }}
-                                </span>
+                            <td class="{% if database_detail.status.last_inc == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_inc == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.last_inc }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.last_dr == 'Meets SLA' %}badge-meets{% elif database_detail.status.last_dr == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.last_dr }}
-                                </span>
+                            <td class="{% if database_detail.status.last_dr == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_dr == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.last_dr }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.failed_backups == 'Meets SLA' %}badge-meets{% elif database_detail.status.failed_backups == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.failed_backups }}
-                                </span>
+                            <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.failed_backups }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.failed_restores == 'Meets SLA' %}badge-meets{% elif database_detail.status.failed_restores == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.failed_restores }}
-                                </span>
+                            <td class="{% if database_detail.status.failed_restores == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_restores == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.failed_restores }}
                             </td>
-                            <td>
-                                <span class="badge-status {% if database_detail.status.replication_lag == 'Meets SLA' %}badge-meets{% elif database_detail.status.replication_lag == 'N/A' %}badge-na{% else %}badge-misses{% endif %}">
-                                    {{ database_detail.status.replication_lag }}
-                                </span>
+                            <td class="{% if database_detail.status.replication_lag == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_lag == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.replication_lag }}
                             </td>
                         </tr>
                     </tbody>
