@@ -82,11 +82,24 @@
                 </td>
                 <td>{{ incident.duration_hrs }}</td>
                 <td>{{ incident.database }}</td>
-                <td style="max-width: 250px; word-break: break-word; white-space: normal;">{{ incident.root_cause|default:"-" }}</td>
+                <td style="max-width: 280px; word-break: break-word; white-space: normal;">
+                    {% if incident.root_cause|slice:":12" == "AUTO-LOGGED:" %}
+                        <details style="cursor: pointer; font-size: 0.9rem;">
+                            <summary style="font-weight: 600; color: var(--color-primary); outline: none;">Auto-Detected Logs</summary>
+                            <div style="font-size: 0.75rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.5rem; margin-top: 0.25rem; font-family: monospace; white-space: pre-wrap; max-height: 120px; overflow-y: auto; text-align: left; line-height: 1.2;">
+                                {{ incident.root_cause }}
+                            </div>
+                        </details>
+                    {% else %}
+                        {{ incident.root_cause|default:"-" }}
+                    {% endif %}
+                </td>
                 <td style="max-width: 250px; word-break: break-word; white-space: normal;">{{ incident.business_impact|default:"-" }}</td>
                 <td>
                     {% if incident.created_by %}
                         {{ incident.created_by.username }}
+                    {% elif incident.resolved_by == 'Script' %}
+                        <span style="color: #475569; font-weight: 600;">Script</span>
                     {% else %}
                         <span style="color: #64748b; font-style: italic;">N/A</span>
                     {% endif %}
