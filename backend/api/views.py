@@ -1187,7 +1187,7 @@ def incident_ingest(request):
             system=system,
             root_cause=root_cause,
             business_impact='Awaiting DBA business impact assessment.' if not is_planned else 'None - Scheduled Maintenance.',
-            resolved_by='Script',
+            resolved_by='System',
             status='Resolved',
             database=db_type,
             assigned_to='DBA Team'
