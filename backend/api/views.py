@@ -149,12 +149,12 @@ def dashboard(request):
         mttr_mins = round(mttr_hrs * 60, 2)
 
         # Target Hours (Availability)
-        th = SLAConfig.objects.filter(
+        sla_config_record = SLAConfig.objects.filter(
             database__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
-        ).aggregate(Sum('target_hours'))['target_hours__sum']
+        ).first()
         
-        if not th:
-            th = 730
+        sla_exists = (sla_config_record is not None)
+        th = sla_config_record.target_hours if sla_exists else 0
 
         if th and th > 0:
             avail = ((float(th) - float(unplanned)) / float(th)) * 100
@@ -191,28 +191,32 @@ def dashboard(request):
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
-            'availability_status': get_status(avail_str, 99.95, '>='),
-            'planned_downtime': round(planned, 2),
-            'planned_downtime_status': get_status(planned, 48.0, '<='),
-            'unplanned_downtime': round(unplanned, 2),
-            'unplanned_downtime_status': get_status(unplanned, 2.0, '<='),
-            'total_incidents': total_incidents,
-            'total_incidents_status': get_status(total_incidents, 4, '<='),
-            'mttr_mins': mttr_mins,
-            'mttr_mins_status': get_status(mttr_mins, 240, '<='),
+            'availability_status': get_status(avail_str, 99.95, '>=') if sla_exists else 'N/A',
+            'planned_downtime': round(planned, 2) if sla_exists else 'No Data',
+            'planned_downtime_status': get_status(planned, 48.0, '<=') if sla_exists else 'N/A',
+            'unplanned_downtime': round(unplanned, 2) if sla_exists else 'No Data',
+            'unplanned_downtime_status': get_status(unplanned, 2.0, '<=') if sla_exists else 'N/A',
+            'total_incidents': total_incidents if sla_exists else 'No Data',
+            'total_incidents_status': get_status(total_incidents, 4, '<=') if sla_exists else 'N/A',
+            'mttr_mins': mttr_mins if sla_exists else 'No Data',
+            'mttr_mins_status': get_status(mttr_mins, 240, '<=') if sla_exists else 'N/A',
             'backup_success': backup_success_pct,
-            'backup_success_status': get_status(backup_success_pct, 95.0, '>='),
+            'backup_success_status': get_status(backup_success_pct, 95.0, '>=') if (sla_exists and backup_success_pct != 'No Data') else 'N/A',
             'restore_success': restore_success_pct,
-            'restore_success_status': get_status(restore_success_pct, 80.0, '>='),
+            'restore_success_status': get_status(restore_success_pct, 80.0, '>=') if (sla_exists and restore_success_pct != 'No Data') else 'N/A',
             'replication_status': rep_status,
-            'replication_status_status': 'N/A' if rep_status in ['No Data', 'N/A'] else ('Meets SLA' if rep_status == 'Healthy' else 'Below SLA'),
-            'failed_backups': failed_backups
+            'replication_status_status': 'N/A' if (rep_status in ['No Data', 'N/A'] or not sla_exists) else ('Meets SLA' if rep_status == 'Healthy' else 'Below SLA'),
+            'failed_backups': failed_backups if sla_exists else 'No Data'
         })
 
     database_detail = None
     if selected_db in db_types:
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
+            # Query if SLA Config exists for the selected database
+            selected_sla_exists = SLAConfig.objects.filter(
+                database__iexact=selected_db, month__year=reporting_month.year, month__month=reporting_month.month
+            ).exists()
             # Query additional details for SLA table
             # Last Full Backup
             last_full = BackupRecovery.objects.filter(
@@ -255,15 +259,15 @@ def dashboard(request):
 
 
             # Calculate Statuses
-            avail_status = get_status(row_data['availability'], 99.95, '>=')
-            planned_status = get_status(row_data['planned_downtime'], 48.0, '<=')
-            unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=')
-            incidents_status = get_status(row_data['total_incidents'], 4, '<=')
-            mttr_status = get_status(row_data['mttr_mins'], 240, '<=') # 4 hrs = 240 mins
-            backup_status = get_status(row_data['backup_success'], 95.0, '>=')
-            restore_status = get_status(row_data['restore_success'], 80.0, '>=')
+            avail_status = get_status(row_data['availability'], 99.95, '>=') if selected_sla_exists else 'N/A'
+            planned_status = get_status(row_data['planned_downtime'], 48.0, '<=') if selected_sla_exists else 'N/A'
+            unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=') if selected_sla_exists else 'N/A'
+            incidents_status = get_status(row_data['total_incidents'], 4, '<=') if selected_sla_exists else 'N/A'
+            mttr_status = get_status(row_data['mttr_mins'], 240, '<=') if selected_sla_exists else 'N/A'
+            backup_status = get_status(row_data['backup_success'], 95.0, '>=') if (selected_sla_exists and row_data['backup_success'] != 'No Data') else 'N/A'
+            restore_status = get_status(row_data['restore_success'], 80.0, '>=') if (selected_sla_exists and row_data['restore_success'] != 'No Data') else 'N/A'
             
-            if row_data['replication_status'] in ['No Data', 'N/A']:
+            if row_data['replication_status'] in ['No Data', 'N/A'] or not selected_sla_exists:
                 rep_status_check = 'N/A'
             else:
                 rep_status_check = 'Meets SLA' if row_data['replication_status'] == 'Healthy' else 'Below SLA'
@@ -288,13 +292,13 @@ def dashboard(request):
             else:
                 dr_status = 'N/A'
 
-            failed_backup_status = 'Meets SLA' if row_data['failed_backups'] == 0 else 'Below SLA'
-            failed_restore_status = 'Meets SLA' if failed_restores == 0 else 'Below SLA'
+            failed_backup_status = 'Meets SLA' if (row_data['failed_backups'] == 0 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A')
+            failed_restore_status = 'Meets SLA' if (failed_restores == 0 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A')
             
             rep_lag_status = 'Below SLA'
-            if rep_lag not in ['No Data', 'N/A']:
+            if rep_lag not in ['No Data', 'N/A'] and selected_sla_exists:
                 rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
-            elif row_data['replication_status'] in ['No Data', 'N/A']:
+            else:
                 rep_lag_status = 'N/A'
 
             database_detail = {
@@ -1161,6 +1165,13 @@ def incident_ingest(request):
             maint_ticket = maintenance.change_id
             severity = 'Low'
             root_cause = f"AUTO-LOGGED: MySQL restart detected within scheduled Maintenance Window ({maint_ticket})."
+        else:
+            # Highlight that this graceful restart was unplanned
+            root_cause = root_cause.replace(
+                "DBA Summary: [MAINTENANCE - CLEAN RESTART]",
+                "DBA Summary: [UNPLANNED MAINTENANCE - CLEAN RESTART]\n"
+                "WARNING: This graceful restart occurred OUTSIDE of a scheduled maintenance window."
+            )
             
         # Build unique self-heal ticket ID e.g., AUTO-SELF-HEAL-260730-1000
         ticket_id = f"AUTO-SELF-HEAL-{start_dt.strftime('%y%m%d-%H%M')}"
