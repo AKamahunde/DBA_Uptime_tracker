@@ -13,13 +13,13 @@
     }
     .modern-table th {
         background-color: #f8fafc;
-        color: #475569;
+        color: #1e293b;
         font-weight: 700;
         text-transform: uppercase;
         font-size: 0.75rem;
         letter-spacing: 0.5px;
         padding: 0.85rem 0.75rem;
-        border-bottom: 2.5px solid #e2e8f0;
+        border-bottom: 2.5px solid #cbd5e1;
         text-align: center;
     }
     .modern-table th:first-child, .modern-table td:first-child {
@@ -28,7 +28,7 @@
     .modern-table td {
         padding: 0.9rem 0.75rem;
         border-bottom: 1px solid #f1f5f9;
-        color: #334155;
+        color: #1e293b;
         text-align: center;
         vertical-align: middle;
     }
@@ -39,24 +39,27 @@
     /* Status Pill Badges */
     .badge-status {
         display: inline-block;
-        padding: 0.25rem 0.65rem;
-        border-radius: 9999px;
-        font-size: 0.8rem;
-        font-weight: 600;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 700;
         text-align: center;
-        min-width: 80px;
+        min-width: 90px;
     }
     .badge-meets {
-        background-color: #ecfdf5;
-        color: #059669;
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
     }
     .badge-misses {
-        background-color: #fef2f2;
-        color: #dc2626;
+        background-color: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
     }
     .badge-na {
         background-color: #f1f5f9;
-        color: #64748b;
+        color: #475569;
+        border: 1px solid #e2e8f0;
     }
 </style>
 
@@ -227,21 +230,8 @@
                     <h3 style="margin-bottom: 0.15rem; color: #333;">Database Detail</h3>
                     <h4 style="color: #555; font-weight: 500;">Showing: {{ database_detail.database }}</h4>
                 </div>
-                <div class="table-menu-wrap">
-                    <button class="table-menu-btn" style="color: var(--color-primary); border: 1px solid #dde3ec; border-radius:4px;" onclick="toggleMenu('menu-detail')" title="Options">&#8942;</button>
-                    <div class="table-menu-dropdown" id="menu-detail">
-                        <button onclick="exportPDF('detail-table-section', 'DB_Detail_{{ database_detail.database }}')">&#128196; Export as PDF</button>
-                    </div>
-                </div>
             </div>
-            <div id="detail-table-section" style="overflow-x: auto; padding: 0.5rem;">
-                <!-- PDF header: visible in export only -->
-                <div class="pdf-report-header" style="display:none; margin-bottom: 1.25rem; border-bottom: 3px solid #002569; padding-bottom: 0.75rem;">
-                    <div style="font-size: 1.3rem; font-weight: 700; color: #002569;">Database Management Hub</div>
-                    <div style="font-size: 1rem; font-weight: 600; color: #333; margin-top: 0.2rem;">Database Detail Report &mdash; {{ database_detail.database }}</div>
-                    <div style="font-size: 0.85rem; color: #555; margin-top: 0.2rem;">Reporting Month: <span class="pdf-month-label"></span></div>
-                    <div style="font-size: 0.8rem; color: #888; margin-top: 0.1rem;">Generated: <span class="pdf-generated-label"></span></div>
-                </div>
+            <div style="overflow-x: auto; padding: 0.5rem;">
                 <table class="modern-table" style="font-size: 0.85rem;">
                     <thead>
                         <tr>
