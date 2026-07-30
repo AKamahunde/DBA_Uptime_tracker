@@ -61,4 +61,5 @@ urlpatterns = [
     path('api/backup/ingest/', views.backup_ingest, name='backup_ingest'),
     path('api/health/ingest/', views.server_health_ingest, name='server_health_ingest'),
     path('api/capacity/ingest/', views.capacity_ingest, name='capacity_ingest'),
+    path('api/incident/ingest/', views.incident_ingest, name='incident_ingest'),
 ]
