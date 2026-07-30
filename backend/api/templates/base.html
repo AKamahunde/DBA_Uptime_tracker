@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Database Management Hub{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
             --color-primary:   #002569;
@@ -20,7 +23,7 @@
             box-sizing: border-box;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Outfit', sans-serif;
             background-color: #f5f5f5;
             color: #333;
             min-height: 100vh;
@@ -35,7 +38,6 @@
             padding: 0 2rem;
             display: flex;
             flex-direction: column;
-            font-family: 'Bookman Old Style', serif;
             border-bottom: 3px solid var(--color-accent);
         }
         .navbar-inner {
@@ -61,7 +63,6 @@
         }
         .navbar h1 {
             font-size: 1.8rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             letter-spacing: 1.5px;
             font-weight: 300;
@@ -76,7 +77,6 @@
             display: flex;
             gap: 0.25rem;
             align-items: center;
-            font-family: 'Bookman Old Style', serif;
         }
         .nav-links a {
             color: white;
@@ -84,7 +84,6 @@
             padding: 0.5rem 0.9rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
-            font-family: 'Bookman Old Style', serif;
             font-size: 1rem;
         }
         .nav-links a:hover, .nav-links a.active {
@@ -121,7 +120,6 @@
             padding: 0.5rem 0.9rem;
             border-radius: 4px;
             transition: background-color 0.2s, color 0.2s;
-            font-family: 'Bookman Old Style', serif;
             font-size: 1rem;
             cursor: pointer;
             background: none;
@@ -154,7 +152,6 @@
             padding: 0.6rem 1rem !important;
             text-decoration: none;
             display: block;
-            font-family: 'Bookman Old Style', serif;
             font-size: 0.95rem;
             transition: background-color 0.2s, color 0.2s;
             border-radius: 0;
