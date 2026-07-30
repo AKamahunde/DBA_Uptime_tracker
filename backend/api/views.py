@@ -1104,6 +1104,90 @@ def capacity_ingest(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 
+@csrf_exempt
+@require_POST
+def incident_ingest(request):
+    api_key = request.headers.get('X-API-KEY')
+    expected_key = os.environ.get('REPLICATION_API_KEY')
+    
+    if not expected_key or api_key != expected_key:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+        
+    try:
+        data = json.loads(request.body)
+        
+        db_type = data.get('database', 'MySQL')
+        start_str = data.get('start')
+        end_str = data.get('end')
+        system = data.get('system', 'MySQL Instance')
+        
+        if not start_str or not end_str:
+            return JsonResponse({'error': 'start and end timestamps are required'}, status=400)
+            
+        def parse_dt(dt_str):
+            try:
+                if 'T' in dt_str:
+                    clean_ts = dt_str.split('.')[0].split('Z')[0]
+                    return datetime.strptime(clean_ts, "%Y-%m-%dT%H:%M:%S")
+                return datetime.strptime(dt_str.split('.')[0], "%Y-%m-%d %H:%M:%S")
+            except Exception as e:
+                raise ValueError(f"Invalid timestamp format '{dt_str}': {e}")
+                
+        start_dt = parse_dt(start_str)
+        end_dt = parse_dt(end_str)
+        
+        duration_delta = end_dt - start_dt
+        duration_hrs = Decimal(str(round(duration_delta.total_seconds() / 3600.0, 2)))
+        
+        # De-duplication check: avoid double registering the same outage
+        exists = IncidentRegister.objects.filter(database=db_type, start=start_dt).exists()
+        if exists:
+            return JsonResponse({'status': 'ignored', 'message': 'Incident already registered'}, status=200)
+            
+        # Check if this incident occurred within a registered maintenance window for the same database
+        maintenance = MaintenanceRegister.objects.filter(
+            database=db_type,
+            start__lte=start_dt,
+            end__gte=end_dt
+        ).first()
+        
+        is_planned = False
+        maint_ticket = None
+        severity = 'Medium'
+        root_cause = data.get('root_cause', 'AUTO-LOGGED: MySQL restart detected in systemd journal. Awaiting DBA review.')
+        
+        if maintenance:
+            is_planned = True
+            maint_ticket = maintenance.change_id
+            severity = 'Low'
+            root_cause = f"AUTO-LOGGED: MySQL restart detected within scheduled Maintenance Window ({maint_ticket})."
+            
+        # Build unique self-heal ticket ID e.g., AUTO-SELF-HEAL-260730-1000
+        ticket_id = f"AUTO-SELF-HEAL-{start_dt.strftime('%y%m%d-%H%M')}"
+        
+        incident = IncidentRegister.objects.create(
+            ticket=ticket_id,
+            date=start_dt.date(),
+            start=start_dt,
+            end=end_dt,
+            duration_hrs=duration_hrs,
+            planned=is_planned,
+            severity=severity,
+            system=system,
+            root_cause=root_cause,
+            business_impact='Awaiting DBA business impact assessment.' if not is_planned else 'None - Scheduled Maintenance.',
+            resolved_by='Script',
+            status='Resolved',
+            database=db_type,
+            assigned_to='DBA Team'
+        )
+        
+        return JsonResponse({'status': 'success', 'id': incident.id, 'ticket': ticket_id})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+
 # --- TARGET HOURS VIEWS ---
 
 @login_required
