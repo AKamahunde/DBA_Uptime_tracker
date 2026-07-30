@@ -98,7 +98,7 @@
                 <td>
                     {% if incident.created_by %}
                         {{ incident.created_by.username }}
-                    {% elif incident.resolved_by == 'Script' %}
+                    {% elif incident.resolved_by == 'System' or incident.resolved_by == 'Script' or incident.ticket|slice:":5" == "AUTO-" %}
                         <span style="color: #475569; font-weight: 600;">Script</span>
                     {% else %}
                         <span style="color: #64748b; font-style: italic;">N/A</span>
