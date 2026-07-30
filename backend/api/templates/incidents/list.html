@@ -44,6 +44,7 @@
                 <th>Ticket</th>
                 <th>System</th>
                 <th>Date</th>
+                <th>Time</th>
                 <th>Severity</th>
                 <th>Status</th>
                 <th>Duration (hrs)</th>
@@ -57,9 +58,16 @@
         <tbody>
             {% for incident in page_obj %}
             <tr {% if incident.status == 'Open' %}style="background-color: #ffd6d6;"{% elif incident.status == 'In Progress' %}style="background-color: #fff3e0;"{% endif %}>
-                <td>{{ incident.ticket }}</td>
+                <td style="word-break: break-all; white-space: normal; max-width: 140px; font-family: monospace; font-size: 0.85rem;">{{ incident.ticket }}</td>
                 <td style="max-width: 120px; word-break: break-word; white-space: normal;" title="{{ incident.system }}">{{ incident.system }}</td>
-                <td>{{ incident.date }}</td>
+                <td>{{ incident.start|date:"F j, Y" }}</td>
+                <td>
+                    {% if incident.start %}
+                        {{ incident.start|date:"H:i" }}{% if incident.end %} - {{ incident.end|date:"H:i" }}{% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
                 <td>
                     {% if incident.severity == 'Critical' %}
                         <span class="badge-accent">{{ incident.severity }}</span>
