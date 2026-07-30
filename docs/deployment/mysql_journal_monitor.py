@@ -10,6 +10,7 @@ import os
 import sys
 import re
 import json
+import socket
 import subprocess
 import urllib.request
 from datetime import datetime
@@ -29,12 +30,41 @@ def parse_journal_timestamp(line):
     except Exception:
         return None
 
+def get_meaningful_summary(outage_type, logs):
+    # Check if there is an OOM kill in the logs
+    is_oom = any("Out of memory" in line or "OOM-killer" in line or "Killed process" in line for line in logs)
+    
+    if is_oom:
+        return (
+            "DBA Summary: [CRITICAL OUTAGE - OUT OF MEMORY]\n"
+            "MySQL was terminated by the Linux Out-of-Memory (OOM) killer because the server ran out of RAM.\n"
+            "The database automatically self-healed and restarted once memory was freed."
+        )
+    elif outage_type == "Crash Outage":
+        return (
+            "DBA Summary: [CRITICAL OUTAGE - UNEXPECTED CRASH]\n"
+            "MySQL process exited ungracefully (e.g., segmentation fault, abort, or forced kill -9).\n"
+            "The database automatically self-healed and restarted."
+        )
+    elif outage_type == "Graceful Restart":
+        return (
+            "DBA Summary: [MAINTENANCE - CLEAN RESTART]\n"
+            "A system administrator or update script initiated a graceful shutdown and restart of the database service.\n"
+            "The service stopped cleanly and started back up."
+        )
+    else:
+        return (
+            "DBA Summary: [OUTAGE - SYSTEM REBOOT]\n"
+            "The operating system rebooted or MySQL encountered a sudden service restart.\n"
+            "The database started up successfully."
+        )
+
 def main():
     api_url = "http://localhost:8000/api/incident/ingest/"  # Adjust as needed or use arg
     api_key = ""  # Will be read from environment or arguments
     timeframe = "24 hours ago"
     db_type = "MySQL"
-    system_name = "MySQL Instance"
+    system_name = socket.gethostname()
     
     # CLI Overrides
     if len(sys.argv) > 1:
@@ -104,12 +134,13 @@ def main():
                 log_snippet.append(line)
                 
                 # We have a matched outage window!
+                summary = get_meaningful_summary(outage_type, log_snippet)
                 incidents_detected.append({
                     "start": outage_start_dt.strftime("%Y-%m-%d %H:%M:%S"),
                     "end": dt.strftime("%Y-%m-%d %H:%M:%S"),
                     "database": db_type,
                     "system": system_name,
-                    "root_cause": f"AUTO-LOGGED: MySQL restart ({outage_type}) detected. Logs:\n" + "\n".join(log_snippet)
+                    "root_cause": f"AUTO-LOGGED: {outage_type} detected.\n\n{summary}\n\nRaw Journal Logs:\n" + "\n".join(log_snippet)
                 })
                 
                 # Reset tracking
