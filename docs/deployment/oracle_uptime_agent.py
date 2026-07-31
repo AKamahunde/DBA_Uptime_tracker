@@ -120,27 +120,141 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"DIAGNOSTIC: Failed to retrieve targets: {e}")
         
-    backup_sql = """
-    SELECT 
-        start_time AS backup_date,
-        CASE WHEN UPPER(input_type) LIKE '%FULL%' THEN 'Full' ELSE 'Incremental' END AS backup_type,
-        status AS backup_status,
-        output_bytes AS backup_size
-    FROM sysman.mgmt$db_backup_history
-    WHERE start_time >= SYSDATE - :days
-      AND (UPPER(target_name) LIKE '%NMSINFRA%' OR UPPER(target_name) LIKE '%INFRA%')
-    ORDER BY start_time DESC
-    """
+    # We will try a tri-level query strategy:
+    # 1. Try MGMT$HA_BACKUP (Summary log view, very common and auto-populated)
+    # 2. Try MGMT$DB_BACKUP_HISTORY (Detailed history view)
+    # 3. Try MGMT$METRIC_DETAILS (Fallback to recent metrics)
+    rows = []
+    columns = []
     
+    # Level 1: MGMT$HA_BACKUP
+    print("Level 1: Querying sysman.mgmt$ha_backup...")
     try:
-        cursor.execute(backup_sql, days=lookback_days)
+        ha_sql = """
+        SELECT 
+            start_time AS backup_date,
+            CASE WHEN UPPER(input_type) LIKE '%FULL%' THEN 'Full' ELSE 'Incremental' END AS backup_type,
+            status AS backup_status,
+            output_bytes AS backup_size
+        FROM sysman.mgmt$ha_backup
+        WHERE start_time >= SYSDATE - :days
+          AND (UPPER(database_name) LIKE '%NMSINFRA%' OR UPPER(database_name) LIKE '%INFRA%')
+        ORDER BY start_time DESC
+        """
+        cursor.execute(ha_sql, days=lookback_days)
         columns = [col[0].lower() for col in cursor.description]
         rows = cursor.fetchall()
-        print(f"Found {len(rows)} backup logs.")
+        print(f"Level 1 Successful: Found {len(rows)} backup logs.")
+    except Exception as e:
+        print(f"Level 1 Failed: {e}")
+        rows = []
         
+    # Level 2: MGMT$DB_BACKUP_HISTORY
+    if not rows:
+        print("Level 2: Querying sysman.mgmt$db_backup_history...")
+        try:
+            history_sql = """
+            SELECT 
+                start_time AS backup_date,
+                CASE WHEN UPPER(input_type) LIKE '%FULL%' THEN 'Full' ELSE 'Incremental' END AS backup_type,
+                status AS backup_status,
+                output_bytes AS backup_size
+            FROM sysman.mgmt$db_backup_history
+            WHERE start_time >= SYSDATE - :days
+              AND (UPPER(target_name) LIKE '%NMSINFRA%' OR UPPER(target_name) LIKE '%INFRA%')
+            ORDER BY start_time DESC
+            """
+            cursor.execute(history_sql, days=lookback_days)
+            columns = [col[0].lower() for col in cursor.description]
+            rows = cursor.fetchall()
+            print(f"Level 2 Successful: Found {len(rows)} backup logs.")
+        except Exception as e:
+            print(f"Level 2 Failed: {e}")
+            rows = []
+            
+    # Level 3: Fallback to MGMT$METRIC_DETAILS
+    if not rows:
+        print("Level 3: Querying sysman.mgmt$metric_details...")
+        try:
+            metric_sql = """
+            SELECT DISTINCT backup_date, backup_type, backup_status, backup_size
+            FROM (
+              SELECT 
+                d.value AS backup_date,
+                'Full' AS backup_type,
+                (SELECT value FROM (
+                   SELECT value FROM SYSMAN.MGMT$METRIC_DETAILS s 
+                   WHERE s.target_guid = d.target_guid 
+                     AND s.metric_name = 'ha_backup_disk' 
+                     AND s.metric_column = 'last_exec_db_backup_status'
+                     AND s.collection_timestamp <= d.collection_timestamp
+                   ORDER BY s.collection_timestamp DESC
+                 ) WHERE ROWNUM = 1) AS backup_status,
+                (SELECT value FROM (
+                   SELECT value FROM SYSMAN.MGMT$METRIC_DETAILS sz 
+                   WHERE sz.target_guid = d.target_guid 
+                     AND sz.metric_name = 'ha_backup_disk' 
+                     AND sz.metric_column = 'last_db_backup_size'
+                     AND sz.collection_timestamp <= d.collection_timestamp
+                   ORDER BY sz.collection_timestamp DESC
+                 ) WHERE ROWNUM = 1) AS backup_size
+              FROM SYSMAN.MGMT$METRIC_DETAILS d
+              WHERE (UPPER(d.target_name) LIKE '%NMSINFRA%' OR UPPER(d.target_name) LIKE '%INFRA%')
+                AND d.metric_name = 'ha_backup_disk'
+                AND d.metric_column = 'last_exec_db_backup_date'
+                AND d.collection_timestamp >= SYSDATE - :days
+              UNION ALL
+              SELECT 
+                d.value AS backup_date,
+                'Incremental' AS backup_type,
+                (SELECT value FROM (
+                   SELECT value FROM SYSMAN.MGMT$METRIC_DETAILS s 
+                   WHERE s.target_guid = d.target_guid 
+                     AND s.metric_name = 'ha_backup_disk' 
+                     AND s.metric_column = 'last_exec_arch_backup_status'
+                     AND s.collection_timestamp <= d.collection_timestamp
+                   ORDER BY s.collection_timestamp DESC
+                 ) WHERE ROWNUM = 1) AS backup_status,
+                (SELECT value FROM (
+                   SELECT value FROM SYSMAN.MGMT$METRIC_DETAILS sz 
+                   WHERE sz.target_guid = d.target_guid 
+                     AND sz.metric_name = 'ha_backup_disk' 
+                     AND sz.metric_column = 'last_arch_backup_size'
+                     AND sz.collection_timestamp <= d.collection_timestamp
+                   ORDER BY sz.collection_timestamp DESC
+                 ) WHERE ROWNUM = 1) AS backup_size
+              FROM SYSMAN.MGMT$METRIC_DETAILS d
+              WHERE (UPPER(d.target_name) LIKE '%NMSINFRA%' OR UPPER(d.target_name) LIKE '%INFRA%')
+                AND d.metric_name = 'ha_backup_disk'
+                AND d.metric_column = 'last_exec_arch_backup_date'
+                AND d.collection_timestamp >= SYSDATE - :days
+            )
+            WHERE backup_date IS NOT NULL
+            ORDER BY backup_date DESC
+            """
+            cursor.execute(metric_sql, days=lookback_days)
+            columns = [col[0].lower() for col in cursor.description]
+            rows = cursor.fetchall()
+            print(f"Level 3 Successful: Found {len(rows)} backup logs.")
+        except Exception as e:
+            print(f"Level 3 Failed: {e}")
+            rows = []
+            
+    try:
         for row in rows:
             record = dict(zip(columns, row))
             backup_date = record['backup_date']
+            
+            # Resolve both datetime objects and string timestamps (Level 3 string output)
+            if isinstance(backup_date, str):
+                try:
+                    backup_date = datetime.strptime(backup_date.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                except:
+                    try:
+                        backup_date = datetime.fromisoformat(backup_date.replace('Z', '+00:00'))
+                    except:
+                        pass
+                        
             if backup_date and hasattr(backup_date, 'tzinfo') and not backup_date.tzinfo:
                 backup_date = backup_date.replace(tzinfo=timezone.utc)
             backup_date_str = backup_date.isoformat() if hasattr(backup_date, 'isoformat') else str(backup_date)
@@ -165,7 +279,7 @@ if __name__ == "__main__":
             }
             send_to_api("backup/ingest/", payload)
     except Exception as e:
-        print(f"Error querying backups: {e}")
+        print(f"Error processing backup logs: {e}")
 
     # --------------------------------------------------------
     # 2. Gather Host System Health (CPU, RAM)

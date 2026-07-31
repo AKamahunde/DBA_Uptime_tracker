@@ -1073,26 +1073,43 @@ def server_health_ingest(request):
         else:
             health_date = datetime.now().date()
             
-        health, created = ServerHealth.objects.update_or_create(
+        # Find the first existing entry for this server/date combination (handles pre-existing duplicate logs cleanly)
+        health = ServerHealth.objects.filter(
             date=health_date,
             server=data.get('server', 'Unknown'),
-            database=data.get('database', 'MySQL'),
-            defaults={
-                'entered_by': 'Script',
-                'cpu_percent': cpu,
-                'memory_percent': memory,
-                'disk_percent': disk,
-                'tablespace_percent': float(data.get('tablespace_percent', 0)),
-                'connections': int(data.get('connections', 0)),
-                'slow_queries': int(data.get('slow_queries', 0)),
-                'threads': int(data.get('threads', 0)),
-                'status': status,
-            }
-        )
+            database=data.get('database', 'MySQL')
+        ).first()
+        
+        if health:
+            health.entered_by = 'Script'
+            health.cpu_percent = cpu
+            health.memory_percent = memory
+            health.disk_percent = disk
+            health.tablespace_percent = float(data.get('tablespace_percent', 0))
+            health.connections = int(data.get('connections', 0))
+            health.slow_queries = int(data.get('slow_queries', 0))
+            health.threads = int(data.get('threads', 0))
+            health.status = status
+            health.save()
+        else:
+            health = ServerHealth.objects.create(
+                date=health_date,
+                server=data.get('server', 'Unknown'),
+                database=data.get('database', 'MySQL'),
+                entered_by='Script',
+                cpu_percent=cpu,
+                memory_percent=memory,
+                disk_percent=disk,
+                tablespace_percent=float(data.get('tablespace_percent', 0)),
+                connections=int(data.get('connections', 0)),
+                slow_queries=int(data.get('slow_queries', 0)),
+                threads=int(data.get('threads', 0)),
+                status=status
+            )
         return JsonResponse({'status': 'success', 'id': health.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
-
+ 
 @csrf_exempt
 @require_POST
 def capacity_ingest(request):
@@ -1114,18 +1131,31 @@ def capacity_ingest(request):
         if most_recent:
             growth = incoming_size - most_recent.database_size_gb
             
-        capacity, created = CapacityPlanning.objects.update_or_create(
+        # Find the first existing entry for this database/month combination (survives pre-existing duplicate logs)
+        capacity = CapacityPlanning.objects.filter(
             month=datetime.now().date(),
-            database=database_instance,
-            defaults={
-                'database_size_gb': incoming_size,
-                'disk_used_percent': Decimal(str(data.get('disk_percent', 0))),
-                'tablespace_used_percent': Decimal(str(data.get('tablespace_percent', 0))),
-                'available_capacity_gb': Decimal(str(data.get('available_capacity_gb', 0))),
-                'largest_table': data.get('largest_table', 'Unknown'),
-                'growth_gb': growth,
-            }
-        )
+            database=database_instance
+        ).first()
+        
+        if capacity:
+            capacity.database_size_gb = incoming_size
+            capacity.disk_used_percent = Decimal(str(data.get('disk_percent', 0)))
+            capacity.tablespace_used_percent = Decimal(str(data.get('tablespace_percent', 0)))
+            capacity.available_capacity_gb = Decimal(str(data.get('available_capacity_gb', 0))),
+            capacity.largest_table = data.get('largest_table', 'Unknown')
+            capacity.growth_gb = growth
+            capacity.save()
+        else:
+            capacity = CapacityPlanning.objects.create(
+                month=datetime.now().date(),
+                database=database_instance,
+                database_size_gb=incoming_size,
+                disk_used_percent=Decimal(str(data.get('disk_percent', 0))),
+                tablespace_used_percent=Decimal(str(data.get('tablespace_percent', 0))),
+                available_capacity_gb=Decimal(str(data.get('available_capacity_gb', 0))),
+                largest_table=data.get('largest_table', 'Unknown'),
+                growth_gb=growth
+            )
         return JsonResponse({'status': 'success', 'id': capacity.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
