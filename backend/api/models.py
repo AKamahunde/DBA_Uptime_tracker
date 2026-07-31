@@ -60,6 +60,31 @@ class IncidentRegister(models.Model):
             
         super().save(*args, **kwargs)
 
+        # Sync to Maintenance Register
+        from api.models import MaintenanceRegister
+        if self.planned:
+            maint_date = self.start.date() if self.start else self.date
+            maint_start = self.start if self.start else timezone.now()
+            maint_end = self.end if self.end else maint_start
+            
+            MaintenanceRegister.objects.update_or_create(
+                change_id=self.ticket,
+                defaults={
+                    'database': self.database,
+                    'date': maint_date,
+                    'activity': f"Planned Incident Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
+                    'start': maint_start,
+                    'end': maint_end,
+                    'risk': 'Medium',
+                    'rollback_plan': 'Awaiting DBA input.',
+                    'approved_by': self.assigned_to or 'System',
+                    'success': True if self.status in ['Resolved', 'Closed'] else False,
+                    'created_by': self.created_by
+                }
+            )
+        else:
+            MaintenanceRegister.objects.filter(change_id=self.ticket).delete()
+
     def __str__(self):
         return f"{self.ticket} - {self.date}"
 
