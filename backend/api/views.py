@@ -646,7 +646,7 @@ def server_health_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
-    queryset = ServerHealth.objects.all().order_by('-date', '-created_at')
+    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
