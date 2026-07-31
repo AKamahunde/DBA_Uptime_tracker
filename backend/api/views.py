@@ -135,8 +135,17 @@ def dashboard(request):
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         )
         total_incidents = incidents.count()
-        
+
+        # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
+        SLA_RESOLUTION_TARGETS = {
+            'Critical': 9,    # 1 working day
+            'High': 9,        # 1 working day
+            'Medium': 18,     # 2 working days
+            'Low': 180,       # 4 weeks
+        }
+
         unplanned = 0
+        sla_breach_count = 0
         now = timezone.now()
         for inc in incidents:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
@@ -144,6 +153,10 @@ def dashboard(request):
                 unplanned += float(diff.total_seconds() / 3600.0)
             elif inc.duration_hrs:
                 unplanned += float(inc.duration_hrs)
+                # Check if this resolved incident breached its severity SLA
+                target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
+                if float(inc.duration_hrs) > target_hrs:
+                    sla_breach_count += 1
                 
         mttr_hrs = (unplanned / total_incidents) if total_incidents > 0 else 0
         mttr_mins = round(mttr_hrs * 60, 2)
@@ -198,6 +211,7 @@ def dashboard(request):
             'unplanned_downtime_status': get_status(unplanned, 2.0, '<=') if sla_exists else 'N/A',
             'total_incidents': total_incidents if sla_exists else 'No Data',
             'total_incidents_status': get_status(total_incidents, 4, '<=') if sla_exists else 'N/A',
+            'sla_breach_count': sla_breach_count if sla_exists else 0,
             'mttr_mins': mttr_mins if sla_exists else 'No Data',
             'mttr_mins_status': get_status(mttr_mins, 240, '<=') if sla_exists else 'N/A',
             'backup_success': backup_success_pct,
@@ -287,8 +301,8 @@ def dashboard(request):
                 inc_status = 'N/A'
                 
             if last_dr:
-                months_since_dr = (now.year - last_dr.date.year) * 12 + now.month - last_dr.date.month
-                dr_status = 'Meets SLA' if months_since_dr < 6 else 'Below SLA'
+                days_since_dr = (now - last_dr.date).days
+                dr_status = 'Meets SLA' if days_since_dr <= 180 else 'Below SLA'
             else:
                 dr_status = 'N/A'
 
@@ -308,6 +322,7 @@ def dashboard(request):
                     'planned_downtime': row_data['planned_downtime'],
                     'unplanned_downtime': row_data['unplanned_downtime'],
                     'total_incidents': row_data['total_incidents'],
+                    'sla_breach_count': row_data.get('sla_breach_count', 0),
                     'mttr_mins': row_data['mttr_mins'],
                     'backup_success': row_data['backup_success'],
                     'restore_success': row_data['restore_success'],

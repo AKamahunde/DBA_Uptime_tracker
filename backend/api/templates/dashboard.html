@@ -170,6 +170,11 @@
                         <!-- Total Incidents -->
                         <td class="{% if row.total_incidents_status == 'Meets SLA' %}cell-meets{% elif row.total_incidents_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                             {{ row.total_incidents }}
+                            {% if row.sla_breach_count > 0 %}
+                                <br><span style="font-size:0.7rem;font-weight:700;color:#c62828;background:#fde8e8;padding:0.1rem 0.35rem;border-radius:3px;">{{ row.sla_breach_count }} SLA breach{{ row.sla_breach_count|pluralize }}</span>
+                            {% elif row.total_incidents != 'No Data' %}
+                                <br><span style="font-size:0.7rem;color:#64748b;">0 SLA breaches</span>
+                            {% endif %}
                         </td>
 
                         <!-- MTTR -->
@@ -238,7 +243,14 @@
                             <td>{{ database_detail.current.availability }}</td>
                             <td>{{ database_detail.current.planned_downtime }}</td>
                             <td>{{ database_detail.current.unplanned_downtime }}</td>
-                            <td>{{ database_detail.current.total_incidents }}</td>
+                            <td>
+                                {{ database_detail.current.total_incidents }}
+                                {% if database_detail.current.sla_breach_count > 0 %}
+                                    <br><span style="font-size:0.7rem;font-weight:700;color:#c62828;background:#fde8e8;padding:0.1rem 0.35rem;border-radius:3px;">{{ database_detail.current.sla_breach_count }} SLA breach{{ database_detail.current.sla_breach_count|pluralize }}</span>
+                                {% elif database_detail.current.total_incidents != 'No Data' %}
+                                    <br><span style="font-size:0.7rem;color:#64748b;">0 SLA breaches</span>
+                                {% endif %}
+                            </td>
                             <td>{{ database_detail.current.mttr_mins }}</td>
                             <td>{{ database_detail.current.backup_success }}</td>
                             <td>{{ database_detail.current.restore_success }}</td>
@@ -263,7 +275,7 @@
                             <td>Healthy</td>
                             <td>&lt; 7 days</td>
                             <td>&le; 24 hrs</td>
-                            <td>&lt; 6 months</td>
+                            <td>&le; 180 days</td>
                             <td>0</td>
                             <td>0</td>
                             <td>&lt; 2 mins</td>

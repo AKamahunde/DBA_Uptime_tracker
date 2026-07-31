@@ -67,7 +67,13 @@
                         {% endif %}
                     </td>
                     <td>{{ capacity.disk_used_percent }}</td>
-                    <td>{{ capacity.tablespace_used_percent }}</td>
+                    <td>
+                        {% if capacity.database == 'MS SQL Server' or capacity.database == 'PostgreSQL' %}
+                            N/A
+                        {% else %}
+                            {{ capacity.tablespace_used_percent }}
+                        {% endif %}
+                    </td>
                     <td>{{ capacity.available_capacity_gb|default:"0.00" }}</td>
                     <td>{{ capacity.largest_table }}</td>
                     <td>

@@ -47,6 +47,7 @@
                 <th>Time</th>
                 <th>Severity</th>
                 <th>Status</th>
+                <th title="IT Service Desk SLA (Policy §20.4.5.2): Critical/High ≤ 9 hrs · Medium ≤ 18 hrs · Low ≤ 180 hrs">SLA ⓘ</th>
                 <th>Duration (hrs)</th>
                 <th>Database</th>
                 <th>Root Cause</th>
@@ -86,6 +87,33 @@
                         <span style="color: #c62828; font-weight: 600;">{{ incident.status }}</span>
                     {% else %}
                         <span style="color: #ef6c00; font-weight: 600;">{{ incident.status }}</span>
+                    {% endif %}
+                </td>
+                <td style="white-space: nowrap;">
+                    {% if incident.status == 'Open' or incident.status == 'In Progress' %}
+                        <span style="display:inline-block;background:#e0f2fe;color:#0369a1;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">⏱ Running</span>
+                    {% elif incident.duration_hrs %}
+                        {% if incident.severity == 'Critical' or incident.severity == 'High' %}
+                            {% if incident.duration_hrs <= 9 %}
+                                <span style="display:inline-block;background:#dcfce7;color:#166534;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✓ Met</span>
+                            {% else %}
+                                <span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✗ Breached</span>
+                            {% endif %}
+                        {% elif incident.severity == 'Medium' %}
+                            {% if incident.duration_hrs <= 18 %}
+                                <span style="display:inline-block;background:#dcfce7;color:#166534;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✓ Met</span>
+                            {% else %}
+                                <span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✗ Breached</span>
+                            {% endif %}
+                        {% else %}{# Low #}
+                            {% if incident.duration_hrs <= 180 %}
+                                <span style="display:inline-block;background:#dcfce7;color:#166534;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✓ Met</span>
+                            {% else %}
+                                <span style="display:inline-block;background:#fee2e2;color:#991b1b;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:3px;">✗ Breached</span>
+                            {% endif %}
+                        {% endif %}
+                    {% else %}
+                        <span style="color:#94a3b8;font-size:0.75rem;">—</span>
                     {% endif %}
                 </td>
                 <td>{{ incident.duration_hrs }}</td>

@@ -11,32 +11,40 @@ import sys
 UPTIME_TRACKER_API_URL = "http://192.168.35.38:90/api/replication/ingest/"
 API_KEY = "uptimetracker_api_9f2c1d8e45x9"
 
-def get_replication_status(user=None, password=None):
-    """Runs SHOW REPLICA STATUS and parses the output."""
+def run_mysql_cmd(query, user=None, password=None):
+    """Helper to run a mysql query and return parsed key-value dict."""
     cmd = ["mysql"]
     if user:
         cmd.extend(["-u", user])
     if password:
         cmd.append(f"-p{password}")
-    cmd.extend(["-e", "SHOW REPLICA STATUS\\G"])
+    cmd.extend(["-e", query])
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running mysql command: {e.stderr}")
-        sys.exit(1)
-        
-    output = result.stdout
-    status = {}
+        output = result.stdout
+        status = {}
+        for line in output.splitlines():
+            line = line.strip()
+            if ":" in line:
+                key, val = line.split(":", 1)
+                status[key.strip()] = val.strip()
+        return status
+    except subprocess.CalledProcessError:
+        return {}
+
+def get_replication_status(user=None, password=None):
+    """Runs SHOW REPLICA STATUS or fallbacks to SHOW SLAVE STATUS and parses the output."""
+    # 1. Try SHOW REPLICA STATUS (MySQL 8.0.22+)
+    status = run_mysql_cmd("SHOW REPLICA STATUS\\G", user, password)
     
-    for line in output.splitlines():
-        line = line.strip()
-        if ":" in line:
-            key, val = line.split(":", 1)
-            status[key.strip()] = val.strip()
-            
+    # 2. Fallback to SHOW SLAVE STATUS (MySQL < 8.0.22 and MariaDB)
     if not status:
-        print("No replica status found. Is this a replica server?")
+        print("SHOW REPLICA STATUS returned no data or failed. Falling back to SHOW SLAVE STATUS...")
+        status = run_mysql_cmd("SHOW SLAVE STATUS\\G", user, password)
+        
+    if not status:
+        print("Error: No replication status found. Is this a replication replica server?")
         sys.exit(1)
         
     return status
@@ -67,20 +75,29 @@ if __name__ == "__main__":
     # Fetch status
     status = get_replication_status(args.user, args.password)
     
-    # Format payload for Uptime Tracker
-    seconds_behind = status.get('Seconds_Behind_Master', '0')
-    if seconds_behind == 'NULL':
+    # Fetch Seconds Behind
+    seconds_behind = status.get('Seconds_Behind_Master')
+    if seconds_behind == 'NULL' or seconds_behind is None:
         seconds_behind = None
     else:
-        seconds_behind = int(seconds_behind)
+        try:
+            seconds_behind = int(seconds_behind)
+        except ValueError:
+            seconds_behind = None
+            
+    # Support both inclusive naming (Source/Replica) and legacy naming (Master/Slave)
+    master_host = status.get('Source_Host') or status.get('Master_Host') or 'Unknown'
+    io_running = status.get('Replica_IO_Running') or status.get('Slave_IO_Running') or 'No'
+    sql_running = status.get('Replica_SQL_Running') or status.get('Slave_SQL_Running') or 'No'
+    last_error = status.get('Last_Error') or status.get('Last_SQL_Error') or status.get('Last_IO_Error') or ''
         
     payload = {
-        "master": status.get('Source_Host', 'Unknown'),
+        "master": master_host,
         "replica": "nickeldbdr",  # Hardcoded or dynamically fetch hostname
-        "io_thread": status.get('Replica_IO_Running', 'No'),
-        "sql_thread": status.get('Replica_SQL_Running', 'No'),
+        "io_thread": io_running,
+        "sql_thread": sql_running,
         "seconds_behind": seconds_behind,
-        "last_error": status.get('Last_Error', '')
+        "last_error": last_error
     }
     
     print(f"Sending payload to Uptime Tracker: {json.dumps(payload, indent=2)}")

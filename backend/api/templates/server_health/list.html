@@ -86,19 +86,19 @@
                     </td>
                     <td>{{ health.database }}</td>
                     <td>
-                        <div style="display: flex; gap: 0.25rem;">
-                            {% if health.created_by %}
+                        {% if health.entered_by == 'Script' %}
+                            <span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Auto-managed</span>
+                        {% else %}
+                            <div style="display: flex; gap: 0.25rem;">
                                 <a href="{% url 'server_health_edit' health.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                            {% else %}
-                                <a href="{% url 'server_health_edit' health.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                            {% endif %}
-                            {% if is_admin or perms.api.delete_serverhealth or health.created_by == request.user %}
-                            <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                            </form>
-                            {% endif %}
-                        </div>
+                                {% if is_admin or perms.api.delete_serverhealth or health.created_by == request.user %}
+                                <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}

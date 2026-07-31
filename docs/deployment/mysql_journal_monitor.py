@@ -26,7 +26,8 @@ def parse_journal_timestamp(line):
         current_year = datetime.now().year
         # Combine with current year as journalctl doesn't print the year by default
         dt = datetime.strptime(f"{current_year} {ts_str}", "%Y %b %d %H:%M:%S")
-        return dt
+        # Attach system local timezone info to standardise transmission
+        return dt.astimezone()
     except Exception:
         return None
 
