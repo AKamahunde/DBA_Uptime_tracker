@@ -111,6 +111,15 @@ if __name__ == "__main__":
     # 1. Gather Backup History (RMAN Backups completed in lookback window)
     # --------------------------------------------------------
     print(f"\nQuerying backup history (last {lookback_days} days)...")
+    
+    # DIAGNOSTIC: Print targets available in the backup history view
+    try:
+        cursor.execute("SELECT DISTINCT target_name FROM sysman.mgmt$db_backup_history WHERE ROWNUM <= 25")
+        oem_targets = [r[0] for r in cursor.fetchall()]
+        print(f"DIAGNOSTIC: Sample targets in mgmt$db_backup_history: {', '.join(oem_targets)}")
+    except Exception as e:
+        print(f"DIAGNOSTIC: Failed to retrieve targets: {e}")
+        
     backup_sql = """
     SELECT 
         start_time AS backup_date,

@@ -107,6 +107,32 @@ if __name__ == "__main__":
     # 1. Backfill RMAN Backup History
     # --------------------------------------------------------
     print(f"\nQuerying backup history (last {lookback_days} days)...")
+    
+    # DIAGNOSTIC: Print targets available in the backup history view
+    try:
+        cursor.execute("SELECT DISTINCT target_name FROM sysman.mgmt$db_backup_history WHERE ROWNUM <= 25")
+        oem_targets = [r[0] for r in cursor.fetchall()]
+        print(f"DIAGNOSTIC: Sample targets in mgmt$db_backup_history: {', '.join(oem_targets)}")
+    except Exception as e:
+        print(f"DIAGNOSTIC: Failed to retrieve targets: {e}")
+        
+    # DIAGNOSTIC: Check sysman.mgmt$ha_backup view
+    print("\nDIAGNOSTIC: Checking sysman.mgmt$ha_backup...")
+    try:
+        cursor.execute("SELECT column_name FROM all_tab_columns WHERE table_name = 'MGMT$HA_BACKUP' AND owner = 'SYSMAN' ORDER BY column_name")
+        cols = [r[0] for r in cursor.fetchall()]
+        print(f"DIAGNOSTIC: Columns in sysman.mgmt$ha_backup: {', '.join(cols)}")
+        
+        cursor.execute("SELECT DISTINCT database_name, host FROM sysman.mgmt$ha_backup WHERE ROWNUM <= 15")
+        rows = cursor.fetchall()
+        print(f"DIAGNOSTIC: Distinct DBs/Hosts in mgmt$ha_backup: {rows}")
+        
+        cursor.execute("SELECT database_name, input_type, status, start_time FROM sysman.mgmt$ha_backup WHERE ROWNUM <= 5")
+        rows = cursor.fetchall()
+        print(f"DIAGNOSTIC: Sample rows in mgmt$ha_backup: {rows}")
+    except Exception as e:
+        print(f"DIAGNOSTIC: Failed to query sysman.mgmt$ha_backup: {e}")
+        
     backup_sql = """
     SELECT 
         start_time AS backup_date,
