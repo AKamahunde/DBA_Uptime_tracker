@@ -131,10 +131,15 @@ def dashboard(request):
         ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
 
         # Unplanned Downtime & MTTR & Incidents
+        # ALL incidents for the month (used for total count display)
         incidents = IncidentRegister.objects.filter(
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         )
         total_incidents = incidents.count()
+
+        # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI
+        unplanned_incidents = incidents.filter(planned=False)
+        total_unplanned = unplanned_incidents.count()
 
         # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
         SLA_RESOLUTION_TARGETS = {
@@ -147,7 +152,7 @@ def dashboard(request):
         unplanned = 0
         sla_breach_count = 0
         now = timezone.now()
-        for inc in incidents:
+        for inc in unplanned_incidents:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 diff = now - inc.start
                 unplanned += float(diff.total_seconds() / 3600.0)
@@ -157,8 +162,8 @@ def dashboard(request):
                 target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
                 if float(inc.duration_hrs) > target_hrs:
                     sla_breach_count += 1
-                
-        mttr_hrs = (unplanned / total_incidents) if total_incidents > 0 else 0
+
+        mttr_hrs = (unplanned / total_unplanned) if total_unplanned > 0 else 0
         mttr_mins = round(mttr_hrs * 60, 2)
 
         # Target Hours (Availability)
@@ -210,7 +215,7 @@ def dashboard(request):
             'unplanned_downtime': round(unplanned, 2) if sla_exists else 'No Data',
             'unplanned_downtime_status': get_status(unplanned, 2.0, '<=') if sla_exists else 'N/A',
             'total_incidents': total_incidents if sla_exists else 'No Data',
-            'total_incidents_status': get_status(total_incidents, 4, '<=') if sla_exists else 'N/A',
+            'total_incidents_status': get_status(total_unplanned, 4, '<=') if sla_exists else 'N/A',
             'sla_breach_count': sla_breach_count if sla_exists else 0,
             'mttr_mins': mttr_mins if sla_exists else 'No Data',
             'mttr_mins_status': get_status(mttr_mins, 240, '<=') if sla_exists else 'N/A',
