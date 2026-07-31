@@ -58,18 +58,29 @@ class IncidentRegister(models.Model):
         else:
             self.duration_hrs = 0
             
+        # Capture original ticket BEFORE saving so we can locate the existing
+        # maintenance record even when the ticket ID is being renamed.
+        original_ticket = self.ticket  # fallback for new records
+        if self.pk:
+            try:
+                original_ticket = IncidentRegister.objects.filter(pk=self.pk).values_list('ticket', flat=True).first() or self.ticket
+            except Exception:
+                pass
+
         super().save(*args, **kwargs)
 
         # Sync to Maintenance Register
         from api.models import MaintenanceRegister
+
         if self.planned:
             maint_date = self.start.date() if self.start else self.date
             maint_start = self.start if self.start else timezone.now()
             maint_end = self.end if self.end else maint_start
-            
+
             MaintenanceRegister.objects.update_or_create(
-                change_id=self.ticket,
+                change_id=original_ticket,   # look up by ORIGINAL ticket
                 defaults={
+                    'change_id': self.ticket,    # update to NEW ticket name
                     'database': self.database,
                     'date': maint_date,
                     'activity': f"Planned Incident Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
@@ -83,7 +94,9 @@ class IncidentRegister(models.Model):
                 }
             )
         else:
-            MaintenanceRegister.objects.filter(change_id=self.ticket).delete()
+            # Incident marked unplanned — remove any linked maintenance record
+            # (check both current and original ticket name in case it was renamed)
+            MaintenanceRegister.objects.filter(change_id__in=[self.ticket, original_ticket]).delete()
 
     def __str__(self):
         return f"{self.ticket} - {self.date}"
