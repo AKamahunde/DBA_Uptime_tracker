@@ -59,7 +59,7 @@
                 {% for health in page_obj %}
                 <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
                     <td>{{ health.date }}</td>
-                    <td>{{ health.created_at|time:"H:i" }}</td>
+                    <td>{{ health.updated_at|time:"H:i" }}</td>
                     <td>
                         {% if health.created_by %}
                             {{ health.created_by.username }}
