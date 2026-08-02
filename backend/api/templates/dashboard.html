@@ -169,11 +169,12 @@
 
                         <!-- Total Incidents -->
                         <td class="{% if row.total_incidents_status == 'Meets SLA' %}cell-meets{% elif row.total_incidents_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.total_incidents }}
+                            <div style="font-size: 1.05rem; font-weight: 700;">{{ row.total_incidents }}</div>
                             {% if row.sla_breach_count > 0 %}
-                                <br><span style="font-size:0.7rem;font-weight:700;color:#c62828;background:#fde8e8;padding:0.1rem 0.35rem;border-radius:3px;">{{ row.sla_breach_count }} SLA breach{{ row.sla_breach_count|pluralize }}</span>
-                            {% elif row.total_incidents != 'No Data' %}
-                                <br><span style="font-size:0.7rem;color:#64748b;">0 SLA breaches</span>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                                    <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
+                                    {{ row.sla_breach_count }} breach{{ row.sla_breach_count|pluralize }}
+                                </div>
                             {% endif %}
                         </td>
 
@@ -244,11 +245,12 @@
                             <td>{{ database_detail.current.planned_downtime }}</td>
                             <td>{{ database_detail.current.unplanned_downtime }}</td>
                             <td>
-                                {{ database_detail.current.total_incidents }}
+                                <div style="font-weight: 700;">{{ database_detail.current.total_incidents }}</div>
                                 {% if database_detail.current.sla_breach_count > 0 %}
-                                    <br><span style="font-size:0.7rem;font-weight:700;color:#c62828;background:#fde8e8;padding:0.1rem 0.35rem;border-radius:3px;">{{ database_detail.current.sla_breach_count }} SLA breach{{ database_detail.current.sla_breach_count|pluralize }}</span>
-                                {% elif database_detail.current.total_incidents != 'No Data' %}
-                                    <br><span style="font-size:0.7rem;color:#64748b;">0 SLA breaches</span>
+                                    <div style="font-size: 0.7rem; font-weight: 700; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                                        <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
+                                        {{ database_detail.current.sla_breach_count }} breach{{ database_detail.current.sla_breach_count|pluralize }}
+                                    </div>
                                 {% endif %}
                             </td>
                             <td>{{ database_detail.current.mttr_mins }}</td>
