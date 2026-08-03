@@ -235,9 +235,10 @@ BEGIN
     SELECT @SizeGb = SUM(size * 8.0 / 1024 / 1024) FROM sys.master_files WHERE database_id = DB_ID(@DbName);
 
     DECLARE @LargestTable NVARCHAR(256) = 'Unknown';
+    DECLARE @LargestTablePages BIGINT = 0;
     DECLARE @SQL NVARCHAR(MAX);
     SET @SQL = N'
-        SELECT TOP 1 @TableOut = t.name
+        SELECT TOP 1 @TableOut = t.name, @PagesOut = SUM(a.total_pages)
         FROM [' + @DbName + '].sys.tables t
         INNER JOIN [' + @DbName + '].sys.indexes i ON t.object_id = i.object_id
         INNER JOIN [' + @DbName + '].sys.partitions p ON i.object_id = p.object_id AND i.index_id = p.index_id
@@ -245,7 +246,21 @@ BEGIN
         GROUP BY t.name
         ORDER BY SUM(a.total_pages) DESC;';
         
-    EXEC sp_executesql @SQL, N'@TableOut NVARCHAR(256) OUTPUT', @TableOut = @LargestTable OUTPUT;
+    EXEC sp_executesql @SQL, N'@TableOut NVARCHAR(256) OUTPUT, @PagesOut BIGINT OUTPUT', @TableOut = @LargestTable OUTPUT, @PagesOut = @LargestTablePages OUTPUT;
+    
+    IF @LargestTable <> 'Unknown'
+    BEGIN
+        DECLARE @TableSizeMb DECIMAL(18,2) = (@LargestTablePages * 8.0) / 1024.0;
+        IF @TableSizeMb >= 102.4
+        BEGIN
+            DECLARE @TableSizeGb DECIMAL(18,2) = @TableSizeMb / 1024.0;
+            SET @LargestTable = @LargestTable + ' (' + CAST(@TableSizeGb AS VARCHAR(50)) + ' GB)';
+        END
+        ELSE
+        BEGIN
+            SET @LargestTable = @LargestTable + ' (' + CAST(@TableSizeMb AS VARCHAR(50)) + ' MB)';
+        END
+    END
     
     SELECT @DbName AS db_name, @SizeGb AS size_gb, @LargestTable AS largest_table;
 END

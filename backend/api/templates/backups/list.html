@@ -63,7 +63,12 @@
                         {% if backup.start %}{{ backup.start|date:"H:i" }} - {{ backup.end|date:"H:i" }}{% endif %}
                     </td>
                     <td>{{ backup.record_type }}</td>
-                    <td>{{ backup.database }}</td>
+                    <td>
+                        {{ backup.database }}
+                        {% if backup.database_instance %}
+                            <br><span style="font-size: 0.725rem; color: #64748b; font-weight: 600;">{{ backup.database_instance }}</span>
+                        {% endif %}
+                    </td>
                     <td>{{ backup.backup_type }}</td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">{{ backup.backup_used }}</td>
                     <td>{{ backup.duration_mins }}</td>

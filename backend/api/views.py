@@ -1145,15 +1145,22 @@ def capacity_ingest(request):
         database_instance = data.get('database', 'MySQL')
         incoming_size = Decimal(str(data.get('database_size_gb', 0)))
         
-        # Calculate growth by finding the most recent record for this database
-        most_recent = CapacityPlanning.objects.filter(database=database_instance).order_by('-month').first()
+        # Enforce a single capacity record per database per month by truncating to the 1st
+        first_day_of_month = datetime.now().date().replace(day=1)
+        
+        # Calculate growth by comparing with the size from the most recent PREVIOUS month
+        most_recent = CapacityPlanning.objects.filter(
+            database=database_instance,
+            month__lt=first_day_of_month
+        ).order_by('-month').first()
+        
         growth = Decimal('0.00')
         if most_recent:
             growth = incoming_size - most_recent.database_size_gb
             
-        # Find the first existing entry for this database/month combination (survives pre-existing duplicate logs)
+        # Find the existing entry for this database/month combination
         capacity = CapacityPlanning.objects.filter(
-            month=datetime.now().date(),
+            month=first_day_of_month,
             database=database_instance
         ).first()
         
@@ -1167,7 +1174,7 @@ def capacity_ingest(request):
             capacity.save()
         else:
             capacity = CapacityPlanning.objects.create(
-                month=datetime.now().date(),
+                month=first_day_of_month,
                 database=database_instance,
                 database_size_gb=incoming_size,
                 disk_used_percent=Decimal(str(data.get('disk_percent', 0))),

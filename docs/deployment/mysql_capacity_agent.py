@@ -33,12 +33,28 @@ def get_database_size_gb():
         return 0.0
 
 def get_largest_table():
-    """Extracts the name of the largest table in the database."""
+    """Extracts the name and size of the largest table in the database."""
     try:
-        query = "SELECT table_name FROM information_schema.tables ORDER BY (data_length + index_length) DESC LIMIT 1;"
+        query = "SELECT table_name, (data_length + index_length) FROM information_schema.tables ORDER BY (data_length + index_length) DESC LIMIT 1;"
         cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"{query}\" -B -N"
         output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-        return output if output else "Unknown"
+        if output:
+            parts = output.split('\t')
+            if len(parts) == 2:
+                name = parts[0]
+                try:
+                    bytes_val = float(parts[1])
+                    gb = bytes_val / (1024 * 1024 * 1024)
+                    if gb >= 0.1:
+                        size_str = f"{round(gb, 2)} GB"
+                    else:
+                        mb = bytes_val / (1024 * 1024)
+                        size_str = f"{round(mb, 2)} MB"
+                    return f"{name} ({size_str})"
+                except ValueError:
+                    return parts[0]
+            return output
+        return "Unknown"
     except Exception as e:
         print(f"Error getting largest table: {e}")
         return "Unknown"

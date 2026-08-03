@@ -214,19 +214,33 @@ if __name__ == "__main__":
             used_gb = size_gb - free_gb
             tablespace_used_percent = (used_gb / size_gb) * 100 if size_gb > 0 else 0.0
             
-            # Retrieve largest table dynamically
+            # Retrieve largest table dynamically with size (excluding system schemas)
             largest_table = "SYS_AUDIT / DATA_TABLE"
             try:
                 cursor.execute("""
-                    SELECT segment_name FROM (
-                        SELECT segment_name FROM dba_segments 
+                    SELECT segment_name, bytes FROM (
+                        SELECT segment_name, bytes FROM dba_segments 
                         WHERE segment_type = 'TABLE' 
+                          AND owner NOT IN ('SYS', 'SYSTEM', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
+                                            'ORDSYS', 'ORDDATA', 'CTXSYS', 'XDB', 'WMSYS', 
+                                            'APEX_040200', 'APPQOSSYS', 'GSMADMIN_INTERNAL')
                         ORDER BY bytes DESC
                     ) WHERE ROWNUM = 1
                 """)
                 table_row = cursor.fetchone()
                 if table_row:
-                    largest_table = table_row[0]
+                    name = table_row[0]
+                    num_bytes = table_row[1]
+                    if num_bytes:
+                        gb = num_bytes / (1024 * 1024 * 1024)
+                        if gb >= 0.1:
+                            size_str = f"{round(gb, 2)} GB"
+                        else:
+                            mb = num_bytes / (1024 * 1024)
+                            size_str = f"{round(mb, 2)} MB"
+                        largest_table = f"{name} ({size_str})"
+                    else:
+                        largest_table = name
             except Exception as table_err:
                 print(f"Could not retrieve largest table: {table_err}")
                 
