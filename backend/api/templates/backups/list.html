@@ -66,7 +66,19 @@
                     <td>
                         {{ backup.database }}
                         {% if backup.database_instance %}
-                            <br><span style="font-size: 0.725rem; color: #64748b; font-weight: 600;">{{ backup.database_instance }}</span>
+                            <br><span style="font-size: 0.725rem; color: #64748b; font-weight: 600;" title="Instance: {{ backup.database_instance }}">
+                                {% if 'nmsinfra' in backup.database_instance %}
+                                    nmsinfra.nms.go.ug (DB)
+                                {% elif 'nmsebs' in backup.database_instance %}
+                                    nmsebs.nms.go.ug (App)
+                                {% elif 'nickle' in backup.database_instance or 'mysql' in backup.database_instance|lower %}
+                                    nickledbnew
+                                {% elif 'windows' in backup.database_instance|lower or 'mssql' in backup.database_instance|lower or 'localhost' in backup.database_instance|lower %}
+                                    Windows Server
+                                {% else %}
+                                    {{ backup.database_instance }}
+                                {% endif %}
+                            </span>
                         {% endif %}
                     </td>
                     <td>{{ backup.backup_type }}</td>

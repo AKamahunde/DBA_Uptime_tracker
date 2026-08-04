@@ -43,6 +43,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Change ID</th>
+                    <th>System</th>
                     <th>Database</th>
                     <th>Reason</th>
                     <th>Risk</th>
@@ -57,6 +58,13 @@
                 <tr {% if not maintenance.success %}style="background-color: #ffd6d6;"{% endif %}>
                     <td>{{ maintenance.date }}</td>
                     <td>{{ maintenance.change_id }}</td>
+                    <td>
+                        {% if maintenance.system %}
+                            {{ maintenance.system }}
+                        {% else %}
+                            <span style="color: #94a3b8; font-style: italic;">—</span>
+                        {% endif %}
+                    </td>
                     <td>{{ maintenance.database }}</td>
                     <td style="max-width: 250px; word-wrap: break-word; white-space: normal; font-size: 0.9rem; color: #475569;">{{ maintenance.activity }}</td>
                     <td>
@@ -107,7 +115,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" style="text-align: center;">No maintenance records found.</td>
+                    <td colspan="10" style="text-align: center;">No maintenance records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

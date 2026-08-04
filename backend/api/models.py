@@ -82,6 +82,7 @@ class IncidentRegister(models.Model):
                 defaults={
                     'change_id': self.ticket,    # update to NEW ticket name
                     'database': self.database,
+                    'system': self.system,        # Sync system name (e.g. nmsinfra (DB))
                     'date': maint_date,
                     'activity': f"Planned Incident Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
                     'start': maint_start,
@@ -276,6 +277,7 @@ class ServerHealth(models.Model):
 class MaintenanceRegister(models.Model):
     date = models.DateField()
     change_id = models.CharField(max_length=50)
+    system = models.CharField(max_length=100, blank=True, default='')
     activity = models.TextField()
     start = models.DateTimeField()
     end = models.DateTimeField()
