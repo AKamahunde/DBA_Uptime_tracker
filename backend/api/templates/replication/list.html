@@ -58,7 +58,7 @@
         <tbody>
             {% for replication in page_obj %}
             <tr {% if replication.status == 'Failed' %}style="background-color: #ffd6d6;"{% endif %}>
-                <td>{{ replication.date|date:"Y-m-d" }} <span style="color: #666; font-size: 0.85em;">{{ replication.created_at|date:"H:i" }}</span></td>
+                <td>{{ replication.date|date:"d/m/Y" }} <span style="color: #666; font-size: 0.85em;">{{ replication.created_at|date:"H:i" }}</span></td>
                 <td>{{ replication.master }}</td>
                 <td>{{ replication.replica }}</td>
                 <td>{{ replication.io_thread }}</td>

@@ -93,7 +93,7 @@
         {% for log in change_logs %}
         <div class="timeline-item" style="position: relative; margin-bottom: 1.5rem;">
             <div style="position: absolute; left: -2rem; top: 0.25rem; width: 12px; height: 12px; background: var(--color-accent); border-radius: 50%; border: 2px solid white;"></div>
-            <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"M d, Y - H:i" }}</div>
+            <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"d M Y - H:i" }}</div>
             <div style="font-weight: 500;">{{ log.action }}</div>
             <div style="font-size: 0.9rem; color: #444;">By: {{ log.changed_by.username|default:"System" }}</div>
             {% if log.assigned_to %}

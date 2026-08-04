@@ -21,7 +21,7 @@
             <tbody>
                 {% for holiday in page_obj %}
                 <tr>
-                    <td>{{ holiday.holiday_date|date:"l, F d, Y" }}</td>
+                    <td>{{ holiday.holiday_date|date:"l, d F Y" }}</td>
                     <td>{{ holiday.name }}</td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">

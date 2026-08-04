@@ -274,19 +274,19 @@ def dashboard(request):
             last_full = BackupRecovery.objects.filter(
                 database__iexact=selected_db, record_type='Backup', backup_type='Full', outcome='Success'
             ).order_by('-date').first()
-            last_full_str = last_full.date.strftime('%m/%d/%Y') if last_full else 'No Data'
+            last_full_str = last_full.date.strftime('%d/%m/%Y') if last_full else 'No Data'
             
             # Last Incremental Backup
             last_inc = BackupRecovery.objects.filter(
                 database__iexact=selected_db, record_type='Backup', backup_type='Incremental', outcome='Success'
             ).order_by('-date').first()
-            last_inc_str = last_inc.date.strftime('%m/%d/%Y') if last_inc else 'No Data'
+            last_inc_str = last_inc.date.strftime('%d/%m/%Y') if last_inc else 'No Data'
             
             # Last DR Test
             last_dr = BackupRecovery.objects.filter(
                 database__iexact=selected_db, record_type='Recovery', outcome='Success'
             ).order_by('-date').first()
-            last_dr_str = last_dr.date.strftime('%m/%d/%Y') if last_dr else 'No Data'
+            last_dr_str = last_dr.date.strftime('%d/%m/%Y') if last_dr else 'No Data'
             
             # Failed Restore Tests
             failed_restores = BackupRecovery.objects.filter(
@@ -418,11 +418,15 @@ def dashboard_print(request):
 
     dashboard_data, _ = _get_dashboard_data(reporting_month)
     
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
     context = {
         'dashboard_data': dashboard_data,
         'reporting_month_str': reporting_month.strftime('%B %Y'),
-        'extracted_by': request.user.username,
-        'extracted_at': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'extracted_by': user_display,
+        'extracted_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
     }
     return render(request, 'dashboard_print.html', context)
 
