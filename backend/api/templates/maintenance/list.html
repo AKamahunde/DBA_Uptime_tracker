@@ -43,9 +43,11 @@
                 <tr>
                     <th>Date</th>
                     <th>Change ID</th>
+                    <th>Database</th>
+                    <th>Reason</th>
                     <th>Risk</th>
                     <th>Success</th>
-                    <th>Database</th>
+                    <th>Approved By</th>
                     <th>Logged By</th>
                     <th>Actions</th>
                 </tr>
@@ -55,6 +57,8 @@
                 <tr {% if not maintenance.success %}style="background-color: #ffd6d6;"{% endif %}>
                     <td>{{ maintenance.date }}</td>
                     <td>{{ maintenance.change_id }}</td>
+                    <td>{{ maintenance.database }}</td>
+                    <td style="max-width: 250px; word-wrap: break-word; white-space: normal; font-size: 0.9rem; color: #475569;">{{ maintenance.activity }}</td>
                     <td>
                         {% if maintenance.risk == 'High' %}
                             <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ maintenance.risk }}</span>
@@ -71,7 +75,13 @@
                             <span style="color: #c62828; font-weight: 600;">No</span>
                         {% endif %}
                     </td>
-                    <td>{{ maintenance.database }}</td>
+                    <td style="font-weight: 500;">
+                        {% if maintenance.approved_by %}
+                            {{ maintenance.approved_by }}
+                        {% else %}
+                            <span style="color: #94a3b8; font-style: italic; font-weight: normal;">—</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if maintenance.created_by %}
                             {{ maintenance.created_by.username }}
@@ -97,7 +107,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" style="text-align: center;">No maintenance records found.</td>
+                    <td colspan="9" style="text-align: center;">No maintenance records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

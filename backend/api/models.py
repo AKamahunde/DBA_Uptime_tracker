@@ -88,7 +88,7 @@ class IncidentRegister(models.Model):
                     'end': maint_end,
                     'risk': 'Medium',
                     'rollback_plan': 'Awaiting DBA input.',
-                    'approved_by': self.assigned_to or 'System',
+                    'approved_by': '',  # Leave blank so a DBA can update it later
                     'success': True if self.status in ['Resolved', 'Closed'] else False,
                     'created_by': self.created_by
                 }
@@ -286,7 +286,7 @@ class MaintenanceRegister(models.Model):
         ('High', 'High')
     ])
     rollback_plan = models.TextField()
-    approved_by = models.CharField(max_length=100)
+    approved_by = models.CharField(max_length=100, blank=True)
     success = models.BooleanField(default=False)
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
