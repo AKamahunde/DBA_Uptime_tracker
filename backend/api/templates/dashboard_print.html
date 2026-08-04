@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,64 +17,67 @@
             --pure-white: #FFFFFF;
         }
 
+        @page {
+            size: A4 portrait;
+            margin: 1.2cm 0.8cm 0.8cm 0.8cm;
+        }
+
         body {
             font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
             color: var(--text-dark);
             background: var(--pure-white);
             margin: 0;
-            padding: 2rem;
-            line-height: 1.5;
+            padding: 0;
+            font-size: 0.82rem;
+            line-height: 1.35;
         }
 
         .header-section {
             border-bottom: 2px solid var(--primary-navy);
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
+            padding-bottom: 0.4rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header-section h1 {
             color: var(--primary-navy);
             margin: 0;
-            font-size: 1.8rem;
+            font-size: 1.3rem;
             font-weight: 600;
+        }
+
+        .header-section .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-soft);
+            font-style: italic;
         }
 
         .notes-section {
             background-color: var(--bg-cool);
-            border-left: 4px solid var(--primary-gold);
-            padding: 1rem 1.25rem;
-            margin-bottom: 2rem;
+            border-left: 3px solid var(--primary-gold);
+            padding: 0.4rem 0.8rem;
+            margin-bottom: 0.6rem;
             border-radius: 4px;
+            font-size: 0.75rem;
         }
 
-        .notes-section h3 {
-            margin: 0 0 0.5rem 0;
+        .notes-section strong {
             color: var(--primary-navy);
-            font-size: 1.05rem;
-        }
-
-        .notes-section ul {
-            margin: 0;
-            padding-left: 1.25rem;
-            color: var(--text-soft);
-            font-size: 0.9rem;
-        }
-
-        .notes-section li {
-            margin-bottom: 0.25rem;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 2.5rem;
+            margin-bottom: 0.6rem;
         }
 
         th, td {
-            padding: 0.75rem 1rem;
+            padding: 0.4rem 0.4rem;
             text-align: left;
             border-bottom: 1px solid var(--border-mist);
-            font-size: 0.9rem;
+            font-size: 0.7rem;
         }
 
         th {
@@ -83,12 +87,9 @@
             border-bottom: 2px solid var(--primary-navy);
         }
 
-        tr.below-sla {
-            background-color: #ffd6d6;
-        }
-
         .status-cell {
             font-weight: 600;
+            font-size: 0.68rem;
         }
         .meets {
             color: var(--primary-green);
@@ -100,16 +101,15 @@
         .legend-section {
             background-color: var(--bg-warm);
             border: 1px solid var(--border-mist);
-            border-radius: 6px;
-            padding: 1.25rem;
-            margin-bottom: 3rem;
-            page-break-inside: avoid;
+            border-radius: 4px;
+            padding: 0.6rem;
+            margin-bottom: 0.8rem;
         }
 
         .legend-section h4 {
-            margin: 0 0 0.75rem 0;
+            margin: 0 0 0.3rem 0;
             color: var(--primary-navy);
-            font-size: 1rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
@@ -118,15 +118,14 @@
             list-style: none;
             padding: 0;
             margin: 0;
-            font-size: 0.875rem;
+            font-size: 0.72rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
         }
 
         .legend-list li {
-            margin-bottom: 0.5rem;
             color: var(--text-dark);
-        }
-        .legend-list li:last-child {
-            margin-bottom: 0;
         }
 
         .legend-title {
@@ -135,34 +134,34 @@
         }
 
         .footer-print {
-            margin-top: 4rem;
-            page-break-inside: avoid;
+            margin-top: 1.25rem;
         }
 
         .metadata {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: var(--text-soft);
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
             border-top: 1px solid var(--border-mist);
-            padding-top: 0.75rem;
+            padding-top: 0.5rem;
         }
 
         .signature-section {
             display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            margin-top: 2rem;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-top: 1rem;
         }
 
         .sig-line {
-            font-size: 0.95rem;
+            flex: 1;
+            font-size: 0.8rem;
             color: var(--text-dark);
+            border-top: 1px solid var(--text-soft);
+            padding-top: 0.4rem;
+            line-height: 1.7;
         }
 
         @media print {
-            body {
-                padding: 0;
-            }
             .no-print {
                 display: none;
             }
@@ -172,20 +171,18 @@
 <body>
 
     <div class="header-section">
-        <h1>Summary of Database Performance for {{ reporting_month_str }}</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 45px; width: auto; border-radius: 4px; border: 1px solid var(--border-mist);">
+            <div>
+                <h1>Summary of Database Performance for {{ reporting_month_str }}</h1>
+                <div class="subtitle">Operations Performance &amp; Compliance Report</div>
+            </div>
+        </div>
     </div>
 
-    <!-- Notes before the table -->
+    <!-- Horizontal Compact Notes Section -->
     <div class="notes-section">
-        <h3>Performance Target Reference Notes</h3>
-        <ul>
-            <li><strong>Uptime SLA</strong> target is configured at <strong>&ge; 99.95%</strong> availability.</li>
-            <li><strong>Planned Downtime</strong> allowance is capped at <strong>&le; 48.0 hours</strong> per month.</li>
-            <li><strong>Unplanned Downtime</strong> limit is capped at <strong>&le; 2.0 hours</strong> per month.</li>
-            <li><strong>Incident Volume</strong> target is <strong>&le; 4</strong> unplanned outages per month.</li>
-            <li><strong>MTTR</strong> target is <strong>&le; 240 minutes</strong>.</li>
-            <li><strong>Backups &amp; Restores</strong> SLA targets are <strong>&ge; 95%</strong> and <strong>&ge; 80%</strong> success rates respectively.</li>
-        </ul>
+        <strong>SLA Targets:</strong> Uptime &ge; 99.95% | Planned Downtime &le; 48.0 hrs | Unplanned Downtime &le; 2.0 hrs | Outages &le; 4 | MTTR &le; 240 mins | Backups &ge; 95% | Restores &ge; 80%
     </div>
 
     <!-- Summary Table -->
@@ -193,15 +190,15 @@
         <thead>
             <tr>
                 <th>Database</th>
-                <th>SLA Uptime</th>
-                <th>Planned Downtime</th>
-                <th>Unplanned Downtime</th>
-                <th>Total Incidents</th>
-                <th>SLA Breaches</th>
-                <th>MTTR (Mins)</th>
-                <th>Backup Success</th>
-                <th>Restore Success</th>
-                <th>Replication Status</th>
+                <th>Uptime</th>
+                <th>Planned</th>
+                <th>Unplanned</th>
+                <th>Incidents</th>
+                <th>Breaches</th>
+                <th>MTTR</th>
+                <th>Backup</th>
+                <th>Restore</th>
+                <th>Replication</th>
             </tr>
         </thead>
         <tbody>
@@ -216,12 +213,8 @@
                         </span>
                     {% endif %}
                 </td>
-                <td>
-                    {{ item.planned_downtime }} hrs
-                </td>
-                <td>
-                    {{ item.unplanned_downtime }} hrs
-                </td>
+                <td>{{ item.planned_downtime }} hrs</td>
+                <td>{{ item.unplanned_downtime }} hrs</td>
                 <td>{{ item.total_incidents }}</td>
                 <td>
                     <span class="{% if item.sla_breach_count > 0 %}below{% endif %}" style="font-weight:600;">
@@ -229,28 +222,22 @@
                     </span>
                 </td>
                 <td>{{ item.mttr_mins }}</td>
-                <td>
-                    {{ item.backup_success }}
-                </td>
-                <td>
-                    {{ item.restore_success }}
-                </td>
-                <td>
-                    {{ item.replication_status }}
-                </td>
+                <td>{{ item.backup_success }}</td>
+                <td>{{ item.restore_success }}</td>
+                <td>{{ item.replication_status }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <!-- Database Legend / Key -->
+    <!-- Two-Column Database Legend / Key -->
     <div class="legend-section">
         <h4>Database Systems &amp; Environment Key</h4>
         <ul class="legend-list">
-            <li><span class="legend-title">Oracle:</span> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; This is the NMS ERP and Core Infrastructure database.</li>
-            <li><span class="legend-title">MySQL:</span> nickledbnew (with replication on nickeldbdr) &mdash; Houses systems like NMS360, ServiceDesk, and DMT.</li>
-            <li><span class="legend-title">MS SQL Server:</span> Windows Server &mdash; Houses MKInsight used by auditors.</li>
-            <li><span class="legend-title">PostgreSQL:</span> Localhost / PostgreSQL Instance &mdash; Houses ColdChain System ODKX.</li>
+            <li><span class="legend-title">Oracle:</span> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powering the core NMS Enterprise Resource Planning (ERP) suite and foundational infrastructure operations.</li>
+            <li><span class="legend-title">MySQL:</span> nickledbnew (replicated live to nickeldbdr) &mdash; Hosting vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Data Migration Tool (DMT).</li>
+            <li><span class="legend-title">MS SQL Server:</span> Windows Server Host &mdash; Supporting MKInsight, the mission-critical internal audit and compliance verification system.</li>
+            <li><span class="legend-title">PostgreSQL:</span> Localhost Instance &mdash; Driving the ColdChain logistical system and ODKX mobile data collection hubs.</li>
         </ul>
     </div>
 
@@ -261,9 +248,21 @@
         </div>
 
         <div class="signature-section">
-            <div class="sig-line">Extracted by: ____________________________________________________ Signature: __________________ Date: ______________</div>
-            <div class="sig-line">Reviewed by: ____________________________________________________ Signature: __________________ Date: ______________</div>
-            <div class="sig-line">Approved by: ____________________________________________________ Signature: __________________ Date: ______________</div>
+            <div class="sig-line">
+                <strong>Extracted By:</strong> {{ extracted_by }}<br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
+            <div class="sig-line">
+                <strong>Reviewed By:</strong><br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
+            <div class="sig-line">
+                <strong>Approved By:</strong><br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
         </div>
     </div>
 
