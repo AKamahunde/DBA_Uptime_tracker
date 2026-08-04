@@ -123,9 +123,27 @@
                 <input type="month" id="month_filter" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.25rem; font-weight: bold; color: var(--color-primary); border: 1px solid #ccc;">
             </div>
         </form>
-        <p style="font-style: italic; color: #555; margin-bottom: 1rem; font-size: 0.9rem;">
-            Side-by-side comparison across all monitored databases, with detail for the selected database below.
+        <p style="font-style: italic; color: var(--text-soft); margin-bottom: 1rem; font-size: 0.95rem;">
+            Database Operations Center: Live SLA compliance, uptime tracking, and backup verification across all production databases.
         </p>
+
+        <!-- Export Actions -->
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1rem;">
+            <a href="{% url 'dashboard_print' %}{% if reporting_month %}?month={{ reporting_month }}{% endif %}" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
+                    <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1"/>
+                </svg>
+                Export as PDF
+            </a>
+            <a href="{% url 'dashboard_excel' %}{% if reporting_month %}?month={{ reporting_month }}{% endif %}" class="btn btn-success" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                    <path d="M5.186 9.853A.5.5 0 0 0 5 10.25a.5.5 0 0 0 .186.397l2.5 2a.5.5 0 0 0 .628 0l2.5-2a.5.5 0 0 0-.628-.794L8 11.286 5.814 9.453a.5.5 0 0 0-.628.4"/>
+                </svg>
+                Export as Excel
+            </a>
+        </div>
 
         <div style="overflow-x: auto;">
             <table class="modern-table">
@@ -206,6 +224,17 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Database Systems & Environment Key -->
+        <div style="margin-top: 1.5rem; background-color: var(--bg-warm); border: 1px solid var(--border-mist); border-radius: var(--radius); padding: 1.25rem; font-size: 0.875rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; border-left: 3px solid var(--primary-gold); padding-left: 0.5rem; font-weight: 600;">Database Systems & Environment Key</h4>
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; color: var(--text-dark);">
+                <li><strong style="color: var(--primary-navy);">Oracle:</strong> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; This is the NMS ERP and Core Infrastructure database.</li>
+                <li><strong style="color: var(--primary-navy);">MySQL:</strong> nickledbnew (with replication on nickeldbdr) &mdash; Houses systems like NMS360, ServiceDesk, and DMT.</li>
+                <li><strong style="color: var(--primary-navy);">MS SQL Server:</strong> Windows Server &mdash; Houses MKInsight used by auditors.</li>
+                <li><strong style="color: var(--primary-navy);">PostgreSQL:</strong> Localhost / PostgreSQL Instance &mdash; Houses ColdChain System ODKX.</li>
+            </ul>
         </div>
 
         {% if database_detail %}

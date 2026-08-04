@@ -103,7 +103,7 @@ def dashboard(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
-    selected_db = request.GET.get('database_select', 'All Databases')
+def _get_dashboard_data(reporting_month):
     db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
 
     def get_status(current, target_val, operator):
@@ -121,6 +121,7 @@ def dashboard(request):
                 return 'Meets SLA' if current <= target_val else 'Below SLA'
         except:
             return 'N/A'
+        return 'N/A'
 
     dashboard_data = []
 
@@ -131,7 +132,7 @@ def dashboard(request):
         ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
 
         # Unplanned Downtime & MTTR & Incidents
-        # ALL incidents for the month (used for total count display)
+        # ALL incidents for the month
         incidents = IncidentRegister.objects.filter(
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         )
@@ -158,7 +159,6 @@ def dashboard(request):
                 unplanned += float(diff.total_seconds() / 3600.0)
             elif inc.duration_hrs:
                 unplanned += float(inc.duration_hrs)
-                # Check if this resolved incident breached its severity SLA
                 target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
                 if float(inc.duration_hrs) > target_hrs:
                     sla_breach_count += 1
@@ -197,7 +197,7 @@ def dashboard(request):
         success_restores = restores.filter(outcome='Success').count()
         restore_success_pct = f"{round((success_restores/total_restores)*100, 1)}%" if total_restores > 0 else 'No Data'
 
-        # Replication Status (Latest record for this month)
+        # Replication Status
         latest_rep = ReplicationMonitor.objects.filter(
             database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
         ).order_by('-date', '-created_at').first()
@@ -227,6 +227,39 @@ def dashboard(request):
             'replication_status_status': 'N/A' if (rep_status in ['No Data', 'N/A'] or not sla_exists) else ('Meets SLA' if rep_status == 'Healthy' else 'Below SLA'),
             'failed_backups': failed_backups if sla_exists else 'No Data'
         })
+    return dashboard_data, db_types
+
+@login_required
+def dashboard(request):
+    autopopulate_fixed_holidays()
+    auto_close_incidents()
+    
+    # Run all counts in a single DB round-trip by using lazy evaluation
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM incident_register),
+                (SELECT COUNT(*) FROM replication_monitor),
+                (SELECT COUNT(*) FROM backup_recovery),
+                (SELECT COUNT(*) FROM server_health),
+                (SELECT COUNT(*) FROM maintenance_register),
+                (SELECT COUNT(*) FROM capacity_planning)
+        """)
+        row = cursor.fetchone()
+
+    # Get reporting month
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    selected_db = request.GET.get('database_select', 'All Databases')
+    dashboard_data, db_types = _get_dashboard_data(reporting_month)
 
     database_detail = None
     if selected_db in db_types:
@@ -371,6 +404,187 @@ def dashboard(request):
         'reporting_month': reporting_month.strftime('%Y-%m'),
     }
     return render(request, 'dashboard.html', context)
+
+@login_required
+def dashboard_print(request):
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    dashboard_data, _ = _get_dashboard_data(reporting_month)
+    
+    context = {
+        'dashboard_data': dashboard_data,
+        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'extracted_by': request.user.username,
+        'extracted_at': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    return render(request, 'dashboard_print.html', context)
+
+@login_required
+def dashboard_excel(request):
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    dashboard_data, _ = _get_dashboard_data(reporting_month)
+    month_display = reporting_month.strftime('%B %Y')
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "DB Performance Summary"
+        
+        # Style Definitions
+        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
+        font_header = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+        font_body = Font(name='Segoe UI', size=10)
+        font_bold = Font(name='Segoe UI', size=10, bold=True)
+        
+        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
+        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
+        
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
+        
+        border_thin = Border(
+            left=Side(style='thin', color='D1D7E0'),
+            right=Side(style='thin', color='D1D7E0'),
+            top=Side(style='thin', color='D1D7E0'),
+            bottom=Side(style='thin', color='D1D7E0')
+        )
+        
+        # Add Title
+        ws.merge_cells('A1:J1')
+        ws['A1'] = f"Summary of Database Performance - {month_display}"
+        ws['A1'].font = font_title
+        ws['A1'].alignment = align_left
+        ws.row_dimensions[1].height = 30
+        
+        ws.append([]) # Empty row
+        
+        # Add Headers
+        headers = [
+            "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
+            "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
+            "Backup Success %", "Restore Success %", "Replication Status"
+        ]
+        ws.append(headers)
+        ws.row_dimensions[3].height = 25
+        
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_num)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_thin
+            
+        # Add Data rows
+        row_num = 4
+        for item in dashboard_data:
+            row_data = [
+                item['database'],
+                item['availability'],
+                item['planned_downtime'],
+                item['unplanned_downtime'],
+                item['total_incidents'],
+                item['sla_breach_count'],
+                item['mttr_mins'],
+                item['backup_success'],
+                item['restore_success'],
+                item['replication_status']
+            ]
+            ws.append(row_data)
+            ws.row_dimensions[row_num].height = 20
+            
+            # Apply body styles
+            for col_num in range(1, 11):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.font = font_body
+                cell.border = border_thin
+                if row_num % 2 == 0:
+                    cell.fill = fill_even
+                
+                if col_num == 1:
+                    cell.alignment = align_left
+                else:
+                    cell.alignment = align_center
+            row_num += 1
+            
+        # Add Legend / Key below table
+        ws.append([]) # empty
+        ws.append([]) # empty
+        legend_start = row_num + 2
+        
+        ws.cell(row=legend_start, column=1, value="Database Key & Host Systems:").font = font_bold
+        ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - This is the NMS ERP and Core Infrastructure database.").font = font_body
+        ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (with replication on nickeldbdr) - Houses systems like NMS360, ServiceDesk, and DMT.").font = font_body
+        ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server - Houses MKInsight used by auditors.").font = font_body
+        ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: Localhost / PostgreSQL Instance - Houses ColdChain System ODKX.").font = font_body
+        
+        # Adjust Column Widths
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                if cell.row == 1 or cell.row > legend_start:
+                    continue
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="DB_Performance_Summary_{month_str}.xlsx"'
+        wb.save(response)
+        return response
+        
+    except ImportError:
+        import csv
+        from django.http import HttpResponse
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="DB_Performance_Summary_{month_str}.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([f"Summary of Database Performance - {month_display}"])
+        writer.writerow([])
+        writer.writerow([
+            "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
+            "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
+            "Backup Success %", "Restore Success %", "Replication Status"
+        ])
+        for item in dashboard_data:
+            writer.writerow([
+                item['database'],
+                item['availability'],
+                item['planned_downtime'],
+                item['unplanned_downtime'],
+                item['total_incidents'],
+                item['sla_breach_count'],
+                item['mttr_mins'],
+                item['backup_success'],
+                item['restore_success'],
+                item['replication_status']
+            ])
+        writer.writerow([])
+        writer.writerow(["Database Key & Host Systems:"])
+        writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - This is the NMS ERP and Core Infrastructure database."])
+        writer.writerow(["MySQL: nickledbnew (with replication on nickeldbdr) - Houses systems like NMS360, ServiceDesk, and DMT."])
+        writer.writerow(["MS SQL Server: Windows Server - Houses MKInsight used by auditors."])
+        writer.writerow(["PostgreSQL: Localhost / PostgreSQL Instance - Houses ColdChain System ODKX."])
+        return response
 
 @login_required
 def incident_list(request):

@@ -4,6 +4,8 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('dashboard/print/', views.dashboard_print, name='dashboard_print'),
+    path('dashboard/excel/', views.dashboard_excel, name='dashboard_excel'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('about/', views.about, name='about'),
