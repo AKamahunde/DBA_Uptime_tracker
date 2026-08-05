@@ -19,7 +19,7 @@
 
         @page {
             size: A4 portrait;
-            margin: 1.8cm 1cm 1cm 1cm;
+            margin: 2.5cm 1.5cm 1.5cm 1.5cm;
         }
 
         body {
@@ -438,7 +438,7 @@
             if (downloadMode) {
                 const element = document.body;
                 const opt = {
-                    margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
+                    margin:       [25, 15, 15, 15], // top, left, bottom, right in mm
                     filename:     'DB_Performance_Summary_{{ selected_db|slugify }}_{{ reporting_month_str|slugify }}.pdf',
                     image:        { type: 'jpeg', quality: 0.98 },
                     html2canvas:  { scale: 2, useCORS: true },

@@ -17,7 +17,7 @@
 
         @page {
             size: portrait;
-            margin: 15mm;
+            margin: 25mm 15mm 15mm 15mm;
         }
 
         body {
@@ -210,7 +210,13 @@
             {% for item in queryset %}
             <tr>
                 <td class="text-left" style="font-weight: 600;">{{ item.month|date:"F Y" }}</td>
-                <td class="text-left">{{ item.database }}</td>
+                <td class="text-left">
+                    {% if item.database == 'Oracle' %}
+                        Oracle (nmsinfra)
+                    {% else %}
+                        {{ item.database }}
+                    {% endif %}
+                </td>
                 <td>{{ item.database_size_gb }}</td>
                 <td>
                     {% if item.growth_gb > 0 %}
@@ -273,7 +279,7 @@
             if (downloadMode) {
                 const element = document.body;
                 const opt = {
-                    margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
+                    margin:       [25, 15, 15, 15], // top, left, bottom, right in mm
                     filename:     'Capacity_Tracking_Report_{{ current_db|slugify }}.pdf',
                     image:        { type: 'jpeg', quality: 0.98 },
                     html2canvas:  { scale: 2, useCORS: true },

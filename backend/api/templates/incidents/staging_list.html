@@ -22,16 +22,7 @@
                 <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
             </select>
         </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="status" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Status</label>
-            <select id="status" name="status" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 180px;">
-                <option value="Awaiting Review" {% if status_filter == 'Awaiting Review' %}selected{% endif %}>Awaiting Review</option>
-                <option value="Promoted to Incident" {% if status_filter == 'Promoted to Incident' %}selected{% endif %}>Promoted to Incident</option>
-                <option value="Promoted to Maintenance" {% if status_filter == 'Promoted to Maintenance' %}selected{% endif %}>Promoted to Maintenance</option>
-                <option value="" {% if status_filter == '' %}selected{% endif %}>All Records</option>
-            </select>
-        </div>
+
 
         <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
             <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
@@ -49,7 +40,6 @@
                     <th>Duration (hrs)</th>
                     <th>Root Cause (Alert Log)</th>
                     <th>Status</th>
-                    <th>Classification Detail</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -77,21 +67,6 @@
                             <span style="display:inline-block; background:#10b981; color:white; font-size:0.75rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:3px; white-space: nowrap;">Maintenance Logged</span>
                         {% endif %}
                     </td>
-                    <td style="font-size: 0.85rem; color: #475569;">
-                        {% if item.status == 'Promoted to Incident' and item.incident_record %}
-                            <a href="{% url 'incident_edit' item.incident_record.pk %}" style="font-weight: 600; color: #002569; text-decoration: underline;">
-                                Ticket: {{ item.incident_record.ticket }}
-                            </a>
-                            <br><span style="font-size: 0.75rem; color: #64748b;">By {{ item.processed_by.username }}<br>on {{ item.processed_at|date:"d/m/H:i" }}</span>
-                        {% elif item.status == 'Promoted to Maintenance' and item.maintenance_record %}
-                            <a href="{% url 'maintenance_edit' item.maintenance_record.pk %}" style="font-weight: 600; color: #002569; text-decoration: underline;">
-                                Change: {{ item.maintenance_record.change_id }}
-                            </a>
-                            <br><span style="font-size: 0.75rem; color: #64748b;">By {{ item.processed_by.username }}<br>on {{ item.processed_at|date:"d/m/H:i" }}</span>
-                        {% else %}
-                            <span style="color: #94a3b8;">—</span>
-                        {% endif %}
-                    </td>
                     <td>
                         {% if item.status == 'Awaiting Review' %}
                             <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 140px;">
@@ -109,7 +84,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">No staged alert logs found matching current filters.</td>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">No staged alert logs found matching current filters.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -124,16 +99,16 @@
         </div>
         <div style="display: flex; gap: 0.5rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
             {% else %}
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
             {% else %}
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>

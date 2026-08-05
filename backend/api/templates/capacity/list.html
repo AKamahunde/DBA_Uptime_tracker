@@ -52,7 +52,7 @@
             <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
                 <option value="">All Databases</option>
                 <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
                 <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
             </select>
         </div>
@@ -82,7 +82,13 @@
                 {% for capacity in page_obj %}
                 <tr>
                     <td style="font-weight: 600;">{{ capacity.month|date:"F Y" }}</td>
-                    <td>{{ capacity.database }}</td>
+                    <td>
+                        {% if capacity.database == 'Oracle' %}
+                            Oracle (nmsinfra)
+                        {% else %}
+                            {{ capacity.database }}
+                        {% endif %}
+                    </td>
                     <td>{{ capacity.database_size_gb }}</td>
                     <td>
                         {% if capacity.growth_gb > 0 %}

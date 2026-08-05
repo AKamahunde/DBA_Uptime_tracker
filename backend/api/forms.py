@@ -97,6 +97,11 @@ class CapacityPlanningForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['database'].choices = [
+            ('MySQL', 'MySQL'),
+            ('Oracle', 'Oracle (nmsinfra)'),
+            ('MS SQL Server', 'MS SQL Server'),
+        ]
         if self.instance and self.instance.pk and self.instance.month:
             self.fields['month'].initial = self.instance.month.strftime('%Y-%m')
 

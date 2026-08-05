@@ -2061,14 +2061,11 @@ def incident_staging_list(request):
         return redirect('dashboard')
         
     current_db = request.GET.get('database', '')
-    status_filter = request.GET.get('status', 'Awaiting Review')
     
-    queryset = IncidentStaging.objects.all().order_by('-start')
+    queryset = IncidentStaging.objects.filter(status='Awaiting Review').order_by('-start')
     
     if current_db:
         queryset = queryset.filter(database=current_db)
-    if status_filter:
-        queryset = queryset.filter(status=status_filter)
         
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get('page')
@@ -2077,7 +2074,6 @@ def incident_staging_list(request):
     context = {
         'page_obj': page_obj,
         'current_db': current_db,
-        'status_filter': status_filter,
     }
     return render(request, 'incidents/staging_list.html', context)
 

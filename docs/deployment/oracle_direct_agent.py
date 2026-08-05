@@ -263,16 +263,12 @@ if __name__ == "__main__":
             try:
                 cursor.execute("""
                     SELECT owner, segment_name, bytes FROM (
-                        SELECT owner, segment_name, bytes FROM dba_segments 
-                        WHERE segment_type = 'TABLE' 
-                          AND owner NOT IN ('SYS', 'SYSTEM', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
-                                            'ORDSYS', 'ORDDATA', 'CTXSYS', 'XDB', 'WMSYS', 
-                                            'APEX_040200', 'APEX_040100', 'APEX_030200', 'FLOWS_FILES', 
-                                            'APEX_PUBLIC_USER', 'HTMLDB_PUBLIC_USER', 'MGMT_VIEW', 'OLAPSYS', 
-                                            'OWBSYS', 'OWBSYS_AUDIT', 'EXFSYS', 'DVSYS', 'DVF', 'LBACSYS', 
-                                            'OJVMSYS', 'SQLTXPLAIN', 'ORDPLUGINS', 'SI_INFORMTN_SCHEMA', 
-                                            'APPQOSSYS', 'GSMADMIN_INTERNAL', 'WRI$_RECON_ABSTRACT')
-                        ORDER BY bytes DESC
+                        SELECT s.owner, s.segment_name, s.bytes 
+                        FROM dba_segments s
+                        JOIN dba_users u ON s.owner = u.username
+                        WHERE s.segment_type = 'TABLE' 
+                          AND u.oracle_maintained = 'N'
+                        ORDER BY s.bytes DESC
                     ) WHERE ROWNUM = 1
                 """)
                 table_row = cursor.fetchone()
