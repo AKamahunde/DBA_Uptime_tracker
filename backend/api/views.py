@@ -3,7 +3,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 import json
 import os
 from django.contrib.auth.decorators import login_required
@@ -14,7 +14,8 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
-    MaintenanceRegister, CapacityPlanning, SLAConfig, IncidentChangeLog, UgandaHoliday
+    MaintenanceRegister, CapacityPlanning, SLAConfig, IncidentChangeLog, UgandaHoliday,
+    IncidentStaging
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
@@ -436,102 +437,8 @@ def dashboard_print(request):
     }
     return render(request, 'dashboard_print.html', context)
 
-
-def _render_to_pdf(template_path, context, request):
-    """Helper: render a Django template to a PDF using xhtml2pdf.
-    Uses a link_callback so static files (logo, CSS) are resolved
-    to absolute filesystem paths instead of HTTP URLs.
-    """
-    import os
-    from io import BytesIO
-    from django.template.loader import render_to_string
-    from django.conf import settings
-
-    try:
-        from xhtml2pdf import pisa
-    except ImportError:
-        return None, "xhtml2pdf is not installed on the server. Run: pip install xhtml2pdf"
-
-    def link_callback(uri, rel):
-        """Convert static/media URIs to absolute OS paths for xhtml2pdf."""
-        static_url = settings.STATIC_URL        # e.g. 'static/'  or '/static/'
-        media_url  = getattr(settings, 'MEDIA_URL', '/media/')
-
-        # Resolve static files
-        if uri.startswith(static_url) or uri.startswith('/' + static_url.lstrip('/')):
-            path = uri.replace(static_url, '', 1).lstrip('/')
-            # Try STATICFILES_DIRS first, then STATIC_ROOT
-            for static_dir in getattr(settings, 'STATICFILES_DIRS', []):
-                candidate = os.path.join(str(static_dir), path)
-                if os.path.exists(candidate):
-                    return candidate
-            static_root = getattr(settings, 'STATIC_ROOT', None)
-            if static_root:
-                candidate = os.path.join(str(static_root), path)
-                if os.path.exists(candidate):
-                    return candidate
-        # Resolve media files
-        if uri.startswith(media_url):
-            path = uri.replace(media_url, '', 1).lstrip('/')
-            media_root = getattr(settings, 'MEDIA_ROOT', '')
-            return os.path.join(str(media_root), path)
-        # Return unchanged for absolute URLs or anything else
-        return uri
-
-    html = render_to_string(template_path, context, request=request)
-    result = BytesIO()
-    pdf = pisa.pisaDocument(
-        BytesIO(html.encode('UTF-8')),
-        result,
-        encoding='UTF-8',
-        link_callback=link_callback,
-    )
-    if pdf.err:
-        return None, f"PDF generation error (code {pdf.err})"
-    return result.getvalue(), None
-
-
-@login_required
-def dashboard_pdf(request):
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    selected_db = request.GET.get('database_select', 'All Databases')
-    dashboard_data, _ = _get_dashboard_data(reporting_month)
-    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
-
-    user_display = request.user.get_full_name()
-    if not user_display:
-        user_display = request.user.username.replace('.', ' ').title()
-
-    context = {
-        'dashboard_data': dashboard_data,
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
-        'extracted_by': user_display,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
-        'database_detail': database_detail,
-        'selected_db': selected_db,
-        'is_pdf': True,
-    }
-    pdf_bytes, error = _render_to_pdf('dashboard_print.html', context, request)
-    if error:
-        messages.error(request, f'PDF generation failed: {error}')
-        return redirect(f"/?month={month_str}&database_select={selected_db}")
-    filename = f"DB_Performance_{selected_db.replace(' ', '_')}_{month_str or reporting_month.strftime('%Y-%m')}.pdf"
-    response = HttpResponse(pdf_bytes, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
-
 @login_required
 def dashboard_excel(request):
-
     month_str = request.GET.get('month', '')
     if month_str:
         try:
@@ -1356,58 +1263,8 @@ def capacity_print(request):
     }
     return render(request, 'capacity/print.html', context)
 
-
-@login_required
-def capacity_pdf(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to export capacity planning records.')
-        return redirect('capacity_list')
-
-    queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
-    current_db = request.GET.get('database', '')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
-    if current_db:
-        queryset = queryset.filter(database=current_db)
-    if start_date:
-        queryset = queryset.filter(month__gte=start_date)
-    if end_date:
-        queryset = queryset.filter(month__lte=end_date)
-
-    user = request.user
-    full_name = f"{user.first_name} {user.last_name}".strip()
-    if not full_name:
-        username = user.username
-        if '.' in username:
-            parts = username.split('.')
-            full_name = " ".join([p.capitalize() for p in parts])
-        else:
-            full_name = username.capitalize()
-
-    context = {
-        'queryset': queryset,
-        'current_db': current_db if current_db else 'All Databases',
-        'start_date': start_date,
-        'end_date': end_date,
-        'extracted_by': full_name,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
-        'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time",
-        'is_pdf': True,
-    }
-    pdf_bytes, error = _render_to_pdf('capacity/print.html', context, request)
-    if error:
-        messages.error(request, f'PDF generation failed: {error}')
-        return redirect(f"/capacity/?database={current_db}&start_date={start_date}&end_date={end_date}")
-    db_label = current_db.replace(' ', '_') if current_db else 'All'
-    filename = f"Capacity_Planning_{db_label}.pdf"
-    response = HttpResponse(pdf_bytes, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
-
 @login_required
 def capacity_excel(request):
-
     if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
         messages.error(request, 'You do not have permission to export capacity planning records.')
         return redirect('capacity_list')
@@ -2016,10 +1873,10 @@ def incident_ingest(request):
         duration_delta = end_dt - start_dt
         duration_hrs = Decimal(str(round(duration_delta.total_seconds() / 3600.0, 2)))
         
-        # De-duplication check: avoid double registering the same outage
-        exists = IncidentRegister.objects.filter(database=db_type, start=start_dt).exists()
+        # De-duplication check: avoid double registering the same outage in staging
+        exists = IncidentStaging.objects.filter(database=db_type, start=start_dt).exists()
         if exists:
-            return JsonResponse({'status': 'ignored', 'message': 'Incident already registered'}, status=200)
+            return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
             
         # Check if this incident occurred within a registered maintenance window for the same database
         maintenance = MaintenanceRegister.objects.filter(
@@ -2028,15 +1885,11 @@ def incident_ingest(request):
             end__gte=end_dt
         ).first()
         
-        is_planned = False
         maint_ticket = None
-        severity = 'Medium'
         root_cause = data.get('root_cause', 'AUTO-LOGGED: MySQL restart detected in systemd journal. Awaiting DBA review.')
         
         if maintenance:
-            is_planned = True
             maint_ticket = maintenance.change_id
-            severity = 'Low'
             root_cause = f"AUTO-LOGGED: MySQL restart detected within scheduled Maintenance Window ({maint_ticket})."
         else:
             # Highlight that this graceful restart was unplanned
@@ -2046,27 +1899,17 @@ def incident_ingest(request):
                 "WARNING: This graceful restart occurred OUTSIDE of a scheduled maintenance window."
             )
             
-        # Build unique self-heal ticket ID e.g., AUTO-SELF-HEAL-260730-1000
-        ticket_id = f"AUTO-SELF-HEAL-{start_dt.strftime('%y%m%d-%H%M')}"
-        
-        incident = IncidentRegister.objects.create(
-            ticket=ticket_id,
-            date=start_dt.date(),
+        staging = IncidentStaging.objects.create(
+            database=db_type,
+            system=system,
             start=start_dt,
             end=end_dt,
             duration_hrs=duration_hrs,
-            planned=is_planned,
-            severity=severity,
-            system=system,
             root_cause=root_cause,
-            business_impact='Awaiting DBA business impact assessment.' if not is_planned else 'None - Scheduled Maintenance.',
-            resolved_by='System',
-            status='Resolved',
-            database=db_type,
-            assigned_to='DBA Team'
+            status='Awaiting Review'
         )
         
-        return JsonResponse({'status': 'success', 'id': incident.id, 'ticket': ticket_id})
+        return JsonResponse({'status': 'success', 'id': staging.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
@@ -2209,5 +2052,127 @@ def holiday_delete(request, pk):
     holiday.delete()
     messages.success(request, 'Public Holiday deleted successfully.')
     return redirect(request.META.get('HTTP_REFERER', 'holiday_list'))
+
+
+@login_required
+def incident_staging_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
+        messages.error(request, 'You do not have permission to view incident staging records.')
+        return redirect('dashboard')
+        
+    current_db = request.GET.get('database', '')
+    status_filter = request.GET.get('status', 'Awaiting Review')
+    
+    queryset = IncidentStaging.objects.all().order_by('-start')
+    
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+        
+    paginator = Paginator(queryset, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'current_db': current_db,
+        'status_filter': status_filter,
+    }
+    return render(request, 'incidents/staging_list.html', context)
+
+
+@login_required
+def staging_promote_incident(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
+        messages.error(request, 'You do not have permission to create incidents.')
+        return redirect('incident_staging_list')
+        
+    staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    
+    if request.method == 'POST':
+        form = IncidentRegisterForm(request.POST)
+        if form.is_valid():
+            incident = form.save(commit=False)
+            incident.created_by = request.user
+            incident.save()
+            
+            # Link/process the staging record
+            staging_item.status = 'Promoted to Incident'
+            staging_item.processed_by = request.user
+            staging_item.processed_at = timezone.now()
+            staging_item.incident_record = incident
+            staging_item.save()
+            
+            messages.success(request, f"Staged alert successfully promoted to Incident: {incident.ticket}")
+            return redirect('incident_staging_list')
+    else:
+        # Pre-populate fields from the staging record
+        ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
+        initial = {
+            'ticket': ticket_id,
+            'date': staging_item.start.date(),
+            'start': staging_item.start,
+            'end': staging_item.end,
+            'system': staging_item.system,
+            'database': staging_item.database,
+            'root_cause': staging_item.root_cause,
+            'resolved_by': 'System',
+            'status': 'Resolved',
+            'business_impact': 'Awaiting DBA business impact assessment.'
+        }
+        form = IncidentRegisterForm(initial=initial)
+        
+    context = {
+        'form': form,
+        'title': 'Promote Staging to Incident',
+        'staging_item': staging_item
+    }
+    return render(request, 'incidents/staging_promote_incident.html', context)
+
+
+@login_required
+def staging_promote_maintenance(request, pk):
+    if not (request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
+        messages.error(request, 'You do not have permission to log maintenance activities.')
+        return redirect('incident_staging_list')
+        
+    staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    
+    if request.method == 'POST':
+        form = MaintenanceRegisterForm(request.POST)
+        if form.is_valid():
+            maintenance = form.save(commit=False)
+            maintenance.created_by = request.user
+            maintenance.save()
+            
+            # Link/process the staging record
+            staging_item.status = 'Promoted to Maintenance'
+            staging_item.processed_by = request.user
+            staging_item.processed_at = timezone.now()
+            staging_item.maintenance_record = maintenance
+            staging_item.save()
+            
+            messages.success(request, f"Staged alert successfully promoted to Maintenance: {maintenance.change_id}")
+            return redirect('incident_staging_list')
+    else:
+        # Pre-populate fields from staging record
+        initial = {
+            'date': staging_item.start.date(),
+            'database': staging_item.database,
+            'system': staging_item.system,
+            'start': staging_item.start,
+            'end': staging_item.end,
+            'activity': staging_item.root_cause,
+            'success': True
+        }
+        form = MaintenanceRegisterForm(initial=initial)
+        
+    context = {
+        'form': form,
+        'title': 'Promote Staging to Maintenance',
+        'staging_item': staging_item
+    }
+    return render(request, 'incidents/staging_promote_maintenance.html', context)
 
 

@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - DBA Operations Tracker{% endblock %}
+
+{% block content %}
+<style>
+    .form-group input[type="checkbox"] {
+        width: auto !important;
+        margin-bottom: 0 !important;
+        cursor: pointer;
+        height: 18px;
+        width: 18px;
+    }
+</style>
+<div class="card" style="margin-bottom: 2rem; border-left: 5px solid #ef4444;">
+    <h3 style="color: #ef4444; margin-bottom: 0.5rem;">Staged Alert Details</h3>
+    <table style="width: 100%; margin-bottom: 0;">
+        <tr>
+            <td style="width: 25%; font-weight: 600; color: #475569;">Database:</td>
+            <td>{{ staging_item.database }} ({{ staging_item.system }})</td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; color: #475569;">Outage Period:</td>
+            <td>{{ staging_item.start|date:"d/m/Y H:i:s" }} to {{ staging_item.end|date:"d/m/Y H:i:s" }} ({{ staging_item.duration_hrs }} hrs)</td>
+        </tr>
+        <tr>
+            <td style="font-weight: 600; color: #475569;">Staged Alert Log:</td>
+            <td style="font-family: monospace; font-size: 0.9em; background-color: #f8fafc; padding: 0.5rem; border-radius: 4px; border: 1px solid #e2e8f0;">
+                {{ staging_item.root_cause|linebreaksbr }}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        
+        {% if form.errors %}
+            <div style="background-color: #f8d7da; color: #721c24; padding: 1rem; margin-bottom: 1rem; border-radius: 4px;">
+                <strong>Please correct the following errors:</strong>
+                <ul>
+                {% for field in form %}
+                    {% for error in field.errors %}
+                        <li>{{ field.label }}: {{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="{{ form.ticket.id_for_label }}">Ticket:</label>
+            {{ form.ticket }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.date.id_for_label }}">Date:</label>
+            {{ form.date }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.start.id_for_label }}">Start:</label>
+            {{ form.start }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.end.id_for_label }}">End:</label>
+            {{ form.end }}
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; margin-bottom: 1.5rem;">
+            {{ form.planned }}
+            <label for="{{ form.planned.id_for_label }}" style="margin-bottom: 0; display: inline-block; cursor: pointer; font-weight: 500;">Planned Incident (occurs during maintenance/approved windows)</label>
+        </div>
+        <div class="form-group">
+            <label for="{{ form.severity.id_for_label }}">Severity:</label>
+            {{ form.severity }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.system.id_for_label }}">System:</label>
+            {{ form.system }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.root_cause.id_for_label }}">Root Cause:</label>
+            {{ form.root_cause }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.business_impact.id_for_label }}">Business Impact:</label>
+            {{ form.business_impact }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.resolved_by.id_for_label }}">Resolved By:</label>
+            {{ form.resolved_by }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.status.id_for_label }}">Status:</label>
+            {{ form.status }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.database.id_for_label }}">Database:</label>
+            {{ form.database }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.assigned_to.id_for_label }}">Assigned To:</label>
+            {{ form.assigned_to }}
+        </div>
+
+        <button type="submit" class="btn btn-success" style="background-color: #ef4444; border-color: #ef4444;">Log Incident</button>
+        <a href="{% url 'incident_staging_list' %}" class="btn btn-danger" style="margin-left: 0.5rem; background-color: #64748b; border-color: #64748b;">Cancel Promotion</a>
+    </form>
+</div>
+{% endblock %}

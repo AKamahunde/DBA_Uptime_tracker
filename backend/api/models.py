@@ -440,3 +440,35 @@ def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
             target_hours=F('target_hours') + 9
         )
 
+
+class IncidentStaging(models.Model):
+    database = models.CharField(max_length=50, choices=[
+        ('MySQL', 'MySQL'),
+        ('Oracle', 'Oracle'),
+        ('MS SQL Server', 'MS SQL Server'),
+    ])
+    system = models.CharField(max_length=100)
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    duration_hrs = models.DecimalField(max_digits=10, decimal_places=2)
+    root_cause = models.TextField(blank=True)
+    status = models.CharField(max_length=50, choices=[
+        ('Awaiting Review', 'Awaiting Review'),
+        ('Promoted to Incident', 'Promoted to Incident'),
+        ('Promoted to Maintenance', 'Promoted to Maintenance'),
+    ], default='Awaiting Review')
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='processed_staging_incidents')
+    processed_at = models.DateTimeField(null=True, blank=True)
+    incident_record = models.ForeignKey('IncidentRegister', on_delete=models.SET_NULL, null=True, blank=True, related_name='staged_incidents')
+    maintenance_record = models.ForeignKey('MaintenanceRegister', on_delete=models.SET_NULL, null=True, blank=True, related_name='staged_maintenances')
+
+    class Meta:
+        db_table = 'incident_staging'
+        verbose_name = 'Incident Staging'
+        verbose_name_plural = 'Incident Staging Records'
+        default_permissions = ('add', 'view')
+
+    def __str__(self):
+        return f"Staged {self.database} ({self.start}) - {self.status}"
+

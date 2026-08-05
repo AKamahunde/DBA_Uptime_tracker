@@ -3,4 +3,3 @@ mysqlclient==2.2.8
 requests==2.32.3
 gunicorn==22.0.0
 python-dotenv==1.0.1
-xhtml2pdf==0.2.16

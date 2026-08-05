@@ -5,7 +5,6 @@ from django.contrib.auth import views as auth_views
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('dashboard/print/', views.dashboard_print, name='dashboard_print'),
-    path('dashboard/pdf/', views.dashboard_pdf, name='dashboard_pdf'),
     path('dashboard/excel/', views.dashboard_excel, name='dashboard_excel'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
@@ -16,6 +15,9 @@ urlpatterns = [
     path('incidents/create/', views.incident_create, name='incident_create'),
     path('incidents/<int:pk>/edit/', views.incident_edit, name='incident_edit'),
     path('incidents/<int:pk>/delete/', views.incident_delete, name='incident_delete'),
+    path('incidents/staging/', views.incident_staging_list, name='incident_staging_list'),
+    path('incidents/staging/<int:pk>/promote-incident/', views.staging_promote_incident, name='staging_promote_incident'),
+    path('incidents/staging/<int:pk>/promote-maintenance/', views.staging_promote_maintenance, name='staging_promote_maintenance'),
     
     # Replication Monitor
     path('replication/', views.replication_list, name='replication_list'),
@@ -44,7 +46,6 @@ urlpatterns = [
     # Capacity Planning
     path('capacity/', views.capacity_list, name='capacity_list'),
     path('capacity/print/', views.capacity_print, name='capacity_print'),
-    path('capacity/pdf/', views.capacity_pdf, name='capacity_pdf'),
     path('capacity/excel/', views.capacity_excel, name='capacity_excel'),
     path('capacity/create/', views.capacity_create, name='capacity_create'),
     path('capacity/<int:pk>/edit/', views.capacity_edit, name='capacity_edit'),

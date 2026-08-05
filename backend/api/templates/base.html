@@ -407,6 +407,12 @@
                     <a href="{% url 'dashboard' %}">Dashboard</a>
                     {% if user.is_admin or perms.api.view_incidentregister %}
                     <a href="{% url 'incident_list' %}">Incidents</a>
+                    <a href="{% url 'incident_staging_list' %}" style="display: inline-flex; align-items: center;">
+                        Staging Area
+                        {% if pending_staging_count > 0 %}
+                            <span style="background-color: var(--primary-gold); color: #002569; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 9999px; margin-left: 0.35rem; line-height: 1; display: inline-block;">{{ pending_staging_count }}</span>
+                        {% endif %}
+                    </a>
                     {% endif %}
                     {% if user.is_admin or perms.api.view_replicationmonitor %}
                     <a href="{% url 'replication_list' %}">Replication</a>
