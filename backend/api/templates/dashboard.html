@@ -123,11 +123,10 @@
             </div>
         </form>
         <!-- Table Description Section -->
-        <div style="margin-bottom: 1.5rem; background-color: #fafafa; border-left: 4px solid var(--primary-navy); padding: 1.25rem; border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
-            <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 1.05rem; font-weight: 700;">Table Description</h4>
-            <h5 style="margin: 0 0 0.5rem 0; color: #475569; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;">Database Operations Center</h5>
-            <p style="margin: 0; color: var(--text-dark); font-size: 0.92rem; line-height: 1.55; text-align: justify;">
-                This section provides a consolidated, live view of Service Level Agreement (SLA) performance across all production database platforms operated by NMS. For the reporting month selected above, the table tracks each database's overall availability percentage, planned and unplanned downtime (in hours), total incidents logged, and mean time to repair (MTTR) in minutes — giving administrators an at-a-glance picture of operational stability. It also reports backup and restore success rates, current replication status, and the count of failed backup jobs, so that data protection and disaster-recovery readiness can be monitored alongside uptime. Each metric is evaluated against its defined SLA threshold and color-coded using the Traffic-Light Status system described below, allowing database administrators and ICT operations teams to quickly identify platforms that require attention without needing to consult individual system logs.
+        <div style="margin-bottom: 1.25rem; background-color: #fafafa; border-left: 4px solid var(--primary-navy); padding: 0.85rem 1.1rem; border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
+            <div style="font-weight: 700; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em;">Database Operations Center</div>
+            <p style="margin: 0.25rem 0 0 0; color: var(--text-dark); font-size: 0.88rem; line-height: 1.45;">
+                Consolidated live view of Service Level Agreement (SLA) compliance, database availability, and backup/replication readiness across production database platforms operated by NMS for the selected reporting month.
             </p>
         </div>
 
@@ -368,57 +367,47 @@
         {% endif %}
 
         <!-- Database Systems & Environment Key -->
-        <div style="margin-top: 2rem; background-color: var(--bg-warm); border: 1px solid var(--border-mist); border-radius: var(--radius); padding: 1.5rem; font-size: 0.875rem;">
-            <h3 style="margin: 0 0 1rem 0; color: var(--primary-navy); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.03em; border-left: 4px solid var(--primary-gold); padding-left: 0.6rem; font-weight: 700;">Database Systems &amp; Environment Key</h3>
+        <div style="margin-top: 2rem; background-color: var(--bg-warm); border: 1px solid var(--border-mist); border-radius: var(--radius); padding: 1.25rem; font-size: 0.85rem;">
+            <h3 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; border-left: 4px solid var(--primary-gold); padding-left: 0.5rem; font-weight: 700;">Database Systems &amp; Environment Key</h3>
             
-            <!-- Traffic-Light Status Description -->
-            <div style="margin-bottom: 1.25rem;">
-                <h4 style="margin: 0 0 0.35rem 0; color: #1e293b; font-size: 0.95rem; font-weight: 600;">Traffic-Light Status</h4>
-                <p style="margin: 0 0 0.5rem 0; color: var(--text-dark); font-size: 0.88rem; line-height: 1.45;">
-                    The dashboard's visual compliance indicator, applied to every metric in the table above:
-                </p>
-                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; color: var(--text-dark);">
-                    <li><span style="display: inline-block; min-width: 65px; color: var(--primary-green); font-weight: 700;">Green</span> — Meets SLA. The metric is within its defined performance threshold for the reporting period.</li>
-                    <li><span style="display: inline-block; min-width: 65px; color: var(--primary-gold); font-weight: 700;">Yellow</span> — Missed SLA. The metric has fallen short of its threshold and warrants review.</li>
-                    <li><span style="display: inline-block; min-width: 65px; color: #c62828; font-weight: 700;">Red</span> — Below SLA. The metric is in breach and requires immediate investigation.</li>
-                    <li><span style="display: inline-block; min-width: 65px; color: var(--text-soft); font-weight: 700;">Grey</span> — No data available. No records were captured for this metric during the reporting period, either because monitoring has not run or no relevant activity occurred.</li>
-                </ul>
-            </div>
-
-            <!-- Databases List -->
-            <div style="display: flex; flex-direction: column; gap: 1.25rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
-                {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
-                <div>
-                    <h4 style="margin: 0 0 0.4rem 0; color: var(--primary-navy); font-size: 0.95rem; font-weight: 700;">Oracle</h4>
-                    <ul style="list-style: none; padding-left: 0.75rem; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; color: var(--text-dark); border-left: 2px solid var(--primary-navy);">
-                        <li><strong>Environment:</strong> nmsinfra.nms.go.ug (database tier) and nmsebs.nms.go.ug (application tier)</li>
-                        <li><strong>Function:</strong> Powers the core NMS Enterprise Resource Planning (ERP) suite</li>
-                        <li><strong>Business context:</strong> Underpins foundational infrastructure operations across the organization, including finance, procurement, and warehousing workflows that depend on the ERP system</li>
+            <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 1.5rem; border-top: 1px solid #cbd5e1; padding-top: 0.75rem;">
+                <!-- Left: Traffic-Light Status -->
+                <div style="border-right: 1px solid #cbd5e1; padding-right: 1.5rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 0.88rem; font-weight: 600;">Traffic-Light Status</h4>
+                    <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: var(--text-dark);">
+                        <li><span style="color: var(--primary-green); font-weight: 700;">Green</span> — Meets SLA</li>
+                        <li><span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> — Missed SLA (review needed)</li>
+                        <li><span style="color: #c62828; font-weight: 700;">Red</span> — Below SLA (investigate)</li>
+                        <li><span style="color: var(--text-soft); font-weight: 700;">Grey</span> — No data available</li>
                     </ul>
                 </div>
-                {% endif %}
-
-                {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-                <div>
-                    <h4 style="margin: 0 0 0.4rem 0; color: var(--primary-navy); font-size: 0.95rem; font-weight: 700;">MySQL</h4>
-                    <ul style="list-style: none; padding-left: 0.75rem; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; color: var(--text-dark); border-left: 2px solid var(--primary-navy);">
-                        <li><strong>Environment:</strong> Hosted on nickledbnew, with live replication to the disaster-recovery instance nickeldbdr</li>
-                        <li><strong>Function:</strong> Hosts vital collaboration and support systems</li>
-                        <li><strong>Business context:</strong> Includes the NMS360 suite, the IT ServiceDesk (used for internal support ticketing), and the Delivery Monitoring Tool (DMT), which tracks the movement of medical supplies to health facilities</li>
-                    </ul>
+                
+                <!-- Right: Database Environment Key -->
+                <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                    {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+                    <div>
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle</strong><br>
+                        <span style="color: #475569; font-weight: 600;">Environment:</span> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)<br>
+                        <span style="color: var(--text-dark);">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.5rem;{% endif %}">
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL</strong><br>
+                        <span style="color: #475569; font-weight: 600;">Environment:</span> nickledbnew (replicated live to nickeldbdr)<br>
+                        <span style="color: var(--text-dark);">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.5rem;{% endif %}">
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL Server</strong><br>
+                        <span style="color: #475569; font-weight: 600;">Environment:</span> Dedicated Windows Server host<br>
+                        <span style="color: var(--text-dark);">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
-
-                {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
-                <div>
-                    <h4 style="margin: 0 0 0.4rem 0; color: var(--primary-navy); font-size: 0.95rem; font-weight: 700;">MS SQL Server</h4>
-                    <ul style="list-style: none; padding-left: 0.75rem; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.88rem; color: var(--text-dark); border-left: 2px solid var(--primary-navy);">
-                        <li><strong>Environment:</strong> Hosted on a dedicated Windows Server instance</li>
-                        <li><strong>Function:</strong> Hosts MKInsight</li>
-                        <li><strong>Business context:</strong> MKInsight runs Pentana Audit, the system used by internal auditors to conduct and document audit and compliance reviews</li>
-                    </ul>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>

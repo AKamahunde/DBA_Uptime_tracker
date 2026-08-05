@@ -1332,7 +1332,7 @@ def capacity_excel(request):
         # Headers
         headers = [
             "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
-            "Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Available (GB)", "Largest Table"
+            "Total Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Free Disk Space (GB)", "Largest Table"
         ]
         ws.append(headers)
         ws.row_dimensions[3].height = 25
@@ -1412,7 +1412,7 @@ def capacity_excel(request):
         writer.writerow([])
         writer.writerow([
             "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
-            "Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Available (GB)", "Largest Table"
+            "Total Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Free Disk Space (GB)", "Largest Table"
         ])
         for item in queryset:
             tablespace_val = f"{item.tablespace_used_percent}%" if item.database != 'MS SQL Server' else 'N/A'

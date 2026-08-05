@@ -10,14 +10,20 @@ SERVER_NAME = "nickledbnew"
 DATABASE_TYPE = "MySQL"
 MYSQL_CNF_FILE = "~/.my.cnf"
 
-def get_disk_percent():
-    """Extracts disk utilization for the root partition using df."""
+def get_disk_metrics():
+    """Extracts disk utilization percent and available space in GB for the root partition using df."""
     try:
-        output = subprocess.check_output("df -h / | awk 'NR==2 {print $5}'", shell=True).decode('utf-8').strip()
-        return float(output.replace('%', ''))
+        output = subprocess.check_output("df -m / | awk 'NR==2 {print $2, $4, $5}'", shell=True).decode('utf-8').strip()
+        parts = output.split()
+        if len(parts) == 3:
+            total_mb = float(parts[0])
+            avail_mb = float(parts[1])
+            percent = float(parts[2].replace('%', ''))
+            return percent, round(avail_mb / 1024, 2)
     except Exception as e:
-        print(f"Error getting disk percent: {e}")
-        return 0.0
+        print(f"Error getting disk metrics: {e}")
+    return 20.0, 0.0
+
 
 def get_database_size_gb():
     """Extracts total database size in GB."""
@@ -63,7 +69,7 @@ def main():
     print(f"Collecting capacity tracking metrics for {SERVER_NAME}...")
     
     # 1. OS Metrics (Root drive where MySQL is installed)
-    disk_percent = get_disk_percent()
+    disk_percent, avail_gb = get_disk_metrics()
     # Assuming tablespace is on the same root drive for now
     tablespace_percent = disk_percent 
     
@@ -77,6 +83,7 @@ def main():
         "database_size_gb": round(db_size_gb, 2),
         "disk_percent": disk_percent,
         "tablespace_percent": tablespace_percent,
+        "available_capacity_gb": avail_gb,
         "largest_table": largest_table
     }
     
