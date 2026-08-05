@@ -80,6 +80,8 @@ class MaintenanceRegisterForm(forms.ModelForm):
         }
 
 class CapacityPlanningForm(forms.ModelForm):
+    month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
+
     class Meta:
         model = CapacityPlanning
         exclude = ['created_by']
@@ -90,9 +92,22 @@ class CapacityPlanningForm(forms.ModelForm):
             'available_capacity_gb': 'Free Disk Space (GB)',
             'growth_gb': 'Growth (GB)',
         }
-        widgets = {
-            'month': forms.DateInput(attrs={'type': 'month'}),
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.month:
+            self.fields['month'].initial = self.instance.month.strftime('%Y-%m')
+
+    def clean_month(self):
+        m_str = self.cleaned_data.get('month')
+        if m_str:
+            from datetime import datetime
+            try:
+                # Appends -01 to save as a valid DateField (YYYY-MM-DD)
+                return datetime.strptime(f"{m_str}-01", "%Y-%m-%d").date()
+            except ValueError:
+                raise forms.ValidationError("Enter a valid month (YYYY-MM).")
+        return m_str
 
 class SLAConfigForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
