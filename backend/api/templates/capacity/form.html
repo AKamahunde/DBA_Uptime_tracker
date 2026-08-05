@@ -5,6 +5,19 @@
 {% block content %}
 <div class="card">
     <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    {% if form.errors %}
+    <div style="background-color: #fde8e8; border: 1px solid #f8b4b4; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; color: #9b1c1c;">
+        <strong style="font-weight: 700;">Please correct the errors below:</strong>
+        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 0.9rem;">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <li><strong>{{ field|capfirst }}</strong>: {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <form method="post">
         {% csrf_token %}
         <div class="form-group">
@@ -22,6 +35,10 @@
         <div class="form-group">
             <label for="{{ form.tablespace_used_percent.id_for_label }}">Tablespace Used %:</label>
             {{ form.tablespace_used_percent }}
+        </div>
+        <div class="form-group">
+            <label for="{{ form.available_capacity_gb.id_for_label }}">Free Disk Space (GB):</label>
+            {{ form.available_capacity_gb }}
         </div>
         <div class="form-group">
             <label for="{{ form.largest_table.id_for_label }}">Largest Table:</label>

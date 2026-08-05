@@ -1769,8 +1769,18 @@ def capacity_ingest(request):
         database_instance = data.get('database', 'MySQL')
         incoming_size = Decimal(str(data.get('database_size_gb', 0)))
         
-        # Enforce a single capacity record per database per month by truncating to the 1st
-        first_day_of_month = datetime.now().date().replace(day=1)
+        # Check if custom month is provided in payload (e.g. "2026-07")
+        month_str = data.get('month')
+        if month_str:
+            try:
+                if len(month_str) == 7:
+                    first_day_of_month = datetime.strptime(month_str, "%Y-%m").date()
+                else:
+                    first_day_of_month = datetime.strptime(month_str[:10], "%Y-%m-%d").date().replace(day=1)
+            except ValueError:
+                first_day_of_month = datetime.now().date().replace(day=1)
+        else:
+            first_day_of_month = datetime.now().date().replace(day=1)
         
         # Calculate growth by comparing with the size from the most recent PREVIOUS month
         most_recent = CapacityPlanning.objects.filter(

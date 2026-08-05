@@ -83,6 +83,13 @@ class CapacityPlanningForm(forms.ModelForm):
     class Meta:
         model = CapacityPlanning
         exclude = ['created_by']
+        labels = {
+            'database_size_gb': 'Database Size (GB)',
+            'disk_used_percent': 'Disk Used %',
+            'tablespace_used_percent': 'Tablespace Used %',
+            'available_capacity_gb': 'Free Disk Space (GB)',
+            'growth_gb': 'Growth (GB)',
+        }
         widgets = {
             'month': forms.DateInput(attrs={'type': 'month'}),
         }

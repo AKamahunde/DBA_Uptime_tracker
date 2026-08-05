@@ -4,6 +4,7 @@ import os
 DB_HOST        = "nmsinfra.nms.go.ug"
 DB_PORT        = 1530
 DB_SID         = "INFRA"
+DB_SERVICE     = "NMS"
 DB_PASS        = "F0rtEBBnms"
 
 oracledb_mode = True
@@ -20,12 +21,12 @@ except ImportError:
 users_to_try = ['system', 'dbsnmp']
 
 for user in users_to_try:
-    print(f"\nTrying connection as user '{user}' on {DB_HOST}:{DB_PORT} ({DB_SID})...")
+    print(f"\nTrying connection as user '{user}' on {DB_HOST}:{DB_PORT} (Service: {DB_SERVICE})...")
     try:
+        dsn = oracledb.makedsn(DB_HOST, DB_PORT, service_name=DB_SERVICE)
         if oracledb_mode:
-            conn = oracledb.connect(user=user, password=DB_PASS, host=DB_HOST, port=DB_PORT, sid=DB_SID)
+            conn = oracledb.connect(user=user, password=DB_PASS, dsn=dsn)
         else:
-            dsn = oracledb.makedsn(DB_HOST, DB_PORT, sid=DB_SID)
             conn = oracledb.connect(user=user, password=DB_PASS, dsn=dsn)
             
         cursor = conn.cursor()

@@ -19,7 +19,8 @@ from datetime import datetime, timedelta, timezone
 # ============================================================
 DB_HOST         = "nmsinfra.nms.go.ug"   # Target Database Hostname
 DB_PORT         = 1530
-DB_SID          = "INFRA"
+DB_SID          = "INFRA"                # CDB Container SID
+DB_SERVICE_NAME = "NMS"                  # Target ERP Pluggable Database (PDB) Service Name
 DB_USER         = "system"               # Database admin user
 DB_PASS         = "F0rtEBBnms"
 
@@ -40,7 +41,7 @@ except ImportError:
         print("Error: The 'oracledb' or 'cx_Oracle' library is required.")
         exit(1)
 
-def connect_to_database(db_user, db_pass, db_host, db_port, db_sid):
+def connect_to_database(db_user, db_pass, db_host, db_port, db_sid=None, db_service=None):
     # Try specified user, fallback to sys as sysdba, then fallback to dbsnmp (using same password)
     attempts = [
         {"user": db_user, "mode": None},
@@ -62,25 +63,32 @@ def connect_to_database(db_user, db_pass, db_host, db_port, db_sid):
         mode = att["mode"]
         print(f"Attempting connection as '{user}'" + (" AS SYSDBA" if mode == 'sysdba' else "") + "...")
         try:
-            if oracledb_mode:
-                if mode == 'sysdba':
-                    connection = oracledb.connect(user=user, password=db_pass, host=db_host, port=db_port, sid=db_sid, mode=oracledb.SYSDBA)
-                else:
-                    connection = oracledb.connect(user=user, password=db_pass, host=db_host, port=db_port, sid=db_sid)
+            # Construct DSN dynamically based on whether service name or SID is used
+            if db_service:
+                dsn = oracledb.makedsn(db_host, db_port, service_name=db_service)
             else:
                 dsn = oracledb.makedsn(db_host, db_port, sid=db_sid)
+
+            if oracledb_mode:
+                if mode == 'sysdba':
+                    connection = oracledb.connect(user=user, password=db_pass, dsn=dsn, mode=oracledb.SYSDBA)
+                else:
+                    connection = oracledb.connect(user=user, password=db_pass, dsn=dsn)
+            else:
                 if mode == 'sysdba':
                     connection = oracledb.connect(user=user, password=db_pass, dsn=dsn, mode=oracledb.SYSDBA)
                 else:
                     connection = oracledb.connect(user=user, password=db_pass, dsn=dsn)
             
             cursor = connection.cursor()
-            print(f"Successfully connected directly to Oracle DB as user '{user}' on {db_host}:{db_port} ({db_sid}).")
+            target_desc = f"Service: {db_service}" if db_service else f"SID: {db_sid}"
+            print(f"Successfully connected directly to Oracle DB as user '{user}' on {db_host}:{db_port} ({target_desc}).")
             return connection, cursor
         except Exception as e:
             print(f"Failed to connect as user '{user}': {e}")
             
-    print(f"Error: Could not connect to target database {db_sid} on {db_host}:{db_port}.")
+    target_desc = f"Service: {db_service}" if db_service else f"SID: {db_sid}"
+    print(f"Error: Could not connect to target database ({target_desc}) on {db_host}:{db_port}.")
     exit(1)
 
 # ============================================================
@@ -131,12 +139,13 @@ if __name__ == "__main__":
     parser.add_argument("-H", "--host", default=DB_HOST, help="Database host")
     parser.add_argument("-P", "--port", type=int, default=DB_PORT, help="Database port")
     parser.add_argument("-S", "--sid", default=DB_SID, help="Database SID")
+    parser.add_argument("-s", "--service", default=DB_SERVICE_NAME, help="Database Service Name (PDB name)")
     
     args = parser.parse_args()
     lookback_days = args.days
     
     print(f"Starting Oracle Direct DB Agent (Lookback: {lookback_days} days)...")
-    conn, cursor = connect_to_database(args.user, args.password, args.host, args.port, args.sid)
+    conn, cursor = connect_to_database(args.user, args.password, args.host, args.port, db_sid=args.sid, db_service=args.service)
     
     # --------------------------------------------------------
     # 1. Gather Direct RMAN Backup History
