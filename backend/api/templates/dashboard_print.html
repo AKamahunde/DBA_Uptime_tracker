@@ -162,6 +162,13 @@
         }
 
         @media print {
+            @page {
+                margin: 0;
+            }
+            body {
+                margin: 1.6cm;
+                background: white;
+            }
             .no-print {
                 display: none;
             }
@@ -399,7 +406,7 @@
     <!-- Bottom Metadata & Signatures -->
     <div class="footer-print">
         <div class="metadata">
-            <strong>Extraction Details:</strong> Extracted by <u>{{ extracted_by }}</u> on {{ extracted_at }} EAT.
+            <strong>Date Run:</strong> {{ extracted_at }} EAT
         </div>
 
         <div class="signature-section">

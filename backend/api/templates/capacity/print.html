@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Capacity Tracking Report - DBA Operations Tracker</title>
+    <title>&nbsp;</title>
     <style>
         :root {
             --primary-navy: #002569;
@@ -99,12 +99,15 @@
         }
 
         th {
-            background-color: var(--primary-navy);
-            color: white;
-            font-weight: 600;
+            background-color: var(--bg-cool);
+            color: var(--primary-navy);
+            font-weight: 700;
             text-transform: uppercase;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             letter-spacing: 0.02em;
+            border-bottom: 2px solid var(--primary-navy);
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         tr:nth-child(even) {
@@ -155,11 +158,15 @@
         }
 
         @media print {
-            .no-print {
-                display: none;
+            @page {
+                margin: 0;
             }
             body {
+                margin: 1.6cm;
                 background: white;
+            }
+            .no-print {
+                display: none;
             }
         }
     </style>
@@ -180,10 +187,8 @@
         <strong>Capacity Planning:</strong> This document tracks monthly storage allocations, database file growths, disk utilization, and tablespace status for databases operated by National Medical Stores (NMS). This reports sizing metrics to assist database administrators and ICT operations teams in proactively projecting storage lifecycles.
     </div>
 
-    <div class="metadata-bar">
+    <div class="metadata-bar" style="justify-content: center;">
         <div><strong>Reporting Period:</strong> {{ reporting_period_str }}</div>
-        <div><strong>Extracted By:</strong> {{ extracted_by }}</div>
-        <div><strong>Date Run:</strong> {{ extracted_at }} EAT</div>
     </div>
 
     <table>
@@ -237,7 +242,7 @@
 
     <div class="footer-print">
         <div class="footer-metadata">
-            <strong>Extraction Details:</strong> Extracted by <u>{{ extracted_by }}</u> on {{ extracted_at }} EAT.
+            <strong>Date Run:</strong> {{ extracted_at }} EAT
         </div>
 
         <div class="signature-section">

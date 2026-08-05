@@ -430,7 +430,7 @@ def dashboard_print(request):
         'dashboard_data': dashboard_data,
         'reporting_month_str': reporting_month.strftime('%B %Y'),
         'extracted_by': user_display,
-        'extracted_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
         'database_detail': database_detail,
         'selected_db': selected_db,
     }
@@ -1257,7 +1257,7 @@ def capacity_print(request):
         'start_date': start_date,
         'end_date': end_date,
         'extracted_by': full_name,
-        'extracted_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
         'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time"
     }
     return render(request, 'capacity/print.html', context)
