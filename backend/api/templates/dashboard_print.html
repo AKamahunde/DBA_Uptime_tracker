@@ -357,51 +357,39 @@
     </div>
     {% endif %}
 
-    <!-- Database Legend / Key -->
-    <div class="legend-section" style="page-break-inside: avoid; margin-top: 1.25rem;">
-        <h4 style="margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--primary-navy); border-bottom: 2px solid var(--primary-gold); padding-bottom: 0.15rem; text-transform: uppercase;">Database Systems &amp; Environment Key</h4>
+    <!-- Database Legend / Key (Summarized for single-page fit) -->
+    <div class="legend-section" style="page-break-inside: avoid; margin-top: 1rem; border-top: 2px solid var(--primary-gold); padding-top: 0.5rem; font-size: 0.72rem; line-height: 1.35;">
+        <h4 style="margin: 0 0 0.35rem 0; font-size: 0.82rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700;">Database Systems &amp; Environment Key</h4>
         
-        <div style="margin-bottom: 0.75rem;">
-            <strong style="font-size: 0.78rem; color: #1e293b;">Traffic-Light Status</strong>
-            <p style="margin: 0.15rem 0 0.35rem 0; font-size: 0.74rem; color: var(--text-dark); line-height: 1.35;">
-                The dashboard's visual compliance indicator, applied to every metric in the table above:
-            </p>
-            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.74rem; color: var(--text-dark); line-height: 1.3;">
-                <li><span style="font-weight: 700; color: var(--primary-green);">Green</span> — Meets SLA. The metric is within its defined performance threshold for the reporting period.</li>
-                <li><span style="font-weight: 700; color: var(--primary-gold);">Yellow</span> — Missed SLA. The metric has fallen short of its threshold and warrants review.</li>
-                <li><span style="font-weight: 700; color: #c62828;">Red</span> — Below SLA. The metric is in breach and requires immediate investigation.</li>
-                <li><span style="font-weight: 700; color: var(--text-soft);">Grey</span> — No data available. No records were captured for this metric during the reporting period, either because monitoring has not run or no relevant activity occurred.</li>
-            </ul>
+        <div style="display: flex; flex-direction: column; gap: 0.35rem; color: var(--text-dark);">
+            <div>
+                <strong>Traffic-Light Status:</strong> 
+                <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA) | 
+                <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Missed SLA) | 
+                <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA) | 
+                <span style="color: var(--text-soft); font-weight: 700;">Grey</span> (No Data)
+            </div>
+            
+            <div style="border-top: 1px dashed #e2e8f0; padding-top: 0.35rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+                <div>
+                    <strong>Oracle:</strong> <u>nmsinfra.nms.go.ug</u> (database tier) &amp; <u>nmsebs.nms.go.ug</u> (application tier) &mdash; Powers NMS ERP suite (finance, procurement, warehousing).
+                </div>
+                {% endif %}
+                
+                {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+                <div>
+                    <strong>MySQL:</strong> <u>nickledbnew</u> (replicated to <u>nickeldbdr</u>) &mdash; Hosts collaboration &amp; support systems (NMS360, IT ServiceDesk, DMT).
+                </div>
+                {% endif %}
+                
+                {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+                <div>
+                    <strong>MS SQL Server:</strong> <u>Windows Server host</u> &mdash; Hosts MKInsight (Pentana Audit) for audit &amp; compliance reviews.
+                </div>
+                {% endif %}
+            </div>
         </div>
-
-        <ul class="legend-list" style="margin-top: 0.5rem; font-size: 0.74rem; line-height: 1.35; list-style: none; padding: 0;">
-            {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
-            <li>
-                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">Oracle</span>
-                <strong>Environment:</strong> nmsinfra.nms.go.ug (database tier) and nmsebs.nms.go.ug (application tier)<br>
-                <strong>Function:</strong> Powers the core NMS Enterprise Resource Planning (ERP) suite<br>
-                <strong>Business context:</strong> Underpins foundational infrastructure operations across the organization, including finance, procurement, and warehousing workflows that depend on the ERP system
-            </li>
-            {% endif %}
-            
-            {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-            <li style="margin-top: 0.5rem;">
-                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">MySQL</span>
-                <strong>Environment:</strong> Hosted on nickledbnew, with live replication to the disaster-recovery instance nickeldbdr<br>
-                <strong>Function:</strong> Hosts vital collaboration and support systems<br>
-                <strong>Business context:</strong> Includes the NMS360 suite, the IT ServiceDesk (used for internal support ticketing), and the Delivery Monitoring Tool (DMT), which tracks the movement of medical supplies to health facilities
-            </li>
-            {% endif %}
-            
-            {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
-            <li style="margin-top: 0.5rem;">
-                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">MS SQL Server</span>
-                <strong>Environment:</strong> Hosted on a dedicated Windows Server instance<br>
-                <strong>Function:</strong> Hosts MKInsight<br>
-                <strong>Business context:</strong> MKInsight runs Pentana Audit, the system used by internal auditors to conduct and document audit and compliance reviews
-            </li>
-            {% endif %}
-        </ul>
     </div>
 
     <!-- Bottom Metadata & Signatures -->
