@@ -177,6 +177,7 @@
 </head>
 <body>
 
+{% if not is_pdf %}
     <!-- Download Toolbar (hidden when printing) -->
     <div class="no-print" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: #002569; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
         <div style="font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
@@ -196,6 +197,7 @@
     </div>
     <!-- Spacer so content doesn't hide under fixed toolbar -->
     <div class="no-print" style="height: 56px;"></div>
+{% endif %}
 
     <div class="header-section">
         <div style="display: flex; align-items: center; gap: 1rem;">

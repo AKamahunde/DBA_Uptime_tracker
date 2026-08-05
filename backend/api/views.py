@@ -438,19 +438,56 @@ def dashboard_print(request):
 
 
 def _render_to_pdf(template_path, context, request):
-    """Helper: render a Django template to a PDF BytesIO using xhtml2pdf."""
+    """Helper: render a Django template to a PDF using xhtml2pdf.
+    Uses a link_callback so static files (logo, CSS) are resolved
+    to absolute filesystem paths instead of HTTP URLs.
+    """
+    import os
     from io import BytesIO
     from django.template.loader import render_to_string
+    from django.conf import settings
+
     try:
         from xhtml2pdf import pisa
     except ImportError:
-        return None, "xhtml2pdf is not installed. Run: pip install xhtml2pdf"
+        return None, "xhtml2pdf is not installed on the server. Run: pip install xhtml2pdf"
+
+    def link_callback(uri, rel):
+        """Convert static/media URIs to absolute OS paths for xhtml2pdf."""
+        static_url = settings.STATIC_URL        # e.g. 'static/'  or '/static/'
+        media_url  = getattr(settings, 'MEDIA_URL', '/media/')
+
+        # Resolve static files
+        if uri.startswith(static_url) or uri.startswith('/' + static_url.lstrip('/')):
+            path = uri.replace(static_url, '', 1).lstrip('/')
+            # Try STATICFILES_DIRS first, then STATIC_ROOT
+            for static_dir in getattr(settings, 'STATICFILES_DIRS', []):
+                candidate = os.path.join(str(static_dir), path)
+                if os.path.exists(candidate):
+                    return candidate
+            static_root = getattr(settings, 'STATIC_ROOT', None)
+            if static_root:
+                candidate = os.path.join(str(static_root), path)
+                if os.path.exists(candidate):
+                    return candidate
+        # Resolve media files
+        if uri.startswith(media_url):
+            path = uri.replace(media_url, '', 1).lstrip('/')
+            media_root = getattr(settings, 'MEDIA_ROOT', '')
+            return os.path.join(str(media_root), path)
+        # Return unchanged for absolute URLs or anything else
+        return uri
 
     html = render_to_string(template_path, context, request=request)
     result = BytesIO()
-    pdf = pisa.pisaDocument(BytesIO(html.encode('UTF-8')), result, encoding='UTF-8')
+    pdf = pisa.pisaDocument(
+        BytesIO(html.encode('UTF-8')),
+        result,
+        encoding='UTF-8',
+        link_callback=link_callback,
+    )
     if pdf.err:
-        return None, f"PDF generation error: {pdf.err}"
+        return None, f"PDF generation error (code {pdf.err})"
     return result.getvalue(), None
 
 
@@ -484,7 +521,8 @@ def dashboard_pdf(request):
     }
     pdf_bytes, error = _render_to_pdf('dashboard_print.html', context, request)
     if error:
-        return HttpResponse(f"<pre>{error}</pre>", status=500)
+        messages.error(request, f'PDF generation failed: {error}')
+        return redirect(f"/?month={month_str}&database_select={selected_db}")
     filename = f"DB_Performance_{selected_db.replace(' ', '_')}_{month_str or reporting_month.strftime('%Y-%m')}.pdf"
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -1358,7 +1396,8 @@ def capacity_pdf(request):
     }
     pdf_bytes, error = _render_to_pdf('capacity/print.html', context, request)
     if error:
-        return HttpResponse(f"<pre>{error}</pre>", status=500)
+        messages.error(request, f'PDF generation failed: {error}')
+        return redirect(f"/capacity/?database={current_db}&start_date={start_date}&end_date={end_date}")
     db_label = current_db.replace(' ', '_') if current_db else 'All'
     filename = f"Capacity_Planning_{db_label}.pdf"
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
