@@ -76,7 +76,6 @@
                     <th>Tablespace Used %</th>
                     <th>Free Disk Space (GB)</th>
                     <th>Largest Table</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -104,25 +103,10 @@
                     </td>
                     <td>{{ capacity.available_capacity_gb|default:"0.00" }}</td>
                     <td style="text-align: left; font-size: 0.8rem; color: #475569;">{{ capacity.largest_table }}</td>
-                    <td>
-                        <div style="display: flex; gap: 0.25rem; justify-content: center; align-items: center;">
-                            {% if capacity.created_by %}
-                                <a href="{% url 'capacity_edit' capacity.pk %}" class="btn btn-primary" style="padding: 0.2rem 0.45rem; font-size: 0.78rem;">Edit</a>
-                            {% else %}
-                                <button class="btn btn-secondary" disabled style="padding: 0.2rem 0.45rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
-                            {% endif %}
-                            {% if is_admin or perms.api.delete_capacityplanning or capacity.created_by == request.user %}
-                            <form method="post" action="{% url 'capacity_delete' capacity.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" style="padding: 0.2rem 0.45rem; font-size: 0.78rem; border: none; cursor: pointer; color: white; background-color: #c62828; border-radius: 4px;">Delete</button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" style="text-align: center;">No capacity tracking records found.</td>
+                    <td colspan="10" style="text-align: center;">No capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
