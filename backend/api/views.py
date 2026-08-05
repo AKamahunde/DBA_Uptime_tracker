@@ -3,7 +3,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import json
 import os
 from django.contrib.auth.decorators import login_required
@@ -436,8 +436,64 @@ def dashboard_print(request):
     }
     return render(request, 'dashboard_print.html', context)
 
+
+def _render_to_pdf(template_path, context, request):
+    """Helper: render a Django template to a PDF BytesIO using xhtml2pdf."""
+    from io import BytesIO
+    from django.template.loader import render_to_string
+    try:
+        from xhtml2pdf import pisa
+    except ImportError:
+        return None, "xhtml2pdf is not installed. Run: pip install xhtml2pdf"
+
+    html = render_to_string(template_path, context, request=request)
+    result = BytesIO()
+    pdf = pisa.pisaDocument(BytesIO(html.encode('UTF-8')), result, encoding='UTF-8')
+    if pdf.err:
+        return None, f"PDF generation error: {pdf.err}"
+    return result.getvalue(), None
+
+
+@login_required
+def dashboard_pdf(request):
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    selected_db = request.GET.get('database_select', 'All Databases')
+    dashboard_data, _ = _get_dashboard_data(reporting_month)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
+
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
+    context = {
+        'dashboard_data': dashboard_data,
+        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'extracted_by': user_display,
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
+        'database_detail': database_detail,
+        'selected_db': selected_db,
+        'is_pdf': True,
+    }
+    pdf_bytes, error = _render_to_pdf('dashboard_print.html', context, request)
+    if error:
+        return HttpResponse(f"<pre>{error}</pre>", status=500)
+    filename = f"DB_Performance_{selected_db.replace(' ', '_')}_{month_str or reporting_month.strftime('%Y-%m')}.pdf"
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
 @login_required
 def dashboard_excel(request):
+
     month_str = request.GET.get('month', '')
     if month_str:
         try:
@@ -1262,8 +1318,57 @@ def capacity_print(request):
     }
     return render(request, 'capacity/print.html', context)
 
+
+@login_required
+def capacity_pdf(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to export capacity planning records.')
+        return redirect('capacity_list')
+
+    queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
+    current_db = request.GET.get('database', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if start_date:
+        queryset = queryset.filter(month__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(month__lte=end_date)
+
+    user = request.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        username = user.username
+        if '.' in username:
+            parts = username.split('.')
+            full_name = " ".join([p.capitalize() for p in parts])
+        else:
+            full_name = username.capitalize()
+
+    context = {
+        'queryset': queryset,
+        'current_db': current_db if current_db else 'All Databases',
+        'start_date': start_date,
+        'end_date': end_date,
+        'extracted_by': full_name,
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
+        'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time",
+        'is_pdf': True,
+    }
+    pdf_bytes, error = _render_to_pdf('capacity/print.html', context, request)
+    if error:
+        return HttpResponse(f"<pre>{error}</pre>", status=500)
+    db_label = current_db.replace(' ', '_') if current_db else 'All'
+    filename = f"Capacity_Planning_{db_label}.pdf"
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
 @login_required
 def capacity_excel(request):
+
     if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
         messages.error(request, 'You do not have permission to export capacity planning records.')
         return redirect('capacity_list')
