@@ -229,39 +229,9 @@ def _get_dashboard_data(reporting_month):
         })
     return dashboard_data, db_types
 
-@login_required
-def dashboard(request):
-    autopopulate_fixed_holidays()
-    auto_close_incidents()
-    
-    # Run all counts in a single DB round-trip by using lazy evaluation
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT
-                (SELECT COUNT(*) FROM incident_register),
-                (SELECT COUNT(*) FROM replication_monitor),
-                (SELECT COUNT(*) FROM backup_recovery),
-                (SELECT COUNT(*) FROM server_health),
-                (SELECT COUNT(*) FROM maintenance_register),
-                (SELECT COUNT(*) FROM capacity_planning)
-        """)
-        row = cursor.fetchone()
-
-    # Get reporting month
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    selected_db = request.GET.get('database_select', 'All Databases')
-    dashboard_data, db_types = _get_dashboard_data(reporting_month)
-
+def _get_database_detail(selected_db, reporting_month, dashboard_data):
     database_detail = None
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
     if selected_db in db_types:
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
@@ -307,8 +277,6 @@ def dashboard(request):
                 
             if selected_db in ['MS SQL Server']:
                 rep_lag_str = 'N/A'
-
-
 
             # Calculate Statuses
             avail_status = get_status(row_data['availability'], 99.95, '>=') if selected_sla_exists else 'N/A'
@@ -389,6 +357,40 @@ def dashboard(request):
                     'replication_lag': rep_lag_status
                 }
             }
+    return database_detail
+
+@login_required
+def dashboard(request):
+    autopopulate_fixed_holidays()
+    auto_close_incidents()
+    
+    # Run all counts in a single DB round-trip by using lazy evaluation
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM incident_register),
+                (SELECT COUNT(*) FROM replication_monitor),
+                (SELECT COUNT(*) FROM backup_recovery),
+                (SELECT COUNT(*) FROM server_health),
+                (SELECT COUNT(*) FROM maintenance_register),
+                (SELECT COUNT(*) FROM capacity_planning)
+        """)
+        row = cursor.fetchone()
+
+    # Get reporting month
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    selected_db = request.GET.get('database_select', 'All Databases')
+    dashboard_data, db_types = _get_dashboard_data(reporting_month)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
 
     context = {
         'incident_count': row[0],
@@ -416,7 +418,9 @@ def dashboard_print(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
+    selected_db = request.GET.get('database_select', 'All Databases')
     dashboard_data, _ = _get_dashboard_data(reporting_month)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     
     user_display = request.user.get_full_name()
     if not user_display:
@@ -427,6 +431,8 @@ def dashboard_print(request):
         'reporting_month_str': reporting_month.strftime('%B %Y'),
         'extracted_by': user_display,
         'extracted_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'database_detail': database_detail,
+        'selected_db': selected_db,
     }
     return render(request, 'dashboard_print.html', context)
 
@@ -441,7 +447,9 @@ def dashboard_excel(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
+    selected_db = request.GET.get('database_select', 'All Databases')
     dashboard_data, _ = _get_dashboard_data(reporting_month)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     month_display = reporting_month.strftime('%B %Y')
 
     try:
@@ -528,6 +536,115 @@ def dashboard_excel(request):
                     cell.alignment = align_center
             row_num += 1
             
+        # Add Database Detail Table if requested
+        if database_detail:
+            ws.append([]) # empty
+            ws.append([]) # empty
+            row_num += 2
+            
+            detail_title_row = row_num
+            ws.cell(row=detail_title_row, column=1, value=f"Database Detail - {database_detail['database']}").font = Font(name='Segoe UI', size=12, bold=True, color='002569')
+            ws.row_dimensions[detail_title_row].height = 25
+            row_num += 1
+            
+            # Detail headers (16 columns)
+            detail_headers = [
+                "Type", "Overall Uptime", "Planned Downtime", "Unplanned Downtime",
+                "Incidents", "SLA Breaches", "MTTR (Mins)", "Backup Success %",
+                "Restore Success %", "Replication Status", "Last Full", "Last Inc",
+                "Last DR Test", "Failed Backups", "Failed Restores", "Replication Lag"
+            ]
+            ws.append(detail_headers)
+            ws.row_dimensions[row_num].height = 25
+            
+            for col_idx, header in enumerate(detail_headers, 1):
+                cell = ws.cell(row=row_num, column=col_idx)
+                cell.font = font_header
+                cell.fill = fill_header
+                cell.alignment = align_center
+                cell.border = border_thin
+            row_num += 1
+            
+            # Current Row
+            current = database_detail['current']
+            row_current = [
+                "Current",
+                current['availability'],
+                f"{current['planned_downtime']} hrs" if current['planned_downtime'] != 'No Data' else 'No Data',
+                f"{current['unplanned_downtime']} hrs" if current['unplanned_downtime'] != 'No Data' else 'No Data',
+                current['total_incidents'],
+                current['sla_breach_count'],
+                f"{current['mttr_mins']} mins" if current['mttr_mins'] != 'No Data' else 'No Data',
+                current['backup_success'],
+                current['restore_success'],
+                current['replication_status'],
+                current['last_full'],
+                current['last_inc'],
+                current['last_dr'],
+                current['failed_backups'],
+                current['failed_restores'],
+                current['replication_lag']
+            ]
+            ws.append(row_current)
+            ws.row_dimensions[row_num].height = 20
+            for col_idx in range(1, 17):
+                cell = ws.cell(row=row_num, column=col_idx)
+                cell.font = font_body
+                cell.border = border_thin
+                if col_idx == 1:
+                    cell.alignment = align_left
+                else:
+                    cell.alignment = align_center
+            row_num += 1
+            
+            # Status Row
+            status = database_detail['status']
+            row_status = [
+                "Status",
+                status['availability'],
+                status['planned_downtime'],
+                status['unplanned_downtime'],
+                status['total_incidents'],
+                "—",
+                status['mttr_mins'],
+                status['backup_success'],
+                status['restore_success'],
+                status['replication_status'],
+                status['last_full'],
+                status['last_inc'],
+                status['last_dr'],
+                status['failed_backups'],
+                status['failed_restores'],
+                status['replication_lag']
+            ]
+            ws.append(row_status)
+            ws.row_dimensions[row_num].height = 20
+            
+            # Colors for Meets/Below SLA
+            fill_meets = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid') # soft green
+            fill_below = PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid') # soft red
+            font_meets = Font(name='Segoe UI', size=10, color='2E7D32', bold=True)
+            font_below = Font(name='Segoe UI', size=10, color='C62828', bold=True)
+            
+            for col_idx in range(1, 17):
+                cell = ws.cell(row=row_num, column=col_idx)
+                cell.font = font_body
+                cell.border = border_thin
+                
+                if col_idx == 1:
+                    cell.alignment = align_left
+                else:
+                    cell.alignment = align_center
+                    
+                val = str(cell.value)
+                if val == 'Meets SLA':
+                    cell.fill = fill_meets
+                    cell.font = font_meets
+                elif val == 'Below SLA':
+                    cell.fill = fill_below
+                    cell.font = font_below
+            row_num += 1
+
         # Add Legend / Key below table
         ws.append([]) # empty
         ws.append([]) # empty
@@ -581,6 +698,60 @@ def dashboard_excel(request):
                 item['restore_success'],
                 item['replication_status']
             ])
+            
+        if database_detail:
+            writer.writerow([])
+            writer.writerow([])
+            writer.writerow([f"Database Detail - {database_detail['database']}"])
+            writer.writerow([])
+            detail_headers = [
+                "Type", "Overall Uptime", "Planned Downtime", "Unplanned Downtime",
+                "Incidents", "SLA Breaches", "MTTR (Mins)", "Backup Success %",
+                "Restore Success %", "Replication Status", "Last Full", "Last Inc",
+                "Last DR Test", "Failed Backups", "Failed Restores", "Replication Lag"
+            ]
+            writer.writerow(detail_headers)
+            
+            current = database_detail['current']
+            writer.writerow([
+                "Current",
+                current['availability'],
+                f"{current['planned_downtime']} hrs" if current['planned_downtime'] != 'No Data' else 'No Data',
+                f"{current['unplanned_downtime']} hrs" if current['unplanned_downtime'] != 'No Data' else 'No Data',
+                current['total_incidents'],
+                current['sla_breach_count'],
+                f"{current['mttr_mins']} mins" if current['mttr_mins'] != 'No Data' else 'No Data',
+                current['backup_success'],
+                current['restore_success'],
+                current['replication_status'],
+                current['last_full'],
+                current['last_inc'],
+                current['last_dr'],
+                current['failed_backups'],
+                current['failed_restores'],
+                current['replication_lag']
+            ])
+            
+            status = database_detail['status']
+            writer.writerow([
+                "Status",
+                status['availability'],
+                status['planned_downtime'],
+                status['unplanned_downtime'],
+                status['total_incidents'],
+                "—",
+                status['mttr_mins'],
+                status['backup_success'],
+                status['restore_success'],
+                status['replication_status'],
+                status['last_full'],
+                status['last_inc'],
+                status['last_dr'],
+                status['failed_backups'],
+                status['failed_restores'],
+                status['replication_lag']
+            ])
+            
         writer.writerow([])
         writer.writerow(["Database Key & Host Systems:"])
         writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite and foundational infrastructure operations."])

@@ -230,17 +230,177 @@
         </tbody>
     </table>
 
-    <!-- Database Legend / Key -->
-    <div class="legend-section">
-        <h4>Database Systems &amp; Environment Key</h4>
-        <p style="margin: 0 0 0.5rem 0; font-size: 0.75rem; color: var(--text-dark); line-height: 1.4;">
-            <strong>Traffic-Light Status:</strong> The dashboard's visual compliance indicator — Green (meets SLA), Yellow (missed SLA), Red (below SLA), Grey (no data available for the period).
+    {% if database_detail %}
+    <!-- Database Detail Section -->
+    <div style="margin-top: 1.25rem; page-break-inside: avoid;">
+        <h3 style="margin: 0 0 0.4rem 0; font-size: 0.95rem; color: var(--primary-navy); border-bottom: 2.5px solid var(--primary-gold); padding-bottom: 0.2rem; text-transform: uppercase; letter-spacing: 0.02em;">
+            Database Detail: {{ database_detail.database }}
+        </h3>
+        <p style="font-style: italic; color: var(--text-soft); font-size: 0.78rem; margin: 0 0 0.6rem 0; line-height: 1.35;">
+            {% if database_detail.database == 'Oracle' %}
+                Detailed SLA compliance metrics, historical recovery backup cycles, and active replication monitoring parameters for Oracle instances supporting the NMS ERP (Core Database &amp; Application Hub).
+            {% elif database_detail.database == 'MySQL' %}
+                Detailed SLA compliance metrics, live replication lag verification, and support systems logs for MySQL instances hosting NMS360, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).
+            {% elif database_detail.database == 'MS SQL Server' %}
+                Detailed SLA compliance metrics, local backup verification logs, and audit system performance metrics for MS SQL Server instances hosting MKInsight, which runs Pentana Audit, the system used by internal auditors.
+            {% endif %}
         </p>
-        <ul class="legend-list">
-            <li><span class="legend-title">Oracle:</span> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powers the core NMS Enterprise Resource Planning (ERP) suite and foundational infrastructure operations.</li>
-            <li><span class="legend-title">MySQL:</span> nickledbnew (replicated live to nickeldbdr) &mdash; Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).</li>
-            <li><span class="legend-title">MS SQL Server:</span> Windows Server host &mdash; Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.</li>
-            <li><span class="legend-title">PostgreSQL:</span> Localhost instance &mdash; Drives the ColdChain logistical system and ODK-X mobile data collection hubs.</li>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+            <!-- Sub-table 1: SLA Metrics -->
+            <table class="print-table" style="font-size: 0.72rem; width: 100%;">
+                <thead>
+                    <tr style="background-color: var(--primary-navy); color: white;">
+                        <th style="padding: 4px 6px; width: 12%;">Type</th>
+                        <th style="padding: 4px 6px;">Overall Uptime</th>
+                        <th style="padding: 4px 6px;">Planned Downtime</th>
+                        <th style="padding: 4px 6px;">Unplanned Downtime</th>
+                        <th style="padding: 4px 6px;">Incidents</th>
+                        <th style="padding: 4px 6px;">SLA Breaches</th>
+                        <th style="padding: 4px 6px;">MTTR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 4px 6px; font-weight: bold;">Current</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.availability }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.planned_downtime }} hrs</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.unplanned_downtime }} hrs</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.total_incidents }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.sla_breach_count }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.mttr_mins }} mins</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; font-weight: bold;">Status</td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.availability == 'Meets SLA' %}meets{% elif database_detail.status.availability == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.availability }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.planned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.planned_downtime == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.planned_downtime }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.unplanned_downtime == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.unplanned_downtime }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.total_incidents == 'Meets SLA' %}meets{% elif database_detail.status.total_incidents == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.total_incidents }}
+                        </td>
+                        <td style="padding: 4px 6px;">—</td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.mttr_mins == 'Meets SLA' %}meets{% elif database_detail.status.mttr_mins == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.mttr_mins }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Sub-table 2: Backup & Replication -->
+            <table class="print-table" style="font-size: 0.72rem; width: 100%;">
+                <thead>
+                    <tr style="background-color: var(--primary-navy); color: white;">
+                        <th style="padding: 4px 6px; width: 12%;">Type</th>
+                        <th style="padding: 4px 6px;">Backup Success</th>
+                        <th style="padding: 4px 6px;">Restore Success</th>
+                        <th style="padding: 4px 6px;">Last Full</th>
+                        <th style="padding: 4px 6px;">Last Inc</th>
+                        <th style="padding: 4px 6px;">Last DR Test</th>
+                        <th style="padding: 4px 6px;">Failed Backups</th>
+                        <th style="padding: 4px 6px;">Failed Restores</th>
+                        <th style="padding: 4px 6px;">Replication Status</th>
+                        <th style="padding: 4px 6px;">Replication Lag</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="padding: 4px 6px; font-weight: bold;">Current</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.backup_success }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.restore_success }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.last_full }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.last_inc }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.last_dr }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.failed_backups }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.failed_restores }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.replication_status }}</td>
+                        <td style="padding: 4px 6px;">{{ database_detail.current.replication_lag }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 4px 6px; font-weight: bold;">Status</td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.backup_success == 'Meets SLA' %}meets{% elif database_detail.status.backup_success == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.backup_success }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.restore_success == 'Meets SLA' %}meets{% elif database_detail.status.restore_success == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.restore_success }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_full == 'Meets SLA' %}meets{% elif database_detail.status.last_full == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.last_full }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_inc == 'Meets SLA' %}meets{% elif database_detail.status.last_inc == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.last_inc }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_dr == 'Meets SLA' %}meets{% elif database_detail.status.last_dr == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.last_dr }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_backups == 'Meets SLA' %}meets{% elif database_detail.status.failed_backups == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.failed_backups }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_restores == 'Meets SLA' %}meets{% elif database_detail.status.failed_restores == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.failed_restores }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_status == 'Meets SLA' %}meets{% elif database_detail.status.replication_status == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.replication_status }}
+                        </td>
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_lag == 'Meets SLA' %}meets{% elif database_detail.status.replication_lag == 'Below SLA' %}below{% endif %}">
+                            {{ database_detail.status.replication_lag }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Database Legend / Key -->
+    <div class="legend-section" style="page-break-inside: avoid; margin-top: 1.25rem;">
+        <h4 style="margin: 0 0 0.4rem 0; font-size: 0.9rem; color: var(--primary-navy); border-bottom: 2px solid var(--primary-gold); padding-bottom: 0.15rem; text-transform: uppercase;">Database Systems &amp; Environment Key</h4>
+        
+        <div style="margin-bottom: 0.75rem;">
+            <strong style="font-size: 0.78rem; color: #1e293b;">Traffic-Light Status</strong>
+            <p style="margin: 0.15rem 0 0.35rem 0; font-size: 0.74rem; color: var(--text-dark); line-height: 1.35;">
+                The dashboard's visual compliance indicator, applied to every metric in the table above:
+            </p>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.74rem; color: var(--text-dark); line-height: 1.3;">
+                <li><span style="font-weight: 700; color: var(--primary-green);">Green</span> — Meets SLA. The metric is within its defined performance threshold for the reporting period.</li>
+                <li><span style="font-weight: 700; color: var(--primary-gold);">Yellow</span> — Missed SLA. The metric has fallen short of its threshold and warrants review.</li>
+                <li><span style="font-weight: 700; color: #c62828;">Red</span> — Below SLA. The metric is in breach and requires immediate investigation.</li>
+                <li><span style="font-weight: 700; color: var(--text-soft);">Grey</span> — No data available. No records were captured for this metric during the reporting period, either because monitoring has not run or no relevant activity occurred.</li>
+            </ul>
+        </div>
+
+        <ul class="legend-list" style="margin-top: 0.5rem; font-size: 0.74rem; line-height: 1.35; list-style: none; padding: 0;">
+            {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+            <li>
+                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">Oracle</span>
+                <strong>Environment:</strong> nmsinfra.nms.go.ug (database tier) and nmsebs.nms.go.ug (application tier)<br>
+                <strong>Function:</strong> Powers the core NMS Enterprise Resource Planning (ERP) suite<br>
+                <strong>Business context:</strong> Underpins foundational infrastructure operations across the organization, including finance, procurement, and warehousing workflows that depend on the ERP system
+            </li>
+            {% endif %}
+            
+            {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+            <li style="margin-top: 0.5rem;">
+                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">MySQL</span>
+                <strong>Environment:</strong> Hosted on nickledbnew, with live replication to the disaster-recovery instance nickeldbdr<br>
+                <strong>Function:</strong> Hosts vital collaboration and support systems<br>
+                <strong>Business context:</strong> Includes the NMS360 suite, the IT ServiceDesk (used for internal support ticketing), and the Delivery Monitoring Tool (DMT), which tracks the movement of medical supplies to health facilities
+            </li>
+            {% endif %}
+            
+            {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+            <li style="margin-top: 0.5rem;">
+                <span class="legend-title" style="font-size: 0.78rem; display: block; margin-bottom: 0.15rem; color: var(--primary-navy); font-weight: 700;">MS SQL Server</span>
+                <strong>Environment:</strong> Hosted on a dedicated Windows Server instance<br>
+                <strong>Function:</strong> Hosts MKInsight<br>
+                <strong>Business context:</strong> MKInsight runs Pentana Audit, the system used by internal auditors to conduct and document audit and compliance reviews
+            </li>
+            {% endif %}
         </ul>
     </div>
 

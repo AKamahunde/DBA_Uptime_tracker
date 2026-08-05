@@ -93,7 +93,6 @@ class SLAConfigForm(forms.ModelForm):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     target_hours = forms.DecimalField(
         required=False,

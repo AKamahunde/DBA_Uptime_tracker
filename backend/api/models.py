@@ -29,7 +29,6 @@ class IncidentRegister(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     assigned_to = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
@@ -143,7 +142,6 @@ class ReplicationMonitor(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     severity = models.CharField(max_length=20, choices=[
         ('Low', 'Low'),
@@ -183,7 +181,6 @@ class BackupRecovery(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     date = models.DateField()
     database_instance = models.CharField(max_length=100)
@@ -259,7 +256,6 @@ class ServerHealth(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -294,7 +290,6 @@ class MaintenanceRegister(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -338,7 +333,6 @@ class CapacityPlanning(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -359,7 +353,6 @@ class SLAConfig(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     target_hours = models.DecimalField(max_digits=10, decimal_places=2)
     sla_percent = models.DecimalField(max_digits=5, decimal_places=2, default=99.95)
