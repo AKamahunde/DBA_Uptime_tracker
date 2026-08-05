@@ -42,6 +42,8 @@ urlpatterns = [
     
     # Capacity Planning
     path('capacity/', views.capacity_list, name='capacity_list'),
+    path('capacity/print/', views.capacity_print, name='capacity_print'),
+    path('capacity/excel/', views.capacity_excel, name='capacity_excel'),
     path('capacity/create/', views.capacity_create, name='capacity_create'),
     path('capacity/<int:pk>/edit/', views.capacity_edit, name='capacity_edit'),
     path('capacity/<int:pk>/delete/', views.capacity_delete, name='capacity_delete'),

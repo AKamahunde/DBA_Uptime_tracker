@@ -11,6 +11,32 @@
         {% endif %}
     </div>
 
+    <!-- Capacity Planning Description Section -->
+    <div style="margin-bottom: 1.5rem; background-color: #fafafa; border-left: 4px solid var(--primary-navy); padding: 1.25rem; border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
+        <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 1.05rem; font-weight: 700;">Capacity Tracking &amp; Lifecycle Planning</h4>
+        <p style="margin: 0; color: var(--text-dark); font-size: 0.92rem; line-height: 1.55; text-align: justify;">
+            This section monitors historical database file sizes, table growth, and underlying system storage consumption patterns across production instances. It computes monthly growth percentages, evaluates remaining available disk capacity, and tracks tablespace metrics to assist database administrators in forecasting future storage requirements. New capacity entries submitted within the same reporting period will automatically consolidate and update the active monthly record for each engine to maintain a single continuous historical series.
+        </p>
+    </div>
+
+    <!-- Export Actions -->
+    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1rem;">
+        <a href="{% url 'capacity_print' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}&print=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
+                <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1"/>
+            </svg>
+            Print PDF
+        </a>
+        <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}" class="btn btn-success" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
+                <path d="M4.603 12.087a.8.8 0 0 1-.438-.42c-.195-.388-.13-.776.08-1.102.218-.33.6-.51 1.078-.52.5-.01.98.184 1.334.58.088.096.115.22.099.348-.027.23-.23.475-.49.49a.6.6 0 0 1-.368-.118.9.9 0 0 0-.58-.15c-.244.01-.41.11-.5.25-.1.144-.09.28.02.43.146.196.48.243.68.22a.5.5 0 0 1 .4.22c.118.175.093.385-.058.535-.224.22-.647.288-1.01.196a1.7 1.7 0 0 1-.8-.445zM11 11h-1v3a.5.5 0 0 1-1 0v-3H8a.5.5 0 0 1 0-1h3a.5.5 0 0 1 0 1"/>
+            </svg>
+            Export Excel
+        </a>
+    </div>
+
     <!-- Filter Bar -->
     <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -44,18 +70,18 @@
                     <th>Database</th>
                     <th>Database Size (GB)</th>
                     <th>Growth (GB)</th>
+                    <th>Growth (%)</th>
+                    <th>Disk Capacity (GB)</th>
                     <th>Disk Used %</th>
                     <th>Tablespace Used %</th>
                     <th>Available (GB)</th>
                     <th>Largest Table</th>
-                    <th>Logged By</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for capacity in page_obj %}
                 <tr>
-                    <td>{{ capacity.month|date:"F Y" }}</td>
+                    <td style="font-weight: 600;">{{ capacity.month|date:"F Y" }}</td>
                     <td>{{ capacity.database }}</td>
                     <td>{{ capacity.database_size_gb }}</td>
                     <td>
@@ -65,38 +91,18 @@
                             <span style="color: #2e7d32; font-weight: 600;">{{ capacity.growth_gb }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ capacity.disk_used_percent }}</td>
+                    <td>{{ capacity.growth_percent }}%</td>
+                    <td>{{ capacity.disk_capacity_gb }}</td>
+                    <td>{{ capacity.disk_used_percent }}%</td>
                     <td>
                         {% if capacity.database == 'MS SQL Server' %}
                             N/A
                         {% else %}
-                            {{ capacity.tablespace_used_percent }}
+                            {{ capacity.tablespace_used_percent }}%
                         {% endif %}
                     </td>
                     <td>{{ capacity.available_capacity_gb|default:"0.00" }}</td>
-                    <td>{{ capacity.largest_table }}</td>
-                    <td>
-                        {% if capacity.created_by %}
-                            {{ capacity.created_by.username }}
-                        {% else %}
-                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div style="display: flex; gap: 0.25rem;">
-                            {% if capacity.created_by %}
-                                <a href="{% url 'capacity_edit' capacity.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                            {% else %}
-                                <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
-                            {% endif %}
-                            {% if is_admin or perms.api.delete_capacityplanning or capacity.created_by == request.user %}
-                            <form method="post" action="{% url 'capacity_delete' capacity.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </td>
+                    <td style="text-align: left; font-size: 0.8rem; color: #475569;">{{ capacity.largest_table }}</td>
                 </tr>
                 {% empty %}
                 <tr>

@@ -338,6 +338,20 @@ class CapacityPlanning(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def growth_percent(self):
+        if self.database_size_gb and self.database_size_gb > 0:
+            return round((self.growth_gb / self.database_size_gb) * 100, 2)
+        return 0.00
+
+    @property
+    def disk_capacity_gb(self):
+        if self.disk_used_percent is not None and self.disk_used_percent < 100:
+            free_percent = 100 - self.disk_used_percent
+            if free_percent > 0:
+                return round((self.available_capacity_gb * 100) / free_percent, 2)
+        return round(self.available_capacity_gb, 2)
+
     class Meta:
         db_table = 'capacity_planning'
         verbose_name = 'Capacity Planning'

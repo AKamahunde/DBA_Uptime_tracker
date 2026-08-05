@@ -1,0 +1,269 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Capacity Tracking Report - DBA Operations Tracker</title>
+    <style>
+        :root {
+            --primary-navy: #002569;
+            --primary-gold: #F1AB00;
+            --primary-green: #76B900;
+            --text-dark: #1e293b;
+            --text-soft: #64748b;
+            --border-mist: #e2e8f0;
+            --bg-cool: #f8fafc;
+        }
+
+        @page {
+            size: portrait;
+            margin: 15mm;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: var(--text-dark);
+            margin: 0;
+            padding: 0;
+            line-height: 1.4;
+            font-size: 0.85rem;
+        }
+
+        .header-section {
+            border-bottom: 2px solid var(--primary-navy);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .header-container {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .logo-img {
+            height: 48px;
+            width: auto;
+            border-radius: 4px;
+            border: 1px solid var(--border-mist);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.3rem;
+            color: var(--primary-navy);
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-soft);
+            font-style: italic;
+            margin-top: 0.15rem;
+        }
+
+        .description-card {
+            background-color: var(--bg-cool);
+            border-left: 4px solid var(--primary-navy);
+            padding: 0.8rem 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            text-align: justify;
+        }
+
+        .metadata-bar {
+            display: flex;
+            justify-content: space-between;
+            background-color: var(--bg-cool);
+            border: 1px solid var(--border-mist);
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+            margin-bottom: 1.5rem;
+            font-size: 0.76rem;
+            color: var(--text-dark);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+            font-size: 0.75rem;
+        }
+
+        th, td {
+            padding: 0.5rem 0.4rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border-mist);
+        }
+
+        th {
+            background-color: var(--primary-navy);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.02em;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .text-left {
+            text-align: left !important;
+        }
+
+        .growth-positive {
+            color: #c62828;
+            font-weight: 600;
+        }
+
+        .growth-neutral {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .footer-print {
+            margin-top: 3rem;
+            border-top: 1px solid var(--border-mist);
+            padding-top: 0.75rem;
+            page-break-inside: avoid;
+        }
+
+        .footer-metadata {
+            font-size: 0.75rem;
+            color: var(--text-soft);
+            margin-bottom: 1.5rem;
+        }
+
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-top: 1.5rem;
+        }
+
+        .sig-line {
+            flex: 1;
+            font-size: 0.78rem;
+            color: var(--text-dark);
+            border-top: 1px dashed var(--text-soft);
+            padding-top: 0.5rem;
+            line-height: 1.8;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+            body {
+                background: white;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <div class="header-container">
+            <img src="{% static 'logo.jpg' %}" alt="Logo" class="logo-img">
+            <div>
+                <h1>Capacity Tracking Report - {{ current_db }}</h1>
+                <div class="subtitle">Operations Lifecycle &amp; Storage Planning Report</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="description-card">
+        <strong>Capacity Planning:</strong> This document tracks monthly storage allocations, database file growths, disk utilization, and tablespace status for databases operated by National Medical Stores (NMS). This reports sizing metrics to assist database administrators and ICT operations teams in proactively projecting storage lifecycles.
+    </div>
+
+    <div class="metadata-bar">
+        <div><strong>Reporting Period:</strong> {{ reporting_period_str }}</div>
+        <div><strong>Extracted By:</strong> {{ extracted_by }}</div>
+        <div><strong>Date Run:</strong> {{ extracted_at }} EAT</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="text-left" style="width: 14%;">Month</th>
+                <th class="text-left" style="width: 12%;">Database</th>
+                <th>DB Size (GB)</th>
+                <th>Growth (GB)</th>
+                <th>Growth (%)</th>
+                <th>Disk Capacity (GB)</th>
+                <th>Disk Used %</th>
+                <th>Tablespace Used %</th>
+                <th>Available (GB)</th>
+                <th class="text-left">Largest Table</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in queryset %}
+            <tr>
+                <td class="text-left" style="font-weight: 600;">{{ item.month|date:"F Y" }}</td>
+                <td class="text-left">{{ item.database }}</td>
+                <td>{{ item.database_size_gb }}</td>
+                <td>
+                    {% if item.growth_gb > 0 %}
+                        <span class="growth-positive">+{{ item.growth_gb }}</span>
+                    {% else %}
+                        <span class="growth-neutral">{{ item.growth_gb }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ item.growth_percent }}%</td>
+                <td>{{ item.disk_capacity_gb }}</td>
+                <td>{{ item.disk_used_percent }}%</td>
+                <td>
+                    {% if item.database == 'MS SQL Server' %}
+                        N/A
+                    {% else %}
+                        {{ item.tablespace_used_percent }}%
+                    {% endif %}
+                </td>
+                <td>{{ item.available_capacity_gb }}</td>
+                <td class="text-left" style="font-size: 0.7rem; color: #475569;">{{ item.largest_table }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10" style="text-align: center; padding: 2rem;">No capacity tracking records match the current filters.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer-print">
+        <div class="footer-metadata">
+            <strong>Extraction Details:</strong> Extracted by <u>{{ extracted_by }}</u> on {{ extracted_at }} EAT.
+        </div>
+
+        <div class="signature-section">
+            <div class="sig-line">
+                <strong>Extracted By:</strong> {{ extracted_by }}<br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
+            <div class="sig-line">
+                <strong>Reviewed By:</strong><br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
+            <div class="sig-line">
+                <strong>Approved By:</strong><br>
+                Signature: __________________________________<br>
+                Date: _______________________________________
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto trigger print dialogue when page loads if ?print=true parameter is present
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

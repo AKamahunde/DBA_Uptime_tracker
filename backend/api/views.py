@@ -1199,7 +1199,7 @@ def capacity_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
         messages.error(request, 'You do not have permission to view capacity planning records.')
         return redirect('dashboard')
-    queryset = CapacityPlanning.objects.all().order_by('-month')
+    queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
@@ -1224,6 +1224,216 @@ def capacity_list(request):
     })
 
 @login_required
+def capacity_print(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to print capacity planning records.')
+        return redirect('capacity_list')
+    queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
+    
+    current_db = request.GET.get('database', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if start_date:
+        queryset = queryset.filter(month__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(month__lte=end_date)
+
+    # Format user extracted name
+    user = request.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        username = user.username
+        if '.' in username:
+            parts = username.split('.')
+            full_name = " ".join([p.capitalize() for p in parts])
+        else:
+            full_name = username.capitalize()
+
+    context = {
+        'queryset': queryset,
+        'current_db': current_db if current_db else 'All Databases',
+        'start_date': start_date,
+        'end_date': end_date,
+        'extracted_by': full_name,
+        'extracted_at': timezone.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time"
+    }
+    return render(request, 'capacity/print.html', context)
+
+@login_required
+def capacity_excel(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to export capacity planning records.')
+        return redirect('capacity_list')
+    
+    queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
+    current_db = request.GET.get('database', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if start_date:
+        queryset = queryset.filter(month__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(month__lte=end_date)
+
+    db_display = current_db if current_db else "All Databases"
+    period_display = f"{start_date}_to_{end_date}" if (start_date or end_date) else "All_Time"
+    
+    # Format user name
+    user = request.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        username = user.username
+        if '.' in username:
+            parts = username.split('.')
+            full_name = " ".join([p.capitalize() for p in parts])
+        else:
+            full_name = username.capitalize()
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Capacity Planning"
+        
+        # Style Definitions
+        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
+        font_header = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+        font_body = Font(name='Segoe UI', size=10)
+        
+        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
+        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
+        
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
+        
+        border_thin = Border(
+            left=Side(style='thin', color='D1D7E0'),
+            right=Side(style='thin', color='D1D7E0'),
+            top=Side(style='thin', color='D1D7E0'),
+            bottom=Side(style='thin', color='D1D7E0')
+        )
+        
+        # Title Block
+        ws.merge_cells('A1:J1')
+        ws['A1'] = f"Capacity Tracking Report for {db_display} - ({period_display.replace('_', ' ')})"
+        ws['A1'].font = font_title
+        ws['A1'].alignment = align_left
+        ws.row_dimensions[1].height = 30
+        
+        ws.append([]) # Empty row
+        
+        # Headers
+        headers = [
+            "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
+            "Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Available (GB)", "Largest Table"
+        ]
+        ws.append(headers)
+        ws.row_dimensions[3].height = 25
+        
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col_num)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_thin
+            
+        row_num = 4
+        for item in queryset:
+            growth_pct = f"{item.growth_percent}%"
+            disk_cap = item.disk_capacity_gb
+            tablespace_val = f"{item.tablespace_used_percent}%" if item.database != 'MS SQL Server' else 'N/A'
+            
+            row_data = [
+                item.month.strftime('%B %Y'),
+                item.database,
+                float(item.database_size_gb),
+                float(item.growth_gb),
+                growth_pct,
+                float(disk_cap),
+                float(item.disk_used_percent),
+                tablespace_val if tablespace_val == 'N/A' else float(item.tablespace_used_percent),
+                float(item.available_capacity_gb),
+                item.largest_table
+            ]
+            ws.append(row_data)
+            ws.row_dimensions[row_num].height = 20
+            
+            for col_num in range(1, 11):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.font = font_body
+                cell.border = border_thin
+                if row_num % 2 == 0:
+                    cell.fill = fill_even
+                
+                if col_num in [1, 2, 10]:
+                    cell.alignment = align_left
+                else:
+                    cell.alignment = align_center
+            row_num += 1
+            
+        # Add metadata footer
+        ws.append([])
+        row_num += 1
+        ws.cell(row=row_num, column=1, value=f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}").font = Font(name='Segoe UI', size=9, italic=True)
+        
+        # Adjust Column Widths
+        for col in ws.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                if cell.row == 1 or cell.row > row_num:
+                    continue
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        filename = f"Capacity_Report_{db_display.replace(' ', '_')}_{period_display}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+        
+    except Exception:
+        import csv
+        from django.http import HttpResponse
+        response = HttpResponse(content_type='text/csv')
+        filename = f"Capacity_Report_{db_display.replace(' ', '_')}_{period_display}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response)
+        writer.writerow([f"Capacity Tracking Report for {db_display} - ({period_display.replace('_', ' ')})"])
+        writer.writerow([])
+        writer.writerow([
+            "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
+            "Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Available (GB)", "Largest Table"
+        ])
+        for item in queryset:
+            tablespace_val = f"{item.tablespace_used_percent}%" if item.database != 'MS SQL Server' else 'N/A'
+            writer.writerow([
+                item.month.strftime('%B %Y'),
+                item.database,
+                item.database_size_gb,
+                item.growth_gb,
+                f"{item.growth_percent}%",
+                item.disk_capacity_gb,
+                item.disk_used_percent,
+                tablespace_val,
+                item.available_capacity_gb,
+                item.largest_table
+            ])
+            
+        writer.writerow([])
+        writer.writerow([f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}"])
+        return response
+
+@login_required
 def capacity_create(request):
     if not (request.user.is_admin or request.user.has_perm('api.add_capacityplanning')):
         messages.error(request, 'You do not have permission to create capacity planning records.')
@@ -1233,9 +1443,27 @@ def capacity_create(request):
         form = CapacityPlanningForm(request.POST)
         if form.is_valid():
             capacity = form.save(commit=False)
-            capacity.created_by = request.user
-            capacity.save()
-            messages.success(request, 'Capacity planning record created successfully.')
+            # Check if a record already exists for the same database and month
+            existing_record = CapacityPlanning.objects.filter(
+                database=capacity.database,
+                month__year=capacity.month.year,
+                month__month=capacity.month.month
+            ).first()
+            if existing_record:
+                # Update existing record
+                existing_record.database_size_gb = capacity.database_size_gb
+                existing_record.available_capacity_gb = capacity.available_capacity_gb
+                existing_record.disk_used_percent = capacity.disk_used_percent
+                existing_record.tablespace_used_percent = capacity.tablespace_used_percent
+                existing_record.largest_table = capacity.largest_table
+                existing_record.growth_gb = capacity.growth_gb
+                existing_record.created_by = request.user
+                existing_record.save()
+                messages.success(request, f"Updated existing capacity planning record for {capacity.database} in {capacity.month.strftime('%B %Y')}.")
+            else:
+                capacity.created_by = request.user
+                capacity.save()
+                messages.success(request, 'Capacity planning record created successfully.')
             return redirect('capacity_list')
     else:
         form = CapacityPlanningForm()
