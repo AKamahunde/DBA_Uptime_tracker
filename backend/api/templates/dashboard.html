@@ -115,7 +115,6 @@
                     <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
                     <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
                     <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-                    <option value="PostgreSQL" {% if selected_db == 'PostgreSQL' %}selected{% endif %}>PostgreSQL</option>
                 </select>
             </div>
             <div style="color: var(--color-primary);">
@@ -124,7 +123,7 @@
             </div>
         </form>
         <p style="font-style: italic; color: var(--text-soft); margin-bottom: 1rem; font-size: 0.95rem;">
-            Database Operations Center: Live SLA compliance, uptime tracking, and backup verification across all production databases.
+            This table shows month-to-date SLA performance for each production database — availability, planned and unplanned downtime, incident counts, mean time to repair (MTTR), backup/restore success rates, replication health, and failed backups — for the reporting month selected above.
         </p>
 
         <!-- Export Actions -->
@@ -229,11 +228,23 @@
         <!-- Database Systems & Environment Key -->
         <div style="margin-top: 1.5rem; background-color: var(--bg-warm); border: 1px solid var(--border-mist); border-radius: var(--radius); padding: 1.25rem; font-size: 0.875rem;">
             <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; border-left: 3px solid var(--primary-gold); padding-left: 0.5rem; font-weight: 600;">Database Systems & Environment Key</h4>
+            
+            <p style="margin: 0.5rem 0 0.75rem 0; color: var(--text-dark); line-height: 1.45;">
+                <strong>Traffic-Light Status:</strong> The dashboard's visual compliance indicator — <span style="color: var(--primary-green); font-weight: 600;">Green</span> (meets SLA), <span style="color: var(--primary-gold); font-weight: 600;">Yellow</span> (missed SLA), <span style="color: #c62828; font-weight: 600;">Red</span> (below SLA), <span style="color: var(--text-soft); font-weight: 600;">Grey</span> (no data available for the period).
+            </p>
+
             <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; color: var(--text-dark);">
-                <li><strong style="color: var(--primary-navy);">Oracle:</strong> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powering the core NMS Enterprise Resource Planning (ERP) suite and foundational infrastructure operations.</li>
-                <li><strong style="color: var(--primary-navy);">MySQL:</strong> nickledbnew (replicated live to nickeldbdr) &mdash; Hosting vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Data Migration Tool (DMT).</li>
-                <li><strong style="color: var(--primary-navy);">MS SQL Server:</strong> Windows Server Host &mdash; Supporting MKInsight, the mission-critical internal audit and compliance verification system.</li>
-                <li><strong style="color: var(--primary-navy);">PostgreSQL:</strong> Localhost Instance &mdash; Driving the ColdChain logistical system and ODKX mobile data collection hubs.</li>
+                {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+                <li><strong style="color: var(--primary-navy);">Oracle:</strong> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powers the core NMS Enterprise Resource Planning (ERP) suite and foundational infrastructure operations.</li>
+                {% endif %}
+                
+                {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+                <li><strong style="color: var(--primary-navy);">MySQL:</strong> nickledbnew (replicated live to nickeldbdr) &mdash; Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).</li>
+                {% endif %}
+                
+                {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+                <li><strong style="color: var(--primary-navy);">MS SQL Server:</strong> Windows Server host &mdash; Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.</li>
+                {% endif %}
             </ul>
         </div>
 
@@ -242,7 +253,16 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <div>
                     <h3 style="margin-bottom: 0.15rem; color: #333;">Database Detail</h3>
-                    <h4 style="color: #555; font-weight: 500;">Showing: {{ database_detail.database }}</h4>
+                    <h4 style="color: #555; font-weight: 500; margin: 0;">Showing: {{ database_detail.database }}</h4>
+                    <p style="font-style: italic; color: var(--text-soft); margin-top: 0.5rem; margin-bottom: 0; font-size: 0.9rem; max-width: 85%; line-height: 1.45;">
+                        {% if database_detail.database == 'Oracle' %}
+                            Detailed SLA compliance metrics, historical recovery backup cycles, and active replication monitoring parameters for Oracle instances supporting the NMS ERP (Core Database &amp; Application Hub).
+                        {% elif database_detail.database == 'MySQL' %}
+                            Detailed SLA compliance metrics, live replication lag verification, and support systems logs for MySQL instances hosting NMS360, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).
+                        {% elif database_detail.database == 'MS SQL Server' %}
+                            Detailed SLA compliance metrics, local backup verification logs, and audit system performance metrics for MS SQL Server instances hosting MKInsight, which runs Pentana Audit, the system used by internal auditors.
+                        {% endif %}
+                    </p>
                 </div>
             </div>
             <div style="overflow-x: auto; padding: 0.5rem;">

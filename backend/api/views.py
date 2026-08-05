@@ -103,25 +103,25 @@ def dashboard(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
-def _get_dashboard_data(reporting_month):
-    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
-
-    def get_status(current, target_val, operator):
-        if current == 'No Data' or current is None or current == 'N/A':
-            return 'N/A'
-        try:
-            if isinstance(current, str) and '%' in current:
-                current = float(current.replace('%', ''))
-            else:
-                current = float(current)
-            
-            if operator == '>=':
-                return 'Meets SLA' if current >= target_val else 'Below SLA'
-            elif operator == '<=':
-                return 'Meets SLA' if current <= target_val else 'Below SLA'
-        except:
-            return 'N/A'
+def get_status(current, target_val, operator):
+    if current == 'No Data' or current is None or current == 'N/A':
         return 'N/A'
+    try:
+        if isinstance(current, str) and '%' in current:
+            current = float(current.replace('%', ''))
+        else:
+            current = float(current)
+        
+        if operator == '>=':
+            return 'Meets SLA' if current >= target_val else 'Below SLA'
+        elif operator == '<=':
+            return 'Meets SLA' if current <= target_val else 'Below SLA'
+    except:
+        return 'N/A'
+    return 'N/A'
+
+def _get_dashboard_data(reporting_month):
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
 
     dashboard_data = []
 
@@ -203,7 +203,7 @@ def _get_dashboard_data(reporting_month):
         ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
         
-        if db_type in ['MS SQL Server', 'PostgreSQL']:
+        if db_type in ['MS SQL Server']:
             rep_status = 'N/A'
 
         dashboard_data.append({
@@ -305,7 +305,7 @@ def dashboard(request):
             else:
                 rep_lag_str = "No Data"
                 
-            if selected_db in ['MS SQL Server', 'PostgreSQL']:
+            if selected_db in ['MS SQL Server']:
                 rep_lag_str = 'N/A'
 
 
@@ -534,10 +534,9 @@ def dashboard_excel(request):
         legend_start = row_num + 2
         
         ws.cell(row=legend_start, column=1, value="Database Key & Host Systems:").font = font_bold
-        ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - This is the NMS ERP and Core Infrastructure database.").font = font_body
-        ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (with replication on nickeldbdr) - Houses systems like NMS360, ServiceDesk, and DMT.").font = font_body
-        ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server - Houses MKInsight used by auditors.").font = font_body
-        ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: Localhost / PostgreSQL Instance - Houses ColdChain System ODKX.").font = font_body
+        ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite and foundational infrastructure operations.").font = font_body
+        ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).").font = font_body
+        ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.").font = font_body
         
         # Adjust Column Widths
         for col in ws.columns:
@@ -584,10 +583,9 @@ def dashboard_excel(request):
             ])
         writer.writerow([])
         writer.writerow(["Database Key & Host Systems:"])
-        writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - This is the NMS ERP and Core Infrastructure database."])
-        writer.writerow(["MySQL: nickledbnew (with replication on nickeldbdr) - Houses systems like NMS360, ServiceDesk, and DMT."])
-        writer.writerow(["MS SQL Server: Windows Server - Houses MKInsight used by auditors."])
-        writer.writerow(["PostgreSQL: Localhost / PostgreSQL Instance - Houses ColdChain System ODKX."])
+        writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite and foundational infrastructure operations."])
+        writer.writerow(["MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, and the Delivery Monitoring Tool (DMT)."])
+        writer.writerow(["MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors."])
         return response
 
 @login_required
