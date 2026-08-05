@@ -177,6 +177,26 @@
 </head>
 <body>
 
+    <!-- Download Toolbar (hidden when printing) -->
+    <div class="no-print" style="position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: #002569; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <div style="font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1"/></svg>
+            Report Preview
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <span style="font-size: 0.8rem; opacity: 0.8;">In the print dialog, set Destination to <strong>Save as PDF</strong></span>
+            <button onclick="window.print()" style="background: #F1AB00; color: #002569; border: none; padding: 0.5rem 1.25rem; border-radius: 5px; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg>
+                Download as PDF
+            </button>
+            <button onclick="window.close()" style="background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4); padding: 0.5rem 1rem; border-radius: 5px; font-size: 0.85rem; cursor: pointer;">
+                &times; Close
+            </button>
+        </div>
+    </div>
+    <!-- Spacer so content doesn't hide under fixed toolbar -->
+    <div class="no-print" style="height: 56px;"></div>
+
     <div class="header-section">
         <div style="display: flex; align-items: center; gap: 1rem;">
             <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 45px; width: auto; border-radius: 4px; border: 1px solid var(--border-mist);">
@@ -428,13 +448,9 @@
         </div>
     </div>
 
-    <!-- Trigger the Print Dialog Automatically -->
+    <!-- Print triggered only by button click, not auto -->
     <script>
-        window.onload = function() {
-            setTimeout(function() {
-                window.print();
-            }, 500);
-        };
+        // Nothing auto. User clicks the Download as PDF button above.
     </script>
 
 </body>

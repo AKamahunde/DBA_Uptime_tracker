@@ -44,6 +44,7 @@ class BackupRecoveryForm(forms.ModelForm):
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'comments': forms.Textarea(attrs={'rows': 3}),
+            'failure_reason': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for backup failure (if any)'}),
             'location': forms.HiddenInput(),
         }
 
@@ -53,6 +54,7 @@ class BackupRecoveryForm(forms.ModelForm):
         self.fields['backup_used'].required = False
         self.fields['location'].required = False
         self.fields['comments'].required = False
+        self.fields['failure_reason'].required = False
         self.fields['tested_by'].required = False
 
 class ServerHealthForm(forms.ModelForm):

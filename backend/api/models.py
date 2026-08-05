@@ -198,6 +198,7 @@ class BackupRecovery(models.Model):
         ('Failed', 'Failed'),
         ('Partial', 'Partial')
     ])
+    failure_reason = models.TextField(blank=True)
     location = models.CharField(max_length=200)
     verified = models.BooleanField(default=False)
     restore_tested = models.BooleanField(default=False)

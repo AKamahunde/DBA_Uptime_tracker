@@ -62,6 +62,10 @@
             <label for="{{ form.outcome.id_for_label }}">Outcome:</label>
             {{ form.outcome }}
         </div>
+        <div class="form-group" id="div_failure_reason">
+            <label for="{{ form.failure_reason.id_for_label }}">Reason for Failure:</label>
+            {{ form.failure_reason }}
+        </div>
         {{ form.location }}
         <div class="form-group">
             <label for="{{ form.verified.id_for_label }}">Verified:</label>
@@ -119,9 +123,27 @@
             });
         }
 
+        const outcomeSelect = document.getElementById('id_outcome');
+        const failureReasonDiv = document.getElementById('div_failure_reason');
+        
+        function toggleFailureReason() {
+            if (outcomeSelect && failureReasonDiv) {
+                const outcome = outcomeSelect.value;
+                failureReasonDiv.style.display = (outcome === 'Failed' || outcome === 'Partial') ? 'block' : 'none';
+            }
+        }
+        
+        if (outcomeSelect) {
+            outcomeSelect.addEventListener('change', toggleFailureReason);
+        }
+
         if (recordTypeSelect) {
-            recordTypeSelect.addEventListener('change', toggleFields);
+            recordTypeSelect.addEventListener('change', function() {
+                toggleFields();
+                toggleFailureReason();
+            });
             toggleFields(); // Initial run on page load
+            toggleFailureReason();
         }
 
         // Auto-calculate Duration in Hours based on Start and End Times

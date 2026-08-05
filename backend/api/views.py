@@ -1678,6 +1678,7 @@ def backup_ingest(request):
             end=data.get('end'),
             duration_mins=data.get('duration_mins', 0),
             outcome=data.get('outcome', 'Failed'),
+            failure_reason=data.get('failure_reason', ''),
             location=data.get('location', 'Unknown'),
             verified=data.get('verified', False),
             compression=data.get('compression', True),

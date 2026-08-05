@@ -192,6 +192,7 @@ if __name__ == "__main__":
                 "end": backup_date_str,
                 "duration_mins": round(duration_mins, 2),
                 "outcome": outcome,
+                "failure_reason": f"RMAN Job Status: {raw_status}" if outcome == "Failed" else "",
                 "location": "Direct DB V$RMAN catalog",
                 "verified": True if outcome == 'Success' else False,
                 "compression": True

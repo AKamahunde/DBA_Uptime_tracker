@@ -40,6 +40,7 @@ def parse_latest_backup():
     backup_type = 'Incremental'
     outcome = 'Failed'
     location = 'Unknown'
+    failure_reason = ''
     
     for line in session_lines:
         match = time_pattern.search(line)
@@ -69,6 +70,7 @@ def parse_latest_backup():
             
         if ("FAILED:" in line or "ERROR:" in line) and outcome != 'Success':
             outcome = 'Failed'
+            failure_reason = line.strip()
             
         if "--- Backup Session Finished ---" in line:
             end_time_str = timestamp
@@ -91,6 +93,7 @@ def parse_latest_backup():
         "end": end_dt.isoformat(),
         "duration_mins": round(duration_mins, 4),
         "outcome": outcome,
+        "failure_reason": failure_reason,
         "location": location,
         "verified": outcome == 'Success',
         "compression": location.endswith('.gz') or location.endswith('.zip') or location.endswith('.gz.tmp'),

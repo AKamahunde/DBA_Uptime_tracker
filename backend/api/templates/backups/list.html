@@ -40,8 +40,7 @@
         <table style="width: 100%; table-layout: auto;">
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Time</th>
+                    <th>Timestamp</th>
                     <th>Record Type</th>
                     <th>Database</th>
                     <th>Backup Type</th>
@@ -49,17 +48,19 @@
                     <th>Duration (Mins)</th>
                     <th>Compression</th>
                     <th>Outcome</th>
+                    <th>Reason for Failure</th>
                     <th>Verified</th>
-                    <th>Logged By</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for backup in page_obj %}
                 <tr {% if backup.outcome == 'Failed' %}style="background-color: #ffd6d6;"{% elif backup.outcome == 'Partial' %}style="background-color: #fff3e0;"{% endif %}>
-                    <td>{{ backup.date }}</td>
                     <td>
-                        {% if backup.start %}{{ backup.start|date:"H:i" }} - {{ backup.end|date:"H:i" }}{% endif %}
+                        {{ backup.start|date:"d/m/Y H:i" }}
+                        {% if backup.end %}
+                            - {{ backup.end|date:"H:i" }}
+                        {% endif %}
                     </td>
                     <td>{{ backup.record_type }}</td>
                     <td>
@@ -100,17 +101,19 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if backup.outcome != 'Success' and backup.failure_reason %}
+                            <span style="color: #c62828; font-weight: 600; font-size: 0.85rem;" title="{{ backup.failure_reason }}">
+                                {{ backup.failure_reason|truncatechars:45 }}
+                            </span>
+                        {% else %}
+                            <span style="color: #64748b;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if backup.verified %}
                             <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Yes</span>
                         {% else %}
                             <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">No</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if backup.created_by %}
-                            {{ backup.created_by.username }}
-                        {% else %}
-                            <span style="display:inline-block;background:#475569;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Script</span>
                         {% endif %}
                     </td>
                     <td>
@@ -131,7 +134,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="12" style="text-align: center;">No backup records found.</td>
+                    <td colspan="11" style="text-align: center;">No backup records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -149,6 +149,7 @@ try {
             end               = $endTime.ToString("yyyy-MM-ddTHH:mm:ssK")
             duration_mins     = [int]$reader["duration_mins"]
             outcome           = $reader["outcome"].ToString()
+            failure_reason    = ""
             location          = $reader["location"].ToString()
             verified          = [bool]($reader["verified"] -eq 1)
             compression       = [bool]($reader["compression"] -eq 1)
