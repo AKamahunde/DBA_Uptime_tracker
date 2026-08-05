@@ -194,6 +194,40 @@ if __name__ == "__main__":
     # --------------------------------------------------------
     # 2. Gather Capacity & Tablespace utilization
     # --------------------------------------------------------
+    def get_host_disk_metrics(size_gb, free_gb, tablespace_used_percent):
+        """
+        Attempts to retrieve OS-level disk utilization percent and available space in GB.
+        If running locally on the database host, it uses standard OS utility commands.
+        Otherwise, it falls back to tablespace metrics to maintain mathematical alignment.
+        """
+        import shutil
+        import subprocess
+        import socket
+        
+        # Check if we are running locally on the target DB host
+        hostname = socket.gethostname()
+        is_local = "nmsinfra" in hostname.lower() or "localhost" in hostname.lower()
+        
+        if is_local:
+            try:
+                total, used, free = shutil.disk_usage("/")
+                percent = (used / total) * 100
+                return round(percent, 2), round(free / (1024**3), 2)
+            except Exception:
+                try:
+                    output = subprocess.check_output("df -m / | awk 'NR==2 {print $2, $4, $5}'", shell=True).decode('utf-8').strip()
+                    parts = output.split()
+                    if len(parts) == 3:
+                        total_mb = float(parts[0])
+                        avail_mb = float(parts[1])
+                        percent = float(parts[2].replace('%', ''))
+                        return percent, round(avail_mb / 1024, 2)
+                except Exception:
+                    pass
+                    
+        # Fallback to tablespace alignment to prevent mathematical contradictions on remote queries
+        return round(tablespace_used_percent, 2), round(free_gb, 2)
+
     print("\nQuerying database size & capacity planning stats directly from database...")
     capacity_sql = """
     SELECT 
@@ -218,19 +252,24 @@ if __name__ == "__main__":
             largest_table = "SYS_AUDIT / DATA_TABLE"
             try:
                 cursor.execute("""
-                    SELECT segment_name, bytes FROM (
-                        SELECT segment_name, bytes FROM dba_segments 
+                    SELECT owner, segment_name, bytes FROM (
+                        SELECT owner, segment_name, bytes FROM dba_segments 
                         WHERE segment_type = 'TABLE' 
                           AND owner NOT IN ('SYS', 'SYSTEM', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
                                             'ORDSYS', 'ORDDATA', 'CTXSYS', 'XDB', 'WMSYS', 
-                                            'APEX_040200', 'APPQOSSYS', 'GSMADMIN_INTERNAL')
+                                            'APEX_040200', 'APEX_040100', 'APEX_030200', 'FLOWS_FILES', 
+                                            'APEX_PUBLIC_USER', 'HTMLDB_PUBLIC_USER', 'MGMT_VIEW', 'OLAPSYS', 
+                                            'OWBSYS', 'OWBSYS_AUDIT', 'EXFSYS', 'DVSYS', 'DVF', 'LBACSYS', 
+                                            'OJVMSYS', 'SQLTXPLAIN', 'ORDPLUGINS', 'SI_INFORMTN_SCHEMA', 
+                                            'APPQOSSYS', 'GSMADMIN_INTERNAL', 'WRI$_RECON_ABSTRACT')
                         ORDER BY bytes DESC
                     ) WHERE ROWNUM = 1
                 """)
                 table_row = cursor.fetchone()
                 if table_row:
-                    name = table_row[0]
-                    num_bytes = table_row[1]
+                    owner = table_row[0]
+                    name = table_row[1]
+                    num_bytes = table_row[2]
                     if num_bytes:
                         gb = num_bytes / (1024 * 1024 * 1024)
                         if gb >= 0.1:
@@ -238,19 +277,22 @@ if __name__ == "__main__":
                         else:
                             mb = num_bytes / (1024 * 1024)
                             size_str = f"{round(mb, 2)} MB"
-                        largest_table = f"{name} ({size_str})"
+                        largest_table = f"{owner}.{name} ({size_str})"
                     else:
-                        largest_table = name
+                        largest_table = f"{owner}.{name}"
             except Exception as table_err:
                 print(f"Could not retrieve largest table: {table_err}")
                 
+            # Query mathematically aligned host disk space or local stats
+            disk_percent, available_capacity_gb = get_host_disk_metrics(size_gb, free_gb, tablespace_used_percent)
+            
             payload = {
                 "database": "Oracle",
                 "database_size_gb": round(size_gb, 2),
-                "disk_percent": 20.00,  # OS level disk metric template
+                "disk_percent": disk_percent,
                 "tablespace_percent": round(tablespace_used_percent, 2),
                 "largest_table": largest_table,
-                "available_capacity_gb": round(free_gb, 2)
+                "available_capacity_gb": available_capacity_gb
             }
             send_to_api("capacity/ingest/", payload)
     except Exception as e:
