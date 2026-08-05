@@ -455,6 +455,7 @@ def dashboard_excel(request):
     try:
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
         
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -481,7 +482,10 @@ def dashboard_excel(request):
         
         # Add Title
         ws.merge_cells('A1:J1')
-        ws['A1'] = f"Summary of Database Performance - {month_display}"
+        if selected_db and selected_db != 'All Databases':
+            ws['A1'] = f"Summary of Database Performance for {selected_db} - {month_display}"
+        else:
+            ws['A1'] = f"Summary of Database Performance - {month_display}"
         ws['A1'].font = font_title
         ws['A1'].alignment = align_left
         ws.row_dimensions[1].height = 30
@@ -658,7 +662,7 @@ def dashboard_excel(request):
         # Adjust Column Widths
         for col in ws.columns:
             max_len = 0
-            col_letter = col[0].column_letter
+            col_letter = get_column_letter(col[0].column)
             for cell in col:
                 if cell.row == 1 or cell.row > legend_start:
                     continue
@@ -666,19 +670,24 @@ def dashboard_excel(request):
                     max_len = max(max_len, len(str(cell.value)))
             ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
             
+        filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="DB_Performance_Summary_{month_str}.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.xlsx"'
         wb.save(response)
         return response
         
-    except ImportError:
+    except Exception:
         import csv
         from django.http import HttpResponse
+        filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="DB_Performance_Summary_{month_str}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.csv"'
         
         writer = csv.writer(response)
-        writer.writerow([f"Summary of Database Performance - {month_display}"])
+        if selected_db and selected_db != 'All Databases':
+            writer.writerow([f"Summary of Database Performance for {selected_db} - {month_display}"])
+        else:
+            writer.writerow([f"Summary of Database Performance - {month_display}"])
         writer.writerow([])
         writer.writerow([
             "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
