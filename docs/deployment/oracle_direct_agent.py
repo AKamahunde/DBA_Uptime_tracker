@@ -259,19 +259,44 @@ if __name__ == "__main__":
             tablespace_used_percent = (used_gb / size_gb) * 100 if size_gb > 0 else 0.0
             
             # Retrieve largest table dynamically with size (excluding system schemas)
-            largest_table = "SYS_AUDIT / DATA_TABLE"
+            largest_table = "None"
             try:
-                cursor.execute("""
-                    SELECT owner, segment_name, bytes FROM (
-                        SELECT s.owner, s.segment_name, s.bytes 
-                        FROM dba_segments s
-                        JOIN dba_users u ON s.owner = u.username
-                        WHERE s.segment_type = 'TABLE' 
-                          AND u.oracle_maintained = 'N'
-                        ORDER BY s.bytes DESC
-                    ) WHERE ROWNUM = 1
-                """)
-                table_row = cursor.fetchone()
+                # 1st Attempt: Use oracle_maintained flag (Oracle 12c+)
+                try:
+                    cursor.execute("""
+                        SELECT owner, segment_name, bytes FROM (
+                            SELECT s.owner, s.segment_name, s.bytes 
+                            FROM dba_segments s
+                            JOIN dba_users u ON s.owner = u.username
+                            WHERE s.segment_type = 'TABLE' 
+                              AND u.oracle_maintained = 'N'
+                            ORDER BY s.bytes DESC
+                        ) WHERE ROWNUM = 1
+                    """)
+                    table_row = cursor.fetchone()
+                except Exception as e_12c:
+                    print(f"Oracle 12c+ query failed (likely on Oracle 11g): {e_12c}. Retrying with 11g compatibility query...")
+                    # 2nd Attempt: Compatibility mode (Oracle 11g) with broad exclusions and LIKE filters
+                    cursor.execute("""
+                        SELECT owner, segment_name, bytes FROM (
+                            SELECT owner, segment_name, bytes FROM dba_segments 
+                            WHERE segment_type = 'TABLE' 
+                              AND owner NOT IN ('SYS', 'SYSTEM', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
+                                                'ORDSYS', 'ORDDATA', 'CTXSYS', 'XDB', 'WMSYS', 
+                                                'MGMT_VIEW', 'OLAPSYS', 'OWBSYS', 'OWBSYS_AUDIT', 
+                                                'EXFSYS', 'DVSYS', 'DVF', 'LBACSYS', 'OJVMSYS', 
+                                                'SQLTXPLAIN', 'ORDPLUGINS', 'SI_INFORMTN_SCHEMA', 
+                                                'APPQOSSYS', 'GSMADMIN_INTERNAL', 'WRI$_RECON_ABSTRACT', 
+                                                'AUDSYS', 'GSMUSER', 'GSMCATUSER', 'DBSFWUSER', 'GGSYS', 
+                                                'OAC_METADATA', 'REMOTE_SCHEDULER_AGENT', 'DIP', 'SYS$UMF', 
+                                                'WRED')
+                              AND owner NOT LIKE 'APEX_%'
+                              AND owner NOT LIKE 'FLOWS_%'
+                            ORDER BY bytes DESC
+                        ) WHERE ROWNUM = 1
+                    """)
+                    table_row = cursor.fetchone()
+
                 if table_row:
                     owner = table_row[0]
                     name = table_row[1]
@@ -288,6 +313,7 @@ if __name__ == "__main__":
                         largest_table = f"{owner}.{name}"
             except Exception as table_err:
                 print(f"Could not retrieve largest table: {table_err}")
+                largest_table = "None"
                 
             # Query mathematically aligned host disk space or local stats
             disk_percent, available_capacity_gb = get_host_disk_metrics(size_gb, free_gb, tablespace_used_percent)
