@@ -270,18 +270,20 @@ if __name__ == "__main__":
                             JOIN dba_users u ON s.owner = u.username
                             WHERE s.segment_type = 'TABLE' 
                               AND u.oracle_maintained = 'N'
+                              AND s.owner NOT IN ('SYS', 'SYSTEM', 'SYS_AUDIT', 'AUDSYS')
+                              AND s.owner NOT LIKE 'SYS_%'
                             ORDER BY s.bytes DESC
                         ) WHERE ROWNUM = 1
                     """)
                     table_row = cursor.fetchone()
                 except Exception as e_12c:
-                    print(f"Oracle 12c+ query failed (likely on Oracle 11g): {e_12c}. Retrying with 11g compatibility query...")
+                    print(f"Oracle 12c+ query failed (likely on Oracle 11g or lack of dba_users privileges): {e_12c}. Retrying with 11g compatibility query...")
                     # 2nd Attempt: Compatibility mode (Oracle 11g) with broad exclusions and LIKE filters
                     cursor.execute("""
                         SELECT owner, segment_name, bytes FROM (
                             SELECT owner, segment_name, bytes FROM dba_segments 
                             WHERE segment_type = 'TABLE' 
-                              AND owner NOT IN ('SYS', 'SYSTEM', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
+                              AND owner NOT IN ('SYS', 'SYSTEM', 'SYS_AUDIT', 'SYSMAN', 'DBSNMP', 'OUTLN', 'MDSYS', 
                                                 'ORDSYS', 'ORDDATA', 'CTXSYS', 'XDB', 'WMSYS', 
                                                 'MGMT_VIEW', 'OLAPSYS', 'OWBSYS', 'OWBSYS_AUDIT', 
                                                 'EXFSYS', 'DVSYS', 'DVF', 'LBACSYS', 'OJVMSYS', 
@@ -292,6 +294,7 @@ if __name__ == "__main__":
                                                 'WRED')
                               AND owner NOT LIKE 'APEX_%'
                               AND owner NOT LIKE 'FLOWS_%'
+                              AND owner NOT LIKE 'SYS_%'
                             ORDER BY bytes DESC
                         ) WHERE ROWNUM = 1
                     """)
@@ -326,6 +329,7 @@ if __name__ == "__main__":
                 "largest_table": largest_table,
                 "available_capacity_gb": available_capacity_gb
             }
+            print(f"Sending Capacity Payload: {json.dumps(payload, indent=2)}")
             send_to_api("capacity/ingest/", payload)
     except Exception as e:
         print(f"Error querying capacity: {e}")

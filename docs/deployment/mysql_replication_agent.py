@@ -30,7 +30,15 @@ def run_mysql_cmd(query, user=None, password=None):
                 key, val = line.split(":", 1)
                 status[key.strip()] = val.strip()
         return status
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        print(f"MySQL command failed with exit code {e.returncode}")
+        if e.stdout:
+            print(f"Stdout: {e.stdout.strip()}")
+        if e.stderr:
+            print(f"Stderr: {e.stderr.strip()}", file=sys.stderr)
+        return {}
+    except FileNotFoundError:
+        print("Error: 'mysql' client command not found. Please ensure MySQL client is installed and in your PATH.", file=sys.stderr)
         return {}
 
 def get_replication_status(user=None, password=None):

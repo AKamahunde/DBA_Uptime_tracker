@@ -1771,6 +1771,11 @@ def capacity_ingest(request):
         database_instance = data.get('database', 'MySQL')
         incoming_size = Decimal(str(data.get('database_size_gb', 0)))
         
+        # Get client IP address for debugging
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        client_ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+        print(f"[DEBUG CAPACITY] Received payload from IP {client_ip} for DB '{database_instance}': size_gb={incoming_size}, largest_table='{data.get('largest_table')}'")
+        
         # Check if custom month is provided in payload (e.g. "2026-07")
         month_str = data.get('month')
         if month_str:
