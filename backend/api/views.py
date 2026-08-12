@@ -104,7 +104,7 @@ def dashboard(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
-def get_status(current, target_val, operator):
+def get_status(current, target_val, operator, warning_val=None):
     if current == 'No Data' or current is None or current == 'N/A':
         return 'N/A'
     try:
@@ -114,9 +114,19 @@ def get_status(current, target_val, operator):
             current = float(current)
         
         if operator == '>=':
-            return 'Meets SLA' if current >= target_val else 'Below SLA'
+            if current >= target_val:
+                return 'Meets SLA'
+            elif warning_val is not None and current >= warning_val:
+                return 'Warning'
+            else:
+                return 'Below SLA'
         elif operator == '<=':
-            return 'Meets SLA' if current <= target_val else 'Below SLA'
+            if current > target_val:
+                return 'Below SLA'
+            elif warning_val is not None and current >= warning_val:
+                return 'Warning'
+            else:
+                return 'Meets SLA'
     except:
         return 'N/A'
     return 'N/A'
@@ -280,13 +290,13 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
                 rep_lag_str = 'N/A'
 
             # Calculate Statuses
-            avail_status = get_status(row_data['availability'], 99.95, '>=') if selected_sla_exists else 'N/A'
-            planned_status = get_status(row_data['planned_downtime'], 48.0, '<=') if selected_sla_exists else 'N/A'
-            unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=') if selected_sla_exists else 'N/A'
-            incidents_status = get_status(row_data['total_incidents'], 4, '<=') if selected_sla_exists else 'N/A'
-            mttr_status = get_status(row_data['mttr_mins'], 240, '<=') if selected_sla_exists else 'N/A'
-            backup_status = get_status(row_data['backup_success'], 95.0, '>=') if (selected_sla_exists and row_data['backup_success'] != 'No Data') else 'N/A'
-            restore_status = get_status(row_data['restore_success'], 80.0, '>=') if (selected_sla_exists and row_data['restore_success'] != 'No Data') else 'N/A'
+            avail_status = get_status(row_data['availability'], 99.95, '>=', 99.90) if selected_sla_exists else 'N/A'
+            planned_status = get_status(row_data['planned_downtime'], 48.0, '<=', 40.0) if selected_sla_exists else 'N/A'
+            unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=', 1.5) if selected_sla_exists else 'N/A'
+            incidents_status = get_status(row_data['total_incidents'], 4, '<=', 3) if selected_sla_exists else 'N/A'
+            mttr_status = get_status(row_data['mttr_mins'], 240, '<=', 180) if selected_sla_exists else 'N/A'
+            backup_status = get_status(row_data['backup_success'], 95.0, '>=', 90.0) if (selected_sla_exists and row_data['backup_success'] != 'No Data') else 'N/A'
+            restore_status = get_status(row_data['restore_success'], 80.0, '>=', 75.0) if (selected_sla_exists and row_data['restore_success'] != 'No Data') else 'N/A'
             
             if row_data['replication_status'] in ['No Data', 'N/A'] or not selected_sla_exists:
                 rep_status_check = 'N/A'
@@ -297,28 +307,34 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
             now = timezone.now().date()
             if last_full:
                 days_since_full = (now - last_full.date).days
-                full_status = 'Meets SLA' if days_since_full < 7 else 'Below SLA'
+                full_status = 'Meets SLA' if days_since_full < 5 else ('Warning' if days_since_full < 7 else 'Below SLA')
             else:
                 full_status = 'N/A'
                 
             if last_inc:
                 days_since_inc = (now - last_inc.date).days
-                inc_status = 'Meets SLA' if days_since_inc <= 1 else 'Below SLA' # 24 hrs
+                inc_status = 'Meets SLA' if days_since_inc <= 1 else ('Warning' if days_since_inc <= 2 else 'Below SLA') # 24 hrs
             else:
                 inc_status = 'N/A'
                 
             if last_dr:
                 days_since_dr = (now - last_dr.date).days
-                dr_status = 'Meets SLA' if days_since_dr <= 180 else 'Below SLA'
+                dr_status = 'Meets SLA' if days_since_dr <= 150 else ('Warning' if days_since_dr <= 180 else 'Below SLA')
             else:
                 dr_status = 'N/A'
 
-            failed_backup_status = 'Meets SLA' if (row_data['failed_backups'] == 0 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A')
-            failed_restore_status = 'Meets SLA' if (failed_restores == 0 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A')
+            failed_backup_status = 'Meets SLA' if (row_data['failed_backups'] == 0 and selected_sla_exists) else ('Warning' if (row_data['failed_backups'] == 1 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A'))
+            failed_restore_status = 'Meets SLA' if (failed_restores == 0 and selected_sla_exists) else ('Warning' if (failed_restores == 1 and selected_sla_exists) else ('Below SLA' if selected_sla_exists else 'N/A'))
             
             rep_lag_status = 'Below SLA'
             if rep_lag not in ['No Data', 'N/A'] and selected_sla_exists:
-                rep_lag_status = 'Meets SLA' if (rep_lag / 60) < 2 else 'Below SLA'
+                lag_mins = rep_lag / 60
+                if lag_mins < 2:
+                    rep_lag_status = 'Meets SLA'
+                elif lag_mins <= 5:
+                    rep_lag_status = 'Warning'
+                else:
+                    rep_lag_status = 'Below SLA'
             else:
                 rep_lag_status = 'N/A'
 

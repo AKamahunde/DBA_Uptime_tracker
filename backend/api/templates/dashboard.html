@@ -60,6 +60,10 @@
         background-color: #f1f5f9 !important;
         color: #475569 !important;
     }
+    .cell-warning {
+        background-color: #fef9c3 !important;
+        color: #a16207 !important;
+    }
 </style>
 
 <h2 style="margin-bottom: 1.5rem; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a;">Dashboard</h2>
@@ -239,7 +243,7 @@
                     <h4 style="color: #555; font-weight: 500; margin: 0;">Showing: {{ database_detail.database }}</h4>
                     <p style="font-style: italic; color: var(--text-soft); margin-top: 0.5rem; margin-bottom: 0; font-size: 0.9rem; max-width: 85%; line-height: 1.45;">
                         {% if database_detail.database == 'Oracle' %}
-                            Detailed SLA compliance metrics, historical recovery backup cycles, and active replication monitoring parameters for Oracle instances supporting the NMS ERP (Core Database &amp; Application Hub).
+                            Detailed SLA compliance, backup cycle history, and replication parameters for the Oracle (nmsinfra) database hosting NMS ERP data.
                         {% elif database_detail.database == 'MySQL' %}
                             Detailed SLA compliance metrics, live replication lag verification, and support systems logs for MySQL instances hosting NMS360, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).
                         {% elif database_detail.database == 'MS SQL Server' %}
@@ -317,46 +321,46 @@
                         <!-- Status Row -->
                         <tr>
                             <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">Status</td>
-                            <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'Warning' %}cell-warning{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.availability }}
                             </td>
-                            <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.planned_downtime }}
                             </td>
-                            <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.unplanned_downtime }}
                             </td>
-                            <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'Warning' %}cell-warning{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.total_incidents }}
                             </td>
-                            <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'Warning' %}cell-warning{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.mttr_mins }}
                             </td>
-                            <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'Warning' %}cell-warning{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.backup_success }}
                             </td>
-                            <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'Warning' %}cell-warning{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.restore_success }}
                             </td>
-                            <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.replication_status }}
                             </td>
-                            <td class="{% if database_detail.status.last_full == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_full == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.last_full == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_full == 'Warning' %}cell-warning{% elif database_detail.status.last_full == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.last_full }}
                             </td>
-                            <td class="{% if database_detail.status.last_inc == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_inc == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.last_inc == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_inc == 'Warning' %}cell-warning{% elif database_detail.status.last_inc == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.last_inc }}
                             </td>
-                            <td class="{% if database_detail.status.last_dr == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_dr == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.last_dr == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_dr == 'Warning' %}cell-warning{% elif database_detail.status.last_dr == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.last_dr }}
                             </td>
-                            <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'Warning' %}cell-warning{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.failed_backups }}
                             </td>
-                            <td class="{% if database_detail.status.failed_restores == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_restores == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.failed_restores == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_restores == 'Warning' %}cell-warning{% elif database_detail.status.failed_restores == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.failed_restores }}
                             </td>
-                            <td class="{% if database_detail.status.replication_lag == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_lag == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                            <td class="{% if database_detail.status.replication_lag == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_lag == 'Warning' %}cell-warning{% elif database_detail.status.replication_lag == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.replication_lag }}
                             </td>
                         </tr>

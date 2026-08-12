@@ -97,6 +97,9 @@
         .below {
             color: #c62828;
         }
+        .warning {
+            color: #a16207;
+        }
 
         .legend-section {
             background-color: var(--bg-warm);
@@ -249,7 +252,7 @@
         </h3>
         <p style="font-style: italic; color: var(--text-soft); font-size: 0.78rem; margin: 0 0 0.6rem 0; line-height: 1.35;">
             {% if database_detail.database == 'Oracle' %}
-                Detailed SLA compliance metrics, historical recovery backup cycles, and active replication monitoring parameters for Oracle instances supporting the NMS ERP (Core Database &amp; Application Hub).
+                Detailed SLA compliance, backup cycle history, and replication parameters for the Oracle (nmsinfra) database hosting NMS ERP data.
             {% elif database_detail.database == 'MySQL' %}
                 Detailed SLA compliance metrics, live replication lag verification, and support systems logs for MySQL instances hosting NMS360, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).
             {% elif database_detail.database == 'MS SQL Server' %}
@@ -283,20 +286,20 @@
                     </tr>
                     <tr>
                         <td style="padding: 4px 6px; font-weight: bold;">Status</td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.availability == 'Meets SLA' %}meets{% elif database_detail.status.availability == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.availability == 'Meets SLA' %}meets{% elif database_detail.status.availability == 'Warning' %}warning{% elif database_detail.status.availability == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.availability }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.planned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.planned_downtime == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.planned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.planned_downtime == 'Warning' %}warning{% elif database_detail.status.planned_downtime == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.planned_downtime }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.unplanned_downtime == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}warning{% elif database_detail.status.unplanned_downtime == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.unplanned_downtime }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.total_incidents == 'Meets SLA' %}meets{% elif database_detail.status.total_incidents == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.total_incidents == 'Meets SLA' %}meets{% elif database_detail.status.total_incidents == 'Warning' %}warning{% elif database_detail.status.total_incidents == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.total_incidents }}
                         </td>
                         <td style="padding: 4px 6px;">—</td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.mttr_mins == 'Meets SLA' %}meets{% elif database_detail.status.mttr_mins == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.mttr_mins == 'Meets SLA' %}meets{% elif database_detail.status.mttr_mins == 'Warning' %}warning{% elif database_detail.status.mttr_mins == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.mttr_mins }}
                         </td>
                     </tr>
@@ -334,31 +337,31 @@
                     </tr>
                     <tr>
                         <td style="padding: 4px 6px; font-weight: bold;">Status</td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.backup_success == 'Meets SLA' %}meets{% elif database_detail.status.backup_success == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.backup_success == 'Meets SLA' %}meets{% elif database_detail.status.backup_success == 'Warning' %}warning{% elif database_detail.status.backup_success == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.backup_success }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.restore_success == 'Meets SLA' %}meets{% elif database_detail.status.restore_success == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.restore_success == 'Meets SLA' %}meets{% elif database_detail.status.restore_success == 'Warning' %}warning{% elif database_detail.status.restore_success == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.restore_success }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_full == 'Meets SLA' %}meets{% elif database_detail.status.last_full == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_full == 'Meets SLA' %}meets{% elif database_detail.status.last_full == 'Warning' %}warning{% elif database_detail.status.last_full == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.last_full }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_inc == 'Meets SLA' %}meets{% elif database_detail.status.last_inc == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_inc == 'Meets SLA' %}meets{% elif database_detail.status.last_inc == 'Warning' %}warning{% elif database_detail.status.last_inc == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.last_inc }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_dr == 'Meets SLA' %}meets{% elif database_detail.status.last_dr == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.last_dr == 'Meets SLA' %}meets{% elif database_detail.status.last_dr == 'Warning' %}warning{% elif database_detail.status.last_dr == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.last_dr }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_backups == 'Meets SLA' %}meets{% elif database_detail.status.failed_backups == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_backups == 'Meets SLA' %}meets{% elif database_detail.status.failed_backups == 'Warning' %}warning{% elif database_detail.status.failed_backups == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.failed_backups }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_restores == 'Meets SLA' %}meets{% elif database_detail.status.failed_restores == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.failed_restores == 'Meets SLA' %}meets{% elif database_detail.status.failed_restores == 'Warning' %}warning{% elif database_detail.status.failed_restores == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.failed_restores }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_status == 'Meets SLA' %}meets{% elif database_detail.status.replication_status == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_status == 'Meets SLA' %}meets{% elif database_detail.status.replication_status == 'Warning' %}warning{% elif database_detail.status.replication_status == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.replication_status }}
                         </td>
-                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_lag == 'Meets SLA' %}meets{% elif database_detail.status.replication_lag == 'Below SLA' %}below{% endif %}">
+                        <td style="padding: 4px 6px;" class="status-cell {% if database_detail.status.replication_lag == 'Meets SLA' %}meets{% elif database_detail.status.replication_lag == 'Warning' %}warning{% elif database_detail.status.replication_lag == 'Below SLA' %}below{% endif %}">
                             {{ database_detail.status.replication_lag }}
                         </td>
                     </tr>
