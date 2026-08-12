@@ -14,7 +14,7 @@
 $SqlServer      = "localhost"                           # SQL Server Instance Name
 $ApiKey         = "uptimetracker_api_9f2c1d8e45x9"       # API Key configured in your web application env
 $ApiBaseUrl     = "http://192.168.35.38:90/api"         # Uptime Tracker base API URL
-$Hostname       = "MS SQL Server"                      # Server name registered in dashboard
+$Hostname       = "Pentana"                            # Server name registered in dashboard
 $DbNameFilter   = "%Live%"                              # SQL LIKE pattern to filter databases
 
 # ============================================================

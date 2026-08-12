@@ -68,7 +68,13 @@
                             <span style="color: #64748b; font-style: italic;">N/A</span>
                         {% endif %}
                     </td>
-                    <td>{{ health.server }}</td>
+                    <td>
+                        {% if health.database == 'MS SQL Server' %}
+                            Pentana
+                        {% else %}
+                            {{ health.server }}
+                        {% endif %}
+                    </td>
                     <td>{{ health.cpu_percent }}</td>
                     <td>{{ health.memory_percent }}</td>
                     <td>{{ health.disk_percent }}</td>
