@@ -10,23 +10,23 @@
     <style>
         :root {
             /* Primaries */
-            --primary-navy: #002569;
-            --primary-green: #76B900;
-            --primary-gold: #F1AB00;
+            --primary-navy: #00205B;      /* Portal Color 281C (Navy Primary) */
+            --primary-green: #70B300;     /* Portal Color 376C (Green Success) */
+            --primary-gold: #F2A900;      /* Portal Color 130C (Gold Action) */
 
             /* Undertones */
-            --bg-cool: #F4F7FC;
-            --bg-warm: #FBF7F0;
+            --bg-cool: #F4F7FC;           /* Cool Lunar (Background) */
+            --bg-warm: #FBF7F0;           /* Warm Canvas (Cards) */
             --text-dark: #3D4A5C;
             --text-soft: #6B6B5E;
-            --border-mist: #D1D7E0;
-            --hover-teal: #1A6B6B;
-            --hover-ochre: #C68E00;
-            --accent-muted-blue: #5A7B9C;
+            --border-mist: #5A7B9C;       /* Dusk Blue (Borders) */
+            --hover-teal: #1A6B6B;        /* Deep Teal (Hover) */
+            --hover-ochre: #D59400;       /* Gold Hover */
+            --accent-muted-blue: #5A7B9C; /* Dusk Blue */
             --pure-white: #FFFFFF;
 
             /* Derived */
-            --shadow: 0 2px 8px rgba(0, 37, 105, 0.08);
+            --shadow: 0 4px 12px rgba(0, 32, 91, 0.05);
             --radius: 6px;
             --font-family: 'Outfit', sans-serif;
 
@@ -193,12 +193,12 @@
             width: 100%;
         }
         .card {
-            background: var(--pure-white);
+            background: var(--bg-warm); /* Warm Canvas (Cards) */
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             padding: 2rem;
             margin-bottom: 1rem;
-            border: 1px solid var(--border-mist);
+            border: 1px solid rgba(90, 123, 156, 0.25); /* Dusk Blue (Borders) */
         }
 
         /* ── Page headings ── */
@@ -206,6 +206,7 @@
             border-left: 4px solid var(--primary-gold);
             padding-left: 0.75rem;
             color: var(--primary-navy);
+            font-weight: 700;
         }
 
         /* ── Buttons ── */
@@ -335,21 +336,20 @@
             gap: 1.5rem;
         }
         .stat-card {
-            background: var(--pure-white);
+            background: var(--bg-warm); /* Warm Canvas (Cards) */
             border-radius: var(--radius);
             padding: 1.5rem;
             box-shadow: var(--shadow);
             text-align: center;
-            /* golden top accent bar */
             border-top: 4px solid var(--primary-gold);
-            border-left: 1px solid var(--border-mist);
-            border-right: 1px solid var(--border-mist);
-            border-bottom: 1px solid var(--border-mist);
+            border-left: 1px solid rgba(90, 123, 156, 0.25); /* Dusk Blue (Borders) */
+            border-right: 1px solid rgba(90, 123, 156, 0.25);
+            border-bottom: 1px solid rgba(90, 123, 156, 0.25);
             transition: transform 0.15s, border-color 0.15s;
         }
         .stat-card:hover {
             transform: translateY(-3px);
-            border-color: var(--accent-muted-blue);
+            border-color: var(--hover-teal); /* Deep Teal (Hover) */
         }
         .stat-card h3 {
             font-size: 2.2rem;
