@@ -1414,6 +1414,19 @@ def maintenance_list(request):
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
         
+    # Calculate KPIs based on the active query filters
+    kpis = {
+        'scheduled': queryset.filter(status__in=['Scheduled', 'In Progress']).count(),
+        'completed': queryset.filter(status='Completed').count(),
+        'downtime': round(sum(float(r.duration_hrs) for r in queryset.filter(status__in=['Completed', 'Failed'])), 1),
+    }
+    
+    completed_failed_count = queryset.filter(status__in=['Completed', 'Failed']).count()
+    if completed_failed_count > 0:
+        kpis['success_rate'] = round((kpis['completed'] / completed_failed_count * 100.0), 1)
+    else:
+        kpis['success_rate'] = 100.0
+        
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -1423,7 +1436,8 @@ def maintenance_list(request):
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'kpis': kpis
     })
 
 @login_required

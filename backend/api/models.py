@@ -287,6 +287,12 @@ class MaintenanceRegister(models.Model):
     rollback_plan = models.TextField()
     approved_by = models.CharField(max_length=100, blank=True)
     success = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=[
+        ('Scheduled', 'Scheduled'),
+        ('In Progress', 'In Progress'),
+        ('Completed', 'Completed'),
+        ('Failed', 'Failed')
+    ], default='Scheduled')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
@@ -303,6 +309,15 @@ class MaintenanceRegister(models.Model):
             self.duration_hrs = round(delta.total_seconds() / 3600, 2)
         elif not self.duration_hrs:
             self.duration_hrs = 0
+            
+        # Sync status and success flags for backward compatibility
+        if self.status == 'Completed':
+            self.success = True
+        elif self.status == 'Failed':
+            self.success = False
+        elif self.success:
+            self.status = 'Completed'
+            
         super().save(*args, **kwargs)
 
     class Meta:
