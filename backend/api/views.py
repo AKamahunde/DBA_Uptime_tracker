@@ -412,9 +412,14 @@ def dashboard(request):
     # KPI Calculations for Dashboard Redesign
     import math
     
+    # Filter dashboard_data by selected_db if a specific database is selected
+    filtered_dashboard_data = dashboard_data
+    if selected_db != 'All Databases':
+        filtered_dashboard_data = [item for item in dashboard_data if item['database'].lower() == selected_db.lower()]
+        
     # 1. Overall Availability & Change
     avail_list = []
-    for item in dashboard_data:
+    for item in filtered_dashboard_data:
         val = item['availability']
         if val != 'No Data':
             try:
@@ -428,17 +433,21 @@ def dashboard(request):
         prev_month = reporting_month.replace(year=reporting_month.year - 1, month=12)
     else:
         prev_month = reporting_month.replace(month=reporting_month.month - 1)
-    
+        
     prev_dashboard_data, _ = _get_dashboard_data(prev_month)
+    filtered_prev_dashboard_data = prev_dashboard_data
+    if selected_db != 'All Databases':
+        filtered_prev_dashboard_data = [item for item in prev_dashboard_data if item['database'].lower() == selected_db.lower()]
+        
     prev_avail_list = []
-    for item in prev_dashboard_data:
+    for item in filtered_prev_dashboard_data:
         val = item['availability']
         if val != 'No Data':
             try:
                 prev_avail_list.append(float(str(val).replace('%', '')))
             except ValueError:
                 pass
-    
+                
     kpi_availability_change = ""
     if avail_list and prev_avail_list:
         current_val = sum(avail_list)/len(avail_list)
@@ -450,11 +459,13 @@ def dashboard(request):
             kpi_availability_change = f"▼ {round(diff, 2)}%"
         else:
             kpi_availability_change = "0.00%"
+    else:
+        kpi_availability_change = "N/A"
             
     # 2. SLA Compliance (databases meeting SLA)
     met_count = 0
     total_count = 0
-    for item in dashboard_data:
+    for item in filtered_dashboard_data:
         sla_configured = SLAConfig.objects.filter(
             database__iexact=item['database'], month__year=reporting_month.year, month__month=reporting_month.month
         ).exists()
@@ -465,17 +476,26 @@ def dashboard(request):
     kpi_sla_compliance = f"{met_count}/{total_count} Met" if total_count > 0 else "N/A"
     
     # 3. Incidents
-    kpi_incidents_total = IncidentRegister.objects.filter(
+    incidents_qs = IncidentRegister.objects.filter(
         date__year=reporting_month.year, date__month=reporting_month.month
-    ).count()
-    kpi_incidents_open = IncidentRegister.objects.filter(
+    )
+    open_incidents_qs = IncidentRegister.objects.filter(
         status__in=['Open', 'In Progress']
-    ).count()
+    )
+    if selected_db != 'All Databases':
+        incidents_qs = incidents_qs.filter(database__iexact=selected_db)
+        open_incidents_qs = open_incidents_qs.filter(database__iexact=selected_db)
+        
+    kpi_incidents_total = incidents_qs.count()
+    kpi_incidents_open = open_incidents_qs.count()
     
     # 4. Backups
     month_backups = BackupRecovery.objects.filter(
         record_type='Backup', date__year=reporting_month.year, date__month=reporting_month.month
     )
+    if selected_db != 'All Databases':
+        month_backups = month_backups.filter(database__iexact=selected_db)
+        
     total_bk = month_backups.count()
     success_bk = month_backups.filter(outcome='Success').count()
     kpi_backup_success = f"{round((success_bk / total_bk) * 100, 1)}%" if total_bk > 0 else "No Data"
@@ -483,6 +503,9 @@ def dashboard(request):
     
     # 5. Replication
     rep_streams = ['MySQL', 'Oracle']
+    if selected_db != 'All Databases':
+        rep_streams = [db for db in rep_streams if db.lower() == selected_db.lower()]
+        
     healthy_count = 0
     total_rep_streams = 0
     for db in rep_streams:
@@ -493,7 +516,7 @@ def dashboard(request):
             total_rep_streams += 1
             if latest_rep.severity != 'Critical' and latest_rep.io_thread == 'Yes' and latest_rep.sql_thread == 'Yes':
                 healthy_count += 1
-    kpi_replication_status = f"{healthy_count}/{total_rep_streams} Healthy" if total_rep_streams > 0 else "No Data"
+    kpi_replication_status = f"{healthy_count}/{total_rep_streams} Healthy" if total_rep_streams > 0 else "N/A"
 
     # 6. Availability Trend (Last 6 Months)
     trend_months = []
@@ -506,8 +529,12 @@ def dashboard(request):
         t_month = reporting_month.replace(year=m_year, month=m_month)
         
         t_data, _ = _get_dashboard_data(t_month)
+        filtered_t_data = t_data
+        if selected_db != 'All Databases':
+            filtered_t_data = [item for item in t_data if item['database'].lower() == selected_db.lower()]
+            
         t_avails = []
-        for item in t_data:
+        for item in filtered_t_data:
             val = item['availability']
             if val != 'No Data':
                 try:
@@ -539,16 +566,22 @@ def dashboard(request):
     # 7. Attention Required Alerts
     attention_items = []
     # Staging review alert
-    staging_reviews = IncidentStaging.objects.filter(status='Awaiting Review').count()
+    staging_reviews_qs = IncidentStaging.objects.filter(status='Awaiting Review')
+    if selected_db != 'All Databases':
+        staging_reviews_qs = staging_reviews_qs.filter(database__iexact=selected_db)
+    staging_reviews = staging_reviews_qs.count()
     if staging_reviews > 0:
         attention_items.append({
             'type': 'warning',
             'message': f"Staging Area: {staging_reviews} alert(s) awaiting review."
         })
     # Failed backups
-    recent_failed_backups = BackupRecovery.objects.filter(
+    recent_failed_backups_qs = BackupRecovery.objects.filter(
         record_type='Backup', outcome='Failed', date__year=reporting_month.year, date__month=reporting_month.month
-    ).count()
+    )
+    if selected_db != 'All Databases':
+        recent_failed_backups_qs = recent_failed_backups_qs.filter(database__iexact=selected_db)
+    recent_failed_backups = recent_failed_backups_qs.count()
     if recent_failed_backups > 0:
         attention_items.append({
             'type': 'danger',
@@ -556,16 +589,21 @@ def dashboard(request):
         })
     # Open incidents
     active_incidents = IncidentRegister.objects.filter(status__in=['Open', 'In Progress']).order_by('-created_at')
+    if selected_db != 'All Databases':
+        active_incidents = active_incidents.filter(database__iexact=selected_db)
     for inc in active_incidents:
         attention_items.append({
             'type': 'danger',
-            'message': f"Open Incident: {inc.ticket_id or 'INC-'+str(inc.id)} ({inc.database}) &mdash; {inc.severity} priority."
+            'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc.database}) &mdash; {inc.severity} priority."
         })
         
     # 8. Combined Recent Activity
     activities = []
     # Backups
-    recent_backups = BackupRecovery.objects.all().order_by('-date', '-created_at')[:5]
+    recent_backups = BackupRecovery.objects.all().order_by('-date', '-created_at')
+    if selected_db != 'All Databases':
+        recent_backups = recent_backups.filter(database__iexact=selected_db)
+    recent_backups = recent_backups[:8]
     for r in recent_backups:
         sort_time = r.created_at if r.created_at else timezone.now().replace(year=r.date.year, month=r.date.month, day=r.date.day, hour=0, minute=0, second=0, microsecond=0)
         activities.append({
@@ -578,7 +616,10 @@ def dashboard(request):
             'status_class': 'success' if r.outcome == 'Success' else 'danger'
         })
     # Incidents
-    recent_incidents = IncidentRegister.objects.all().order_by('-created_at')[:5]
+    recent_incidents = IncidentRegister.objects.all().order_by('-created_at')
+    if selected_db != 'All Databases':
+        recent_incidents = recent_incidents.filter(database__iexact=selected_db)
+    recent_incidents = recent_incidents[:8]
     for r in recent_incidents:
         action_str = "Incident logged" if r.status in ['Open', 'In Progress'] else f"Incident {r.status.lower()}"
         activities.append({
@@ -591,7 +632,10 @@ def dashboard(request):
             'status_class': 'danger' if r.status in ['Open', 'In Progress'] else 'success'
         })
     # Replication
-    recent_rep = ReplicationMonitor.objects.all().order_by('-date', '-created_at')[:5]
+    recent_rep = ReplicationMonitor.objects.all().order_by('-date', '-created_at')
+    if selected_db != 'All Databases':
+        recent_rep = recent_rep.filter(database__iexact=selected_db)
+    recent_rep = recent_rep[:8]
     for r in recent_rep:
         status_val = 'Healthy' if (r.severity != 'Critical' and r.io_thread == 'Yes' and r.sql_thread == 'Yes') else 'Issue'
         sort_time = r.created_at if r.created_at else timezone.now().replace(year=r.date.year, month=r.date.month, day=r.date.day, hour=0, minute=0, second=0, microsecond=0)
@@ -1448,12 +1492,176 @@ def capacity_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Capacity Redesign calculations
+    dbs = ['Oracle', 'MySQL', 'MS SQL Server']
+    latest_records = {}
+    for db in dbs:
+        rec = CapacityPlanning.objects.filter(database=db).order_by('-month', '-updated_at').first()
+        if rec:
+            latest_records[db] = rec
+            
+    # Calculate overall KPIs
+    kpi_capacity = 0.0
+    kpi_used = 0.0
+    kpi_free = 0.0
+    kpi_growth = 0.0
+    kpi_size = 0.0
+    
+    for db, rec in latest_records.items():
+        cap = float(rec.disk_capacity_gb)
+        used_pct = float(rec.disk_used_percent)
+        free = float(rec.available_capacity_gb)
+        growth = float(rec.growth_gb)
+        size = float(rec.database_size_gb)
+        
+        # Handle MySQL July 0.00 capacity inconsistency in-memory
+        if cap == 0.0 and free == 0.0 and used_pct > 0:
+            cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+            free = cap - size
+            
+        kpi_capacity += cap
+        kpi_used += (cap * used_pct / 100.0)
+        kpi_free += free
+        kpi_growth += growth
+        kpi_size += size
+        
+    kpi_used_percent = round((kpi_used / kpi_capacity * 100.0), 1) if kpi_capacity > 0 else 0.0
+    kpi_growth_percent = round((kpi_growth / kpi_size * 100.0), 2) if kpi_size > 0 else 0.0
+    
+    # Build capacity health panels
+    health_panels = []
+    for db in dbs:
+        rec = latest_records.get(db)
+        if rec:
+            cap = float(rec.disk_capacity_gb)
+            used_pct = float(rec.disk_used_percent)
+            free = float(rec.available_capacity_gb)
+            growth = float(rec.growth_gb)
+            size = float(rec.database_size_gb)
+            
+            if cap == 0.0 and free == 0.0 and used_pct > 0:
+                cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+                free = cap - size
+                
+            if used_pct < 70.0:
+                status = 'Healthy'
+                status_class = 'success'
+            elif used_pct < 85.0:
+                status = 'Monitor'
+                status_class = 'warning'
+            elif used_pct < 95.0:
+                status = 'Warning'
+                status_class = 'orange'
+            else:
+                status = 'Critical'
+                status_class = 'danger'
+                
+            health_panels.append({
+                'database': db,
+                'used_percent': round(used_pct, 1),
+                'used_gb': round(cap * used_pct / 100.0, 1),
+                'capacity_gb': round(cap, 1),
+                'free_gb': round(free, 1),
+                'growth_gb': round(growth, 2),
+                'growth_percent': round((growth / size * 100.0), 2) if size > 0 else 0.0,
+                'status': status,
+                'status_class': status_class
+            })
+            
+    # Build growth trend chart data (SVG coordinates)
+    trend_db = current_db if current_db else 'Oracle'
+    trend_recs = CapacityPlanning.objects.filter(database=trend_db).order_by('month')
+    trend_months_list = list(trend_recs)[-6:]
+    
+    trend_polyline_points = ""
+    trend_data_points = []
+    if trend_months_list:
+        max_gb = float(max(r.database_size_gb for r in trend_months_list))
+        min_gb = float(min(r.database_size_gb for r in trend_months_list))
+        gb_range = max(1.0, max_gb - min_gb)
+        
+        svg_points = []
+        for idx, r in enumerate(trend_months_list):
+            m_val = float(r.database_size_gb)
+            x = 40 + idx * 64
+            y = 20 + (max_gb - m_val) * 80 / gb_range
+            svg_points.append(f"{x},{y}")
+            
+            trend_data_points.append({
+                'x': x,
+                'y': y,
+                'text_y': y - 8,
+                'name': r.month.strftime('%b'),
+                'value': round(m_val, 1)
+            })
+        trend_polyline_points = " ".join(svg_points)
+        
+    # Build Forecast Block (Linear projection based on last 3 months)
+    forecast_db = current_db if current_db else 'Oracle'
+    db_recs = CapacityPlanning.objects.filter(database=forecast_db).order_by('-month', '-updated_at')[:3]
+    forecast_info = {}
+    if db_recs.exists():
+        latest = db_recs[0]
+        avg_growth = sum(float(r.growth_gb) for r in db_recs) / len(db_recs)
+        
+        cap = float(latest.disk_capacity_gb)
+        used_pct = float(latest.disk_used_percent)
+        free = float(latest.available_capacity_gb)
+        
+        if cap == 0.0 and free == 0.0 and used_pct > 0:
+            size = float(latest.database_size_gb)
+            cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+            free = cap - size
+            
+        warning_used_gb = cap * 0.8
+        current_used_gb = cap * used_pct / 100.0
+        space_left_gb = warning_used_gb - current_used_gb
+        
+        if avg_growth > 0:
+            headroom_months = space_left_gb / avg_growth
+            if headroom_months < 0:
+                headroom_str = "Exceeded threshold"
+                est_date_str = "Exceeded"
+            elif headroom_months > 60:
+                headroom_str = "> 5 years"
+                est_date_str = "Safe"
+            else:
+                headroom_str = f"{round(headroom_months, 1)} months"
+                # Calculate estimated date
+                est_days = headroom_months * 30.44
+                est_date = latest.month + timedelta(days=est_days)
+                est_date_str = est_date.strftime('%B %Y')
+        else:
+            headroom_str = "Infinite"
+            est_date_str = "Safe"
+            
+        forecast_info = {
+            'database': forecast_db,
+            'current_used_pct': round(used_pct, 1),
+            'avg_growth': round(avg_growth, 2),
+            'headroom_months': headroom_str,
+            'est_date': est_date_str
+        }
+    
     return render(request, 'capacity/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        
+        # Redesign KPIs
+        'kpi_capacity': round(kpi_capacity, 1),
+        'kpi_used_gb': round(kpi_used, 1),
+        'kpi_used_percent': kpi_used_percent,
+        'kpi_free_gb': round(kpi_free, 1),
+        'kpi_growth_gb': round(kpi_growth, 2),
+        'kpi_growth_percent': kpi_growth_percent,
+        'health_panels': health_panels,
+        'trend_db': trend_db,
+        'trend_polyline_points': trend_polyline_points,
+        'trend_data_points': trend_data_points,
+        'forecast_info': forecast_info
     })
 
 @login_required

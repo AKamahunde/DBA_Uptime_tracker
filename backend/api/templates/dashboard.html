@@ -11,19 +11,19 @@
         text-align: center;
         font-size: 0.9rem;
         background-color: #fff;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #e2e8f0;
         border-radius: 6px;
         overflow: hidden;
     }
     .modern-table th {
-        background-color: #f1f5f9;
+        background-color: #f8fafc;
         color: #334155;
         font-weight: 700;
         text-transform: uppercase;
         font-size: 0.75rem;
         letter-spacing: 0.5px;
         padding: 0.95rem 0.75rem;
-        border-bottom: 2.5px solid #cbd5e1;
+        border-bottom: 2px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
     }
     .modern-table th:last-child {
@@ -35,7 +35,7 @@
     }
     .modern-table td {
         padding: 0.85rem 0.75rem;
-        border-bottom: 1px solid #cbd5e1;
+        border-bottom: 1px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
         font-weight: 600;
         vertical-align: middle;
@@ -64,12 +64,47 @@
         background-color: #fef9c3 !important;
         color: #a16207 !important;
     }
+
+    /* KPI Card Hover Animations */
+    .kpi-card {
+        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1.15rem 1rem;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.04);
+        position: relative;
+        overflow: hidden;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+        border-color: #cbd5e1;
+    }
+
+    .kpi-accent-navy { border-left: 4px solid var(--primary-navy); }
+    .kpi-accent-gold { border-left: 4px solid var(--primary-gold); }
+    .kpi-accent-red { border-left: 4px solid #ef4444; }
+    .kpi-accent-green { border-left: 4px solid var(--primary-green); }
+    .kpi-accent-blue { border-left: 4px solid #2563eb; }
 </style>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-    <div>
-        <h2 style="margin: 0; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a;">Database Operations Overview</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time performance and SLA tracking console.</p>
+<!-- Header & Scope Selection -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
+        <div>
+            <h2 style="margin: 0; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem;">
+                Database Operations Overview
+            </h2>
+            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time performance and SLA tracking console.</p>
+        </div>
+        
+        <!-- Glassmorphic Scope Badge -->
+        <div style="background: rgba(0, 37, 105, 0.05); color: var(--primary-navy); border: 1px solid rgba(0, 37, 105, 0.12); border-radius: 9999px; padding: 0.3rem 0.85rem; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem; font-family: monospace;">
+            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if selected_db == 'All Databases' %}#2563eb{% else %}var(--primary-green){% endif %};"></span>
+            SCOPE: {{ selected_db|upper }}
+        </div>
     </div>
     
     <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
@@ -92,28 +127,28 @@
 <!-- Top Row KPI Strip -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
     <!-- 1. Availability KPI -->
-    <div onclick="window.location.href='?database_select={{ selected_db }}&month={{ reporting_month }}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+    <div class="kpi-card kpi-accent-navy" onclick="window.location.href='?database_select={{ selected_db }}&month={{ reporting_month }}'">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Availability</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_availability }}</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if '▼' in kpi_availability_change %}#ef4444{% elif '▲' in kpi_availability_change %}#10b981{% else %}#64748b{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
+        <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_availability }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if '▼' in kpi_availability_change %}#ef4444{% elif '▲' in kpi_availability_change %}#10b981{% else %}#64748b{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.20rem;">
             {{ kpi_availability_change }} <span style="font-weight: normal; color: #94a3b8;">vs prev month</span>
         </div>
     </div>
 
     <!-- 2. SLA Compliance KPI -->
-    <div onclick="window.location.href='{% url 'sla_config_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+    <div class="kpi-card kpi-accent-gold" onclick="window.location.href='{% url 'sla_config_list' %}'">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SLA Status</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_sla_compliance }}</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if '0/' in kpi_sla_compliance %}#ef4444{% elif 'Met' in kpi_sla_compliance and not '0/' in kpi_sla_compliance %}#10b981{% else %}#f59e0b{% endif %}; margin-top: 0.5rem;">
+        <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_sla_compliance }}</div>
+        <div style="font-size: 0.72rem; font-weight: 700; color: {% if '0/' in kpi_sla_compliance %}#ef4444{% elif 'Met' in kpi_sla_compliance and not '0/' in kpi_sla_compliance %}#10b981{% else %}#f59e0b{% endif %}; margin-top: 0.5rem;">
             {% if 'Met' in kpi_sla_compliance %}✓ SLA Compliance Met{% else %}SLA Unconfigured{% endif %}
         </div>
     </div>
 
     <!-- 3. Incidents KPI -->
-    <div onclick="window.location.href='{% url 'incident_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+    <div class="kpi-card kpi-accent-red" onclick="window.location.href='{% url 'incident_list' %}'">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Incidents</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_incidents_total }}</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if kpi_incidents_open > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
+        <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_incidents_total }}</div>
+        <div style="font-size: 0.72rem; font-weight: 700; color: {% if kpi_incidents_open > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
             {% if kpi_incidents_open > 0 %}
                 <span style="display:inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
                 {{ kpi_incidents_open }} Open Incidents
@@ -124,48 +159,47 @@
     </div>
 
     <!-- 4. Backups KPI -->
-    <div onclick="window.location.href='{% url 'backup_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+    <div class="kpi-card kpi-accent-green" onclick="window.location.href='{% url 'backup_list' %}'">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Backups</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_backup_success }}</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem;">
+        <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_backup_success }}</div>
+        <div style="font-size: 0.72rem; font-weight: 700; color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem;">
             {% if kpi_backup_failed > 0 %}{{ kpi_backup_failed }} Failed Runs{% else %}✓ Backups Verified{% endif %}
         </div>
     </div>
 
     <!-- 5. Replication KPI -->
-    <div onclick="window.location.href='{% url 'replication_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+    <div class="kpi-card kpi-accent-blue" onclick="window.location.href='{% url 'replication_list' %}'">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Replication</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_replication_status }}</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status %}#10b981{% else %}#ef4444{% endif %}; margin-top: 0.5rem;">
-            {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status %}✓ Live Sync Active{% else %}Replication Alert{% endif %}
+        <div style="font-size: 1.7rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_replication_status }}</div>
+        <div style="font-size: 0.72rem; font-weight: 700; color: {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status and not 'N/A' in kpi_replication_status %}#10b981{% elif 'N/A' in kpi_replication_status %}#64748b{% else %}#ef4444{% endif %}; margin-top: 0.5rem;">
+            {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status and not 'N/A' in kpi_replication_status %}✓ Live Sync Active{% elif 'N/A' in kpi_replication_status %}No streams configured{% else %}Replication Alert{% endif %}
         </div>
     </div>
 </div>
 
-<!-- Second Row: Trend & Database Health -->
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-    <!-- Left: Availability Trend SVG -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+<!-- Balanced Second Row: Diagnostic Grid -->
+<div style="display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Compact Availability Trend SVG -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.15rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
         <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
                 <div>
-                    <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
-                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Overall database availability over the last 6 months (Target: &ge; 99.95%)</p>
+                    <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
+                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;">
-                        Export PDF
-                    </a>
-                </div>
+                <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.5rem; font-size: 0.7rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">
+                    Export PDF
+                </a>
             </div>
         </div>
         
-        <div style="margin-top: 1.5rem; position: relative;">
-            <svg viewBox="0 0 400 120" style="width: 100%; height: auto; overflow: visible;">
+        <!-- Scaled down height constraint -->
+        <div style="position: relative; max-height: 120px; overflow: hidden; margin-top: 0.5rem;">
+            <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
                 <!-- Grid Lines -->
-                <line x1="40" y1="20" x2="360" y2="20" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="60" x2="360" y2="60" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="100" x2="360" y2="100" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
                 
                 <!-- SLA Reference Line (99.95%) -->
                 <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
@@ -174,93 +208,61 @@
                 <!-- Value Polyline -->
                 <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
                 
-                <!-- Data Point Circles and Tooltips -->
+                <!-- Data Point Circles -->
                 {% for m in trend_months %}
-                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="4" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
                     <!-- Value Label -->
                     <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
                     <!-- Month Label -->
-                    <text x="{{ m.x }}" y="115" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
                 {% endfor %}
             </svg>
         </div>
     </div>
 
-    <!-- Right: Database Health Overview -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+    <!-- Middle: Database Health Overview -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.15rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Database Health</h3>
+            <h3 style="margin: 0 0 0.85rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Database Health</h3>
             
-            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.6rem;">
                 {% for row in dashboard_data %}
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border: 1px solid #f1f5f9; border-radius: 4px; background: #fafafa;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; border: 1px solid #f1f5f9; border-radius: 4px; background: #fafafa; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f1f5f9';" onmouseout="this.style.backgroundColor='#fafafa';">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background-color: {% if row.availability_status == 'Meets SLA' %}#10b981{% elif row.availability_status == 'Warning' %}#f59e0b{% else %}#ef4444{% endif %};"></span>
-                        <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-decoration: none;">{{ row.database }}</a>
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: {% if row.availability_status == 'Meets SLA' %}#10b981{% elif row.availability_status == 'Warning' %}#f59e0b{% else %}#ef4444{% endif %};"></span>
+                        <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="color: var(--primary-navy); font-size: 0.85rem; font-weight: 700; text-decoration: none;">{{ row.database }}</a>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 0.9rem; font-weight: 800; color: #1e293b;">{{ row.availability }}</div>
-                        <div style="font-size: 0.72rem; color: #64748b;">{{ row.total_incidents }} incident{{ row.total_incidents|pluralize }}</div>
+                        <div style="font-size: 0.85rem; font-weight: 800; color: #1e293b;">{{ row.availability }}</div>
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ row.total_incidents }} incident{{ row.total_incidents|pluralize }}</div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
         
-        <div style="border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: center; font-size: 0.72rem; color: #64748b; font-weight: 600;">
-            Click database name to view metrics
-        </div>
-    </div>
-</div>
-
-<!-- Third Row: Backups & Attention Required -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-    <!-- Left: Backup & Restore Summary -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Backup &amp; Restore Compliance</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
-                    <span style="color: #475569; font-weight: 600;">Backup Success Rate</span>
-                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.backup_success|default:kpi_backup_success }}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
-                    <span style="color: #475569; font-weight: 600;">Restore Success Rate</span>
-                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.restore_success|default:"100.0%" }}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
-                    <span style="color: #475569; font-weight: 600;">Failed Backup Runs</span>
-                    <strong style="color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; font-size: 1.05rem;">
-                        {{ kpi_backup_failed }}
-                    </strong>
-                </div>
-            </div>
-        </div>
-        <div style="margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: right;">
-            <a href="{% url 'backup_list' %}" style="font-size: 0.8rem; font-weight: 700; color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
-                View Backup Register &rarr;
-            </a>
+        <div style="border-top: 1px solid #f1f5f9; padding-top: 0.5rem; text-align: center; font-size: 0.7rem; color: #94a3b8; font-weight: 600;">
+            Click database name to scope view
         </div>
     </div>
 
     <!-- Right: Attention Required Alerts -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.15rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
+            <h3 style="margin: 0 0 0.85rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
             
-            <div style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 160px; overflow-y: auto;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 120px; overflow-y: auto;">
                 {% for item in attention_items %}
-                    <div style="display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 4px; font-size: 0.8rem; 
+                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.45rem 0.6rem; border-radius: 4px; font-size: 0.75rem; 
                                 {% if item.type == 'danger' %}background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
                                 {% elif item.type == 'warning' %}background: #fffbeb; border: 1px solid #fde047; color: #92400e;
                                 {% else %}background: #f8fafc; border: 1px solid #cbd5e1; color: #334155;{% endif %}">
-                        <span style="font-size: 1rem; line-height: 1;">⚠</span>
+                        <span style="font-size: 0.85rem; line-height: 1;">⚠</span>
                         <div style="font-weight: 600;">{{ item.message|safe }}</div>
                     </div>
                 {% empty %}
-                    <div style="text-align: center; padding: 1.5rem; color: #64748b; font-size: 0.85rem; font-style: italic; border: 1px dashed #cbd5e1; border-radius: 4px; width: 100%;">
-                        ✓ All systems operating within normal parameters.
+                    <div style="text-align: center; padding: 1.25rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed #cbd5e1; border-radius: 4px; width: 100%;">
+                        ✓ All systems operating normally.
                     </div>
                 {% endfor %}
             </div>
@@ -319,7 +321,6 @@
                 <!-- Target Row -->
                 <tr style="color: #64748b; font-style: italic; background-color: #fbfcfd;">
                     <td style="font-weight: 700; color: #475569; text-align: left; background-color: #f8fafc;">Target Target</td>
-                    <td>&ge; 99.95%</td>
                     <td>&le; 48 hrs</td>
                     <td>&le; 2 hrs</td>
                     <td>&le; 4/month</td>
@@ -327,6 +328,7 @@
                     <td>&ge; 95%</td>
                     <td>&ge; 80%</td>
                     <td>Healthy</td>
+                    <td>0</td>
                     <td>0</td>
                 </tr>
                 <!-- Status Row -->
@@ -366,51 +368,83 @@
 </div>
 {% endif %}
 
-<!-- Bottom Row: Recent Activity Log Feed -->
-<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
-        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Live Event Log</span>
+<!-- Balanced Third Row: Backups & Recent Activity Feed side-by-side -->
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Backup & Restore Summary -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Backup &amp; Restore Compliance</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Backup Success Rate</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.backup_success|default:kpi_backup_success }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Restore Success Rate</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.restore_success|default:"100.0%" }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
+                    <span style="color: #475569; font-weight: 600;">Failed Backup Runs</span>
+                    <strong style="color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; font-size: 1.05rem;">
+                        {{ kpi_backup_failed }}
+                    </strong>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: right;">
+            <a href="{% url 'backup_list' %}" style="font-size: 0.8rem; font-weight: 700; color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                View Backup Register &rarr;
+            </a>
+        </div>
     </div>
-    
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
-            <thead>
-                <tr style="border-bottom: 1.5px solid #cbd5e1; background: #f8fafc;">
-                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 12%;">Date / Time</th>
-                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%;">Activity Action</th>
-                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 20%;">Database Target</th>
-                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 15%; text-align: center;">Outcome / State</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for act in recent_activity %}
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                    <td style="padding: 0.65rem 0.75rem; color: #64748b; font-weight: 500; font-family: monospace;">
-                        {{ act.date_str }} <span style="font-size: 0.75rem; opacity: 0.7;">{{ act.time_str }}</span>
-                    </td>
-                    <td style="padding: 0.65rem 0.75rem; font-weight: 700; color: #1e293b;">
-                        {{ act.action }}
-                    </td>
-                    <td style="padding: 0.65rem 0.75rem; font-weight: 600; color: var(--primary-navy);">
-                        {{ act.database }}
-                    </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
-                                    {% if act.status_class == 'success' %}background: #dcfce7; color: #15803d;
-                                    {% elif act.status_class == 'danger' %}background: #fee2e2; color: #b91c1c;
-                                    {% else %}background: #fffbeb; color: #b45309;{% endif %}">
-                            {{ act.status }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b; font-style: italic;">No recent activities logged in the system.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+    <!-- Right: Recent Activity Log Feed -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
+            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Live Event Log</span>
+        </div>
+        
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                <thead>
+                    <tr style="border-bottom: 1.5px solid #cbd5e1; background: #f8fafc;">
+                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 15%;">Date / Time</th>
+                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 35%;">Activity Action</th>
+                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%;">Database Target</th>
+                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%; text-align: center;">Outcome / State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in recent_activity %}
+                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='#f8fafc';" onmouseout="this.style.backgroundColor='transparent';">
+                        <td style="padding: 0.65rem 0.75rem; color: #64748b; font-weight: 500; font-family: monospace;">
+                            {{ act.date_str }} <span style="font-size: 0.75rem; opacity: 0.7;">{{ act.time_str }}</span>
+                        </td>
+                        <td style="padding: 0.65rem 0.75rem; font-weight: 700; color: #1e293b;">
+                            {{ act.action }}
+                        </td>
+                        <td style="padding: 0.65rem 0.75rem; font-weight: 600; color: var(--primary-navy);">
+                            {{ act.database }}
+                        </td>
+                        <td style="padding: 0.65rem 0.75rem; text-align: center;">
+                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+                                        {% if act.status_class == 'success' %}background: #dcfce7; color: #15803d;
+                                        {% elif act.status_class == 'danger' %}background: #fee2e2; color: #b91c1c;
+                                        {% else %}background: #fffbeb; color: #b45309;{% endif %}">
+                                {{ act.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b; font-style: italic;">No recent activities logged in the system.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -456,7 +490,7 @@
             <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
                 <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL (nms360)</strong> &mdash;
                 <span style="color: #475569; font-weight: 600;">nickledbnew (replicated to nickeldbdr)</span>
-                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</p>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Database Monitoring Tool.</p>
             </div>
             {% endif %}
             

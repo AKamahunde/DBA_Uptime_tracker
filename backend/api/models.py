@@ -353,6 +353,12 @@ class CapacityPlanning(models.Model):
                 return round((self.available_capacity_gb * 100) / free_percent, 2)
         return round(self.available_capacity_gb, 2)
 
+    @property
+    def disk_used_gb(self):
+        cap = float(self.disk_capacity_gb)
+        used_pct = float(self.disk_used_percent)
+        return round(cap * used_pct / 100.0, 2)
+
     class Meta:
         db_table = 'capacity_planning'
         verbose_name = 'Capacity Planning'
