@@ -3,11 +3,67 @@
 {% block title %}Capacity Tracking - Database Monitoring Tool{% endblock %}
 
 {% block content %}
+<style>
+    /* Premium Capacity Table Styling */
+    .modern-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.82rem; /* Reduced compact font size matching other tabs */
+        background-color: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .modern-table th {
+        background-color: #f8fafc;
+        color: #475569;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+        padding: 0.65rem 0.75rem;
+        border-bottom: 2px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+    }
+    .modern-table th:last-child {
+        border-right: none;
+    }
+    .modern-table td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #e2e8f0;
+        border-right: 1px solid #e2e8f0;
+        font-weight: 600;
+        vertical-align: middle;
+        color: #0f172a;
+    }
+    .modern-table td:last-child {
+        border-right: none;
+    }
+    .modern-table tbody tr {
+        transition: background-color 0.15s ease;
+    }
+    .modern-table tbody tr:hover {
+        background-color: #f0f7ff !important; /* Light blue hover */
+    }
+</style>
+
 <!-- Page Header -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-    <div>
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div style="flex: 1; min-width: 300px;">
         <h2 style="margin: 0; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a;">Capacity Tracking</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Monitor database growth, storage utilisation and available capacity across production environments.</p>
+        <div style="background-color: #f8fafc; border-left: 4px solid var(--primary-navy); padding: 0.8rem 1rem; margin-top: 0.75rem; border-radius: 4px; font-size: 0.82rem; line-height: 1.45; color: #334155; text-align: justify;">
+            This report shows monthly storage allocations, database file growths, disk utilization, and tablespace status for 
+            {% if current_db == 'Oracle' %}
+                the Oracle (nmsinfra) database
+            {% elif current_db == 'MySQL' %}
+                the MySQL database
+            {% elif current_db == 'MS SQL Server' %}
+                the MS SQL Server database
+            {% else %}
+                databases
+            {% endif %}, reporting sizing metrics to assist database administrators in projecting storage needs.
+        </div>
     </div>
     {% if is_admin or perms.api.add_capacityplanning %}
     <a href="{% url 'capacity_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.5rem 1.25rem; font-weight: 600;">+ New Record</a>
@@ -206,6 +262,7 @@
                 <tr>
                     <th>Month</th>
                     <th>Database</th>
+                    <th>DB Size</th>
                     <th>Capacity</th>
                     <th>Used</th>
                     <th>Free</th>
@@ -229,6 +286,9 @@
                             {{ capacity.database }}
                         {% endif %}
                         </strong>
+                    </td>
+                    <td>
+                        {{ capacity.database_size_gb }} GB
                     </td>
                     <td>
                         {% if capacity.database == 'MySQL' and capacity.available_capacity_gb == 0 and capacity.disk_used_percent == 20 %}
@@ -266,7 +326,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">No capacity tracking records found.</td>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
