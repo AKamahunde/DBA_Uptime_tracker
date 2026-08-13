@@ -46,6 +46,28 @@
     .modern-table tbody tr:hover {
         background-color: #f0f7ff !important; /* Light blue hover */
     }
+
+    /* Compact column divider styles */
+    .kpi-metric-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .db-util-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    @media (min-width: 768px) {
+        .kpi-metric-col:not(:first-child) {
+            border-left: 1px solid rgba(90, 123, 156, 0.12);
+            padding-left: 1.5rem;
+        }
+        .db-util-col:not(:first-child) {
+            border-left: 1px solid rgba(90, 123, 156, 0.12);
+            padding-left: 1.5rem;
+        }
+    }
 </style>
 
 <!-- Page Header -->
@@ -70,80 +92,80 @@
     {% endif %}
 </div>
 
-<!-- Four Summary KPI Cards -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+<!-- Combined Overall Summary Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
     <!-- 1. Current Capacity -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Current Capacity</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_capacity }} GB</div>
-        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem;">Total monitored storage</div>
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Current Capacity</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_capacity }} GB</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Total monitored storage</span>
     </div>
 
     <!-- 2. Used Capacity -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Used Storage</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_used_gb }} GB</div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: #f59e0b; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
-            {{ kpi_used_percent }}% utilised
-        </div>
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Used Storage</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_used_gb }} GB</strong>
+        <span style="font-size: 0.72rem; color: #f59e0b; font-weight: 600; margin-top: 0.1rem;">{{ kpi_used_percent }}% utilised</span>
     </div>
 
     <!-- 3. Free Capacity -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Free Capacity</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_free_gb }} GB</div>
-        <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem;">Available storage</div>
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Free Capacity</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_free_gb }} GB</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Available storage</span>
     </div>
 
     <!-- 4. Monthly Growth -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Growth This Month</div>
-        <div style="font-size: 1.6rem; font-weight: 800; color: {% if kpi_growth_gb > 0 %}#ef4444{% else %}#10b981{% endif %}; line-height: 1.1;">
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Growth This Month</span>
+        <strong style="color: {% if kpi_growth_gb > 0 %}#c5221f{% else %}#137333{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">
             {% if kpi_growth_gb > 0 %}+{% endif %}{{ kpi_growth_gb }} GB
-        </div>
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if kpi_growth_gb > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem;">
+        </strong>
+        <span style="font-size: 0.72rem; color: {% if kpi_growth_gb > 0 %}#c5221f{% else %}#137333{% endif %}; font-weight: 600; margin-top: 0.1rem;">
             {% if kpi_growth_gb > 0 %}+{% endif %}{{ kpi_growth_percent }}%
-        </div>
+        </span>
     </div>
 </div>
 
-<!-- Database Capacity Health Panels -->
-<h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Database Utilisation</h3>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem;">
-    {% for db in health_panels %}
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-            <strong style="color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.02em;">{{ db.database }}</strong>
-            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
-                        {% if db.status_class == 'success' %}background: #dcfce7; color: #15803d;
-                        {% elif db.status_class == 'warning' %}background: #fffbeb; color: #b45309;
-                        {% elif db.status_class == 'orange' %}background: #ffedd5; color: #c2410c;
-                        {% else %}background: #fee2e2; color: #b91c1c;{% endif %}">
-                {{ db.status }}
-            </span>
-        </div>
-        
-        <!-- Progress Bar -->
-        <div style="background: #f1f5f9; border-radius: 9999px; height: 12px; position: relative; overflow: hidden; margin-bottom: 1rem;">
-            <div style="height: 100%; border-radius: 9999px; width: {{ db.used_percent }}%;
-                        {% if db.status_class == 'success' %}background-color: #10b981;
-                        {% elif db.status_class == 'warning' %}background-color: #f59e0b;
-                        {% elif db.status_class == 'orange' %}background-color: #ea580c;
-                        {% else %}background-color: #ef4444;{% endif %}">
+<!-- Database Utilisation Unified Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
+    <h3 style="margin: 0 0 1.25rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Database Utilisation</h3>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+        {% for db in health_panels %}
+        <div class="db-util-col">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: var(--primary-navy); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">{{ db.database }}</strong>
+                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+                            {% if db.status_class == 'success' %}background: #e2f0d9; color: #385723;
+                            {% elif db.status_class == 'warning' or db.status_class == 'orange' %}background: #fff2cc; color: #d59400;
+                            {% else %}background: #fce4d6; color: #c65911;{% endif %}">
+                    {{ db.status }}
+                </span>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div style="background: #f1f5f9; border-radius: 9999px; height: 10px; position: relative; overflow: hidden; margin-bottom: 0.25rem; margin-top: 0.25rem;">
+                <div style="height: 100%; border-radius: 9999px; width: {{ db.used_percent }}%;
+                            {% if db.status_class == 'success' %}background-color: #10b981;
+                            {% elif db.status_class == 'warning' %}background-color: #f59e0b;
+                            {% elif db.status_class == 'orange' %}background-color: #ea580c;
+                            {% else %}background-color: #ef4444;{% endif %}">
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                <span style="color: #475569;"><strong style="color: #0f172a; font-weight: 600;">{{ db.used_percent }}%</strong> utilised</span>
+                <span style="color: #64748b;">{{ db.free_gb }} GB free</span>
+            </div>
+            
+            <div style="font-size: 0.72rem; border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 0.4rem; display: flex; justify-content: space-between; color: #64748b; margin-top: 0.25rem;">
+                <span>Size: <strong>{{ db.database_size_gb }} GB</strong></span>
+                <span>Monthly Growth: <strong style="color: {% if db.growth_gb > 0 %}#c5221f{% else %}#137333{% endif %};">{% if db.growth_gb > 0 %}+{% endif %}{{ db.growth_gb }} GB</strong></span>
             </div>
         </div>
-        
-        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.75rem;">
-            <span style="color: #475569;"><strong style="color: #0f172a;">{{ db.used_percent }}%</strong> utilised</span>
-            <span style="color: #64748b;">{{ db.free_gb }} GB free</span>
-        </div>
-        
-        <div style="font-size: 0.75rem; border-top: 1px solid rgba(90, 123, 156, 0.15); padding-top: 0.5rem; display: flex; justify-content: space-between; color: #64748b;">
-            <span>Size: <strong>{{ db.database_size_gb }} GB</strong></span>
-            <span>Monthly Growth: <strong style="color: {% if db.growth_gb > 0 %}#ef4444{% else %}#10b981{% endif %};">{% if db.growth_gb > 0 %}+{% endif %}{{ db.growth_gb }} GB</strong></span>
-        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
 </div>
 
 <!-- Capacity Forecast Redesign -->
