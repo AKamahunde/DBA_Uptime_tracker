@@ -66,365 +66,407 @@
     }
 </style>
 
-<h2 style="margin-bottom: 1.5rem; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a;">Dashboard</h2>
-<div class="dashboard-grid">
-    <div class="stat-card" title="Overview of all operations and quick stats">
-        <h3>{{ incident_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Incidents</p>
-        <p style="font-size: 0.8rem; color: #777;">Log and track database incidents and outages</p>
-        <a href="{% url 'incident_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h2 style="margin: 0; font-family: 'Segoe UI', sans-serif; font-weight: 700; color: #0f172a;">Database Operations Overview</h2>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time performance and SLA tracking console.</p>
     </div>
-    <div class="stat-card" title="Monitor master-replica replication health">
-        <h3>{{ replication_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Replication Records</p>
-        <p style="font-size: 0.8rem; color: #777;">Monitor master-replica replication health</p>
-        <a href="{% url 'replication_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+    
+    <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+            <select name="database_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
+                <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+            </select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
+            <input type="month" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+        </div>
+    </form>
+</div>
+
+<!-- Top Row KPI Strip -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <!-- 1. Availability KPI -->
+    <div onclick="window.location.href='?database_select={{ selected_db }}&month={{ reporting_month }}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Availability</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_availability }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if '▼' in kpi_availability_change %}#ef4444{% elif '▲' in kpi_availability_change %}#10b981{% else %}#64748b{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
+            {{ kpi_availability_change }} <span style="font-weight: normal; color: #94a3b8;">vs prev month</span>
+        </div>
     </div>
-    <div class="stat-card" title="Track all database backup and recovery operations">
-        <h3>{{ backup_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Backup &amp; Restore Register</p>
-        <p style="font-size: 0.8rem; color: #777;">Track all database backup and recovery operations</p>
-        <a href="{% url 'backup_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+
+    <!-- 2. SLA Compliance KPI -->
+    <div onclick="window.location.href='{% url 'sla_config_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SLA Status</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_sla_compliance }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if '0/' in kpi_sla_compliance %}#ef4444{% elif 'Met' in kpi_sla_compliance and not '0/' in kpi_sla_compliance %}#10b981{% else %}#f59e0b{% endif %}; margin-top: 0.5rem;">
+            {% if 'Met' in kpi_sla_compliance %}✓ SLA Compliance Met{% else %}SLA Unconfigured{% endif %}
+        </div>
     </div>
-    <div class="stat-card" title="Monitor server CPU, memory, disk, and connection metrics">
-        <h3>{{ server_health_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Server Health Registry</p>
-        <p style="font-size: 0.8rem; color: #777;">Monitor server CPU, memory, disk, and connection metrics</p>
-        <a href="{% url 'server_health_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+
+    <!-- 3. Incidents KPI -->
+    <div onclick="window.location.href='{% url 'incident_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Incidents</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_incidents_total }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if kpi_incidents_open > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
+            {% if kpi_incidents_open > 0 %}
+                <span style="display:inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
+                {{ kpi_incidents_open }} Open Incidents
+            {% else %}
+                ✓ 0 Active Outages
+            {% endif %}
+        </div>
     </div>
-    <div class="stat-card" title="Log scheduled maintenance activities and change records">
-        <h3>{{ maintenance_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Maintenance Records</p>
-        <p style="font-size: 0.8rem; color: #777;">Log scheduled maintenance activities and change records</p>
-        <a href="{% url 'maintenance_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+
+    <!-- 4. Backups KPI -->
+    <div onclick="window.location.href='{% url 'backup_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Backups</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_backup_success }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem;">
+            {% if kpi_backup_failed > 0 %}{{ kpi_backup_failed }} Failed Runs{% else %}✓ Backups Verified{% endif %}
+        </div>
     </div>
-    <div class="stat-card" title="Track database growth, disk usage, and future planning">
-        <h3>{{ capacity_count }}</h3>
-        <p style="font-weight: 600; color: #333; margin-bottom: 0.2rem;">Capacity Tracking</p>
-        <p style="font-size: 0.8rem; color: #777;">Track database growth, disk usage, and future planning</p>
-        <a href="{% url 'capacity_list' %}" class="btn btn-primary" style="margin-top: 1rem;">View</a>
+
+    <!-- 5. Replication KPI -->
+    <div onclick="window.location.href='{% url 'replication_list' %}'" style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);" onmouseover="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.02)';">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Replication</div>
+        <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_replication_status }}</div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status %}#10b981{% else %}#ef4444{% endif %}; margin-top: 0.5rem;">
+            {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status %}✓ Live Sync Active{% else %}Replication Alert{% endif %}
+        </div>
     </div>
 </div>
 
-<div class="card" style="margin-top: 2rem; padding: 0;">
-    <div style="background-color: var(--color-primary); color: white; text-align: center; padding: 0.75rem; font-weight: bold; font-size: 1.2rem; border-top-left-radius: 5px; border-top-right-radius: 5px;">
-        Database Detail Table
-    </div>
-    <div style="padding: 1.5rem;">
-        <form method="GET" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; font-weight: bold;">
-            <div>
-                <label for="database_select">Select Database:</label>
-                <select id="database_select" name="database_select" onchange="this.form.submit()" style="padding: 0.25rem; font-weight: bold;">
-                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
-                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-                </select>
-            </div>
-            <div style="color: var(--color-primary);">
-                <label for="month_filter">Reporting Month:</label>
-                <input type="month" id="month_filter" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.25rem; font-weight: bold; color: var(--color-primary); border: 1px solid #ccc;">
-            </div>
-        </form>
-        <!-- Table Description Section -->
-        <div style="margin-bottom: 1.25rem; background-color: #fafafa; border-left: 4px solid var(--primary-navy); padding: 0.85rem 1.1rem; border-radius: 4px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);">
-            <div style="font-weight: 700; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em;">Database Operations Center</div>
-            <p style="margin: 0.25rem 0 0 0; color: var(--text-dark); font-size: 0.88rem; line-height: 1.45;">
-                Consolidated live view of Service Level Agreement (SLA) compliance, database availability, and backup/replication readiness across production database platforms operated by NMS for the selected reporting month.
-            </p>
-        </div>
-
-        <!-- Export Actions -->
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-bottom: 1rem;">
-            <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1"/>
-                    <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1"/>
-                </svg>
-                Export as PDF
-            </a>
-            <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download class="btn btn-success" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 1rem; font-size: 0.9rem;">
-                <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2M9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
-                    <path d="M5.186 9.853A.5.5 0 0 0 5 10.25a.5.5 0 0 0 .186.397l2.5 2a.5.5 0 0 0 .628 0l2.5-2a.5.5 0 0 0-.628-.794L8 11.286 5.814 9.453a.5.5 0 0 0-.628.4"/>
-                </svg>
-                Export as Excel
-            </a>
-        </div>
-
-        <div style="overflow-x: auto;">
-            <table class="modern-table">
-                <thead>
-                    <tr>
-                        <th>Database</th>
-                        <th>Overall Availability %</th>
-                        <th>Planned Downtime (hrs)</th>
-                        <th>Unplanned Downtime (hrs)</th>
-                        <th>Total Incidents</th>
-                        <th>MTTR (mins)</th>
-                        <th>Backup Success %</th>
-                        <th>Restore Success %</th>
-                        <th>Replication Status</th>
-                        <th>Failed Backups</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in dashboard_data %}
-                    <tr>
-                        <td style="font-weight: 700;">
-                            <a href="?database_select={{ row.database }}{% if reporting_month %}&month={{ reporting_month }}{% endif %}" style="color: #2563eb; text-decoration: none; transition: color 0.15s;">
-                                {{ row.database }}
-                            </a>
-                        </td>
-                        
-                        <!-- Availability -->
-                        <td class="{% if row.availability_status == 'Meets SLA' %}cell-meets{% elif row.availability_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.availability }}
-                        </td>
-
-                        <!-- Planned Downtime -->
-                        <td class="{% if row.planned_downtime_status == 'Meets SLA' %}cell-meets{% elif row.planned_downtime_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.planned_downtime|floatformat:2 }}
-                        </td>
-
-                        <!-- Unplanned Downtime -->
-                        <td class="{% if row.unplanned_downtime_status == 'Meets SLA' %}cell-meets{% elif row.unplanned_downtime_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.unplanned_downtime|floatformat:2 }}
-                        </td>
-
-                        <!-- Total Incidents -->
-                        <td class="{% if row.total_incidents_status == 'Meets SLA' %}cell-meets{% elif row.total_incidents_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            <div style="font-size: 1.05rem; font-weight: 700;">{{ row.total_incidents }}</div>
-                            {% if row.sla_breach_count > 0 %}
-                                <div style="font-size: 0.7rem; font-weight: 700; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
-                                    <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
-                                    {{ row.sla_breach_count }} breach{{ row.sla_breach_count|pluralize }}
-                                </div>
-                            {% endif %}
-                        </td>
-
-                        <!-- MTTR -->
-                        <td class="{% if row.mttr_mins_status == 'Meets SLA' %}cell-meets{% elif row.mttr_mins_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.mttr_mins }}
-                        </td>
-
-                        <!-- Backup Success -->
-                        <td class="{% if row.backup_success_status == 'Meets SLA' %}cell-meets{% elif row.backup_success_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.backup_success }}
-                        </td>
-
-                        <!-- Restore Success -->
-                        <td class="{% if row.restore_success_status == 'Meets SLA' %}cell-meets{% elif row.restore_success_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.restore_success }}
-                        </td>
-
-                        <!-- Replication Status -->
-                        <td class="{% if row.replication_status_status == 'Meets SLA' %}cell-meets{% elif row.replication_status_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                            {{ row.replication_status }}
-                        </td>
-
-                        <!-- Failed Backups -->
-                        <td class="{% if row.failed_backups > 0 %}cell-misses{% else %}cell-meets{% endif %}">
-                            {% if row.failed_backups > 0 %}{{ row.failed_backups }}{% else %}0{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-
-
-        {% if database_detail %}
-        <div style="margin-top: 3rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+<!-- Second Row: Trend & Database Health -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Availability Trend SVG -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
-                    <h3 style="margin-bottom: 0.15rem; color: #333;">Database Detail</h3>
-                    <h4 style="color: #555; font-weight: 500; margin: 0;">Showing: {{ database_detail.database }}</h4>
-                    <p style="font-style: italic; color: var(--text-soft); margin-top: 0.5rem; margin-bottom: 0; font-size: 0.9rem; max-width: 85%; line-height: 1.45;">
-                        {% if database_detail.database == 'Oracle' %}
-                            Detailed SLA compliance, backup cycle history, and replication parameters for the Oracle (nmsinfra) database hosting NMS ERP data.
-                        {% elif database_detail.database == 'MySQL' %}
-                            Detailed SLA compliance metrics, live replication lag verification, and support systems logs for MySQL instances hosting NMS360, IT ServiceDesk, and the Delivery Monitoring Tool (DMT).
-                        {% elif database_detail.database == 'MS SQL Server' %}
-                            Detailed SLA compliance metrics, local backup verification logs, and audit system performance metrics for MS SQL Server instances hosting MKInsight, which runs Pentana Audit, the system used by internal auditors.
-                        {% endif %}
-                    </p>
+                    <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
+                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Overall database availability over the last 6 months (Target: &ge; 99.95%)</p>
                 </div>
-            </div>
-            <div style="overflow-x: auto; padding: 0.5rem;">
-                <table class="modern-table" style="font-size: 0.85rem;">
-                    <thead>
-                        <tr>
-                            <th>Metric</th>
-                            <th>Overall Availability</th>
-                            <th>Planned Downtime (hrs)</th>
-                            <th>Unplanned Downtime (hrs)</th>
-                            <th>Total Incidents</th>
-                            <th>MTTR (mins)</th>
-                            <th>Backup Success Rate</th>
-                            <th>Restore Success Rate</th>
-                            <th>Replication Status</th>
-                            <th>Last Successful Full</th>
-                            <th>Last Successful Incremental</th>
-                            <th>Last DR Test</th>
-                            <th>Failed Backups</th>
-                            <th>Failed Restores</th>
-                            <th>Replication Lag</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Current Row -->
-                        <tr>
-                            <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">Current</td>
-                            <td>{{ database_detail.current.availability }}</td>
-                            <td>{{ database_detail.current.planned_downtime }}</td>
-                            <td>{{ database_detail.current.unplanned_downtime }}</td>
-                            <td>
-                                <div style="font-weight: 700;">{{ database_detail.current.total_incidents }}</div>
-                                {% if database_detail.current.sla_breach_count > 0 %}
-                                    <div style="font-size: 0.7rem; font-weight: 700; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
-                                        <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
-                                        {{ database_detail.current.sla_breach_count }} breach{{ database_detail.current.sla_breach_count|pluralize }}
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>{{ database_detail.current.mttr_mins }}</td>
-                            <td>{{ database_detail.current.backup_success }}</td>
-                            <td>{{ database_detail.current.restore_success }}</td>
-                            <td>{{ database_detail.current.replication_status }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_full }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_inc }}</td>
-                            <td style="font-size: 0.8rem; color: #64748b; font-weight: normal;">{{ database_detail.current.last_dr }}</td>
-                            <td>{{ database_detail.current.failed_backups }}</td>
-                            <td>{{ database_detail.current.failed_restores }}</td>
-                            <td>{{ database_detail.current.replication_lag }}</td>
-                        </tr>
-                        <!-- Target Row -->
-                        <tr style="color: #64748b; font-style: italic; background-color: #fbfcfd;">
-                            <td style="font-weight: 700; color: #475569; text-align: left; background-color: #f8fafc;">Target</td>
-                            <td>&ge; 99.95%</td>
-                            <td>&le; 48 hrs</td>
-                            <td>&le; 2 hrs</td>
-                            <td>&le; 4/month</td>
-                            <td>&le; 240 mins</td>
-                            <td>&ge; 95%</td>
-                            <td>&ge; 80%</td>
-                            <td>Healthy</td>
-                            <td>&lt; 7 days</td>
-                            <td>&le; 24 hrs</td>
-                            <td>&le; 180 days</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>&lt; 2 mins</td>
-                        </tr>
-                        <!-- Status Row -->
-                        <tr>
-                            <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">Status</td>
-                            <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'Warning' %}cell-warning{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.availability }}
-                            </td>
-                            <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.planned_downtime }}
-                            </td>
-                            <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.unplanned_downtime }}
-                            </td>
-                            <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'Warning' %}cell-warning{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.total_incidents }}
-                            </td>
-                            <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'Warning' %}cell-warning{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.mttr_mins }}
-                            </td>
-                            <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'Warning' %}cell-warning{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.backup_success }}
-                            </td>
-                            <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'Warning' %}cell-warning{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.restore_success }}
-                            </td>
-                            <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.replication_status }}
-                            </td>
-                            <td class="{% if database_detail.status.last_full == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_full == 'Warning' %}cell-warning{% elif database_detail.status.last_full == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.last_full }}
-                            </td>
-                            <td class="{% if database_detail.status.last_inc == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_inc == 'Warning' %}cell-warning{% elif database_detail.status.last_inc == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.last_inc }}
-                            </td>
-                            <td class="{% if database_detail.status.last_dr == 'Meets SLA' %}cell-meets{% elif database_detail.status.last_dr == 'Warning' %}cell-warning{% elif database_detail.status.last_dr == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.last_dr }}
-                            </td>
-                            <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'Warning' %}cell-warning{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.failed_backups }}
-                            </td>
-                            <td class="{% if database_detail.status.failed_restores == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_restores == 'Warning' %}cell-warning{% elif database_detail.status.failed_restores == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.failed_restores }}
-                            </td>
-                            <td class="{% if database_detail.status.replication_lag == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_lag == 'Warning' %}cell-warning{% elif database_detail.status.replication_lag == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                                {{ database_detail.status.replication_lag }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div style="display: flex; gap: 0.5rem;">
+                    <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;">
+                        Export PDF
+                    </a>
+                </div>
             </div>
         </div>
-        {% endif %}
+        
+        <div style="margin-top: 1.5rem; position: relative;">
+            <svg viewBox="0 0 400 120" style="width: 100%; height: auto; overflow: visible;">
+                <!-- Grid Lines -->
+                <line x1="40" y1="20" x2="360" y2="20" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="60" x2="360" y2="60" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="100" x2="360" y2="100" stroke="#f1f5f9" stroke-width="1" />
+                
+                <!-- SLA Reference Line (99.95%) -->
+                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
 
-        <!-- Database Systems & Environment Key -->
-        <div style="margin-top: 2.5rem; border-top: 1.5px solid #e2e8f0; padding-top: 1.5rem; font-size: 0.85rem; line-height: 1.5;">
-            <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 2rem;">
-                <!-- Left: Traffic-Light Status -->
-                <div style="border-right: 1px solid #cbd5e1; padding-right: 2rem;">
-                    <h4 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">Traffic-Light Status</h4>
-                    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-green);"></span>
-                            <strong style="color: var(--primary-green); font-weight: 600; width: 60px;">Green</strong> &mdash; Meets SLA
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-gold);"></span>
-                            <strong style="color: var(--primary-gold); font-weight: 600; width: 60px;">Yellow</strong> &mdash; Warning (review needed)
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #c62828;"></span>
-                            <strong style="color: #c62828; font-weight: 600; width: 60px;">Red</strong> &mdash; Below SLA (investigate)
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--text-soft);"></span>
-                            <strong style="color: var(--text-soft); font-weight: 600; width: 60px;">Grey</strong> &mdash; No data available
-                        </div>
+                <!-- Value Polyline -->
+                <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                
+                <!-- Data Point Circles and Tooltips -->
+                {% for m in trend_months %}
+                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="4" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                    <!-- Value Label -->
+                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    <!-- Month Label -->
+                    <text x="{{ m.x }}" y="115" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                {% endfor %}
+            </svg>
+        </div>
+    </div>
+
+    <!-- Right: Database Health Overview -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Database Health</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                {% for row in dashboard_data %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 0.85rem; border: 1px solid #f1f5f9; border-radius: 4px; background: #fafafa;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background-color: {% if row.availability_status == 'Meets SLA' %}#10b981{% elif row.availability_status == 'Warning' %}#f59e0b{% else %}#ef4444{% endif %};"></span>
+                        <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-decoration: none;">{{ row.database }}</a>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.9rem; font-weight: 800; color: #1e293b;">{{ row.availability }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b;">{{ row.total_incidents }} incident{{ row.total_incidents|pluralize }}</div>
                     </div>
                 </div>
-                
-                <!-- Right: Database Environment Key -->
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">System Specifications</h4>
-                    
-                    {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
-                    <div>
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle (nmsinfra)</strong> &mdash;
-                        <span style="color: #475569; font-weight: 600;">nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)</span>
-                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
-                    </div>
-                    {% endif %}
-                    
-                    {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL (nms360)</strong> &mdash;
-                        <span style="color: #475569; font-weight: 600;">nickledbnew (replicated to nickeldbdr)</span>
-                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</p>
-                    </div>
-                    {% endif %}
-                    
-                    {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
-                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL (Pentana)</strong> &mdash;
-                        <span style="color: #475569; font-weight: 600;">Windows Server host</span>
-                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
-                    </div>
-                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div style="border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: center; font-size: 0.72rem; color: #64748b; font-weight: 600;">
+            Click database name to view metrics
+        </div>
+    </div>
+</div>
+
+<!-- Third Row: Backups & Attention Required -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Backup & Restore Summary -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Backup &amp; Restore Compliance</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Backup Success Rate</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.backup_success|default:kpi_backup_success }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Restore Success Rate</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.restore_success|default:"100.0%" }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
+                    <span style="color: #475569; font-weight: 600;">Failed Backup Runs</span>
+                    <strong style="color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; font-size: 1.05rem;">
+                        {{ kpi_backup_failed }}
+                    </strong>
                 </div>
             </div>
+        </div>
+        <div style="margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: right;">
+            <a href="{% url 'backup_list' %}" style="font-size: 0.8rem; font-weight: 700; color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
+                View Backup Register &rarr;
+            </a>
+        </div>
+    </div>
+
+    <!-- Right: Attention Required Alerts -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 160px; overflow-y: auto;">
+                {% for item in attention_items %}
+                    <div style="display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 4px; font-size: 0.8rem; 
+                                {% if item.type == 'danger' %}background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
+                                {% elif item.type == 'warning' %}background: #fffbeb; border: 1px solid #fde047; color: #92400e;
+                                {% else %}background: #f8fafc; border: 1px solid #cbd5e1; color: #334155;{% endif %}">
+                        <span style="font-size: 1rem; line-height: 1;">⚠</span>
+                        <div style="font-weight: 600;">{{ item.message|safe }}</div>
+                    </div>
+                {% empty %}
+                    <div style="text-align: center; padding: 1.5rem; color: #64748b; font-size: 0.85rem; font-style: italic; border: 1px dashed #cbd5e1; border-radius: 4px; width: 100%;">
+                        ✓ All systems operating within normal parameters.
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database detail metrics table (displays when specific database scope is selected) -->
+{% if database_detail %}
+<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 0.5rem;">
+        <div>
+            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">SLA Compliance &amp; Operational Metrics</h3>
+            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Showing detailed SLA configuration parameters for <strong>{{ database_detail.database }}</strong></p>
+        </div>
+    </div>
+    
+    <div style="overflow-x: auto;">
+        <table class="modern-table" style="font-size: 0.85rem; width: 100%;">
+            <thead>
+                <tr>
+                    <th>Metric Row</th>
+                    <th>Overall Availability</th>
+                    <th>Planned Downtime (hrs)</th>
+                    <th>Unplanned Downtime (hrs)</th>
+                    <th>Total Incidents</th>
+                    <th>MTTR (mins)</th>
+                    <th>Backup Success Rate</th>
+                    <th>Restore Success Rate</th>
+                    <th>Replication Status</th>
+                    <th>Failed Backups</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Current Row -->
+                <tr>
+                    <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">Current Month</td>
+                    <td>{{ database_detail.current.availability }}</td>
+                    <td>{{ database_detail.current.planned_downtime }}</td>
+                    <td>{{ database_detail.current.unplanned_downtime }}</td>
+                    <td>
+                        <div style="font-weight: 700;">{{ database_detail.current.total_incidents }}</div>
+                        {% if database_detail.current.sla_breach_count > 0 %}
+                            <div style="font-size: 0.7rem; font-weight: 700; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                                <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
+                                {{ database_detail.current.sla_breach_count }} breach{{ database_detail.current.sla_breach_count|pluralize }}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>{{ database_detail.current.mttr_mins }}</td>
+                    <td>{{ database_detail.current.backup_success }}</td>
+                    <td>{{ database_detail.current.restore_success }}</td>
+                    <td>{{ database_detail.current.replication_status }}</td>
+                    <td>{{ database_detail.current.failed_backups }}</td>
+                </tr>
+                <!-- Target Row -->
+                <tr style="color: #64748b; font-style: italic; background-color: #fbfcfd;">
+                    <td style="font-weight: 700; color: #475569; text-align: left; background-color: #f8fafc;">Target Target</td>
+                    <td>&ge; 99.95%</td>
+                    <td>&le; 48 hrs</td>
+                    <td>&le; 2 hrs</td>
+                    <td>&le; 4/month</td>
+                    <td>&le; 240 mins</td>
+                    <td>&ge; 95%</td>
+                    <td>&ge; 80%</td>
+                    <td>Healthy</td>
+                    <td>0</td>
+                </tr>
+                <!-- Status Row -->
+                <tr>
+                    <td style="font-weight: 700; color: #0f172a; text-align: left; background-color: #f8fafc;">SLA Status</td>
+                    <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'Warning' %}cell-warning{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.availability }}
+                    </td>
+                    <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.planned_downtime }}
+                    </td>
+                    <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.unplanned_downtime }}
+                    </td>
+                    <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'Warning' %}cell-warning{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.total_incidents }}
+                    </td>
+                    <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'Warning' %}cell-warning{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.mttr_mins }}
+                    </td>
+                    <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'Warning' %}cell-warning{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.backup_success }}
+                    </td>
+                    <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'Warning' %}cell-warning{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.restore_success }}
+                    </td>
+                    <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.replication_status }}
+                    </td>
+                    <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'Warning' %}cell-warning{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                        {{ database_detail.status.failed_backups }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Bottom Row: Recent Activity Log Feed -->
+<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
+        <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Live Event Log</span>
+    </div>
+    
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 1.5px solid #cbd5e1; background: #f8fafc;">
+                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 12%;">Date / Time</th>
+                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%;">Activity Action</th>
+                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 20%;">Database Target</th>
+                    <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 15%; text-align: center;">Outcome / State</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for act in recent_activity %}
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 0.65rem 0.75rem; color: #64748b; font-weight: 500; font-family: monospace;">
+                        {{ act.date_str }} <span style="font-size: 0.75rem; opacity: 0.7;">{{ act.time_str }}</span>
+                    </td>
+                    <td style="padding: 0.65rem 0.75rem; font-weight: 700; color: #1e293b;">
+                        {{ act.action }}
+                    </td>
+                    <td style="padding: 0.65rem 0.75rem; font-weight: 600; color: var(--primary-navy);">
+                        {{ act.database }}
+                    </td>
+                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
+                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+                                    {% if act.status_class == 'success' %}background: #dcfce7; color: #15803d;
+                                    {% elif act.status_class == 'danger' %}background: #fee2e2; color: #b91c1c;
+                                    {% else %}background: #fffbeb; color: #b45309;{% endif %}">
+                            {{ act.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b; font-style: italic;">No recent activities logged in the system.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Database Systems & Environment Key -->
+<div style="border-top: 1.5px solid #e2e8f0; padding-top: 1.5rem; font-size: 0.85rem; line-height: 1.5; margin-bottom: 2rem;">
+    <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 2rem;">
+        <!-- Left: Traffic-Light Status -->
+        <div style="border-right: 1px solid #cbd5e1; padding-right: 2rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">Traffic-Light Status</h4>
+            <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-green);"></span>
+                    <strong style="color: var(--primary-green); font-weight: 600; width: 60px;">Green</strong> &mdash; Meets SLA
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-gold);"></span>
+                    <strong style="color: var(--primary-gold); font-weight: 600; width: 60px;">Yellow</strong> &mdash; Warning (review needed)
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #c62828;"></span>
+                    <strong style="color: #c62828; font-weight: 600; width: 60px;">Red</strong> &mdash; Below SLA (investigate)
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--text-soft);"></span>
+                    <strong style="color: var(--text-soft); font-weight: 600; width: 60px;">Grey</strong> &mdash; No data available
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right: Database Environment Key -->
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">System Specifications</h4>
+            
+            {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+            <div>
+                <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle (nmsinfra)</strong> &mdash;
+                <span style="color: #475569; font-weight: 600;">nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)</span>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
+            </div>
+            {% endif %}
+            
+            {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+            <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
+                <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL (nms360)</strong> &mdash;
+                <span style="color: #475569; font-weight: 600;">nickledbnew (replicated to nickeldbdr)</span>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</p>
+            </div>
+            {% endif %}
+            
+            {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+            <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
+                <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL (Pentana)</strong> &mdash;
+                <span style="color: #475569; font-weight: 600;">Windows Server host</span>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

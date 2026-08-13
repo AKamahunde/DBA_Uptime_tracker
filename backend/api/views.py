@@ -409,6 +409,205 @@ def dashboard(request):
     dashboard_data, db_types = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
 
+    # KPI Calculations for Dashboard Redesign
+    import math
+    
+    # 1. Overall Availability & Change
+    avail_list = []
+    for item in dashboard_data:
+        val = item['availability']
+        if val != 'No Data':
+            try:
+                avail_list.append(float(str(val).replace('%', '')))
+            except ValueError:
+                pass
+    kpi_availability = f"{round(sum(avail_list)/len(avail_list), 2)}%" if avail_list else "No Data"
+    
+    # Previous month delta
+    if reporting_month.month == 1:
+        prev_month = reporting_month.replace(year=reporting_month.year - 1, month=12)
+    else:
+        prev_month = reporting_month.replace(month=reporting_month.month - 1)
+    
+    prev_dashboard_data, _ = _get_dashboard_data(prev_month)
+    prev_avail_list = []
+    for item in prev_dashboard_data:
+        val = item['availability']
+        if val != 'No Data':
+            try:
+                prev_avail_list.append(float(str(val).replace('%', '')))
+            except ValueError:
+                pass
+    
+    kpi_availability_change = ""
+    if avail_list and prev_avail_list:
+        current_val = sum(avail_list)/len(avail_list)
+        prev_val = sum(prev_avail_list)/len(prev_avail_list)
+        diff = current_val - prev_val
+        if diff > 0:
+            kpi_availability_change = f"▲ +{round(diff, 2)}%"
+        elif diff < 0:
+            kpi_availability_change = f"▼ {round(diff, 2)}%"
+        else:
+            kpi_availability_change = "0.00%"
+            
+    # 2. SLA Compliance (databases meeting SLA)
+    met_count = 0
+    total_count = 0
+    for item in dashboard_data:
+        sla_configured = SLAConfig.objects.filter(
+            database__iexact=item['database'], month__year=reporting_month.year, month__month=reporting_month.month
+        ).exists()
+        if sla_configured:
+            total_count += 1
+            if item['availability_status'] == 'Meets SLA':
+                met_count += 1
+    kpi_sla_compliance = f"{met_count}/{total_count} Met" if total_count > 0 else "N/A"
+    
+    # 3. Incidents
+    kpi_incidents_total = IncidentRegister.objects.filter(
+        date__year=reporting_month.year, date__month=reporting_month.month
+    ).count()
+    kpi_incidents_open = IncidentRegister.objects.filter(
+        status__in=['Open', 'In Progress']
+    ).count()
+    
+    # 4. Backups
+    month_backups = BackupRecovery.objects.filter(
+        record_type='Backup', date__year=reporting_month.year, date__month=reporting_month.month
+    )
+    total_bk = month_backups.count()
+    success_bk = month_backups.filter(outcome='Success').count()
+    kpi_backup_success = f"{round((success_bk / total_bk) * 100, 1)}%" if total_bk > 0 else "No Data"
+    kpi_backup_failed = month_backups.filter(outcome='Failed').count()
+    
+    # 5. Replication
+    rep_streams = ['MySQL', 'Oracle']
+    healthy_count = 0
+    total_rep_streams = 0
+    for db in rep_streams:
+        latest_rep = ReplicationMonitor.objects.filter(
+            database__iexact=db, date__year=reporting_month.year, date__month=reporting_month.month
+        ).order_by('-date', '-created_at').first()
+        if latest_rep:
+            total_rep_streams += 1
+            if latest_rep.severity != 'Critical' and latest_rep.io_thread == 'Yes' and latest_rep.sql_thread == 'Yes':
+                healthy_count += 1
+    kpi_replication_status = f"{healthy_count}/{total_rep_streams} Healthy" if total_rep_streams > 0 else "No Data"
+
+    # 6. Availability Trend (Last 6 Months)
+    trend_months = []
+    for i in range(5, -1, -1):
+        m_year = reporting_month.year
+        m_month = reporting_month.month - i
+        while m_month <= 0:
+            m_month += 12
+            m_year -= 1
+        t_month = reporting_month.replace(year=m_year, month=m_month)
+        
+        t_data, _ = _get_dashboard_data(t_month)
+        t_avails = []
+        for item in t_data:
+            val = item['availability']
+            if val != 'No Data':
+                try:
+                    t_avails.append(float(str(val).replace('%', '')))
+                except ValueError:
+                    pass
+        avg_avail = round(sum(t_avails)/len(t_avails), 2) if t_avails else 100.0
+        trend_months.append({
+            'name': t_month.strftime('%b'),
+            'value': avg_avail,
+        })
+        
+    min_val = min([m['value'] for m in trend_months] + [99.95])
+    y_min = math.floor(min_val - 0.2) if min_val < 98.0 else 98.0
+    y_max = 100.0
+    y_range = max(0.1, y_max - y_min)
+    
+    points = []
+    for idx, m in enumerate(trend_months):
+        x = 40 + idx * 64
+        y = 20 + (100.0 - m['value']) * 80 / y_range
+        points.append(f"{x},{y}")
+        m['x'] = x
+        m['y'] = y
+        m['text_y'] = y - 8
+    trend_polyline_points = " ".join(points)
+    sla_y_coord = 20 + (100.0 - 99.95) * 80 / y_range
+    
+    # 7. Attention Required Alerts
+    attention_items = []
+    # Staging review alert
+    staging_reviews = IncidentStaging.objects.filter(status='Awaiting Review').count()
+    if staging_reviews > 0:
+        attention_items.append({
+            'type': 'warning',
+            'message': f"Staging Area: {staging_reviews} alert(s) awaiting review."
+        })
+    # Failed backups
+    recent_failed_backups = BackupRecovery.objects.filter(
+        record_type='Backup', outcome='Failed', date__year=reporting_month.year, date__month=reporting_month.month
+    ).count()
+    if recent_failed_backups > 0:
+        attention_items.append({
+            'type': 'danger',
+            'message': f"Backups: {recent_failed_backups} backup failure(s) detected this month."
+        })
+    # Open incidents
+    active_incidents = IncidentRegister.objects.filter(status__in=['Open', 'In Progress']).order_by('-created_at')
+    for inc in active_incidents:
+        attention_items.append({
+            'type': 'danger',
+            'message': f"Open Incident: {inc.ticket_id or 'INC-'+str(inc.id)} ({inc.database}) &mdash; {inc.severity} priority."
+        })
+        
+    # 8. Combined Recent Activity
+    activities = []
+    # Backups
+    recent_backups = BackupRecovery.objects.all().order_by('-date', '-created_at')[:5]
+    for r in recent_backups:
+        sort_time = r.created_at if r.created_at else timezone.now().replace(year=r.date.year, month=r.date.month, day=r.date.day, hour=0, minute=0, second=0, microsecond=0)
+        activities.append({
+            'sort_time': sort_time,
+            'time_str': r.created_at.strftime('%H:%M') if r.created_at else '',
+            'date_str': r.date.strftime('%d/%m'),
+            'action': f"{r.backup_type or r.record_type} run",
+            'database': r.database,
+            'status': r.outcome,
+            'status_class': 'success' if r.outcome == 'Success' else 'danger'
+        })
+    # Incidents
+    recent_incidents = IncidentRegister.objects.all().order_by('-created_at')[:5]
+    for r in recent_incidents:
+        action_str = "Incident logged" if r.status in ['Open', 'In Progress'] else f"Incident {r.status.lower()}"
+        activities.append({
+            'sort_time': r.created_at,
+            'time_str': r.created_at.strftime('%H:%M') if r.created_at else '',
+            'date_str': r.date.strftime('%d/%m'),
+            'action': action_str,
+            'database': r.database,
+            'status': r.status,
+            'status_class': 'danger' if r.status in ['Open', 'In Progress'] else 'success'
+        })
+    # Replication
+    recent_rep = ReplicationMonitor.objects.all().order_by('-date', '-created_at')[:5]
+    for r in recent_rep:
+        status_val = 'Healthy' if (r.severity != 'Critical' and r.io_thread == 'Yes' and r.sql_thread == 'Yes') else 'Issue'
+        sort_time = r.created_at if r.created_at else timezone.now().replace(year=r.date.year, month=r.date.month, day=r.date.day, hour=0, minute=0, second=0, microsecond=0)
+        activities.append({
+            'sort_time': sort_time,
+            'time_str': r.created_at.strftime('%H:%M') if r.created_at else '',
+            'date_str': r.date.strftime('%d/%m'),
+            'action': "Replication check",
+            'database': r.database,
+            'status': status_val,
+            'status_class': 'success' if status_val == 'Healthy' else 'warning'
+        })
+        
+    activities.sort(key=lambda x: x['sort_time'], reverse=True)
+    recent_activity = activities[:8]
+
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -421,6 +620,23 @@ def dashboard(request):
         'database_detail': database_detail,
         'selected_db': selected_db,
         'reporting_month': reporting_month.strftime('%Y-%m'),
+        
+        # New Redesign KPIs
+        'kpi_availability': kpi_availability,
+        'kpi_availability_change': kpi_availability_change,
+        'kpi_sla_compliance': kpi_sla_compliance,
+        'kpi_incidents_total': kpi_incidents_total,
+        'kpi_incidents_open': kpi_incidents_open,
+        'kpi_backup_success': kpi_backup_success,
+        'kpi_backup_failed': kpi_backup_failed,
+        'kpi_replication_status': kpi_replication_status,
+        'trend_months': trend_months,
+        'trend_polyline_points': trend_polyline_points,
+        'sla_y_coord': sla_y_coord,
+        'y_min': y_min,
+        'y_max': y_max,
+        'attention_items': attention_items,
+        'recent_activity': recent_activity,
     }
     return render(request, 'dashboard.html', context)
 
