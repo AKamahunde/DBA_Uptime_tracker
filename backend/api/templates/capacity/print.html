@@ -211,6 +211,7 @@
             <tr>
                 <th class="text-left" style="width: 12%;">Month</th>
                 <th class="text-left" style="width: 12%;">Database</th>
+                <th>DB Size</th>
                 <th>Capacity</th>
                 <th>Used</th>
                 <th>Free</th>
@@ -235,6 +236,7 @@
                     {% endif %}
                     </strong>
                 </td>
+                <td>{{ item.database_size_gb }} GB</td>
                 <td>
                     {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
                         372.50 GB

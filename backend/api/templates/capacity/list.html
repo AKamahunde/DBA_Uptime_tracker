@@ -138,8 +138,8 @@
             <span style="color: #64748b;">{{ db.free_gb }} GB free</span>
         </div>
         
-        <div style="font-size: 0.75rem; border-top: 1px solid #f1f5f9; padding-top: 0.5rem; display: flex; justify-content: space-between; color: #64748b;">
-            <span>Size: <strong>{{ db.capacity_gb }} GB</strong></span>
+        <div style="font-size: 0.75rem; border-top: 1px solid rgba(90, 123, 156, 0.15); padding-top: 0.5rem; display: flex; justify-content: space-between; color: #64748b;">
+            <span>Size: <strong>{{ db.database_size_gb }} GB</strong></span>
             <span>Monthly Growth: <strong style="color: {% if db.growth_gb > 0 %}#ef4444{% else %}#10b981{% endif %};">{% if db.growth_gb > 0 %}+{% endif %}{{ db.growth_gb }} GB</strong></span>
         </div>
     </div>

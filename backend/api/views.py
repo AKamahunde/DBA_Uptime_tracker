@@ -1526,7 +1526,7 @@ def capacity_list(request):
         kpi_size += size
         
     kpi_used_percent = round((kpi_used / kpi_capacity * 100.0), 1) if kpi_capacity > 0 else 0.0
-    kpi_growth_percent = round((kpi_growth / kpi_size * 100.0), 2) if kpi_size > 0 else 0.0
+    kpi_growth_percent = round((kpi_growth / kpi_capacity * 100.0), 2) if kpi_capacity > 0 else 0.0
     
     # Build capacity health panels
     health_panels = []
@@ -1561,6 +1561,7 @@ def capacity_list(request):
                 'used_percent': round(used_pct, 1),
                 'used_gb': round(cap * used_pct / 100.0, 1),
                 'capacity_gb': round(cap, 1),
+                'database_size_gb': round(size, 1),
                 'free_gb': round(free, 1),
                 'growth_gb': round(growth, 2),
                 'growth_percent': round((growth / size * 100.0), 2) if size > 0 else 0.0,
