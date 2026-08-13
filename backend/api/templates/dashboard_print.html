@@ -372,36 +372,63 @@
     {% endif %}
 
     <!-- Database Legend / Key (Summarized for single-page fit) -->
-    <div class="legend-section" style="page-break-inside: avoid; margin-top: 1rem; border-top: 2px solid var(--primary-gold); padding-top: 0.5rem; font-size: 0.72rem; line-height: 1.35;">
-        <h4 style="margin: 0 0 0.35rem 0; font-size: 0.82rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700;">Database Systems &amp; Environment Key</h4>
-        
-        <div style="display: flex; flex-direction: column; gap: 0.35rem; color: var(--text-dark);">
+    <!-- Database Legend / Key (Summarized for single-page fit) -->
+    <div style="page-break-inside: avoid; margin-top: 1.5rem; border-top: 1.5px solid #e2e8f0; padding-top: 1rem; font-size: 0.72rem; line-height: 1.45;">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
+            <!-- Left: Traffic-Light Status -->
             <div>
-                <strong>Traffic-Light Status:</strong> 
-                <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA) | 
-                <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Warning) | 
-                <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA) | 
-                <span style="color: var(--text-soft); font-weight: 700;">Grey</span> (No Data)
+                <h4 style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">Traffic-Light Status</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem 0.8rem;">
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--primary-green);"></span>
+                        <strong style="color: var(--primary-green); font-weight: 600;">Green</strong> &mdash; Meets SLA
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--primary-gold);"></span>
+                        <strong style="color: var(--primary-gold); font-weight: 600;">Yellow</strong> &mdash; Warning
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #c62828;"></span>
+                        <strong style="color: #c62828; font-weight: 600;">Red</strong> &mdash; Below SLA
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.35rem;">
+                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-soft);"></span>
+                        <strong style="color: var(--text-soft); font-weight: 600;">Grey</strong> &mdash; No Data
+                    </div>
+                </div>
             </div>
             
-            <div style="border-top: 1px dashed #e2e8f0; padding-top: 0.35rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
-                <div>
-                    <strong>Oracle:</strong> <u>nmsinfra.nms.go.ug</u> (database tier) &amp; <u>nmsebs.nms.go.ug</u> (application tier) &mdash; Powers NMS ERP suite (finance, procurement, warehousing).
-                </div>
-                {% endif %}
-                
-                {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-                <div>
-                    <strong>MySQL:</strong> <u>nickledbnew</u> (replicated to <u>nickeldbdr</u>) &mdash; Hosts collaboration &amp; support systems (NMS360, IT ServiceDesk, DMT).
-                </div>
-                {% endif %}
-                
-                {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
-                <div>
-                    <strong>MS SQL Server:</strong> <u>Windows Server host</u> &mdash; Hosts MKInsight (Pentana Audit) for audit &amp; compliance reviews.
-                </div>
-                {% endif %}
+            <!-- Right: System Environments -->
+            <div>
+                <h4 style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">System Specifications</h4>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem;">
+                    <tbody>
+                        {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
+                        <tr>
+                            <td style="padding: 3px 0; vertical-align: top; width: 25%; font-weight: bold; color: var(--primary-navy);">Oracle (nmsinfra)</td>
+                            <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
+                                nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powers NMS ERP suite (finance, procurement, warehousing).
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
+                        <tr>
+                            <td style="padding: 3px 0; vertical-align: top; font-weight: bold; color: var(--primary-navy);">MySQL (nms360)</td>
+                            <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
+                                nickledbnew (replicated to nickeldbdr) &mdash; Hosts collaboration &amp; support systems (NMS360, IT ServiceDesk, DMT).
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
+                        <tr>
+                            <td style="padding: 3px 0; vertical-align: top; font-weight: bold; color: var(--primary-navy);">MS SQL (Pentana)</td>
+                            <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
+                                Windows Server host &mdash; Hosts MKInsight (Pentana Audit) for audit &amp; compliance reviews.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

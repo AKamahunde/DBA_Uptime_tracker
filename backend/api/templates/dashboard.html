@@ -371,44 +371,56 @@
         {% endif %}
 
         <!-- Database Systems & Environment Key -->
-        <div style="margin-top: 2rem; background-color: var(--bg-warm); border: 1px solid var(--border-mist); border-radius: var(--radius); padding: 1.25rem; font-size: 0.85rem;">
-            <h3 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.03em; border-left: 4px solid var(--primary-gold); padding-left: 0.5rem; font-weight: 700;">Database Systems &amp; Environment Key</h3>
-            
-            <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 1.5rem; border-top: 1px solid #cbd5e1; padding-top: 0.75rem;">
+        <div style="margin-top: 2.5rem; border-top: 1.5px solid #e2e8f0; padding-top: 1.5rem; font-size: 0.85rem; line-height: 1.5;">
+            <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 2rem;">
                 <!-- Left: Traffic-Light Status -->
-                <div style="border-right: 1px solid #cbd5e1; padding-right: 1.5rem;">
-                    <h4 style="margin: 0 0 0.5rem 0; color: #1e293b; font-size: 0.88rem; font-weight: 600;">Traffic-Light Status</h4>
-                    <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.8rem; color: var(--text-dark);">
-                        <li><span style="color: var(--primary-green); font-weight: 700;">Green</span> — Meets SLA</li>
-                        <li><span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> — Warning (review needed)</li>
-                        <li><span style="color: #c62828; font-weight: 700;">Red</span> — Below SLA (investigate)</li>
-                        <li><span style="color: var(--text-soft); font-weight: 700;">Grey</span> — No data available</li>
-                    </ul>
+                <div style="border-right: 1px solid #cbd5e1; padding-right: 2rem;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">Traffic-Light Status</h4>
+                    <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-green);"></span>
+                            <strong style="color: var(--primary-green); font-weight: 600; width: 60px;">Green</strong> &mdash; Meets SLA
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-gold);"></span>
+                            <strong style="color: var(--primary-gold); font-weight: 600; width: 60px;">Yellow</strong> &mdash; Warning (review needed)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #c62828;"></span>
+                            <strong style="color: #c62828; font-weight: 600; width: 60px;">Red</strong> &mdash; Below SLA (investigate)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--text-soft);"></span>
+                            <strong style="color: var(--text-soft); font-weight: 600; width: 60px;">Grey</strong> &mdash; No data available
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Right: Database Environment Key -->
-                <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">System Specifications</h4>
+                    
                     {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
                     <div>
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle</strong><br>
-                        <span style="color: #475569; font-weight: 600;">Environment:</span> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)<br>
-                        <span style="color: var(--text-dark);">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</span>
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle (nmsinfra)</strong> &mdash;
+                        <span style="color: #475569; font-weight: 600;">nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)</span>
+                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
                     </div>
                     {% endif %}
                     
                     {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.5rem;{% endif %}">
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL</strong><br>
-                        <span style="color: #475569; font-weight: 600;">Environment:</span> nickledbnew (replicated live to nickeldbdr)<br>
-                        <span style="color: var(--text-dark);">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</span>
+                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL (nms360)</strong> &mdash;
+                        <span style="color: #475569; font-weight: 600;">nickledbnew (replicated to nickeldbdr)</span>
+                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).</p>
                     </div>
                     {% endif %}
                     
                     {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
-                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.5rem;{% endif %}">
-                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL Server</strong><br>
-                        <span style="color: #475569; font-weight: 600;">Environment:</span> Dedicated Windows Server host<br>
-                        <span style="color: var(--text-dark);">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</span>
+                    <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
+                        <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL (Pentana)</strong> &mdash;
+                        <span style="color: #475569; font-weight: 600;">Windows Server host</span>
+                        <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
                     </div>
                     {% endif %}
                 </div>
