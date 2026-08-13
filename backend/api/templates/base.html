@@ -193,12 +193,12 @@
             width: 100%;
         }
         .card {
-            background: var(--bg-warm); /* Warm Canvas (Cards) */
+            background: var(--pure-white); /* Pure White (clean card background) */
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             padding: 2rem;
             margin-bottom: 1rem;
-            border: 1px solid rgba(90, 123, 156, 0.25); /* Dusk Blue (Borders) */
+            border: 1px solid rgba(90, 123, 156, 0.15); /* Soft Dusk Blue (Borders) */
         }
 
         /* ── Page headings ── */
@@ -268,16 +268,19 @@
         th, td {
             padding: 0.8rem 1.2rem;
             text-align: left;
-            border-bottom: 1px solid var(--border-mist);
+            border-bottom: 1px solid rgba(90, 123, 156, 0.15); /* Dusk Blue (Borders) */
         }
         th {
-            background-color: var(--bg-cool);
+            background-color: var(--bg-cool); /* Cool Lunar (Background) */
             color: var(--primary-navy);
-            font-weight: 600;
+            font-weight: 700;
             border-bottom: 2px solid var(--primary-navy);
         }
+        tr:nth-child(even) {
+            background-color: var(--bg-warm); /* Warm Canvas (Cards/Alternating Rows) */
+        }
         tr:hover {
-            background-color: var(--bg-warm);   /* warm row hover */
+            background-color: #e6eefb !important; /* Cool Lunar Hover */
         }
 
         /* ── Forms ── */

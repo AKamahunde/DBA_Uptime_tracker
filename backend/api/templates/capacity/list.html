@@ -73,14 +73,14 @@
 <!-- Four Summary KPI Cards -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
     <!-- 1. Current Capacity -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Current Capacity</div>
         <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_capacity }} GB</div>
         <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem;">Total monitored storage</div>
     </div>
 
     <!-- 2. Used Capacity -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Used Storage</div>
         <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_used_gb }} GB</div>
         <div style="font-size: 0.75rem; font-weight: 700; color: #f59e0b; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
@@ -89,14 +89,14 @@
     </div>
 
     <!-- 3. Free Capacity -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Free Capacity</div>
         <div style="font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1;">{{ kpi_free_gb }} GB</div>
         <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem;">Available storage</div>
     </div>
 
     <!-- 4. Monthly Growth -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow);">
         <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Growth This Month</div>
         <div style="font-size: 1.6rem; font-weight: 800; color: {% if kpi_growth_gb > 0 %}#ef4444{% else %}#10b981{% endif %}; line-height: 1.1;">
             {% if kpi_growth_gb > 0 %}+{% endif %}{{ kpi_growth_gb }} GB
@@ -111,7 +111,7 @@
 <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Database Utilisation</h3>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem;">
     {% for db in health_panels %}
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
             <strong style="color: var(--primary-navy); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.02em;">{{ db.database }}</strong>
             <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
@@ -149,7 +149,7 @@
 <!-- Growth Chart & Capacity Forecast Redesign -->
 <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem;">
     <!-- Storage Growth Trend -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
             <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Storage Growth Trend</h3>
             <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Database size (GB) historical tracking over the last 6 months (Selected DB: <strong>{{ trend_db }}</strong>)</p>
@@ -182,7 +182,7 @@
     </div>
 
     <!-- Capacity Forecast Projections -->
-    <div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
             <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
             <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Linear projection to warning threshold based on last 3 months (Scope: <strong>{{ forecast_info.database }}</strong>)</p>
@@ -218,7 +218,7 @@
 </div>
 
 <!-- Capacity Records Table Section -->
-<div style="background: var(--bg-warm); border: 1px solid rgba(90, 123, 156, 0.25); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
     <!-- Compact Header with Export Options on same line -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
         <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Capacity Records</h3>
