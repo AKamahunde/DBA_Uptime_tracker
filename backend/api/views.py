@@ -1404,6 +1404,18 @@ def maintenance_list(request):
         return redirect('dashboard')
     queryset = MaintenanceRegister.objects.all().order_by('-date', '-created_at')
     
+    # Auto-mark passed maintenance windows as Completed if they are still Scheduled/In Progress
+    from django.utils import timezone
+    now = timezone.now()
+    passed_maintenances = MaintenanceRegister.objects.filter(
+        end__lt=now,
+        status__in=['Scheduled', 'In Progress']
+    )
+    if passed_maintenances.exists():
+        for maint in passed_maintenances:
+            maint.status = 'Completed'
+            maint.save() # Auto-updates success = True in save()
+            
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
