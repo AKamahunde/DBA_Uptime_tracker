@@ -146,73 +146,33 @@
     {% endfor %}
 </div>
 
-<!-- Growth Chart & Capacity Forecast Redesign -->
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem;">
-    <!-- Storage Growth Trend -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Storage Growth Trend</h3>
-            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Database size (GB) historical tracking over the last 6 months (Selected DB: <strong>{{ trend_db }}</strong>)</p>
-        </div>
-        
-        <div style="margin-top: 1.5rem; position: relative;">
-            {% if trend_polyline_points %}
-            <svg viewBox="0 0 400 120" style="width: 100%; height: auto; overflow: visible;">
-                <!-- Grid Lines -->
-                <line x1="40" y1="20" x2="360" y2="20" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="60" x2="360" y2="60" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="100" x2="360" y2="100" stroke="#f1f5f9" stroke-width="1" />
-
-                <!-- Value Polyline -->
-                <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
-                
-                <!-- Data Point Circles and Tooltips -->
-                {% for m in trend_data_points %}
-                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="4" fill="#2563eb" stroke="white" stroke-width="1.5" />
-                    <!-- Value Label -->
-                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }} GB</text>
-                    <!-- Month Label -->
-                    <text x="{{ m.x }}" y="115" fill="#64748b" font-size="9" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-                {% endfor %}
-            </svg>
-            {% else %}
-            <div style="text-align: center; padding: 2rem; color: #64748b; font-style: italic;">No trend data available for selected period.</div>
-            {% endif %}
-        </div>
+<!-- Capacity Forecast Redesign -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2.5rem;">
+    <div style="margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Linear projection to warning threshold based on last 3 months (Scope: <strong>{{ forecast_info.database }}</strong>)</p>
     </div>
-
-    <!-- Capacity Forecast Projections -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
-            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Linear projection to warning threshold based on last 3 months (Scope: <strong>{{ forecast_info.database }}</strong>)</p>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <span style="color: #64748b; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Current Utilisation</span>
+            <strong style="color: #0f172a; font-size: 1.3rem; font-weight: 800;">{{ forecast_info.current_used_pct }}%</strong>
         </div>
-        
-        <div style="margin-top: 1rem; font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.4rem;">
-                <span style="color: #475569; font-weight: 600;">Current Utilisation</span>
-                <strong style="color: #0f172a;">{{ forecast_info.current_used_pct }}%</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.4rem;">
-                <span style="color: #475569; font-weight: 600;">Warning Threshold</span>
-                <strong style="color: #ea580c;">80.0%</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.4rem;">
-                <span style="color: #475569; font-weight: 600;">Avg. Growth Rate</span>
-                <strong style="color: #0f172a;">~ {{ forecast_info.avg_growth }} GB/mo</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.4rem;">
-                <span style="color: #475569; font-weight: 600;">Remaining Headroom</span>
-                <strong style="color: {% if 'months' in forecast_info.headroom_months %}#ea580c{% else %}#10b981{% endif %};">{{ forecast_info.headroom_months }}</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.2rem;">
-                <span style="color: #475569; font-weight: 600;">Estimated Limit Date</span>
-                <strong style="color: #002569; font-size: 0.9rem;">{{ forecast_info.est_date }}</strong>
-            </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <span style="color: #64748b; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Warning Threshold</span>
+            <strong style="color: #ea580c; font-size: 1.3rem; font-weight: 800;">80.0%</strong>
         </div>
-        
-        <div style="margin-top: 1rem; font-size: 0.72rem; color: #94a3b8; font-style: italic; text-align: center;">
-            Projections assume constant growth rates
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <span style="color: #64748b; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Avg. Growth Rate</span>
+            <strong style="color: #0f172a; font-size: 1.3rem; font-weight: 800;">~ {{ forecast_info.avg_growth }} GB/mo</strong>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <span style="color: #64748b; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Remaining Headroom</span>
+            <strong style="color: {% if 'months' in forecast_info.headroom_months %}#ea580c{% else %}#10b981{% endif %}; font-size: 1.3rem; font-weight: 800;">{{ forecast_info.headroom_months }}</strong>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <span style="color: #64748b; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Estimated Limit Date</span>
+            <strong style="color: var(--primary-navy); font-size: 1.2rem; font-weight: 800;">{{ forecast_info.est_date }}</strong>
         </div>
     </div>
 </div>
