@@ -97,14 +97,14 @@
                         
                         <!-- Date & Window -->
                         <td class="text-left" style="vertical-align: top;">
-                            <div style="font-weight: 700; color: var(--primary-navy);">{{ maintenance.date|date:"d M Y" }}</div>
+                            <div style="font-weight: 600; color: var(--primary-navy);">{{ maintenance.date|date:"d M Y" }}</div>
                             <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ maintenance.start|date:"H:i" }} - {{ maintenance.end|date:"H:i" }} ({{ maintenance.duration_hrs }}h)</div>
                         </td>
 
                         <!-- Change ID & Systems -->
                         <td class="text-left" style="vertical-align: top;">
-                            <div style="font-weight: 700; color: #0f172a; word-break: break-all;">{{ maintenance.change_id }}</div>
-                            <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 600;">
+                            <div style="font-weight: 600; color: #0f172a; word-break: break-all;">{{ maintenance.change_id }}</div>
+                            <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;">
                                 {% if maintenance.system %}{{ maintenance.system }} | {% endif %}{{ maintenance.database }}
                             </div>
                         </td>
@@ -116,7 +116,7 @@
 
                         <!-- Status Badge -->
                         <td style="vertical-align: middle;">
-                            <span class="status-badge status-{{ maintenance.status|lower }}" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; text-align: center; width: 85px; text-transform: uppercase;
+                            <span class="status-badge status-{{ maintenance.status|lower }}" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; text-align: center; width: 85px; text-transform: uppercase;
                                         {% if maintenance.status == 'Completed' %}background: #e2f0d9; color: #385723;
                                         {% elif maintenance.status == 'Failed' %}background: #fce4d6; color: #c65911;
                                         {% elif maintenance.status == 'In Progress' %}background: #fff2cc; color: #d59400;
@@ -127,7 +127,7 @@
 
                         <!-- Risk Badge -->
                         <td style="vertical-align: middle;">
-                            <span class="risk-badge" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; width: 60px; text-align: center; text-transform: uppercase;
+                            <span class="risk-badge" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; width: 60px; text-align: center; text-transform: uppercase;
                                         {% if maintenance.risk == 'High' %}background: #fce4d6; color: #c65911;
                                         {% elif maintenance.risk == 'Medium' %}background: #fff2cc; color: #d59400;
                                         {% else %}background: #e2f0d9; color: #385723;{% endif %}">
@@ -140,12 +140,12 @@
                             <div class="actions-dropdown" style="position: relative; display: inline-block;">
                                 <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ maintenance.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1;">⋮</button>
                                 <div id="actions-{{ maintenance.pk }}" class="actions-dropdown-content" style="display: none; position: absolute; right: 0; background: var(--pure-white); box-shadow: var(--shadow); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; z-index: 100; min-width: 120px; overflow: hidden;">
-                                    <a href="#" onclick="showDetailsFromTrigger('row-{{ maintenance.pk }}')" style="display: block; padding: 0.5rem 1rem; color: var(--text-dark); text-decoration: none; font-size: 0.82rem; text-align: left; font-weight: 600;">Details</a>
-                                    <a href="{% url 'maintenance_edit' maintenance.pk %}" style="display: block; padding: 0.5rem 1rem; color: var(--text-dark); text-decoration: none; font-size: 0.82rem; text-align: left; font-weight: 600;">Edit</a>
+                                    <a href="#" onclick="showDetailsFromTrigger('row-{{ maintenance.pk }}')" style="display: block; padding: 0.5rem 1rem; color: var(--text-dark); text-decoration: none; font-size: 0.82rem; text-align: left; font-weight: 500;">Details</a>
+                                    <a href="{% url 'maintenance_edit' maintenance.pk %}" style="display: block; padding: 0.5rem 1rem; color: var(--text-dark); text-decoration: none; font-size: 0.82rem; text-align: left; font-weight: 500;">Edit</a>
                                     {% if is_admin or perms.api.delete_maintenanceregister or maintenance.created_by == request.user %}
                                     <form method="post" action="{% url 'maintenance_delete' maintenance.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Are you sure you want to delete this record?');">
                                         {% csrf_token %}
-                                        <button type="submit" style="display: block; width: 100%; padding: 0.5rem 1rem; color: #c5221f; text-decoration: none; font-size: 0.82rem; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 600;">Delete</button>
+                                        <button type="submit" style="display: block; width: 100%; padding: 0.5rem 1rem; color: #c5221f; text-decoration: none; font-size: 0.82rem; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; font-weight: 500;">Delete</button>
                                     </form>
                                     {% endif %}
                                 </div>
@@ -194,27 +194,27 @@
         <div id="details-content" style="display: flex; flex-direction: column; gap: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 0.75rem; margin-bottom: 0.25rem;">
                 <div>
-                    <h3 id="panel-change-id" style="margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--primary-navy); word-break: break-all;">—</h3>
-                    <div id="panel-meta" style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 0.25rem;">—</div>
+                    <h3 id="panel-change-id" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--primary-navy); word-break: break-all;">—</h3>
+                    <div id="panel-meta" style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 0.25rem;">—</div>
                 </div>
-                <span id="panel-status-badge" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;">—</span>
+                <span id="panel-status-badge" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;">—</span>
             </div>
 
             <!-- Time Metrics -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
                 <div>
-                    <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Window Start</div>
-                    <div id="panel-start" style="font-size: 0.85rem; font-weight: 600; color: #0f172a; margin-top: 0.25rem;">—</div>
+                    <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Window Start</div>
+                    <div id="panel-start" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
                 </div>
                 <div>
-                    <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Window End</div>
-                    <div id="panel-end" style="font-size: 0.85rem; font-weight: 600; color: #0f172a; margin-top: 0.25rem;">—</div>
+                    <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Window End</div>
+                    <div id="panel-end" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
                 </div>
             </div>
 
             <!-- Activity Details -->
             <div>
-                <h4 style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
+                <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
                     Activity Description
                 </h4>
                 <div id="panel-activity" style="font-size: 0.85rem; line-height: 1.5; color: #334155;">—</div>
@@ -222,7 +222,7 @@
 
             <!-- Rollback Strategy -->
             <div style="margin-top: 0.5rem;">
-                <h4 style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
+                <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
                     Rollback Strategy
                 </h4>
                 <div id="panel-rollback" style="font-size: 0.85rem; line-height: 1.5; color: #334155;">—</div>
@@ -232,11 +232,11 @@
             <div style="border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 1rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem;">
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: #64748b; font-weight: 500;">Approved By</span>
-                    <strong id="panel-approved-by" style="color: #1e293b; font-weight: 600;">—</strong>
+                    <strong id="panel-approved-by" style="color: #1e293b; font-weight: 500;">—</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between;">
                     <span style="color: #64748b; font-weight: 500;">Logged By</span>
-                    <strong id="panel-logged-by" style="color: #1e293b; font-weight: 600;">—</strong>
+                    <strong id="panel-logged-by" style="color: #1e293b; font-weight: 500;">—</strong>
                 </div>
             </div>
         </div>
@@ -362,7 +362,7 @@
         badge.style.padding = "0.15rem 0.5rem";
         badge.style.borderRadius = "12px";
         badge.style.fontSize = "0.68rem";
-        badge.style.fontWeight = "700";
+        badge.style.fontWeight = "600";
     }
 
     // Close actions menus if user clicks outside
