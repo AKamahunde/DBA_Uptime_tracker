@@ -86,7 +86,7 @@ DATABASES = {
         'NAME': os.environ.get('DB_NAME', 'dba_tracker'),
         'USER': os.environ.get('DB_USER', 'root'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'Adm1n@2020'),
-        'HOST': os.environ.get('DB_HOST', '192.168.35.38'),
+        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
         'PORT': os.environ.get('DB_PORT', '3306'),
         'CONN_MAX_AGE': 60,  # Keep connection alive for 60s to avoid reconnecting on every request
         'OPTIONS': {
