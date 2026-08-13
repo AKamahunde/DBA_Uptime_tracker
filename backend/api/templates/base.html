@@ -469,7 +469,12 @@
             document.querySelectorAll('.nav-links a').forEach(function(link) {
                 const linkPath = new URL(link.href, window.location.origin).pathname;
                 if (linkPath !== '/' && currentPath.startsWith(linkPath)) {
-                    link.classList.add('active');
+                    // Avoid highlighting 'Incidents' tab when visiting 'Staging Area'
+                    if (linkPath === '/incidents/' && currentPath.startsWith('/incidents/staging/')) {
+                        // Skip
+                    } else {
+                        link.classList.add('active');
+                    }
                 } else if (linkPath === '/' && currentPath === '/') {
                     link.classList.add('active');
                 }
