@@ -199,6 +199,7 @@
         <strong>SLA Targets:</strong> Uptime &ge; 99.95% | Planned Downtime &le; 48.0 hrs | Unplanned Downtime &le; 2.0 hrs | Outages &le; 4 | MTTR &le; 240 mins | Backups &ge; 95% | Restores &ge; 80%
     </div>
 
+    {% if selected_db == 'All Databases' %}
     <!-- Summary Table -->
     <table>
         <thead>
@@ -256,6 +257,7 @@
             {% endfor %}
         </tbody>
     </table>
+    {% endif %}
 
     {% if database_detail %}
     <!-- Database Detail Section -->

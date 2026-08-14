@@ -815,7 +815,7 @@ def dashboard_excel(request):
         )
         
         # Add Title
-        ws.merge_cells('A1:J1')
+        ws.merge_cells('A1:P1')
         if selected_db and selected_db != 'All Databases':
             ws['A1'] = f"Summary of Database Performance for {selected_db} - {month_display}"
         else:
@@ -825,61 +825,64 @@ def dashboard_excel(request):
         ws.row_dimensions[1].height = 30
         
         ws.append([]) # Empty row
-        
-        # Add Headers
-        headers = [
-            "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
-            "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
-            "Backup Success %", "Restore Success %", "Replication Status"
-        ]
-        ws.append(headers)
-        ws.row_dimensions[3].height = 25
-        
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=3, column=col_num)
-            cell.font = font_header
-            cell.fill = fill_header
-            cell.alignment = align_center
-            cell.border = border_thin
-            
-        # Add Data rows
-        row_num = 4
-        for item in dashboard_data:
-            row_data = [
-                item['database'],
-                item['availability'],
-                item['planned_downtime'],
-                item['unplanned_downtime'],
-                item['total_incidents'],
-                item['sla_breach_count'],
-                item['mttr_mins'],
-                item['backup_success'],
-                item['restore_success'],
-                item['replication_status']
+        row_num = 3
+
+        if selected_db == 'All Databases':
+            # Add Headers
+            headers = [
+                "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
+                "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
+                "Backup Success %", "Restore Success %", "Replication Status"
             ]
-            ws.append(row_data)
-            ws.row_dimensions[row_num].height = 20
+            ws.append(headers)
+            ws.row_dimensions[row_num].height = 25
             
-            # Apply body styles
-            for col_num in range(1, 11):
+            for col_num, header in enumerate(headers, 1):
                 cell = ws.cell(row=row_num, column=col_num)
-                cell.font = font_body
+                cell.font = font_header
+                cell.fill = fill_header
+                cell.alignment = align_center
                 cell.border = border_thin
-                if row_num % 2 == 0:
-                    cell.fill = fill_even
                 
-                if col_num == 1:
-                    cell.alignment = align_left
-                else:
-                    cell.alignment = align_center
             row_num += 1
-            
+            # Add Data rows
+            for item in dashboard_data:
+                row_data = [
+                    item['database'],
+                    item['availability'],
+                    item['planned_downtime'],
+                    item['unplanned_downtime'],
+                    item['total_incidents'],
+                    item['sla_breach_count'],
+                    item['mttr_mins'],
+                    item['backup_success'],
+                    item['restore_success'],
+                    item['replication_status']
+                ]
+                ws.append(row_data)
+                ws.row_dimensions[row_num].height = 20
+                
+                # Apply body styles
+                for col_num in range(1, 11):
+                    cell = ws.cell(row=row_num, column=col_num)
+                    cell.font = font_body
+                    cell.border = border_thin
+                    if row_num % 2 == 0:
+                        cell.fill = fill_even
+                    
+                    if col_num == 1:
+                        cell.alignment = align_left
+                    else:
+                        cell.alignment = align_center
+                row_num += 1
+                
         # Add Database Detail Table if requested
         if database_detail:
-            ws.append([]) # empty
-            ws.append([]) # empty
-            row_num += 2
-            
+            if selected_db == 'All Databases':
+                ws.append([]) # empty
+                ws.append([]) # empty
+                row_num += 2
+                
             detail_title_row = row_num
             ws.cell(row=detail_title_row, column=1, value=f"Database Detail - {database_detail['database']}").font = Font(name='Segoe UI', size=12, bold=True, color='002569')
             ws.row_dimensions[detail_title_row].height = 25
@@ -1016,37 +1019,40 @@ def dashboard_excel(request):
         filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.csv"'
-        
         writer = csv.writer(response)
         if selected_db and selected_db != 'All Databases':
             writer.writerow([f"Summary of Database Performance for {selected_db} - {month_display}"])
         else:
             writer.writerow([f"Summary of Database Performance - {month_display}"])
         writer.writerow([])
-        writer.writerow([
-            "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
-            "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
-            "Backup Success %", "Restore Success %", "Replication Status"
-        ])
-        for item in dashboard_data:
+        
+        if selected_db == 'All Databases':
             writer.writerow([
-                item['database'],
-                item['availability'],
-                item['planned_downtime'],
-                item['unplanned_downtime'],
-                item['total_incidents'],
-                item['sla_breach_count'],
-                item['mttr_mins'],
-                item['backup_success'],
-                item['restore_success'],
-                item['replication_status']
+                "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
+                "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
+                "Backup Success %", "Restore Success %", "Replication Status"
             ])
-            
+            for item in dashboard_data:
+                writer.writerow([
+                    item['database'],
+                    item['availability'],
+                    item['planned_downtime'],
+                    item['unplanned_downtime'],
+                    item['total_incidents'],
+                    item['sla_breach_count'],
+                    item['mttr_mins'],
+                    item['backup_success'],
+                    item['restore_success'],
+                    item['replication_status']
+                ])
+                
         if database_detail:
-            writer.writerow([])
-            writer.writerow([])
+            if selected_db == 'All Databases':
+                writer.writerow([])
+                writer.writerow([])
             writer.writerow([f"Database Detail - {database_detail['database']}"])
             writer.writerow([])
+            
             detail_headers = [
                 "Type", "Overall Uptime", "Planned Downtime", "Unplanned Downtime",
                 "Incidents", "SLA Breaches", "MTTR (Mins)", "Backup Success %",
