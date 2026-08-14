@@ -3,272 +3,551 @@
 {% block title %}Incident Register - DBA Operations Tracker{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2>Incident Register</h2>
+<style>
+    /* Table Highlight Class */
+    .row-highlight {
+        background-color: #e6eefb !important;
+    }
+    
+    /* Dropdown Actions Menu styling */
+    .actions-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .actions-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        background: var(--pure-white);
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(90, 123, 156, 0.15);
+        border-radius: 6px;
+        z-index: 100;
+        min-width: 120px;
+        overflow: hidden;
+    }
+    .actions-dropdown-content a, 
+    .actions-dropdown-content button {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 1rem;
+        color: var(--text-dark);
+        text-decoration: none;
+        font-size: 0.82rem;
+        text-align: left;
+        font-weight: 500;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .actions-dropdown-content a:hover, 
+    .actions-dropdown-content button:hover {
+        background-color: var(--bg-cool);
+    }
+    .actions-dropdown:hover .actions-dropdown-content {
+        display: none;
+    }
+
+    /* Pulsing Outage Dot Animation */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    .badge-running-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background-color: #ef4444;
+        border-radius: 50%;
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Custom columns layout styling */
+    .kpi-metric-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    @media (min-width: 768px) {
+        .kpi-metric-col:not(:first-child) {
+            border-left: 1px solid rgba(90, 123, 156, 0.12);
+            padding-left: 1.5rem;
+        }
+    }
+</style>
+
+<!-- Page Header with General Filters -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Incident Register</h2>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time outage detection, SLA tracking, and resolution timeline.</p>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            {% if start_date or end_date or current_db %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+            </div>
+            {% endif %}
+        </form>
+        
         {% if is_admin or perms.api.add_incidentregister %}
-        <a href="{% url 'incident_create' %}" class="btn btn-success">Create New Record</a>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <a href="{% url 'incident_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Incident</a>
+        </div>
         {% endif %}
     </div>
+</div>
 
-    <!-- Filter Bar -->
-    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="start_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">From Date</label>
-            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="end_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">To Date</label>
-            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
-            <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
-                <option value="">All Databases</option>
-                <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
-            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
-            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
-        </div>
-    </form>
+<!-- Combined Overall Summary Card (Three Incident KPIs) -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- 1. Active Outages -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+            {% if kpi_active_outages > 0 %}<span class="badge-running-dot"></span>{% endif %}
+            Active Outages
+        </span>
+        <strong style="color: {% if kpi_active_outages > 0 %}#c5221f{% else %}#0f172a{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_active_outages }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Currently unresolved tickets</span>
+    </div>
 
-    <style>
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-        .badge-running-dot {
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            background-color: #0284c7;
-            border-radius: 50%;
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-    </style>
-    <div style="overflow-x: auto;">
-    <table>
-        <thead>
-            <tr>
-                <th>Ticket</th>
-                <th>System</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Severity</th>
-                <th>Status</th>
-                <th title="IT Service Desk SLA (Policy §20.4.5.2): Critical/High ≤ 9 hrs · Medium ≤ 18 hrs · Low ≤ 180 hrs" style="cursor: help;">SLA Status</th>
-                <th>Duration (hrs)</th>
-                <th>Database</th>
-                <th>Root Cause</th>
-                <th>Business Impact</th>
-                <th>Logged By</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for incident in page_obj %}
-            <tr {% if incident.status == 'Open' %}style="background-color: #ffd6d6;"{% elif incident.status == 'In Progress' %}style="background-color: #fff3e0;"{% endif %}>
-                <td style="word-break: break-all; white-space: normal; max-width: 140px; font-family: monospace; font-size: 0.85rem;">{{ incident.ticket }}</td>
-                <td style="max-width: 120px; word-break: break-word; white-space: normal;" title="{{ incident.system }}">{{ incident.system }}</td>
-                <td>{{ incident.start|date:"j F Y" }}</td>
-                <td>
-                    {% if incident.start %}
-                        {{ incident.start|date:"H:i" }}{% if incident.end %} - {{ incident.end|date:"H:i" }}{% endif %}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>
-                    {% if incident.severity == 'Critical' %}
-                        <span class="badge-accent">{{ incident.severity }}</span>
-                    {% elif incident.severity == 'High' %}
-                        <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
-                    {% elif incident.severity == 'Medium' %}
-                        <span style="display:inline-block;background:#fb8c00;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
-                    {% else %}
-                        <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">{{ incident.severity }}</span>
-                    {% endif %}
-                </td>
-                <td>
-                    {% if incident.status == 'Resolved' or incident.status == 'Closed' %}
-                        <span style="color: #2e7d32; font-weight: 600;">{{ incident.status }}</span>
-                    {% elif incident.status == 'Open' %}
-                        <span style="color: #c62828; font-weight: 600;">{{ incident.status }}</span>
-                    {% else %}
-                        <span style="color: #ef6c00; font-weight: 600;">{{ incident.status }}</span>
-                    {% endif %}
-                           <td style="white-space: nowrap; vertical-align: middle;">
-                    {% if incident.status == 'Open' or incident.status == 'In Progress' %}
-                        <span style="display: inline-flex; align-items: center; gap: 0.35rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                            <span class="badge-running-dot"></span>
-                            Running
-                        </span>
-                    {% elif incident.duration_hrs %}
-                        {% if incident.severity == 'Critical' or incident.severity == 'High' %}
-                            {% if incident.duration_hrs <= 9 %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
-                                    </svg>
-                                    Met
-                                </span>
-                            {% else %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
-                                    </svg>
-                                    Breached
-                                </span>
-                            {% endif %}
-                        {% elif incident.severity == 'Medium' %}
-                            {% if incident.duration_hrs <= 18 %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
-                                    </svg>
-                                    Met
-                                </span>
-                            {% else %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
-                                    </svg>
-                                    Breached
-                                </span>
-                            {% endif %}
-                        {% else %}{# Low #}
-                            {% if incident.duration_hrs <= 180 %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
-                                    </svg>
-                                    Met
-                                </span>
-                            {% else %}
-                                <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; font-size: 0.725rem; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 9999px;">
-                                    <svg style="width: 10px; height: 10px;" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
-                                    </svg>
-                                    Breached
-                                </span>
-                            {% endif %}
-                        {% endif %}
-                    {% else %}
-                        <span style="color: #94a3b8; font-size: 0.75rem;">—</span>
-                    {% endif %}
-                </td>
+    <!-- 2. Resolved Tickets -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Resolved Tickets</span>
+        <strong style="color: #137333; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_resolved_count }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Resolved or closed events</span>
+    </div>
 
-                <td>{{ incident.duration_hrs }}</td>
-                <td>{{ incident.database }}</td>
-                <td style="max-width: 280px; word-break: break-word; white-space: normal;">
-                    {% if incident.root_cause|slice:":12" == "AUTO-LOGGED:" %}
-                        <details style="cursor: pointer; font-size: 0.9rem;">
-                            <summary style="font-weight: 600; color: var(--color-primary); outline: none;">Auto-Detected Logs</summary>
-                            <div style="font-size: 0.75rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.5rem; margin-top: 0.25rem; font-family: monospace; white-space: pre-wrap; max-height: 120px; overflow-y: auto; text-align: left; line-height: 1.2;">
-                                {{ incident.root_cause }}
-                            </div>
-                        </details>
-                    {% else %}
-                        {{ incident.root_cause|default:"-" }}
-                    {% endif %}
-                </td>
-                <td style="max-width: 250px; word-break: break-word; white-space: normal;">{{ incident.business_impact|default:"-" }}</td>
-                <td>
-                    {% if incident.created_by %}
-                        {{ incident.created_by.username }}
-                    {% elif incident.resolved_by == 'System' or incident.resolved_by == 'Script' or incident.ticket|slice:":5" == "AUTO-" %}
-                        <span style="color: #475569; font-weight: 600;">Script</span>
-                    {% else %}
-                        <span style="color: #64748b; font-style: italic;">N/A</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <div style="display: flex; gap: 0.25rem;">
-                        <button type="button" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; background: #e2e8f0; color: #333;" onclick="document.getElementById('history-modal-{{ incident.pk }}').style.display='block'">History</button>
-                        {% if incident.created_by %}
-                            <a href="{% url 'incident_edit' incident.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                        {% else %}
-                            <a href="{% url 'incident_edit' incident.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                        {% endif %}
-                        {% if is_admin or perms.api.delete_incidentregister or incident.created_by == request.user %}
-                        <form method="post" action="{% url 'incident_delete' incident.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                        </form>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
+    <!-- 3. Unplanned Downtime -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Unplanned Downtime</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_downtime_hours }} hrs</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Total active service outages</span>
+    </div>
+</div>
 
-            <!-- History Modal -->
-            <div id="history-modal-{{ incident.pk }}" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                <div style="background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; margin: 10vh auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                    <button type="button" onclick="document.getElementById('history-modal-{{ incident.pk }}').style.display='none'" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
-                    <h3 style="margin-bottom: 1.5rem; border-left: 4px solid var(--color-accent); padding-left: 0.6rem; margin-top: 0;">History: {{ incident.ticket }}</h3>
-                    {% if incident.change_logs.all %}
-                    <div class="timeline" style="border-left: 2px solid var(--color-primary); padding-left: 1.5rem; margin-left: 1rem;">
-                        {% for log in incident.change_logs.all %}
-                        <div class="timeline-item" style="position: relative; margin-bottom: 1.5rem;">
-                            <div style="position: absolute; left: -2rem; top: 0.25rem; width: 12px; height: 12px; background: var(--color-accent); border-radius: 50%; border: 2px solid white;"></div>
-                            <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"d M Y - H:i" }}</div>
-                            <div style="font-weight: 500;">{{ log.action }}</div>
-                            <div style="font-size: 0.9rem; color: #444;">By: {{ log.changed_by.username|default:"System" }}</div>
-                            {% if log.assigned_to %}
-                            <div style="font-size: 0.85rem; color: #475569; margin-top: 0.25rem;">
-                                <span style="font-weight: 600;">Assigned to:</span> {{ log.assigned_to }}
-                            </div>
-                            {% endif %}
-                            {% if log.comment %}
-                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-left: 3px solid #ddd; font-style: italic; font-size: 0.9rem;">
-                                "{{ log.comment }}"
-                            </div>
-                            {% endif %}
-                        </div>
+<!-- Registry Workspace (Split Layout Container) -->
+<div id="registry-workspace" style="display: flex; gap: 1.5rem; width: 100%; align-items: flex-start; transition: all 0.3s ease;">
+    <!-- Left Pane: Incidents Table (Takes 100% width on load, collapses to 70% on select) -->
+    <div id="table-pane" style="flex: 1; transition: all 0.3s ease; width: 100%; overflow: hidden;">
+        <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Incident / Target</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Outage Window</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity / Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for incident in page_obj %}
+                        <tr class="incident-row" id="row-{{ incident.pk }}" 
+                            style="cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid rgba(90, 123, 156, 0.1);"
+                            onclick="selectIncidentRow('row-{{ incident.pk }}')"
+                            data-pk="{{ incident.pk }}"
+                            data-ticket="{{ incident.ticket }}"
+                            data-system="{{ incident.system|default:'—' }}"
+                            data-database="{{ incident.database }}"
+                            data-date="{{ incident.date|date:'d M Y' }}"
+                            data-start="{{ incident.start|date:'d M Y, H:i' }}"
+                            data-end="{{ incident.end|date:'d M Y, H:i'|default:'Active Outage' }}"
+                            data-duration="{{ incident.duration_hrs }}"
+                            data-planned="{% if incident.planned %}Planned Outage{% else %}Unplanned Outage{% endif %}"
+                            data-severity="{{ incident.severity }}"
+                            data-status="{{ incident.status }}"
+                            data-root-cause="{{ incident.root_cause }}"
+                            data-impact="{{ incident.business_impact }}"
+                            data-resolved-by="{{ incident.resolved_by|default:'—' }}"
+                            data-assigned-to="{{ incident.assigned_to|default:'—' }}"
+                            data-logged-by="{% if incident.created_by %}{{ incident.created_by.username }}{% else %}System{% endif %}"
+                            data-change-logs='[
+                                {% for log in incident.change_logs.all %}
+                                    {
+                                        "changed_at": "{{ log.changed_at|date:"d M Y, H:i" }}",
+                                        "action": "{{ log.action|escapejs }}",
+                                        "changed_by": "{{ log.changed_by.username|default:"System"|escapejs }}",
+                                        "assigned_to": "{{ log.assigned_to|default:""|escapejs }}",
+                                        "comment": "{{ log.comment|default:""|escapejs }}"
+                                    }{% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            ]'>
+                            
+                            <!-- Incident / Target -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                                <div style="font-weight: 600; color: var(--primary-navy); font-family: monospace;">{{ incident.ticket }}</div>
+                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;">
+                                    {{ incident.system }} | <span style="font-weight: 600;">{{ incident.database }}</span>
+                                </div>
+                            </td>
+
+                            <!-- Outage Window -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                                <div style="font-weight: 600; color: #0f172a;">{{ incident.start|date:"d M Y" }}</div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
+                                    {{ incident.start|date:"H:i" }} - {% if incident.end %}{{ incident.end|date:"H:i" }}{% else %}Active{% endif %} ({{ incident.duration_hrs }}h)
+                                </div>
+                            </td>
+
+                            <!-- Severity / Status -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 0.35rem;">
+                                    <!-- Severity Badge -->
+                                    <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
+                                                {% if incident.severity == 'Critical' or incident.severity == 'High' %}background: #fce8e6; color: #c5221f;
+                                                {% elif incident.severity == 'Medium' %}background: #fef7e0; color: #b06000;
+                                                {% else %}background: #e6f4ea; color: #137333;{% endif %}">
+                                        {{ incident.severity }}
+                                    </span>
+                                    
+                                    <!-- Status Badge -->
+                                    <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 85px; text-align: center;
+                                                {% if incident.status == 'Open' %}background: #fce8e6; color: #c5221f;
+                                                {% elif incident.status == 'In Progress' %}background: #fef7e0; color: #b06000;
+                                                {% else %}background: #e6f4ea; color: #137333;{% endif %}">
+                                        {{ incident.status }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- SLA Status -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; white-space: nowrap;">
+                                {% if incident.status == 'Open' or incident.status == 'In Progress' %}
+                                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">
+                                        <span class="badge-running-dot" style="background-color: #0284c7;"></span>
+                                        Running
+                                    </span>
+                                {% else %}
+                                    {% if incident.severity == 'Critical' or incident.severity == 'High' %}
+                                        {% if incident.duration_hrs <= 9 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                        {% else %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                        {% endif %}
+                                    {% elif incident.severity == 'Medium' %}
+                                        {% if incident.duration_hrs <= 18 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                        {% else %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if incident.duration_hrs <= 180 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                        {% else %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+
+                            <!-- Action Menu -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
+                                <div class="actions-dropdown">
+                                    <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ incident.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
+                                    <div id="actions-{{ incident.pk }}" class="actions-dropdown-content">
+                                        <a href="#" onclick="showDetailsFromTrigger('row-{{ incident.pk }}')">Details</a>
+                                        <a href="{% url 'incident_edit' incident.pk %}">Edit</a>
+                                        {% if is_admin or perms.api.delete_incidentregister or incident.created_by == request.user %}
+                                        <form method="post" action="{% url 'incident_delete' incident.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Are you sure you want to delete this incident?');">
+                                            {% csrf_token %}
+                                            <button type="submit" style="color: #c5221f;">Delete</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No incidents found.</td>
+                        </tr>
                         {% endfor %}
-                    </div>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination Controls -->
+            {% if page_obj.has_other_pages %}
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
+                <div style="color: #64748b; font-size: 0.8rem; font-weight: 500;">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </div>
+                <div style="display: flex; gap: 0.35rem;">
+                    {% if page_obj.has_previous %}
+                        <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                        <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
                     {% else %}
-                    <p style="color: #666; font-style: italic;">No history recorded for this incident yet.</p>
+                        <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
+                        <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
+                    {% endif %}
+
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                    {% else %}
+                        <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
+                        <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
                     {% endif %}
                 </div>
             </div>
-
-            {% empty %}
-            <tr>
-                <td colspan="6" style="text-align: center;">No incidents found.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-
-    <!-- Pagination Controls -->
-    {% if page_obj.has_other_pages %}
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-        <div style="color: #64748b; font-size: 0.875rem;">
-            Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
-        </div>
-        <div style="display: flex; gap: 0.5rem;">
-            {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
-            {% else %}
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
-            {% endif %}
-
-            {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
-            {% else %}
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
             {% endif %}
         </div>
     </div>
-    {% endif %}
+
+    <!-- Right Pane: Details Drawer (Width 0 on load, transitions to 30%) -->
+    <div id="details-pane" style="width: 0; display: none; transition: all 0.3s ease; flex-shrink: 0; position: sticky; top: 1.5rem;">
+        <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); position: relative;">
+            <!-- Close Button -->
+            <button type="button" onclick="closeIncidentDetails()" style="position: absolute; right: 0.75rem; top: 0.75rem; background: none; border: none; font-size: 1.35rem; cursor: pointer; color: var(--text-soft); line-height: 1; outline: none;">&times;</button>
+            
+            <div id="details-content" style="display: flex; flex-direction: column; gap: 1.15rem;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 0.75rem; margin-bottom: 0.25rem;">
+                    <div>
+                        <h3 id="panel-ticket" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--primary-navy); word-break: break-all; font-family: monospace;">—</h3>
+                        <div id="panel-meta" style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 0.25rem;">—</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end;">
+                        <span id="panel-severity-badge" style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;">—</span>
+                        <span id="panel-status-badge" style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;">—</span>
+                    </div>
+                </div>
+
+                <!-- Time Metrics -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage Start</div>
+                        <div id="panel-start" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage End</div>
+                        <div id="panel-end" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
+                    </div>
+                </div>
+
+                <!-- Root Cause -->
+                <div>
+                    <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
+                        Root Cause Description
+                    </h4>
+                    <div id="panel-root-cause" style="font-size: 0.85rem; line-height: 1.5; color: #334155; max-height: 150px; overflow-y: auto;">—</div>
+                </div>
+
+                <!-- Business Impact -->
+                <div style="margin-top: 0.25rem;">
+                    <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0;">
+                        Business Impact
+                    </h4>
+                    <div id="panel-impact" style="font-size: 0.85rem; line-height: 1.5; color: #334155;">—</div>
+                </div>
+
+                <!-- Resolved By & Assigned To -->
+                <div style="border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 1rem; margin-top: 0.25rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748b; font-weight: 500;">Assigned To</span>
+                        <strong id="panel-assigned-to" style="color: #1e293b; font-weight: 500;">—</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748b; font-weight: 500;">Resolved By</span>
+                        <strong id="panel-resolved-by" style="color: #1e293b; font-weight: 500;">—</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748b; font-weight: 500;">Logged By</span>
+                        <strong id="panel-logged-by" style="color: #1e293b; font-weight: 500;">—</strong>
+                    </div>
+                </div>
+                
+                <!-- Timeline Event Log (Collapsible) -->
+                <div id="panel-logs-section" style="border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 1rem; margin-top: 0.25rem; display: none;">
+                    <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem 0;">
+                        Incident Change Logs
+                    </h4>
+                    <div id="panel-logs-timeline" style="max-height: 160px; overflow-y: auto; padding-right: 0.25rem;">
+                        <!-- JS injected -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Toggle Actions Dropdown Menu
+    function toggleActionsDropdown(event, dropdownId) {
+        event.stopPropagation();
+        
+        var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+            if (dropdowns[i].id !== dropdownId) {
+                dropdowns[i].style.display = "none";
+            }
+        }
+        
+        var content = document.getElementById(dropdownId);
+        if (content.style.display === "block") {
+            content.style.display = "none";
+        } else {
+            content.style.display = "block";
+        }
+    }
+
+    // Row selection and Split Layout transition
+    function selectIncidentRow(rowId) {
+        const row = document.getElementById(rowId);
+        if (!row) return;
+
+        if (row.classList.contains('row-highlight')) {
+            closeIncidentDetails();
+            return;
+        }
+
+        document.querySelectorAll('.incident-row').forEach(r => r.classList.remove('row-highlight'));
+        row.classList.add('row-highlight');
+
+        document.getElementById('panel-ticket').textContent = row.getAttribute('data-ticket');
+        
+        const system = row.getAttribute('data-system');
+        const db = row.getAttribute('data-database');
+        const planned = row.getAttribute('data-planned');
+        document.getElementById('panel-meta').textContent = `${system} | ${db} | ${planned}`;
+        
+        document.getElementById('panel-start').textContent = row.getAttribute('data-start');
+        
+        const end = row.getAttribute('data-end');
+        const duration = row.getAttribute('data-duration');
+        document.getElementById('panel-end').textContent = `${end} (${duration}h)`;
+        
+        const rootCause = row.getAttribute('data-root-cause') || '—';
+        const rootCauseContainer = document.getElementById('panel-root-cause');
+        if (rootCause.startsWith('AUTO-LOGGED:')) {
+            rootCauseContainer.innerHTML = `
+                <details open style="cursor: pointer;">
+                    <summary style="font-weight: 600; color: var(--primary-navy); font-size: 0.78rem;">Auto-detected Exception Logs</summary>
+                    <pre style="font-size: 0.72rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0.4rem; margin-top: 0.25rem; font-family: monospace; white-space: pre-wrap; overflow-x: auto; line-height: 1.2;">${rootCause}</pre>
+                </details>
+            `;
+        } else {
+            rootCauseContainer.textContent = rootCause;
+        }
+        
+        document.getElementById('panel-impact').textContent = row.getAttribute('data-impact') || '—';
+        document.getElementById('panel-assigned-to').textContent = row.getAttribute('data-assigned-to');
+        document.getElementById('panel-resolved-by').textContent = row.getAttribute('data-resolved-by');
+        document.getElementById('panel-logged-by').textContent = row.getAttribute('data-logged-by');
+
+        const severity = row.getAttribute('data-severity');
+        const sevBadge = document.getElementById('panel-severity-badge');
+        sevBadge.textContent = severity;
+        sevBadge.style.display = "inline-block";
+        if (severity === 'Critical' || severity === 'High') {
+            sevBadge.style.background = '#fce8e6';
+            sevBadge.style.color = '#c5221f';
+        } else if (severity === 'Medium') {
+            sevBadge.style.background = '#fef7e0';
+            sevBadge.style.color = '#b06000';
+        } else {
+            sevBadge.style.background = '#e6f4ea';
+            sevBadge.style.color = '#137333';
+        }
+
+        const status = row.getAttribute('data-status');
+        const statusBadge = document.getElementById('panel-status-badge');
+        statusBadge.textContent = status;
+        statusBadge.style.display = "inline-block";
+        if (status === 'Open') {
+            statusBadge.style.background = '#fce8e6';
+            statusBadge.style.color = '#c5221f';
+        } else if (status === 'In Progress') {
+            statusBadge.style.background = '#fef7e0';
+            statusBadge.style.color = '#b06000';
+        } else {
+            statusBadge.style.background = '#e6f4ea';
+            statusBadge.style.color = '#137333';
+        }
+
+        const logsData = JSON.parse(row.getAttribute('data-change-logs') || '[]');
+        const logsContainer = document.getElementById('panel-logs-timeline');
+        const logsSection = document.getElementById('panel-logs-section');
+        
+        if (logsData.length > 0) {
+            logsSection.style.display = 'block';
+            let html = '';
+            logsData.forEach(log => {
+                html += `
+                    <div style="position: relative; padding-left: 1.25rem; margin-bottom: 1rem; font-size: 0.78rem;">
+                        <div style="position: absolute; left: 0; top: 0.25rem; width: 6px; height: 6px; background-color: var(--primary-green); border-radius: 50%;"></div>
+                        <div style="color: #64748b; font-size: 0.7rem; font-weight: 500;">${log.changed_at}</div>
+                        <div style="font-weight: 600; color: #1e293b; margin-top: 0.1rem;">${log.action}</div>
+                        <div style="color: #475569; margin-top: 0.05rem;">By: ${log.changed_by}</div>
+                        ${log.comment ? `<div style="margin-top: 0.25rem; padding: 0.35rem 0.5rem; background: #f8fafc; border-left: 2px solid #cbd5e1; font-style: italic; color: #475569; font-size: 0.75rem;">"${log.comment}"</div>` : ''}
+                    </div>
+                `;
+            });
+            logsContainer.innerHTML = html;
+        } else {
+            logsSection.style.display = 'none';
+        }
+
+        const tablePane = document.getElementById('table-pane');
+        const detailsPane = document.getElementById('details-pane');
+        
+        tablePane.style.width = "70%";
+        tablePane.style.flex = "0 0 70%";
+        
+        detailsPane.style.display = "block";
+        detailsPane.style.width = "30%";
+        detailsPane.style.flex = "0 0 30%";
+    }
+
+    function closeIncidentDetails() {
+        document.querySelectorAll('.incident-row').forEach(r => r.classList.remove('row-highlight'));
+        
+        const tablePane = document.getElementById('table-pane');
+        const detailsPane = document.getElementById('details-pane');
+        
+        tablePane.style.width = "100%";
+        tablePane.style.flex = "1";
+        
+        detailsPane.style.display = "none";
+        detailsPane.style.width = "0";
+        detailsPane.style.flex = "0";
+    }
+
+    function showDetailsFromTrigger(rowId) {
+        closeIncidentDetails();
+        setTimeout(() => selectIncidentRow(rowId), 50);
+    }
+
+    window.onclick = function(event) {
+        if (!event.target.matches('.actions-trigger')) {
+            var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.style.display === "block") {
+                    openDropdown.style.display = "none";
+                }
+            }
+        }
+    }
+</script>
 {% endblock %}

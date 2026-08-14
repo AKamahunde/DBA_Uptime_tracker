@@ -1068,12 +1068,31 @@ def incident_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = IncidentRegister.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+
+    kpi_active_outages = kpi_queryset.filter(status__in=['Open', 'In Progress']).count()
+    kpi_resolved_count = kpi_queryset.filter(status__in=['Resolved', 'Closed']).count()
+    
+    from django.db.models import Sum
+    kpi_downtime_hours = kpi_queryset.filter(planned=False).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+    kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
+    
     return render(request, 'incidents/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'kpi_active_outages': kpi_active_outages,
+        'kpi_resolved_count': kpi_resolved_count,
+        'kpi_downtime_hours': kpi_downtime_hours
     })
 
 @login_required
