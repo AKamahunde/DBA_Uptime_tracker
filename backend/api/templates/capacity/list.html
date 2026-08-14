@@ -71,25 +71,44 @@
 </style>
 
 <!-- Page Header -->
-<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-    <div style="flex: 1; min-width: 300px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
         <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Capacity Tracking</h2>
-        <div style="background-color: #f8fafc; border-left: 4px solid var(--primary-navy); padding: 0.8rem 1rem; margin-top: 0.75rem; border-radius: 4px; font-size: 0.82rem; line-height: 1.45; color: #334155; text-align: justify;">
-            This report shows monthly storage allocations, database file growths, disk utilization, and tablespace status for 
-            {% if current_db == 'Oracle' %}
-                the Oracle (nmsinfra) database
-            {% elif current_db == 'MySQL' %}
-                the MySQL database
-            {% elif current_db == 'MS SQL Server' %}
-                the MS SQL Server database
-            {% else %}
-                databases
-            {% endif %}, reporting sizing metrics to assist database administrators in projecting storage needs.
-        </div>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Storage growth, tablespace utilization, and capacity projections.</p>
     </div>
-    {% if is_admin or perms.api.add_capacityplanning %}
-    <a href="{% url 'capacity_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.5rem 1.25rem; font-weight: 600;">+ New Record</a>
-    {% endif %}
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            {% if start_date or end_date or current_db %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+            </div>
+            {% endif %}
+        </form>
+        
+        {% if is_admin or perms.api.add_capacityplanning %}
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <a href="{% url 'capacity_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
+        </div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Combined Overall Summary Card -->
@@ -232,28 +251,7 @@
         </div>
     </div>
 
-    <!-- Compressed Filter Bar -->
-    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; background: #f8fafc; padding: 0.85rem 1.25rem; border-radius: 6px; border: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap; font-size: 0.85rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <label for="start_date" style="font-weight: 600; color: #475569; white-space: nowrap;">Period:</label>
-            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.8rem;">
-            <span style="color: #64748b;">to</span>
-            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.8rem;">
-        </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: 0.5rem;">
-            <label for="database" style="font-weight: 600; color: #475569; white-space: nowrap;">Database:</label>
-            <select id="database" name="database" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 140px; font-size: 0.8rem; background: #fff;">
-                <option value="">All Databases</option>
-                <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
-                <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
-        </div>
-        <div style="display: flex; gap: 0.35rem; align-items: center; margin-left: auto;">
-            <button type="submit" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Apply Filters</button>
-            <a href="?" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center;">Reset</a>
-        </div>
-    </form>
+
 
     <!-- Table structured as Capacity -> Consumption -> Remaining -> Growth -->
     <div style="overflow-x: auto;">
