@@ -1624,7 +1624,11 @@ def capacity_list(request):
         trend_polyline_points = " ".join(svg_points)
         
     # Build Forecast Block (Linear projection based on last 3 months)
-    forecast_db = current_db if current_db else 'Oracle'
+    forecast_db = request.GET.get('forecast_db', '')
+    if current_db:
+        forecast_db = current_db
+    elif not forecast_db:
+        forecast_db = 'Oracle'
     db_recs = CapacityPlanning.objects.filter(database=forecast_db).order_by('-month', '-updated_at')[:3]
     forecast_info = {}
     if db_recs.exists():
