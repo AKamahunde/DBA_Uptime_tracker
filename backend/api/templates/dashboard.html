@@ -128,146 +128,166 @@
     </form>
 </div>
 
-<!-- Top Row KPI Strip -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    <!-- 1. Availability KPI -->
-    <div class="kpi-card kpi-accent-navy" onclick="window.location.href='?database_select={{ selected_db }}&month={{ reporting_month }}'">
-        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Availability</div>
-        <div style="font-size: 1.7rem; font-weight: 700; color: #0f172a; line-height: 1.1;">{{ kpi_availability }}</div>
-        <div style="font-size: 0.72rem; font-weight: 600; color: {% if '▼' in kpi_availability_change %}#ef4444{% elif '▲' in kpi_availability_change %}#10b981{% else %}#64748b{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.20rem;">
-            {{ kpi_availability_change }} <span style="font-weight: normal; color: #94a3b8;">vs prev month</span>
-        </div>
-    </div>
-
-    <!-- 2. SLA Compliance KPI -->
-    <div class="kpi-card kpi-accent-gold" onclick="window.location.href='{% url 'sla_config_list' %}'">
-        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">SLA Status</div>
-        <div style="font-size: 1.7rem; font-weight: 700; color: #0f172a; line-height: 1.1;">{{ kpi_sla_compliance }}</div>
-        <div style="font-size: 0.72rem; font-weight: 600; color: {% if '0/' in kpi_sla_compliance %}#ef4444{% elif 'Met' in kpi_sla_compliance and not '0/' in kpi_sla_compliance %}#10b981{% else %}#f59e0b{% endif %}; margin-top: 0.5rem;">
-            {% if 'Met' in kpi_sla_compliance %}✓ SLA Compliance Met{% else %}SLA Unconfigured{% endif %}
-        </div>
-    </div>
-
-    <!-- 3. Incidents KPI -->
-    <div class="kpi-card kpi-accent-red" onclick="window.location.href='{% url 'incident_list' %}'">
-        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Incidents</div>
-        <div style="font-size: 1.7rem; font-weight: 700; color: #0f172a; line-height: 1.1;">{{ kpi_incidents_total }}</div>
-        <div style="font-size: 0.72rem; font-weight: 600; color: {% if kpi_incidents_open > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem; display: flex; align-items: center; gap: 0.2rem;">
-            {% if kpi_incidents_open > 0 %}
-                <span style="display:inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
-                {{ kpi_incidents_open }} Open Incidents
-            {% else %}
-                ✓ 0 Active Outages
+<!-- Database Environment Cards -->
+<div style="margin-bottom: 2rem;">
+    {% if selected_db == 'All Databases' %}
+        <!-- Fleet Overview Mode: Render all three environments -->
+        {% for row in dashboard_data %}
+            {% if row.database == 'Oracle' %}
+                <!-- Oracle flagship environment card (100% width) -->
+                <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); border-left: 5px solid var(--primary-navy); margin-bottom: 1.25rem; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <strong style="font-size: 1.05rem; color: var(--primary-navy);">Oracle Database Environment</strong>
+                            <span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.45rem; border-radius: 3px; font-weight: 600; font-family: monospace;">nmsinfra</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                                        {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
+                                        {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
+                                        {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                                {% if row.health_status == 'HEALTHY' %}✓ Healthy{% elif row.health_status == 'WARNING' %}⚠ Warning{% else %}⚡ Outage{% endif %}
+                            </span>
+                            <a href="?database_select=Oracle&month={{ reporting_month }}" style="font-size: 0.75rem; color: #2563eb; text-decoration: none; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; background: #eff6ff;">Drill Down &rarr;</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem;">
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.availability }}</div>
+                            <div style="font-size: 0.7rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.15rem;">
+                                {% if row.availability_status == 'Meets SLA' %}✓ Meets SLA Target (≥99.95%){% else %}⚠ Below SLA Target{% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Active Outages &amp; Volume</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.active_incidents }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">active / {{ row.total_incidents }} total</span></div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
+                                {{ row.sla_breach_count }} SLA breach{{ row.sla_breach_count|pluralize }} detected
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Backup Status</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.backup_success }}</div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Last: {{ row.last_backup_detail }}">
+                                Last: {{ row.last_backup_detail }}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication Link</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; margin-top: 0.25rem;">{{ row.replication_status }}</div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
+                                {% if row.replication_status == 'Healthy' %}Live sync active{% else %}No active stream alert{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             {% endif %}
-        </div>
-    </div>
+        {% endfor %}
 
-    <!-- 4. Backups KPI -->
-    <div class="kpi-card kpi-accent-green" onclick="window.location.href='{% url 'backup_list' %}'">
-        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Backups</div>
-        <div style="font-size: 1.7rem; font-weight: 700; color: #0f172a; line-height: 1.1;">{{ kpi_backup_success }}</div>
-        <div style="font-size: 0.72rem; font-weight: 600; color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; margin-top: 0.5rem;">
-            {% if kpi_backup_failed > 0 %}{{ kpi_backup_failed }} Failed Runs{% else %}✓ Backups Verified{% endif %}
+        <!-- Split row for MySQL and MS SQL Server -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+            {% for row in dashboard_data %}
+                {% if row.database != 'Oracle' %}
+                    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); border-left: 5px solid {% if row.database == 'MySQL' %}var(--primary-gold){% else %}var(--accent-muted-blue){% endif %}; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <strong style="font-size: 0.95rem; color: var(--primary-navy);">{{ row.database }} Environment</strong>
+                                <span style="font-size: 0.7rem; background: #f1f5f9; color: #475569; padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
+                                    {% if row.database == 'MySQL' %}nms360{% else %}Pentana{% endif %}
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span style="display: inline-block; padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+                                            {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
+                                            {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
+                                            {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                                    {% if row.health_status == 'HEALTHY' %}Healthy{% elif row.health_status == 'WARNING' %}Warning{% else %}Outage{% endif %}
+                                </span>
+                                <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="font-size: 0.7rem; color: #2563eb; text-decoration: none; font-weight: 600; padding: 0.15rem 0.35rem; border-radius: 4px; background: #eff6ff;">Drill Down &rarr;</a>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
+                            <div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-top: 0.15rem;">{{ row.availability }}</div>
+                                <div style="font-size: 0.65rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.1rem;">
+                                    {% if row.availability_status == 'Meets SLA' %}Met{% else %}Breached{% endif %}
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Incidents</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-top: 0.15rem;">{{ row.active_incidents }} / {{ row.total_incidents }}</div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 600; margin-top: 0.1rem;">Active / Total</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Backups</div>
+                                <div style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-top: 0.15rem;">{{ row.backup_success }}</div>
+                                <div style="font-size: 0.65rem; color: #64748b; font-weight: 600; margin-top: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ row.last_backup_detail }}">
+                                    {{ row.last_backup_detail }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
         </div>
-    </div>
-
-    <!-- 5. Replication KPI -->
-    <div class="kpi-card kpi-accent-blue" onclick="window.location.href='{% url 'replication_list' %}'">
-        <div style="font-size: 0.75rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Replication</div>
-        <div style="font-size: 1.7rem; font-weight: 700; color: #0f172a; line-height: 1.1;">{{ kpi_replication_status }}</div>
-        <div style="font-size: 0.72rem; font-weight: 600; color: {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status and not 'N/A' in kpi_replication_status %}#10b981{% elif 'N/A' in kpi_replication_status %}#64748b{% else %}#ef4444{% endif %}; margin-top: 0.5rem;">
-            {% if 'Healthy' in kpi_replication_status and not '0/' in kpi_replication_status and not 'N/A' in kpi_replication_status %}✓ Live Sync Active{% elif 'N/A' in kpi_replication_status %}No streams configured{% else %}Replication Alert{% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Balanced Second Row: Diagnostic Grid -->
-<div style="display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr; gap: 1.5rem; margin-bottom: 2rem;">
-    <!-- Left: Compact Availability Trend SVG -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow);">
-        <div>
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-                <div>
-                    <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
-                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
+    {% else %}
+        <!-- Scoped Mode: Render ONLY the selected database environment card (100% width) -->
+        {% for row in dashboard_data %}
+            {% if row.database == selected_db %}
+                <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); border-left: 5px solid {% if row.database == 'Oracle' %}var(--primary-navy){% elif row.database == 'MySQL' %}var(--primary-gold){% else %}var(--accent-muted-blue){% endif %}; margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <strong style="font-size: 1.05rem; color: var(--primary-navy);">{{ row.database }} Database Environment</strong>
+                            <span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.45rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
+                                {% if row.database == 'Oracle' %}nmsinfra{% elif row.database == 'MySQL' %}nms360{% else %}Pentana{% endif %}
+                            </span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                                        {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
+                                        {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
+                                        {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                                {% if row.health_status == 'HEALTHY' %}✓ Healthy{% elif row.health_status == 'WARNING' %}⚠ Warning{% else %}⚡ Outage{% endif %}
+                            </span>
+                            <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.75rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1;">&larr; Back to Fleet Overview</a>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem;">
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.availability }}</div>
+                            <div style="font-size: 0.7rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.15rem;">
+                                {% if row.availability_status == 'Meets SLA' %}✓ Meets SLA Target (≥99.95%){% else %}⚠ Below SLA Target{% endif %}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Active Outages &amp; Volume</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.active_incidents }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">active / {{ row.total_incidents }} total</span></div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
+                                {{ row.sla_breach_count }} SLA breach{{ row.sla_breach_count|pluralize }} detected
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Backup Status</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.backup_success }}</div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Last: {{ row.last_backup_detail }}">
+                                Last: {{ row.last_backup_detail }}
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication Link</div>
+                            <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; margin-top: 0.25rem;">{{ row.replication_status }}</div>
+                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
+                                {% if row.replication_status == 'Healthy' %}Live sync active{% else %}No active stream alert{% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.5rem; font-size: 0.7rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">
-                    Export PDF
-                </a>
-            </div>
-        </div>
-        
-        <!-- Scaled down height constraint -->
-        <div style="position: relative; max-height: 120px; overflow: hidden; margin-top: 0.5rem;">
-            <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
-                <!-- Grid Lines -->
-                <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
-                
-                <!-- SLA Reference Line (99.95%) -->
-                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
-                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
-
-                <!-- Value Polyline -->
-                <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
-                
-                <!-- Data Point Circles -->
-                {% for m in trend_months %}
-                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
-                    <!-- Value Label -->
-                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
-                    <!-- Month Label -->
-                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-                {% endfor %}
-            </svg>
-        </div>
-    </div>
-
-    <!-- Middle: Database Health Overview -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0 0 0.85rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Database Health</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                {% for row in dashboard_data %}
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0; border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if row.availability_status == 'Meets SLA' %}#10b981{% elif row.availability_status == 'Warning' %}#f59e0b{% else %}#ef4444{% endif %};"></span>
-                        <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="color: var(--primary-navy); font-size: 0.82rem; font-weight: 600; text-decoration: none;">{{ row.database }}</a>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.82rem; font-weight: 700; color: #1e293b;">{{ row.availability }}</div>
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ row.total_incidents }} incident{{ row.total_incidents|pluralize }}</div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <div style="border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 0.5rem; text-align: center; font-size: 0.7rem; color: #94a3b8; font-weight: 600;">
-            Click database name to scope view
-        </div>
-    </div>
-
-    <!-- Right: Attention Required Alerts -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0 0 0.85rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 120px; overflow-y: auto; padding-right: 0.25rem;">
-                {% for item in attention_items %}
-                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
-                        <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
-                    </div>
-                {% empty %}
-                    <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
-                        ✓ All systems operating normally.
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+            {% endif %}
+        {% endfor %}
+    {% endif %}
 </div>
 
 <!-- Database detail metrics table (displays when specific database scope is selected) -->
@@ -320,7 +340,8 @@
                 </tr>
                 <!-- Target Row -->
                 <tr style="color: #64748b; font-style: italic; background-color: #fbfcfd;">
-                    <td style="font-weight: 600; color: #475569; text-align: left; background-color: #f8fafc;">Target Target</td>
+                    <td style="font-weight: 600; color: #475569; text-align: left; background-color: #f8fafc;">Target target</td>
+                    <td>&ge; 99.95%</td>
                     <td>&le; 48 hrs</td>
                     <td>&le; 2 hrs</td>
                     <td>&le; 4/month</td>
@@ -328,7 +349,6 @@
                     <td>&ge; 95%</td>
                     <td>&ge; 80%</td>
                     <td>Healthy</td>
-                    <td>0</td>
                     <td>0</td>
                 </tr>
                 <!-- Status Row -->
@@ -368,46 +388,90 @@
 </div>
 {% endif %}
 
-<!-- Balanced Third Row: Backups & Recent Activity Feed side-by-side -->
-<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; margin-bottom: 2rem;">
-    <!-- Left: Backup & Restore Summary -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+<!-- Balanced Analytics Row: Trend SVG chart & Telemetry metrics side-by-side -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Availability Trend SVG -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow);">
         <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Backup &amp; Restore Compliance</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.88rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
-                    <span style="color: #475569; font-weight: 600;">Backup Success Rate</span>
-                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.backup_success|default:kpi_backup_success }}</strong>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
+                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
-                    <span style="color: #475569; font-weight: 600;">Restore Success Rate</span>
-                    <strong style="color: #0f172a; font-size: 1rem;">{{ database_detail.current.restore_success|default:"100.0%" }}</strong>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
-                    <span style="color: #475569; font-weight: 600;">Failed Backup Runs</span>
-                    <strong style="color: {% if kpi_backup_failed > 0 %}#ef4444{% else %}#10b981{% endif %}; font-size: 1.05rem;">
-                        {{ kpi_backup_failed }}
-                    </strong>
-                </div>
+                <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.5rem; font-size: 0.7rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">
+                    Export PDF
+                </a>
             </div>
         </div>
-        <div style="margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem; text-align: right;">
-            <a href="{% url 'backup_list' %}" style="font-size: 0.8rem; font-weight: 700; color: #2563eb; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
-                View Backup Register &rarr;
-            </a>
+        
+        <div style="position: relative; max-height: 120px; overflow: hidden; margin-top: 0.5rem;">
+            <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
+                <!-- Grid Lines -->
+                <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
+                
+                <!-- SLA Reference Line (99.95%) -->
+                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
+
+                <!-- Value Polyline -->
+                <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                
+                <!-- Data Point Circles -->
+                {% for m in trend_months %}
+                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                    <!-- Value Label -->
+                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    <!-- Month Label -->
+                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                {% endfor %}
+            </svg>
         </div>
     </div>
 
-    <!-- Right: Recent Activity Log Feed -->
+    <!-- Right: Backups & SLA Summary -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Fleet KPI &amp; SLA Compliance</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.82rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Overall Fleet Availability</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ kpi_availability }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">SLA Compliance Targets</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ kpi_sla_compliance }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #f1f5f9; padding-bottom: 0.5rem;">
+                    <span style="color: #475569; font-weight: 600;">Monthly Incident Volume</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ kpi_incidents_total }} <span style="font-size: 0.72rem; color: #ef4444; font-weight: 600;">({{ kpi_incidents_open }} active)</span></strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.25rem;">
+                    <span style="color: #475569; font-weight: 600;">Backup Success Rate</span>
+                    <strong style="color: #0f172a; font-size: 1rem;">{{ kpi_backup_success }}</strong>
+                </div>
+            </div>
+        </div>
+        <div style="margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem; display: flex; justify-content: space-between; font-size: 0.78rem;">
+            <a href="{% url 'backup_list' %}" style="font-weight: 700; color: #2563eb; text-decoration: none;">Backup List &rarr;</a>
+            <a href="{% url 'incident_list' %}" style="font-weight: 700; color: #2563eb; text-decoration: none;">Incident List &rarr;</a>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Row: Recent Activity Log Feed & Attention Required side-by-side -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Recent Activity Feed -->
     <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
             <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Live Event Log</span>
         </div>
         
         <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
                 <thead>
                     <tr style="border-bottom: 1.5px solid #cbd5e1; background: #f8fafc;">
                         <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 15%;">Date / Time</th>
@@ -429,10 +493,10 @@
                             {{ act.database }}
                         </td>
                         <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
-                                        {% if act.status_class == 'success' %}background: #dcfce7; color: #15803d;
-                                        {% elif act.status_class == 'danger' %}background: #fee2e2; color: #b91c1c;
-                                        {% else %}background: #fffbeb; color: #b45309;{% endif %}">
+                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+                                        {% if act.status_class == 'success' %}background: #e6f4ea; color: #137333;
+                                        {% elif act.status_class == 'danger' %}background: #fce8e6; color: #c5221f;
+                                        {% else %}background: #fef7e0; color: #b06000;{% endif %}">
                                 {{ act.status }}
                             </span>
                         </td>
@@ -444,6 +508,25 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Right: Attention Required Alerts -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
+                {% for item in attention_items %}
+                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
+                        <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
+                    </div>
+                {% empty %}
+                    <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
+                        ✓ All systems operating normally.
+                    </div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>

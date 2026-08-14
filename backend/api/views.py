@@ -217,6 +217,52 @@ def _get_dashboard_data(reporting_month):
         if db_type in ['MS SQL Server']:
             rep_status = 'N/A'
 
+        # Health status calculation
+        active_incidents = IncidentRegister.objects.filter(
+            database__iexact=db_type,
+            status__in=['Open', 'In Progress']
+        ).count()
+        
+        failed_backups_count = BackupRecovery.objects.filter(
+            database__iexact=db_type,
+            record_type='Backup',
+            outcome='Failed',
+            date__year=reporting_month.year,
+            date__month=reporting_month.month
+        ).count()
+        
+        replication_issues = False
+        if db_type in ['MySQL', 'Oracle']:
+            latest_rep_check = ReplicationMonitor.objects.filter(
+                database__iexact=db_type
+            ).order_by('-date', '-created_at').first()
+            if latest_rep_check and (latest_rep_check.status != 'Healthy' or latest_rep_check.severity == 'Critical'):
+                replication_issues = True
+                
+        high_disk_usage = False
+        latest_capacity = CapacityPlanning.objects.filter(
+            database__iexact=db_type
+        ).order_by('-month').first()
+        if latest_capacity and latest_capacity.disk_used_percent and latest_capacity.disk_used_percent > 85:
+            high_disk_usage = True
+            
+        if active_incidents > 0:
+            health_status = 'OUTAGE'
+        elif failed_backups_count > 0 or replication_issues or high_disk_usage:
+            health_status = 'WARNING'
+        else:
+            health_status = 'HEALTHY'
+
+        # Last backup details
+        last_backup = BackupRecovery.objects.filter(
+            database__iexact=db_type,
+            record_type='Backup'
+        ).order_by('-date', '-created_at').first()
+        
+        last_backup_str = 'No Backups Logged'
+        if last_backup:
+            last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
+
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
@@ -236,7 +282,10 @@ def _get_dashboard_data(reporting_month):
             'restore_success_status': get_status(restore_success_pct, 80.0, '>=') if (sla_exists and restore_success_pct != 'No Data') else 'N/A',
             'replication_status': rep_status,
             'replication_status_status': 'N/A' if (rep_status in ['No Data', 'N/A'] or not sla_exists) else ('Meets SLA' if rep_status == 'Healthy' else 'Below SLA'),
-            'failed_backups': failed_backups if sla_exists else 'No Data'
+            'failed_backups': failed_backups if sla_exists else 'No Data',
+            'health_status': health_status,
+            'active_incidents': active_incidents,
+            'last_backup_detail': last_backup_str
         })
     return dashboard_data, db_types
 
