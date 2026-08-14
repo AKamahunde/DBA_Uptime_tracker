@@ -1377,12 +1377,32 @@ def server_health_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = ServerHealth.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+        
+    kpi_unhealthy_count = kpi_queryset.filter(status__in=['Critical', 'Warning']).count()
+    
+    from django.db.models import Avg
+    avg_cpu = kpi_queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
+    avg_mem = kpi_queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
+    kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
+    kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
+    
     return render(request, 'server_health/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'kpi_unhealthy_count': kpi_unhealthy_count,
+        'kpi_avg_cpu': kpi_avg_cpu,
+        'kpi_avg_mem': kpi_avg_mem
     })
 
 @login_required
@@ -2388,10 +2408,12 @@ def incident_ingest(request):
         duration_delta = end_dt - start_dt
         duration_hrs = Decimal(str(round(duration_delta.total_seconds() / 3600.0, 2)))
         
-        # De-duplication check: avoid double registering the same outage in staging
-        exists = IncidentStaging.objects.filter(database=db_type, start=start_dt).exists()
-        if exists:
+        # De-duplication check: avoid double registering the same outage in staging or active register
+        if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
             return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
+            
+        if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
+            return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
             
         # Check if this incident occurred within a registered maintenance window for the same database
         maintenance = MaintenanceRegister.objects.filter(
@@ -2577,6 +2599,25 @@ def incident_staging_list(request):
         
     current_db = request.GET.get('database', '')
     
+    # Auto-resolve/sync any staging records that were manually logged or resolved in registers
+    awaiting_records = IncidentStaging.objects.filter(status='Awaiting Review')
+    for record in awaiting_records:
+        incident = IncidentRegister.objects.filter(database=record.database, start=record.start).first()
+        if incident:
+            record.status = 'Promoted to Incident'
+            record.incident_record = incident
+            record.processed_at = datetime.now()
+            record.save()
+            continue
+            
+        maintenance = MaintenanceRegister.objects.filter(database=record.database, start=record.start).first()
+        if maintenance:
+            record.status = 'Promoted to Maintenance'
+            record.maintenance_record = maintenance
+            record.processed_at = datetime.now()
+            record.save()
+            continue
+            
     queryset = IncidentStaging.objects.filter(status='Awaiting Review').order_by('-start')
     
     if current_db:
