@@ -3,114 +3,264 @@
 {% block title %}Server Health - DBA Operations Tracker{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2>Server Health</h2>
+<style>
+    /* Dropdown Actions Menu styling */
+    .actions-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .actions-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        background: var(--pure-white);
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(90, 123, 156, 0.15);
+        border-radius: 6px;
+        z-index: 100;
+        min-width: 100px;
+        overflow: hidden;
+    }
+    .actions-dropdown-content a, 
+    .actions-dropdown-content button {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 1rem;
+        color: var(--text-dark);
+        text-decoration: none;
+        font-size: 0.82rem;
+        text-align: left;
+        font-weight: 500;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .actions-dropdown-content a:hover, 
+    .actions-dropdown-content button:hover {
+        background-color: var(--bg-cool);
+    }
+    .actions-dropdown:hover .actions-dropdown-content {
+        display: none;
+    }
+
+    /* Custom columns layout styling */
+    .kpi-metric-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    @media (min-width: 768px) {
+        .kpi-metric-col:not(:first-child) {
+            border-left: 1px solid rgba(90, 123, 156, 0.12);
+            padding-left: 1.5rem;
+        }
+    }
+</style>
+
+<!-- Page Header with General Filters -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Server Health</h2>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time resource utilization, active connection threads, and slow query monitoring.</p>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            {% if start_date or end_date or current_db %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+            </div>
+            {% endif %}
+        </form>
+        
         {% if is_admin or perms.api.add_serverhealth %}
-        <a href="{% url 'server_health_create' %}" class="btn btn-success">Create New Record</a>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <a href="{% url 'server_health_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
+        </div>
         {% endif %}
     </div>
+</div>
 
-    <!-- Filter Bar -->
-    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="start_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">From Date</label>
-            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="end_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">To Date</label>
-            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
-            <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
-                <option value="">All Databases</option>
-                <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
-            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
-            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
-        </div>
-    </form>
+<!-- Three Server Health KPIs Summary Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- 1. Unhealthy Logs -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Unhealthy Logs</span>
+        <strong style="color: {% if kpi_unhealthy_count > 0 %}#c5221f{% else %}#137333{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_unhealthy_count }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Warning or critical status alerts</span>
+    </div>
 
+    <!-- 2. Avg CPU Utilization -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Avg CPU Utilisation</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_avg_cpu }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Average processing workload</span>
+    </div>
+
+    <!-- 3. Avg Memory Utilization -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Avg Memory Utilisation</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_avg_mem }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Average RAM consumption</span>
+    </div>
+</div>
+
+<!-- Server Health Registry Table Panel -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
     <div style="overflow-x: auto;">
-        <table>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
             <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Logged By</th>
-                    <th>Server</th>
-                    <th>CPU %</th>
-                    <th>Memory %</th>
-                    <th>Disk %</th>
-                    <th>Running Threads</th>
-                    <th>Slow Queries</th>
-                    <th>Status</th>
-                    <th>Database</th>
-                    <th>Actions</th>
+                <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Timestamp</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Server / Platform</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">CPU</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Disk</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Threads</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Slow Qs</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Logged By</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for health in page_obj %}
-                <tr {% if health.status == 'Critical' %}style="background-color: #ffd6d6;"{% elif health.status == 'Warning' %}style="background-color: #fff3e0;"{% endif %}>
-                    <td>{{ health.date }}</td>
-                    <td>{{ health.updated_at|time:"H:i" }}</td>
-                    <td>
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
+                    <!-- Timestamp -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.date|date:"d M Y" }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
+                            {{ health.updated_at|time:"H:i" }}
+                        </div>
+                    </td>
+
+                    <!-- Server / Platform -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                        <div style="font-weight: 600; color: #0f172a;">
+                            {% if health.database == 'MS SQL Server' %}
+                                Pentana
+                            {% else %}
+                                {{ health.server }}
+                            {% endif %}
+                        </div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; font-weight: 500;">
+                            {{ health.database }}
+                        </div>
+                    </td>
+
+                    <!-- CPU -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-weight: 600; color: {% if health.cpu_percent > 75 %}#c5221f{% else %}#0f172a{% endif %};">
+                                {{ health.cpu_percent }}%
+                            </span>
+                            <!-- mini bar -->
+                            <div style="width: 45px; height: 4px; background-color: #e2e8f0; border-radius: 2px; margin-top: 0.25rem; overflow: hidden;">
+                                <div style="width: {{ health.cpu_percent }}%; height: 100%; background-color: {% if health.cpu_percent > 85 %}#c5221f{% elif health.cpu_percent > 70 %}#ef6c00{% else %}#137333{% endif %};"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Memory -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-weight: 600; color: {% if health.memory_percent > 80 %}#c5221f{% else %}#0f172a{% endif %};">
+                                {{ health.memory_percent }}%
+                            </span>
+                            <!-- mini bar -->
+                            <div style="width: 45px; height: 4px; background-color: #e2e8f0; border-radius: 2px; margin-top: 0.25rem; overflow: hidden;">
+                                <div style="width: {{ health.memory_percent }}%; height: 100%; background-color: {% if health.memory_percent > 85 %}#c5221f{% elif health.memory_percent > 75 %}#ef6c00{% else %}#137333{% endif %};"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Disk -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <span style="font-weight: 600; color: {% if health.disk_percent > 80 %}#c5221f{% else %}#0f172a{% endif %};">
+                                {{ health.disk_percent }}%
+                            </span>
+                            <!-- mini bar -->
+                            <div style="width: 45px; height: 4px; background-color: #e2e8f0; border-radius: 2px; margin-top: 0.25rem; overflow: hidden;">
+                                <div style="width: {{ health.disk_percent }}%; height: 100%; background-color: {% if health.disk_percent > 85 %}#c5221f{% elif health.disk_percent > 75 %}#ef6c00{% else %}#137333{% endif %};"></div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Threads -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 500; color: #334155;">
+                        {{ health.threads }}
+                    </td>
+
+                    <!-- Slow Qs -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 500; color: {% if health.slow_queries > 0 %}#b06000{% else %}#64748b{% endif %};">
+                        {{ health.slow_queries }}
+                    </td>
+
+                    <!-- Status -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
+                                    {% if health.status == 'Healthy' %}background: #e6f4ea; color: #137333;
+                                    {% elif health.status == 'Critical' %}background: #fce8e6; color: #c5221f;
+                                    {% else %}background: #fef7e0; color: #b06000;{% endif %}">
+                            {{ health.status }}
+                        </span>
+                    </td>
+
+                    <!-- Logged By -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-weight: 500; color: #475569;">
                         {% if health.created_by %}
                             {{ health.created_by.username }}
                         {% elif health.entered_by == 'Script' %}
-                            <span class="badge-accent" style="background-color: #e0e0e0; color: #555;">Script</span>
+                            <span style="display: inline-block; background: #e2e8f0; color: #475569; font-size: 0.7rem; font-weight: 600; padding: 0.12rem 0.45rem; border-radius: 9999px;">Script</span>
                         {% else %}
-                            <span style="color: #64748b; font-style: italic;">N/A</span>
+                            <span style="color: #94a3b8; font-style: italic;">System</span>
                         {% endif %}
                     </td>
-                    <td>
-                        {% if health.database == 'MS SQL Server' %}
-                            Pentana
-                        {% else %}
-                            {{ health.server }}
-                        {% endif %}
-                    </td>
-                    <td>{{ health.cpu_percent }}</td>
-                    <td>{{ health.memory_percent }}</td>
-                    <td>{{ health.disk_percent }}</td>
-                    <td>{{ health.threads }}</td>
-                    <td>{{ health.slow_queries }}</td>
-                    <td>
-                        {% if health.status == 'Healthy' %}
-                            <span style="color: #2e7d32; font-weight: 600;">{{ health.status }}</span>
-                        {% elif health.status == 'Critical' %}
-                            <span style="color: #c62828; font-weight: 600;">{{ health.status }}</span>
-                        {% else %}
-                            <span style="color: #ef6c00; font-weight: 600;">{{ health.status }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ health.database }}</td>
-                    <td>
+
+                    <!-- Actions -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
                         {% if health.entered_by == 'Script' and not is_admin %}
-                            <span style="color: #64748b; font-style: italic; font-size: 0.85rem;">Auto-managed</span>
+                            <span style="color: var(--text-soft); font-size: 0.72rem; font-style: italic;" title="Automated metrics cannot be modified manually">Auto</span>
                         {% else %}
-                            <div style="display: flex; gap: 0.25rem;">
-                                {% if health.entered_by != 'Script' %}
-                                    <a href="{% url 'server_health_edit' health.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
-                                {% endif %}
-                                {% if is_admin or perms.api.delete_serverhealth or health.created_by == request.user %}
-                                <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                                </form>
-                                {% endif %}
+                            <div class="actions-dropdown">
+                                <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ health.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
+                                <div id="actions-{{ health.pk }}" class="actions-dropdown-content">
+                                    {% if health.entered_by != 'Script' %}
+                                        <a href="{% url 'server_health_edit' health.pk %}">Edit</a>
+                                    {% endif %}
+                                    {% if is_admin or perms.api.delete_serverhealth or health.created_by == request.user %}
+                                    <form method="post" action="{% url 'server_health_delete' health.pk %}" style="margin: 0; {% if health.entered_by != 'Script' %}border-top: 1px solid rgba(90, 123, 156, 0.1);{% endif %}" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                        {% csrf_token %}
+                                        <button type="submit" style="color: #c5221f;">Delete</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
                             </div>
                         {% endif %}
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="12" style="text-align: center;">No server health records found.</td>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No server health records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -119,28 +269,62 @@
 
     <!-- Pagination Controls -->
     {% if page_obj.has_other_pages %}
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-        <div style="color: #64748b; font-size: 0.875rem;">
-            Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
+        <div style="color: #64748b; font-size: 0.8rem; font-weight: 500;">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.35rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
             {% else %}
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
             {% else %}
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
             {% endif %}
         </div>
     </div>
     {% endif %}
 </div>
+
+<script>
+    // Toggle Actions Dropdown Menu
+    function toggleActionsDropdown(event, dropdownId) {
+        event.stopPropagation();
+        
+        var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+            if (dropdowns[i].id !== dropdownId) {
+                dropdowns[i].style.display = "none";
+            }
+        }
+        
+        var content = document.getElementById(dropdownId);
+        if (content.style.display === "block") {
+            content.style.display = "none";
+        } else {
+            content.style.display = "block";
+        }
+    }
+
+    // Close actions menus if user clicks outside
+    window.onclick = function(event) {
+        if (!event.target.matches('.actions-trigger')) {
+            var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.style.display === "block") {
+                    openDropdown.style.display = "none";
+                }
+            }
+        }
+    }
+</script>
 {% endblock %}
