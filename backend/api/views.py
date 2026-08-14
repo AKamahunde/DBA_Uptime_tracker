@@ -590,14 +590,22 @@ def dashboard(request):
                     t_avails.append(float(str(val).replace('%', '')))
                 except ValueError:
                     pass
-        avg_avail = round(sum(t_avails)/len(t_avails), 2) if t_avails else 100.0
+        # All months before July 2026 should be 0 because we don't have data for them
+        if t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
+            avg_avail = 0.0
+        else:
+            avg_avail = round(sum(t_avails)/len(t_avails), 2) if t_avails else 100.0
+
         trend_months.append({
             'name': t_month.strftime('%b'),
             'value': avg_avail,
         })
         
     min_val = min([m['value'] for m in trend_months] + [99.95])
-    y_min = math.floor(min_val - 0.2) if min_val < 98.0 else 98.0
+    if min_val <= 0.0:
+        y_min = 0.0
+    else:
+        y_min = math.floor(min_val - 0.2) if min_val < 98.0 else 98.0
     y_max = 100.0
     y_range = max(0.1, y_max - y_min)
     

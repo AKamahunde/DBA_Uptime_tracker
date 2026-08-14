@@ -148,7 +148,6 @@
                                         {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
                                 {% if row.health_status == 'HEALTHY' %}✓ Healthy{% elif row.health_status == 'WARNING' %}⚠ Warning{% else %}⚡ Outage{% endif %}
                             </span>
-                            <a href="?database_select=Oracle&month={{ reporting_month }}" style="font-size: 0.75rem; color: #2563eb; text-decoration: none; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; background: #eff6ff;">Drill Down &rarr;</a>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem;">
@@ -174,7 +173,7 @@
                             </div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication Link</div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication</div>
                             <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; margin-top: 0.25rem;">{{ row.replication_status }}</div>
                             <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
                                 {% if row.replication_status == 'Healthy' %}Live sync active{% else %}No active stream alert{% endif %}
@@ -194,7 +193,7 @@
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
                                 <strong style="font-size: 0.95rem; color: var(--primary-navy);">{{ row.database }} Environment</strong>
                                 <span style="font-size: 0.7rem; background: #f1f5f9; color: #475569; padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
-                                    {% if row.database == 'MySQL' %}nms360{% else %}Pentana{% endif %}
+                                    {% if row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
                                 </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 0.35rem;">
@@ -204,7 +203,6 @@
                                             {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
                                     {% if row.health_status == 'HEALTHY' %}Healthy{% elif row.health_status == 'WARNING' %}Warning{% else %}Outage{% endif %}
                                 </span>
-                                <a href="?database_select={{ row.database }}&month={{ reporting_month }}" style="font-size: 0.7rem; color: #2563eb; text-decoration: none; font-weight: 600; padding: 0.15rem 0.35rem; border-radius: 4px; background: #eff6ff;">Drill Down &rarr;</a>
                             </div>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
@@ -241,7 +239,7 @@
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <strong style="font-size: 1.05rem; color: var(--primary-navy);">{{ row.database }} Database Environment</strong>
                             <span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.45rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
-                                {% if row.database == 'Oracle' %}nmsinfra{% elif row.database == 'MySQL' %}nms360{% else %}Pentana{% endif %}
+                                {% if row.database == 'Oracle' %}nmsinfra{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
                             </span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -277,7 +275,7 @@
                             </div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication Link</div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication</div>
                             <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; margin-top: 0.25rem;">{{ row.replication_status }}</div>
                             <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
                                 {% if row.replication_status == 'Healthy' %}Live sync active{% else %}No active stream alert{% endif %}
@@ -416,7 +414,7 @@
                 <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
 
                 <!-- Value Polyline -->
-                <polyline fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
                 
                 <!-- Data Point Circles -->
                 {% for m in trend_months %}
@@ -478,13 +476,14 @@
     </div>
 </div>
 
-<!-- Database Systems & Environment Key -->
-<div style="border-top: 1.5px solid #e2e8f0; padding-top: 1.5rem; font-size: 0.85rem; line-height: 1.5; margin-bottom: 2rem;">
+<!-- System Reference & Specifications Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+    <h3 style="margin: 0 0 1.25rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">System Reference &amp; Specifications</h3>
     <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 2rem;">
         <!-- Left: Traffic-Light Status -->
         <div style="border-right: 1px solid #cbd5e1; padding-right: 2rem;">
-            <h4 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">Traffic-Light Status</h4>
-            <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+            <h4 style="margin: 0 0 0.75rem 0; color: var(--primary-navy); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">Traffic-Light Status</h4>
+            <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.82rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-green);"></span>
                     <strong style="color: var(--primary-green); font-weight: 600; width: 60px;">Green</strong> &mdash; Meets SLA
@@ -505,30 +504,30 @@
         </div>
         
         <!-- Right: Database Environment Key -->
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">System Specifications</h4>
+        <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.82rem;">
+            <h4 style="margin: 0 0 0.25rem 0; color: var(--primary-navy); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em;">System Specifications</h4>
             
             {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
             <div>
-                <strong style="color: var(--primary-navy); font-size: 0.9rem;">Oracle (nmsinfra)</strong> &mdash;
+                <strong style="color: var(--primary-navy); font-size: 0.85rem;">Oracle (nmsinfra)</strong> &mdash;
                 <span style="color: #475569; font-weight: 600;">nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)</span>
-                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.78rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
             </div>
             {% endif %}
             
             {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
             <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
-                <strong style="color: var(--primary-navy); font-size: 0.9rem;">MySQL (nms360)</strong> &mdash;
+                <strong style="color: var(--primary-navy); font-size: 0.85rem;">MySQL (nickledbnew)</strong> &mdash;
                 <span style="color: #475569; font-weight: 600;">nickledbnew (replicated to nickeldbdr)</span>
-                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Database Monitoring Tool.</p>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.78rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Database Monitoring Tool.</p>
             </div>
             {% endif %}
             
             {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
             <div style="{% if selected_db == 'All Databases' %}border-top: 1px dashed #e2e8f0; padding-top: 0.75rem;{% endif %}">
-                <strong style="color: var(--primary-navy); font-size: 0.9rem;">MS SQL (Pentana)</strong> &mdash;
+                <strong style="color: var(--primary-navy); font-size: 0.85rem;">MS SQL (Pentana)</strong> &mdash;
                 <span style="color: #475569; font-weight: 600;">Windows Server host</span>
-                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.8rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
+                <p style="color: var(--text-dark); margin: 0.2rem 0 0 0; font-size: 0.78rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
             </div>
             {% endif %}
         </div>
