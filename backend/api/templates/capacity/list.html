@@ -68,6 +68,41 @@
             padding-left: 1.5rem;
         }
     }
+
+    /* Export Dropdown Styles */
+    .export-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .export-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        background-color: #ffffff;
+        min-width: 140px;
+        box-shadow: 0px 8px 16px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        z-index: 100;
+        margin-top: 4px;
+        overflow: hidden;
+    }
+    .export-dropdown:hover .export-dropdown-content {
+        display: block;
+    }
+    .export-dropdown-content a {
+        color: #334155;
+        padding: 0.5rem 0.75rem;
+        text-decoration: none;
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 600;
+        transition: background-color 0.15s;
+        text-align: left;
+    }
+    .export-dropdown-content a:hover {
+        background-color: #f8fafc;
+    }
 </style>
 
 <!-- Page Header -->
@@ -102,7 +137,23 @@
             </div>
             {% endif %}
         </form>
-        
+        <!-- Export Dropdown -->
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <div class="export-dropdown">
+                <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 1.25rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff; height: 34px; line-height: 20px;">
+                    Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
+                </button>
+                <div class="export-dropdown-content">
+                    <a href="{% url 'capacity_print' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
+                        📄 Export PDF
+                    </a>
+                    <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
+                        📊 Export Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+
         {% if is_admin or perms.api.add_capacityplanning %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <a href="{% url 'capacity_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
@@ -240,17 +291,9 @@
 
 <!-- Capacity Records Table Section -->
 <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <!-- Compact Header with Export Options on same line -->
+    <!-- Compact Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
         <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Capacity Records</h3>
-        <div style="display: flex; gap: 0.5rem;">
-            <a href="{% url 'capacity_print' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">
-                Export PDF
-            </a>
-            <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}" download class="btn btn-success" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: #16a34a; border-color: #16a34a;">
-                Export Excel
-            </a>
-        </div>
     </div>
 
 

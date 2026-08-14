@@ -92,6 +92,41 @@
     .kpi-accent-red { border-left: 4px solid #ef4444; }
     .kpi-accent-green { border-left: 4px solid var(--primary-green); }
     .kpi-accent-blue { border-left: 4px solid var(--accent-muted-blue); }
+
+    /* Export Dropdown Styles */
+    .export-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .export-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        background-color: #ffffff;
+        min-width: 140px;
+        box-shadow: 0px 8px 16px rgba(15, 23, 42, 0.08);
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        z-index: 100;
+        margin-top: 4px;
+        overflow: hidden;
+    }
+    .export-dropdown:hover .export-dropdown-content {
+        display: block;
+    }
+    .export-dropdown-content a {
+        color: #334155;
+        padding: 0.5rem 0.75rem;
+        text-decoration: none;
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 600;
+        transition: background-color 0.15s;
+        text-align: left;
+    }
+    .export-dropdown-content a:hover {
+        background-color: #f8fafc;
+    }
 </style>
 
 <!-- Header & Scope Selection -->
@@ -111,21 +146,40 @@
         </div>
     </div>
     
-    <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
-            <select name="database_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
-                <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
-                <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
+                <input type="month" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+        </form>
+        
+        <!-- Export dropdown button in header -->
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <div class="export-dropdown">
+                <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
+                    Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
+                </button>
+                <div class="export-dropdown-content">
+                    <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank">
+                        📄 Export PDF
+                    </a>
+                    <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download>
+                        📊 Export Excel
+                    </a>
+                </div>
+            </div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
-            <input type="month" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
-        </div>
-    </form>
+    </div>
 </div>
 
 <!-- Database Environment Cards -->
@@ -146,7 +200,7 @@
                                         {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
                                         {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
                                         {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
-                                {% if row.health_status == 'HEALTHY' %}✓ Healthy{% elif row.health_status == 'WARNING' %}⚠ Warning{% else %}⚡ Outage{% endif %}
+                                {% if row.health_status == 'HEALTHY' %} Healthy{% elif row.health_status == 'WARNING' %} Warning{% else %}  Outage{% endif %}
                             </span>
                         </div>
                     </div>
@@ -155,7 +209,7 @@
                             <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
                             <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.availability }}</div>
                             <div style="font-size: 0.7rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.15rem;">
-                                {% if row.availability_status == 'Meets SLA' %}✓ Meets SLA Target (≥99.95%){% else %}⚠ Below SLA Target{% endif %}
+                                {% if row.availability_status == 'Meets SLA' %} Meets SLA Target (≥99.95%){% else %} Below SLA Target{% endif %}
                             </div>
                         </div>
                         <div>
@@ -247,7 +301,7 @@
                                         {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
                                         {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
                                         {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
-                                {% if row.health_status == 'HEALTHY' %}✓ Healthy{% elif row.health_status == 'WARNING' %}⚠ Warning{% else %}⚡ Outage{% endif %}
+                                {% if row.health_status == 'HEALTHY' %} Healthy{% elif row.health_status == 'WARNING' %} Warning{% else %} Outage{% endif %}
                             </span>
                             <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.75rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1;">&larr; Back to Fleet Overview</a>
                         </div>
@@ -257,7 +311,7 @@
                             <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
                             <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.availability }}</div>
                             <div style="font-size: 0.7rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.15rem;">
-                                {% if row.availability_status == 'Meets SLA' %}✓ Meets SLA Target (≥99.95%){% else %}⚠ Below SLA Target{% endif %}
+                                {% if row.availability_status == 'Meets SLA' %} Meets SLA Target (≥99.95%){% else %} Below SLA Target{% endif %}
                             </div>
                         </div>
                         <div>
@@ -416,10 +470,10 @@
                 <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
             {% elif selected_db == 'MySQL' %}
                 <span style="color: var(--primary-navy); font-weight: 700;">MySQL (nickledbnew)</span> &mdash; nickledbnew (replicated to nickeldbdr)
-                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Database Monitoring Tool.</p>
+                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts NMS360, IT ServiceDesk ticketing, and Delivery Monitoring Tool(DMT).</p>
             {% elif selected_db == 'MS SQL Server' %}
                 <span style="color: var(--primary-navy); font-weight: 700;">MS SQL (Pentana)</span> &mdash; Windows Server host
-                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
+                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for auditing purposes.</p>
             {% endif %}
         </div>
     </div>
@@ -436,9 +490,6 @@
                     <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
                     <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
                 </div>
-                <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.5rem; font-size: 0.7rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">
-                    Export PDF
-                </a>
             </div>
         </div>
         
