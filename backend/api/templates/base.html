@@ -370,7 +370,7 @@
             margin-top: auto;
             color: var(--text-soft);
             font-size: 0.9rem;
-            border-top: 1px solid var(--border-mist);
+            border-top: none;
         }
         .footer a {
             color: var(--accent-muted-blue);
@@ -545,7 +545,7 @@
     </script>
 
     <footer class="footer">
-        <p>&copy; 2026 Database Monitoring Tool | <a href="{% url 'about' %}">About DB Tool</a></p>
+        <p>&copy; 2026 Database Monitoring Tool{% if request.resolver_match.url_name == 'dashboard' %} | <a href="{% url 'about' %}">About DB Tool</a>{% endif %}</p>
     </footer>
 </body>
 </html>
