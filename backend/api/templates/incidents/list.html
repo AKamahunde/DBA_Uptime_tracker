@@ -156,7 +156,10 @@
                         <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Incident / Target</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Outage Window</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity / Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Duration</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
                         </tr>
@@ -206,29 +209,42 @@
                             <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
                                 <div style="font-weight: 600; color: #0f172a;">{{ incident.start|date:"d M Y" }}</div>
                                 <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
-                                    {{ incident.start|date:"H:i" }} - {% if incident.end %}{{ incident.end|date:"H:i" }}{% else %}Active{% endif %} ({{ incident.duration_hrs }}h)
+                                    {{ incident.start|date:"H:i" }} - {% if incident.end %}{{ incident.end|date:"H:i" }}{% else %}Active{% endif %}
                                 </div>
                             </td>
 
-                            <!-- Severity / Status -->
+                            <!-- Duration -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
+                                {{ incident.duration_hrs }} hrs
+                            </td>
+
+                            <!-- Severity -->
                             <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
-                                <div style="display: flex; flex-direction: column; align-items: center; gap: 0.35rem;">
-                                    <!-- Severity Badge -->
-                                    <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
-                                                {% if incident.severity == 'Critical' or incident.severity == 'High' %}background: #fce8e6; color: #c5221f;
-                                                {% elif incident.severity == 'Medium' %}background: #fef7e0; color: #b06000;
-                                                {% else %}background: #e6f4ea; color: #137333;{% endif %}">
-                                        {{ incident.severity }}
-                                    </span>
-                                    
-                                    <!-- Status Badge -->
-                                    <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 85px; text-align: center;
-                                                {% if incident.status == 'Open' %}background: #fce8e6; color: #c5221f;
-                                                {% elif incident.status == 'In Progress' %}background: #fef7e0; color: #b06000;
-                                                {% else %}background: #e6f4ea; color: #137333;{% endif %}">
-                                        {{ incident.status }}
-                                    </span>
-                                </div>
+                                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
+                                            {% if incident.severity == 'Critical' or incident.severity == 'High' %}background: #fce8e6; color: #c5221f;
+                                            {% elif incident.severity == 'Medium' %}background: #fef7e0; color: #b06000;
+                                            {% else %}background: #e6f4ea; color: #137333;{% endif %}">
+                                    {{ incident.severity }}
+                                </span>
+                            </td>
+
+                            <!-- Status -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 85px; text-align: center;
+                                            {% if incident.status == 'Open' %}background: #fce8e6; color: #c5221f;
+                                            {% elif incident.status == 'In Progress' %}background: #fef7e0; color: #b06000;
+                                            {% else %}background: #e6f4ea; color: #137333;{% endif %}">
+                                    {{ incident.status }}
+                                </span>
+                            </td>
+
+                            <!-- Root Cause -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-weight: 500;" title="{{ incident.root_cause }}">
+                                {% if incident.root_cause|slice:":12" == "AUTO-LOGGED:" %}
+                                    <span style="font-family: monospace; font-size: 0.75rem; color: var(--primary-navy);">Auto-detected logs</span>
+                                {% else %}
+                                    {{ incident.root_cause|default:"—" }}
+                                {% endif %}
                             </td>
 
                             <!-- SLA Status -->
