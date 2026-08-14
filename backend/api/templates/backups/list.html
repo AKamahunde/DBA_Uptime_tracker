@@ -3,138 +3,248 @@
 {% block title %}Backup & Recovery - DBA Operations Tracker{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2>Backup & Recovery</h2>
+<style>
+    /* Dropdown Actions Menu styling */
+    .actions-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+    .actions-dropdown-content {
+        display: none;
+        position: absolute;
+        right: 0;
+        background: var(--pure-white);
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(90, 123, 156, 0.15);
+        border-radius: 6px;
+        z-index: 100;
+        min-width: 100px;
+        overflow: hidden;
+    }
+    .actions-dropdown-content a, 
+    .actions-dropdown-content button {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 1rem;
+        color: var(--text-dark);
+        text-decoration: none;
+        font-size: 0.82rem;
+        text-align: left;
+        font-weight: 500;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .actions-dropdown-content a:hover, 
+    .actions-dropdown-content button:hover {
+        background-color: var(--bg-cool);
+    }
+    .actions-dropdown:hover .actions-dropdown-content {
+        display: none;
+    }
+
+    /* Custom columns layout styling */
+    .kpi-metric-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    @media (min-width: 768px) {
+        .kpi-metric-col:not(:first-child) {
+            border-left: 1px solid rgba(90, 123, 156, 0.12);
+            padding-left: 1.5rem;
+        }
+    }
+</style>
+
+<!-- Page Header with General Filters -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Backup & Recovery</h2>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Backup execution results, recovery verification, and failure analysis.</p>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            {% if start_date or end_date or current_db %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+            </div>
+            {% endif %}
+        </form>
+        
         {% if is_admin or perms.api.add_backuprecovery %}
-        <a href="{% url 'backup_create' %}" class="btn btn-success">Create New Record</a>
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+            <a href="{% url 'backup_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
+        </div>
         {% endif %}
     </div>
+</div>
 
-    <!-- Filter Bar -->
-    <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center;">
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="start_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">From Date</label>
-            <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="end_date" style="font-size: 0.8rem; font-weight: 600; color: #475569;">To Date</label>
-            <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
-            <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
-                <option value="">All Databases</option>
-                <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
-            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
-            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
-        </div>
-    </form>
+<!-- Three Backup KPIs Summary Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- 1. Success Rate -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Success Rate</span>
+        <strong style="color: {% if kpi_backup_success_rate == '100.0%' or kpi_backup_success_rate == '100%' %}#137333{% else %}#0f172a{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_backup_success_rate }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Backup success outcomes</span>
+    </div>
 
+    <!-- 2. Failed Backups -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Failed Backups</span>
+        <strong style="color: {% if kpi_backup_failed_count > 0 %}#c5221f{% else %}#0f172a{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_backup_failed_count }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Failed job counts</span>
+    </div>
+
+    <!-- 3. Restores Completed -->
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Restores Verified</span>
+        <strong style="color: var(--primary-navy); font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_restore_count }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Executed recovery checks</span>
+    </div>
+</div>
+
+<!-- Backups Registry Table Panel -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
     <div style="overflow-x: auto;">
-        <table style="width: 100%; table-layout: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
             <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Record Type</th>
-                    <th>Database</th>
-                    <th>Backup Type</th>
-                    <th>Backup File / Reference</th>
-                    <th>Duration (Mins)</th>
-                    <th>Compression</th>
-                    <th>Outcome</th>
-                    <th>Reason for Failure</th>
-                    <th>Verified</th>
-                    <th>Actions</th>
+                <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Timestamp</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Type</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Database / Host</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Method</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Backup File / Reference</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Duration</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Outcome</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Verified</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for backup in page_obj %}
-                <tr {% if backup.outcome == 'Failed' %}style="background-color: #ffd6d6;"{% elif backup.outcome == 'Partial' %}style="background-color: #fff3e0;"{% endif %}>
-                    <td>
-                        {{ backup.start|date:"d/m/Y H:i" }}
-                        {% if backup.end %}
-                            - {{ backup.end|date:"H:i" }}
-                        {% endif %}
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
+                    <!-- Timestamp -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ backup.start|date:"d M Y" }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
+                            {{ backup.start|date:"H:i" }}{% if backup.end %} - {{ backup.end|date:"H:i" }}{% endif %}
+                        </div>
                     </td>
-                    <td>{{ backup.record_type }}</td>
-                    <td>
-                        {{ backup.database }}
+
+                    <!-- Type -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-weight: 600; color: var(--primary-navy);">
+                        {{ backup.record_type }}
+                    </td>
+
+                    <!-- Database / Host -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ backup.database }}</div>
                         {% if backup.database_instance %}
-                            <br><span style="font-size: 0.725rem; color: #64748b; font-weight: 600;" title="Instance: {{ backup.database_instance }}">
-                                {% if 'nmsinfra' in backup.database_instance %}
-                                    nmsinfra.nms.go.ug (DB)
-                                {% elif 'nmsebs' in backup.database_instance %}
-                                    nmsebs.nms.go.ug (App)
-                                {% elif 'nickle' in backup.database_instance or 'mysql' in backup.database_instance|lower %}
-                                    nickledbnew
-                                {% elif 'windows' in backup.database_instance|lower or 'mssql' in backup.database_instance|lower or 'localhost' in backup.database_instance|lower %}
-                                    Windows Server
-                                {% else %}
-                                    {{ backup.database_instance }}
-                                {% endif %}
-                            </span>
-                        {% endif %}
-                    </td>
-                    <td>{{ backup.backup_type }}</td>
-                    <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">{{ backup.backup_used }}</td>
-                    <td>{{ backup.duration_mins }}</td>
-                    <td>
-                        {% if backup.compression %}
-                            <span style="color: #2e7d32; font-weight: 600;">Yes</span>
-                        {% else %}
-                            <span style="color: #c62828;">No</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if backup.outcome == 'Success' %}
-                            <span style="color: #2e7d32; font-weight: 600;">{{ backup.outcome }}</span>
-                        {% elif backup.outcome == 'Failed' %}
-                            <span style="color: #c62828; font-weight: 600;">{{ backup.outcome }}</span>
-                        {% else %}
-                            <span style="color: #ef6c00; font-weight: 600;">{{ backup.outcome }}</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if backup.outcome != 'Success' and backup.failure_reason %}
-                            <span style="color: #c62828; font-weight: 600; font-size: 0.85rem;" title="{{ backup.failure_reason }}">
-                                {{ backup.failure_reason|truncatechars:45 }}
-                            </span>
-                        {% else %}
-                            <span style="color: #64748b;">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if backup.verified %}
-                            <span style="display:inline-block;background:#43a047;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">Yes</span>
-                        {% else %}
-                            <span style="display:inline-block;background:#e53935;color:white;font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:3px;">No</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div style="display: flex; gap: 0.25rem;">
-                            {% if backup.created_by %}
-                                <a href="{% url 'backup_edit' backup.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.875rem;">Edit</a>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; font-weight: 500;">
+                            {% if 'nmsinfra' in backup.database_instance %}
+                                nmsinfra.nms.go.ug
+                            {% elif 'nmsebs' in backup.database_instance %}
+                                nmsebs.nms.go.ug
+                            {% elif 'nickle' in backup.database_instance or 'mysql' in backup.database_instance|lower %}
+                                nickledbnew
+                            {% elif 'windows' in backup.database_instance|lower or 'mssql' in backup.database_instance|lower or 'localhost' in backup.database_instance|lower %}
+                                Windows Server
                             {% else %}
-                                <button class="btn btn-secondary" disabled style="padding: 0.25rem 0.5rem; font-size: 0.875rem; opacity: 0.5; cursor: not-allowed;" title="Automated records cannot be edited">Auto</button>
+                                {{ backup.database_instance }}
                             {% endif %}
-                            {% if is_admin or perms.api.delete_backuprecovery or backup.created_by == request.user %}
-                            <form method="post" action="{% url 'backup_delete' backup.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this record?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; border: none; cursor: pointer; color: white; background-color: #c62828;">Delete</button>
-                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Method -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                        <div style="font-weight: 600; color: #334155;">{{ backup.backup_type }}</div>
+                        {% if backup.compression %}
+                            <div style="font-size: 0.7rem; color: #137333; font-weight: 600; margin-top: 0.1rem;">Compressed</div>
+                        {% else %}
+                            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.1rem;">Uncompressed</div>
+                        {% endif %}
+                    </td>
+
+                    <!-- Backup File / Reference -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-family: monospace; font-size: 0.75rem; color: #475569; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ backup.backup_used }}">
+                        {{ backup.backup_used }}
+                    </td>
+
+                    <!-- Duration -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 500; color: #0f172a;">
+                        {{ backup.duration_mins }} min
+                    </td>
+
+                    <!-- Outcome -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.15rem;">
+                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
+                                        {% if backup.outcome == 'Success' %}background: #e6f4ea; color: #137333;
+                                        {% elif backup.outcome == 'Failed' %}background: #fce8e6; color: #c5221f;
+                                        {% else %}background: #fef7e0; color: #b06000;{% endif %}">
+                                {{ backup.outcome }}
+                            </span>
+                            {% if backup.outcome == 'Failed' and backup.failure_reason %}
+                                <div style="font-size: 0.7rem; color: #c5221f; font-weight: 500; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ backup.failure_reason }}">
+                                    {{ backup.failure_reason }}
+                                </div>
                             {% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Verified -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 45px; text-align: center;
+                                    {% if backup.verified %}background: #e6f4ea; color: #137333;
+                                    {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                            {% if backup.verified %}Yes{% else %}No{% endif %}
+                        </span>
+                    </td>
+
+                    <!-- Action Menu -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
+                        <div class="actions-dropdown">
+                            <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ backup.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
+                            <div id="actions-{{ backup.pk }}" class="actions-dropdown-content">
+                                {% if backup.created_by %}
+                                    <a href="{% url 'backup_edit' backup.pk %}">Edit</a>
+                                {% else %}
+                                    <button disabled style="opacity: 0.5; cursor: not-allowed; color: var(--text-soft);" title="Automated records cannot be edited">Auto</button>
+                                {% endif %}
+                                {% if is_admin or perms.api.delete_backuprecovery or backup.created_by == request.user %}
+                                <form method="post" action="{% url 'backup_delete' backup.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                    {% csrf_token %}
+                                    <button type="submit" style="color: #c5221f;">Delete</button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" style="text-align: center;">No backup records found.</td>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No backup records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -143,28 +253,62 @@
 
     <!-- Pagination Controls -->
     {% if page_obj.has_other_pages %}
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-        <div style="color: #64748b; font-size: 0.875rem;">
-            Showing page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
+        <div style="color: #64748b; font-size: 0.8rem; font-weight: 500;">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.35rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
             {% else %}
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
-                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
             {% else %}
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
-                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
             {% endif %}
         </div>
     </div>
     {% endif %}
 </div>
+
+<script>
+    // Toggle Actions Dropdown Menu
+    function toggleActionsDropdown(event, dropdownId) {
+        event.stopPropagation();
+        
+        var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+            if (dropdowns[i].id !== dropdownId) {
+                dropdowns[i].style.display = "none";
+            }
+        }
+        
+        var content = document.getElementById(dropdownId);
+        if (content.style.display === "block") {
+            content.style.display = "none";
+        } else {
+            content.style.display = "block";
+        }
+    }
+
+    // Close actions menus if user clicks outside
+    window.onclick = function(event) {
+        if (!event.target.matches('.actions-trigger')) {
+            var dropdowns = document.getElementsByClassName("actions-dropdown-content");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                if (openDropdown.style.display === "block") {
+                    openDropdown.style.display = "none";
+                }
+            }
+        }
+    }
+</script>
 {% endblock %}

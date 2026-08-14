@@ -1285,12 +1285,30 @@ def backup_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = BackupRecovery.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+        
+    total_backups = kpi_queryset.filter(record_type='Backup').count()
+    success_backups = kpi_queryset.filter(record_type='Backup', outcome='Success').count()
+    kpi_backup_success_rate = f"{round((success_backups / total_backups) * 100, 1)}%" if total_backups > 0 else 'No Data'
+    kpi_backup_failed_count = kpi_queryset.filter(record_type='Backup', outcome='Failed').count()
+    kpi_restore_count = kpi_queryset.filter(record_type='Recovery').count()
+    
     return render(request, 'backups/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'kpi_backup_success_rate': kpi_backup_success_rate,
+        'kpi_backup_failed_count': kpi_backup_failed_count,
+        'kpi_restore_count': kpi_restore_count
     })
 
 @login_required
