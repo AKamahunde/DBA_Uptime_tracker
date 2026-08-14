@@ -1534,6 +1534,8 @@ def capacity_list(request):
     kpi_size = 0.0
     
     for db, rec in latest_records.items():
+        if current_db and db != current_db:
+            continue
         cap = float(rec.disk_capacity_gb)
         used_pct = float(rec.disk_used_percent)
         free = float(rec.available_capacity_gb)

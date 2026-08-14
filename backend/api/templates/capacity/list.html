@@ -117,7 +117,7 @@
     <div class="kpi-metric-col">
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Current Capacity</span>
         <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_capacity }} GB</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Total monitored storage</span>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">{% if current_db %}{{ current_db }} monitored storage{% else %}Total monitored storage{% endif %}</span>
     </div>
 
     <!-- 2. Used Capacity -->
@@ -131,7 +131,7 @@
     <div class="kpi-metric-col">
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Free Capacity</span>
         <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_free_gb }} GB</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Available storage</span>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">{% if current_db %}{{ current_db }} available storage{% else %}Available storage{% endif %}</span>
     </div>
 
     <!-- 4. Monthly Growth -->
@@ -152,6 +152,7 @@
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
         {% for db in health_panels %}
+        {% if not current_db or db.database == current_db %}
         <div class="db-util-col">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong style="color: var(--primary-navy); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">{{ db.database }}</strong>
@@ -183,6 +184,7 @@
                 <span>Monthly Growth: <strong style="color: {% if db.growth_gb > 0 %}#c5221f{% else %}#137333{% endif %};">{% if db.growth_gb > 0 %}+{% endif %}{{ db.growth_gb }} GB</strong></span>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
     </div>
 </div>
