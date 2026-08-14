@@ -1274,12 +1274,32 @@ def replication_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = ReplicationMonitor.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+        
+    total_checks = kpi_queryset.count()
+    healthy_checks = kpi_queryset.filter(status='Healthy').count()
+    kpi_replication_health_rate = f"{round((healthy_checks / total_checks) * 100, 1)}%" if total_checks > 0 else 'No Data'
+    kpi_replication_failed_count = kpi_queryset.filter(status='Failed').count()
+    
+    lag_queryset = kpi_queryset.filter(seconds_behind__isnull=False)
+    kpi_max_lag = lag_queryset.order_by('-seconds_behind').first().seconds_behind if lag_queryset.exists() else 0
+    
     return render(request, 'replication/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
         'current_db': current_db,
         'start_date': start_date,
-        'end_date': end_date
+        'end_date': end_date,
+        'kpi_replication_health_rate': kpi_replication_health_rate,
+        'kpi_replication_failed_count': kpi_replication_failed_count,
+        'kpi_max_lag': kpi_max_lag
     })
 
 @login_required
