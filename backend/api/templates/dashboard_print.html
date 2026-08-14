@@ -226,12 +226,6 @@
                             ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
                         </span>
                     </div>
-                    <span style="display: inline-block; padding: 0.08rem 0.3rem; border-radius: 3px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; margin-top: 0.15rem;
-                                {% if item.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
-                                {% elif item.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
-                                {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
-                        {{ item.health_status }}
-                    </span>
                 </td>
                 <td>
                     {{ item.availability }}
