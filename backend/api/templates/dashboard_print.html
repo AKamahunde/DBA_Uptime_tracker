@@ -218,7 +218,20 @@
         <tbody>
             {% for item in dashboard_data %}
             <tr>
-                <td><strong>{{ item.database }}</strong></td>
+                <td style="padding: 0.5rem 0.4rem; vertical-align: middle;">
+                    <div style="font-weight: 700; color: var(--primary-navy); font-size: 0.8rem;">
+                        {{ item.database }}
+                        <span style="font-size: 0.65rem; font-weight: normal; font-family: monospace; color: #64748b; margin-left: 0.25rem;">
+                            ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
+                        </span>
+                    </div>
+                    <span style="display: inline-block; padding: 0.08rem 0.3rem; border-radius: 3px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; margin-top: 0.15rem;
+                                {% if item.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
+                                {% elif item.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
+                                {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                        {{ item.health_status }}
+                    </span>
+                </td>
                 <td>
                     {{ item.availability }}
                     {% if item.availability != 'No Data' %}
@@ -367,14 +380,51 @@
                     </tr>
                 </tbody>
             </table>
+            
+            <!-- Legend and specific server specs inside the card detail -->
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border-mist); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem; font-size: 0.7rem; line-height: 1.45;">
+                <div>
+                    <h4 style="margin: 0 0 0.4rem 0; font-size: 0.75rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">SLA Status Legend</h4>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-green);"></span>
+                            <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-gold);"></span>
+                            <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Warning)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: #c62828;"></span>
+                            <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--text-soft);"></span>
+                            <span style="color: var(--text-soft); font-weight: 700;">Grey</span> (N/A)
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="max-width: 450px;">
+                    <h4 style="margin: 0 0 0.3rem 0; font-size: 0.75rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">System Specifications</h4>
+                    {% if selected_db == 'Oracle' %}
+                        <strong style="color: var(--primary-navy);">Oracle (nmsinfra)</strong> &mdash; nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)
+                        <p style="color: #64748b; margin: 0.15rem 0 0 0; font-size: 0.68rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
+                    {% elif selected_db == 'MySQL' %}
+                        <strong style="color: var(--primary-navy);">MySQL (nickledbnew)</strong> &mdash; nickledbnew (replicated to nickeldbdr)
+                        <p style="color: #64748b; margin: 0.15rem 0 0 0; font-size: 0.68rem;">Hosts NMS360 collaboration, IT ServiceDesk ticketing, and Database Monitoring Tool.</p>
+                    {% elif selected_db == 'MS SQL Server' %}
+                        <strong style="color: var(--primary-navy);">MS SQL (Pentana)</strong> &mdash; Windows Server host
+                        <p style="color: #64748b; margin: 0.15rem 0 0 0; font-size: 0.68rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance reviews.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
-
-    <!-- Database Legend / Key (Summarized for single-page fit) -->
+    {% endif %}    {% if selected_db == 'All Databases' %}
     <!-- Database Legend / Key (Summarized for single-page fit) -->
     <div style="page-break-inside: avoid; margin-top: 1.5rem; border-top: 1.5px solid #e2e8f0; padding-top: 1rem; font-size: 0.72rem; line-height: 1.45;">
-        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 1fr 2.5fr; gap: 1.5rem;">
             <!-- Left: Traffic-Light Status -->
             <div>
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">Traffic-Light Status</h4>
@@ -403,35 +453,30 @@
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 0.8rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">System Specifications</h4>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.72rem;">
                     <tbody>
-                        {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
                         <tr>
                             <td style="padding: 3px 0; vertical-align: top; width: 25%; font-weight: bold; color: var(--primary-navy);">Oracle (nmsinfra)</td>
                             <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
                                 nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) &mdash; Powers NMS ERP suite (finance, procurement, warehousing).
                             </td>
                         </tr>
-                        {% endif %}
-                        {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
                         <tr>
-                            <td style="padding: 3px 0; vertical-align: top; font-weight: bold; color: var(--primary-navy);">MySQL (nms360)</td>
+                            <td style="padding: 3px 0; vertical-align: top; font-weight: bold; color: var(--primary-navy);">MySQL (nickledbnew)</td>
                             <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
                                 nickledbnew (replicated to nickeldbdr) &mdash; Hosts collaboration &amp; support systems (NMS360, IT ServiceDesk, DMT).
-                            </td>
+                              </td>
                         </tr>
-                        {% endif %}
-                        {% if selected_db == 'All Databases' or selected_db == 'MS SQL Server' %}
                         <tr>
                             <td style="padding: 3px 0; vertical-align: top; font-weight: bold; color: var(--primary-navy);">MS SQL (Pentana)</td>
                             <td style="padding: 3px 0 3px 0.5rem; vertical-align: top; color: #475569;">
                                 Windows Server host &mdash; Hosts MKInsight (Pentana Audit) for audit &amp; compliance reviews.
                             </td>
                         </tr>
-                        {% endif %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Bottom Metadata & Signatures -->
     <div class="footer-print">
