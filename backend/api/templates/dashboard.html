@@ -461,73 +461,20 @@
     </div>
 </div>
 
-<!-- Bottom Row: Recent Activity Log Feed & Attention Required side-by-side -->
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
-    <!-- Left: Recent Activity Feed -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Recent Activity Feed</h3>
-            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Live Event Log</span>
-        </div>
-        
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
-                <thead>
-                    <tr style="border-bottom: 1.5px solid #cbd5e1; background: #f8fafc;">
-                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 15%;">Date / Time</th>
-                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 35%;">Activity Action</th>
-                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%;">Database Target</th>
-                        <th style="padding: 0.6rem 0.75rem; font-weight: 700; color: #475569; width: 25%; text-align: center;">Outcome / State</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for act in recent_activity %}
-                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='#f8fafc';" onmouseout="this.style.backgroundColor='transparent';">
-                        <td style="padding: 0.65rem 0.75rem; color: #64748b; font-weight: 500; font-family: monospace;">
-                            {{ act.date_str }} <span style="font-size: 0.75rem; opacity: 0.7;">{{ act.time_str }}</span>
-                        </td>
-                        <td style="padding: 0.65rem 0.75rem; font-weight: 700; color: #1e293b;">
-                            {{ act.action }}
-                        </td>
-                        <td style="padding: 0.65rem 0.75rem; font-weight: 600; color: var(--primary-navy);">
-                            {{ act.database }}
-                        </td>
-                        <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
-                                        {% if act.status_class == 'success' %}background: #e6f4ea; color: #137333;
-                                        {% elif act.status_class == 'danger' %}background: #fce8e6; color: #c5221f;
-                                        {% else %}background: #fef7e0; color: #b06000;{% endif %}">
-                                {{ act.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" style="text-align: center; padding: 2rem; color: #64748b; font-style: italic;">No recent activities logged in the system.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Right: Attention Required Alerts -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Attention Required</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
-                {% for item in attention_items %}
-                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
-                        <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
-                    </div>
-                {% empty %}
-                    <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
-                        ✓ All systems operating normally.
-                    </div>
-                {% endfor %}
+<!-- Bottom Row: Attention Required Alerts -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+    <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">Attention Required Alerts</h3>
+    
+    <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
+        {% for item in attention_items %}
+            <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
+                <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
             </div>
-        </div>
+        {% empty %}
+            <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
+                ✓ All systems operating normally.
+            </div>
+        {% endfor %}
     </div>
 </div>
 
