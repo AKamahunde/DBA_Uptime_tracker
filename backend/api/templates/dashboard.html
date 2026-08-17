@@ -225,7 +225,7 @@
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <strong style="font-size: 1.05rem; color: var(--primary-navy);">{{ row.database }} Database Environment</strong>
                             <span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.45rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
-                                {% if row.database == 'Oracle' %}nmsinfra{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
+                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
                             </span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -398,7 +398,7 @@
         <div style="max-width: 550px;">
             <strong style="color: var(--primary-navy); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.02em; display: block; margin-bottom: 0.4rem;">System Specifications</strong>
             {% if selected_db == 'Oracle' %}
-                <span style="color: var(--primary-navy); font-weight: 700;">Oracle (nmsinfra)</span> &mdash; nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)
+                <span style="color: var(--primary-navy); font-weight: 700;">Oracle (nmsinfra / nmsebs)</span> &mdash; nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)
                 <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
             {% elif selected_db == 'MySQL' %}
                 <span style="color: var(--primary-navy); font-weight: 700;">MySQL (nickledbnew)</span> &mdash; nickledbnew (replicated to nickeldbdr)
@@ -447,19 +447,19 @@
                             {{ item.availability }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.planned_downtime }}h
+                            {{ item.planned_downtime }}{% if item.planned_downtime != 'No Data' %}h{% endif %}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.unplanned_downtime }}h
+                            {{ item.unplanned_downtime }}{% if item.unplanned_downtime != 'No Data' %}h{% endif %}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                             {{ item.total_incidents }}
                         </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.sla_breaches > 0 %}#c5221f{% else %}#137333{% endif %};">
-                            {{ item.sla_breaches }}
+                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.sla_breach_count > 0 %}#c5221f{% else %}#137333{% endif %};">
+                            {{ item.sla_breach_count }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.mttr }}h
+                            {{ item.mttr_mins }}{% if item.mttr_mins != 'No Data' %}m{% endif %}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                             {{ item.backup_success }}
@@ -519,7 +519,7 @@
         <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.78rem;">Last 6 months trend (Target SLA threshold: &ge; 99.95%)</p>
     </div>
     
-    <div style="position: relative; max-height: 140px; overflow: hidden; margin-top: 1rem;">
+    <div style="position: relative; max-width: 550px; margin-top: 1rem;">
         <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
             <!-- Grid Lines -->
             <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
