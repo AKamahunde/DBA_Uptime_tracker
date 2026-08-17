@@ -526,35 +526,55 @@
             <p style="margin: 0 0 0.75rem 0; color: #64748b; font-size: 0.72rem;">Performance comparison of all monitored database engines.</p>
             
             <div style="overflow-x: auto;">
-                <table class="modern-table" style="font-size: 0.78rem; width: 100%; border-collapse: collapse; margin-top: 0.25rem;">
+                <table class="modern-table" style="font-size: 0.72rem; width: 100%; border-collapse: collapse; margin-top: 0.25rem; white-space: nowrap;">
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 0.45rem 0.5rem; text-align: left; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Database</th>
-                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Uptime</th>
-                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Incidents</th>
-                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Backups</th>
-                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Replication</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">DB</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Uptime</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Planned</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Unplanned</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Incidents</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Breaches</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">MTTR</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Backup</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Restore</th>
+                            <th style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.65rem; text-transform: uppercase;">Replication</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in dashboard_data %}
                         <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding: 0.45rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
+                            <td style="padding: 0.45rem 0.35rem; font-weight: 700; color: var(--primary-navy);">
                                 {{ item.database }} 
-                                <span style="font-size: 0.65rem; font-weight: normal; color: #64748b; font-family: monospace;">
+                                <span style="font-size: 0.6rem; font-weight: normal; color: #64748b; font-family: monospace;">
                                     ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
                                 </span>
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
                                 {{ item.availability }}
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600;">
-                                {{ item.active_incidents }} / {{ item.total_incidents }}
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #475569;">
+                                {{ item.planned_downtime }}h
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #475569;">
+                                {{ item.unplanned_downtime }}h
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 600; color: #334155;">
+                                {{ item.total_incidents }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 600; color: {% if item.sla_breaches > 0 %}#c5221f{% else %}#137333{% endif %};">
+                                {{ item.sla_breaches }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #475569;">
+                                {{ item.mttr }}h
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 600; color: #334155;">
                                 {{ item.backup_success }}
                             </td>
-                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 600; color: #334155;">
+                                {{ item.restore_success }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
                                 {{ item.replication_status }}
                             </td>
                         </tr>
