@@ -248,21 +248,7 @@
             <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Linear projection to warning threshold based on last 3 months</p>
         </div>
         
-        {% if not current_db %}
-        <!-- Forecast target selector when All Databases are visible -->
-        <form method="get" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-            <input type="hidden" name="start_date" value="{{ start_date }}">
-            <input type="hidden" name="end_date" value="{{ end_date }}">
-            <label for="forecast_db" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;">Forecast Target:</label>
-            <select id="forecast_db" name="forecast_db" onchange="this.form.submit()" style="padding: 0.25rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.8rem; background: #fff; font-weight: 600; color: var(--primary-navy);">
-                <option value="Oracle" {% if forecast_info.database == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
-                <option value="MySQL" {% if forecast_info.database == 'MySQL' %}selected{% endif %}>MySQL</option>
-                <option value="MS SQL Server" {% if forecast_info.database == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-            </select>
-        </form>
-        {% else %}
         <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Scope: <strong style="color: var(--primary-navy);">{{ forecast_info.database }}</strong></span>
-        {% endif %}
     </div>
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">

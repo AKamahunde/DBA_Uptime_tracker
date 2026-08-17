@@ -1766,55 +1766,117 @@ def capacity_list(request):
         trend_polyline_points = " ".join(svg_points)
         
     # Build Forecast Block (Linear projection based on last 3 months)
-    forecast_db = request.GET.get('forecast_db', '')
-    if current_db:
-        forecast_db = current_db
-    elif not forecast_db:
-        forecast_db = 'Oracle'
-    db_recs = CapacityPlanning.objects.filter(database=forecast_db).order_by('-month', '-updated_at')[:3]
     forecast_info = {}
-    if db_recs.exists():
-        latest = db_recs[0]
-        avg_growth = sum(float(r.growth_gb) for r in db_recs) / len(db_recs)
-        
-        cap = float(latest.disk_capacity_gb)
-        used_pct = float(latest.disk_used_percent)
-        free = float(latest.available_capacity_gb)
-        
-        if cap == 0.0 and free == 0.0 and used_pct > 0:
+    if current_db:
+        # Specific database scope
+        db_recs = CapacityPlanning.objects.filter(database=current_db).order_by('-month', '-updated_at')[:3]
+        if db_recs.exists():
+            latest = db_recs[0]
+            avg_growth = sum(float(r.growth_gb) for r in db_recs) / len(db_recs)
+            
+            cap = float(latest.disk_capacity_gb)
+            used_pct = float(latest.disk_used_percent)
+            free = float(latest.available_capacity_gb)
             size = float(latest.database_size_gb)
-            cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
-            free = cap - size
             
-        warning_used_gb = cap * 0.8
-        current_used_gb = cap * used_pct / 100.0
-        space_left_gb = warning_used_gb - current_used_gb
-        
-        if avg_growth > 0:
-            headroom_months = space_left_gb / avg_growth
-            if headroom_months < 0:
-                headroom_str = "Exceeded threshold"
-                est_date_str = "Exceeded"
-            elif headroom_months > 60:
-                headroom_str = "> 5 years"
-                est_date_str = "Safe"
+            if cap == 0.0 and free == 0.0 and used_pct > 0:
+                cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+                free = cap - size
+                
+            warning_used_gb = cap * 0.8
+            current_used_gb = cap * used_pct / 100.0
+            space_left_gb = warning_used_gb - current_used_gb
+            
+            if avg_growth > 0:
+                headroom_months = space_left_gb / avg_growth
+                if headroom_months < 0:
+                    headroom_str = "Exceeded threshold"
+                    est_date_str = "Exceeded"
+                elif headroom_months > 60:
+                    headroom_str = "> 5 years"
+                    est_date_str = "Safe"
+                else:
+                    headroom_str = f"{round(headroom_months, 1)} months"
+                    est_days = headroom_months * 30.44
+                    est_date = latest.month + timedelta(days=est_days)
+                    est_date_str = est_date.strftime('%B %Y')
             else:
-                headroom_str = f"{round(headroom_months, 1)} months"
-                # Calculate estimated date
-                est_days = headroom_months * 30.44
-                est_date = latest.month + timedelta(days=est_days)
-                est_date_str = est_date.strftime('%B %Y')
-        else:
-            headroom_str = "Infinite"
-            est_date_str = "Safe"
-            
-        forecast_info = {
-            'database': forecast_db,
-            'current_used_pct': round(used_pct, 1),
-            'avg_growth': round(avg_growth, 2),
-            'headroom_months': headroom_str,
-            'est_date': est_date_str
-        }
+                headroom_str = "Infinite"
+                est_date_str = "Safe"
+                
+            forecast_info = {
+                'database': current_db,
+                'current_used_pct': round(used_pct, 1),
+                'avg_growth': round(avg_growth, 2),
+                'headroom_months': headroom_str,
+                'est_date': est_date_str
+            }
+    else:
+        # Fleet-wide scope (All Databases combined)
+        unique_months = CapacityPlanning.objects.order_by('-month').values_list('month', flat=True).distinct()[:3]
+        if unique_months:
+            fleet_months = []
+            for month in unique_months:
+                month_recs = CapacityPlanning.objects.filter(month=month)
+                total_cap = 0.0
+                total_used = 0.0
+                total_growth = 0.0
+                
+                for r in month_recs:
+                    cap = float(r.disk_capacity_gb)
+                    used_pct = float(r.disk_used_percent)
+                    size = float(r.database_size_gb)
+                    free = float(r.available_capacity_gb)
+                    
+                    if cap == 0.0 and free == 0.0 and used_pct > 0:
+                        cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+                        
+                    total_cap += cap
+                    total_used += (cap * used_pct / 100.0)
+                    total_growth += float(r.growth_gb)
+                    
+                fleet_months.append({
+                    'month': month,
+                    'capacity_gb': total_cap,
+                    'used_gb': total_used,
+                    'growth_gb': total_growth
+                })
+                
+            if fleet_months:
+                latest = fleet_months[0]
+                avg_growth = sum(m['growth_gb'] for m in fleet_months) / len(fleet_months)
+                
+                cap = latest['capacity_gb']
+                used_pct = (latest['used_gb'] / cap * 100.0) if cap > 0 else 0.0
+                
+                warning_used_gb = cap * 0.8
+                current_used_gb = latest['used_gb']
+                space_left_gb = warning_used_gb - current_used_gb
+                
+                if avg_growth > 0:
+                    headroom_months = space_left_gb / avg_growth
+                    if headroom_months < 0:
+                        headroom_str = "Exceeded threshold"
+                        est_date_str = "Exceeded"
+                    elif headroom_months > 60:
+                        headroom_str = "> 5 years"
+                        est_date_str = "Safe"
+                    else:
+                        headroom_str = f"{round(headroom_months, 1)} months"
+                        est_days = headroom_months * 30.44
+                        est_date = latest['month'] + timedelta(days=est_days)
+                        est_date_str = est_date.strftime('%B %Y')
+                else:
+                    headroom_str = "Infinite"
+                    est_date_str = "Safe"
+                    
+                forecast_info = {
+                    'database': 'All Databases',
+                    'current_used_pct': round(used_pct, 1),
+                    'avg_growth': round(avg_growth, 2),
+                    'headroom_months': headroom_str,
+                    'est_date': est_date_str
+                }
     
     return render(request, 'capacity/list.html', {
         'page_obj': page_obj, 
