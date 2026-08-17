@@ -10,7 +10,8 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 import os
 
 from django.core.asgi import get_asgi_application
+from django.contrib.staticfiles.handlers import ASGIStaticFilesHandler
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dba_tracker.settings')
 
-application = get_asgi_application()
+application = ASGIStaticFilesHandler(get_asgi_application())
