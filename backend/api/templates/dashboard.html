@@ -480,40 +480,123 @@
 </div>
 {% endif %}
 
-<!-- Availability Trend SVG Card -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-            <div>
-                <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
-                <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
+<!-- Balanced Analytics Row: Trend SVG chart & Database Comparison side-by-side -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Availability Trend SVG -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow);">
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
+                    <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.72rem;">Last 6 months trend (Target: &ge; 99.95%)</p>
+                </div>
             </div>
         </div>
-    </div>
-    
-    <div style="position: relative; max-height: 120px; overflow: hidden; margin-top: 0.5rem;">
-        <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
-            <!-- Grid Lines -->
-            <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
-            <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
-            <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
-            
-            <!-- SLA Reference Line (99.95%) -->
-            <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
-            <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
+        
+        <div style="position: relative; max-height: 120px; overflow: hidden; margin-top: 0.5rem;">
+            <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
+                <!-- Grid Lines -->
+                <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
+                
+                <!-- SLA Reference Line (99.95%) -->
+                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
 
-            <!-- Value Polyline -->
-            <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                <!-- Value Polyline -->
+                <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                
+                <!-- Data Point Circles -->
+                {% for m in trend_months %}
+                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                    <!-- Value Label -->
+                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    <!-- Month Label -->
+                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                {% endfor %}
+            </svg>
+        </div>
+    </div>
+
+    <!-- Right: Database Comparison Table & Specs -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 0.25rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy);">Database Comparison</h3>
+            <p style="margin: 0 0 0.75rem 0; color: #64748b; font-size: 0.72rem;">Performance comparison of all monitored database engines.</p>
             
-            <!-- Data Point Circles -->
-            {% for m in trend_months %}
-                <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
-                <!-- Value Label -->
-                <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
-                <!-- Month Label -->
-                <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-            {% endfor %}
-        </svg>
+            <div style="overflow-x: auto;">
+                <table class="modern-table" style="font-size: 0.78rem; width: 100%; border-collapse: collapse; margin-top: 0.25rem;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 0.45rem 0.5rem; text-align: left; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Database</th>
+                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Uptime</th>
+                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Incidents</th>
+                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Backups</th>
+                            <th style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: var(--primary-navy); font-size: 0.7rem; text-transform: uppercase;">Replication</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in dashboard_data %}
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 0.45rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
+                                {{ item.database }} 
+                                <span style="font-size: 0.65rem; font-weight: normal; color: #64748b; font-family: monospace;">
+                                    ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
+                                </span>
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
+                                {{ item.availability }}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600;">
+                                {{ item.active_incidents }} / {{ item.total_incidents }}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
+                                {{ item.backup_success }}
+                            </td>
+                            <td style="padding: 0.45rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
+                                {{ item.replication_status }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SLA Status Legend and Specifications inside the comparison card -->
+        <div style="margin-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.12); padding-top: 0.75rem; font-size: 0.7rem; line-height: 1.4;">
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1rem; flex-wrap: wrap;">
+                <!-- SLA Legend -->
+                <div>
+                    <h4 style="margin: 0 0 0.3rem 0; font-size: 0.72rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">SLA Status</h4>
+                    <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                            <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background-color: var(--primary-green);"></span>
+                            <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                            <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background-color: var(--primary-gold);"></span>
+                            <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Warning)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                            <span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background-color: #c62828;"></span>
+                            <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Environment details -->
+                <div>
+                    <h4 style="margin: 0 0 0.3rem 0; font-size: 0.72rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">Environment Specifications</h4>
+                    <div style="color: #475569; font-size: 0.65rem;">
+                        <strong>Oracle:</strong> nmsinfra.nms.go.ug (DB) &amp; nmsebs (App)<br>
+                        <strong>MySQL:</strong> nickledbnew (replicated live)<br>
+                        <strong>MS SQL:</strong> Windows Server host (Pentana)
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
