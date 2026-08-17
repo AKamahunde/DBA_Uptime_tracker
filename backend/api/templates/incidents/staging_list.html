@@ -76,6 +76,12 @@
                                 <a href="{% url 'staging_promote_maintenance' item.pk %}" class="btn btn-success" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; text-decoration: none; background-color: #10b981; border-color: #10b981;">
                                     Log Maintenance
                                 </a>
+                                <form method="post" action="{% url 'staging_delete' item.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to dismiss/delete this staged alert?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; outline: none; font-family: inherit;">
+                                        Dismiss Alert
+                                    </button>
+                                </form>
                             </div>
                         {% else %}
                             <span style="color: #94a3b8; font-size: 0.85rem;">Processed</span>

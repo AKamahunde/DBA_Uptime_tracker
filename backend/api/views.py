@@ -2811,3 +2811,19 @@ def staging_promote_maintenance(request, pk):
     return render(request, 'incidents/staging_promote_maintenance.html', context)
 
 
+@login_required
+def staging_delete(request, pk):
+    # Check permissions
+    if not (request.user.is_admin or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.view_incidentregister')):
+        messages.error(request, 'You do not have permission to delete staging records.')
+        return redirect('incident_staging_list')
+        
+    staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    
+    if request.method == 'POST':
+        staging_item.delete()
+        messages.success(request, "Staging alert successfully dismissed.")
+        
+    return redirect('incident_staging_list')
+
+

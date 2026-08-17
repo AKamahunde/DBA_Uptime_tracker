@@ -18,6 +18,7 @@ urlpatterns = [
     path('incidents/staging/', views.incident_staging_list, name='incident_staging_list'),
     path('incidents/staging/<int:pk>/promote-incident/', views.staging_promote_incident, name='staging_promote_incident'),
     path('incidents/staging/<int:pk>/promote-maintenance/', views.staging_promote_maintenance, name='staging_promote_maintenance'),
+    path('incidents/staging/<int:pk>/delete/', views.staging_delete, name='staging_delete'),
     
     # Replication Monitor
     path('replication/', views.replication_list, name='replication_list'),
