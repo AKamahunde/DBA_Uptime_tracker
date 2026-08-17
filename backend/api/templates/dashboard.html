@@ -440,7 +440,7 @@
                         <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
                             {{ item.database }} 
                             <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
-                                ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
+                                ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
                             </span>
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
@@ -512,51 +512,58 @@
     </div>
 </div>
 
-<!-- Row 3: Availability Trend Line Chart (Full-Width Card) -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <div>
-        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.78rem;">Last 6 months trend (Target SLA threshold: &ge; 99.95%)</p>
-    </div>
-    
-    <div style="position: relative; max-width: 550px; margin-top: 1rem;">
-        <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
-            <!-- Grid Lines -->
-            <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
-            <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
-            <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
-            
-            <!-- SLA Reference Line (99.95%) -->
-            <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
-            <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
+<!-- Row 3: Trend Chart & Alerts Side-by-Side -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Left: Availability Trend Card -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">Availability Trend</h3>
+            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.78rem;">Last 6 months trend (Target SLA threshold: &ge; 99.95%)</p>
+        </div>
+        
+        <div style="position: relative; max-width: 100%; margin-top: 1rem;">
+            <svg viewBox="0 0 400 110" style="width: 100%; height: auto; overflow: visible;">
+                <!-- Grid Lines -->
+                <line x1="40" y1="15" x2="360" y2="15" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="50" x2="360" y2="50" stroke="#f1f5f9" stroke-width="1" />
+                <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
+                
+                <!-- SLA Reference Line (99.95%) -->
+                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA 99.95%</text>
 
-            <!-- Value Polyline -->
-            <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
-            
-            <!-- Data Point Circles -->
-            {% for m in trend_months %}
-                <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
-                <!-- Value Label -->
-                <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
-                <!-- Month Label -->
-                <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-            {% endfor %}
-        </svg>
+                <!-- Value Polyline -->
+                <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                
+                <!-- Data Point Circles -->
+                {% for m in trend_months %}
+                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                    <!-- Value Label -->
+                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    <!-- Month Label -->
+                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                {% endfor %}
+            </svg>
+        </div>
     </div>
-</div>
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <h3 style="margin: 0 0 1rem 0; font-size: 0.95rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">Attention Required Alerts</h3>
-    
-    <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
-        {% for item in attention_items %}
-            <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
-                <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
+
+    <!-- Right: Attention Required Alerts Card -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0 0 1rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">Attention Required Alerts</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
+                {% for item in attention_items %}
+                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
+                        <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
+                    </div>
+                {% empty %}
+                    <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
+                        ✓ All systems operating normally.
+                    </div>
+                {% endfor %}
             </div>
-        {% empty %}
-            <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
-                ✓ All systems operating normally.
-            </div>
-        {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}
