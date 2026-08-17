@@ -424,11 +424,11 @@
                     <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Database Engine</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Uptime SLA</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Planned Down</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down</th>
+                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Planned Down (hrs)</th>
+                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down (hrs)</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">SLA Breaches</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">MTTR</th>
+                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">MTTR (mins)</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Backup Success</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Restore Success</th>
                         <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Replication</th>
@@ -447,10 +447,10 @@
                             {{ item.availability }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.planned_downtime }}{% if item.planned_downtime != 'No Data' %}h{% endif %}
+                            {{ item.planned_downtime }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.unplanned_downtime }}{% if item.unplanned_downtime != 'No Data' %}h{% endif %}
+                            {{ item.unplanned_downtime }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                             {{ item.total_incidents }}
@@ -459,7 +459,7 @@
                             {{ item.sla_breach_count }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.mttr_mins }}{% if item.mttr_mins != 'No Data' %}m{% endif %}
+                            {{ item.mttr_mins }}
                         </td>
                         <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                             {{ item.backup_success }}
