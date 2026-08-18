@@ -430,7 +430,7 @@
                         </div>
                     </div>
                     {% endif %}
-                    <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                    <form id="logout-form" method="post" action="{% url 'logout' %}" style="display:inline;">
                         {% csrf_token %}
                         <button type="submit" class="nav-logout-btn">Logout</button>
                     </form>
@@ -532,13 +532,59 @@
                 if (unplannedDowntime) unplannedDowntime.addEventListener('input', calculateAvailability);
             }
 
-            // Auto-refresh the page every 10 minutes (600000 ms) to show new records
-            // Safely disabled on data entry (create/edit) and login pages to prevent wiping user progress
+            // ── Inactivity & Session Management ──
             const path = window.location.pathname;
-            const isDataEntryPage = path.includes('/create/') || path.includes('/edit/') || path.includes('/login/');
+            const isLoginPage = path.includes('/login/');
+            const isDataEntryPage = path.includes('/create/') || path.includes('/edit/') || isLoginPage;
+
+            // Track last activity in localStorage (persists across reloads/tabs)
+            function resetActivityTimer() {
+                if (!isLoginPage) {
+                    localStorage.setItem('lastActivity', Date.now().toString());
+                }
+            }
+
+            if (!isLoginPage) {
+                // Initialize timestamp if not present
+                if (!localStorage.getItem('lastActivity')) {
+                    resetActivityTimer();
+                }
+
+                // Reset timer on user interaction
+                const activityEvents = ['mousemove', 'mousedown', 'click', 'scroll', 'keydown', 'touchstart'];
+                activityEvents.forEach(event => {
+                    window.addEventListener(event, resetActivityTimer, { passive: true });
+                });
+
+                // Periodically check for complete inactivity (20 minutes = 1200000 ms)
+                const inactivityInterval = setInterval(() => {
+                    const lastActivity = parseInt(localStorage.getItem('lastActivity') || '0');
+                    const timeSinceLastActivity = Date.now() - lastActivity;
+
+                    if (timeSinceLastActivity >= 1200000) {
+                        clearInterval(inactivityInterval);
+                        const logoutForm = document.getElementById('logout-form');
+                        if (logoutForm) {
+                            logoutForm.submit();
+                        } else {
+                            window.location.href = "{% url 'logout' %}";
+                        }
+                    }
+                }, 15000); // Check every 15 seconds
+            }
+
+            // Auto-refresh page every 10 minutes, but only if user was active recently
             if (!isDataEntryPage) {
                 setTimeout(() => {
-                    window.location.reload();
+                    const lastActivity = parseInt(localStorage.getItem('lastActivity') || '0');
+                    const timeSinceLastActivity = Date.now() - lastActivity;
+
+                    // Only reload if user was active in the last 5 minutes (300000 ms)
+                    if (timeSinceLastActivity < 300000) {
+                        window.location.reload();
+                    } else {
+                        console.log("Auto-refresh skipped due to user inactivity.");
+                    }
                 }, 600000);
             }
         });
