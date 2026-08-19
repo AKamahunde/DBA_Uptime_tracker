@@ -368,7 +368,7 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
                 
             if last_dr:
                 days_since_dr = (now - last_dr.date).days
-                dr_status = 'Meets SLA' if days_since_dr <= 150 else ('Warning' if days_since_dr <= 180 else 'Below SLA')
+                dr_status = 'Meets SLA' if days_since_dr <= 300 else ('Warning' if days_since_dr <= 365 else 'Below SLA')
             else:
                 dr_status = 'N/A'
 
