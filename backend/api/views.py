@@ -2772,6 +2772,21 @@ def incident_staging_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Calculate waiting duration for each record in the page
+    now = timezone.now()
+    for record in page_obj:
+        delta = now - record.created_at
+        days = delta.days
+        hours = delta.seconds // 3600
+        minutes = (delta.seconds % 3600) // 60
+        
+        if days > 0:
+            record.waiting_duration = f"{days}d {hours}h"
+        elif hours > 0:
+            record.waiting_duration = f"{hours}h {minutes}m"
+        else:
+            record.waiting_duration = f"{minutes}m"
+            
     context = {
         'page_obj': page_obj,
         'current_db': current_db,

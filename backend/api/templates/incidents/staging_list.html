@@ -53,6 +53,9 @@
                         {% if item.end %}
                             - {{ item.end|date:"H:i" }}
                         {% endif %}
+                        <div style="font-size: 0.72rem; color: #475569; margin-top: 0.25rem; font-weight: 500;">
+                            Waiting: <span style="color: #d97706; font-weight: 700;">{{ item.waiting_duration }}</span>
+                        </div>
                     </td>
                     <td>{{ item.duration_hrs }}</td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">
