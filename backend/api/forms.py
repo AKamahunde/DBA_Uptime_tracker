@@ -6,7 +6,7 @@ from .models import (
 
 class IncidentRegisterForm(forms.ModelForm):
     change_comment = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional reason for change (e.g., Escalating to senior dev)'}),
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status or assignee changes)'}),
         required=False,
         label="Change Comment / Reason"
     )
@@ -21,6 +21,28 @@ class IncidentRegisterForm(forms.ModelForm):
             'root_cause': forms.Textarea(attrs={'rows': 3}),
             'business_impact': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Only enforce on editing existing records
+        if self.instance and self.instance.pk:
+            old_status = self.instance.status
+            old_assigned = self.instance.assigned_to
+            
+            new_status = cleaned_data.get('status')
+            new_assigned = cleaned_data.get('assigned_to')
+            comment = cleaned_data.get('change_comment', '').strip()
+            
+            status_changed = old_status != new_status
+            assigned_changed = old_assigned != new_assigned
+            
+            if (status_changed or assigned_changed) and not comment:
+                self.add_error('change_comment', forms.ValidationError(
+                    "A change-reason comment is required whenever you change the status or assignee."
+                ))
+                
+        return cleaned_data
 
 class ReplicationMonitorForm(forms.ModelForm):
     class Meta:
