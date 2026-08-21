@@ -46,6 +46,29 @@ def auto_close_incidents():
             new_status="Closed"
         )
 
+def auto_update_maintenance_statuses():
+    # Auto-updates maintenance windows based on start and end times
+    now = timezone.now()
+    
+    # 1. Scheduled -> In Progress: if start <= now < end
+    active_maintenances = MaintenanceRegister.objects.filter(
+        status='Scheduled',
+        start__lte=now,
+        end__gt=now
+    )
+    for maint in active_maintenances:
+        maint.status = 'In Progress'
+        maint.save()
+        
+    # 2. Scheduled/In Progress -> Completed: if end <= now
+    passed_maintenances = MaintenanceRegister.objects.filter(
+        end__lte=now,
+        status__in=['Scheduled', 'In Progress']
+    )
+    for maint in passed_maintenances:
+        maint.status = 'Completed'
+        maint.save()
+
 def autopopulate_fixed_holidays():
     from datetime import date
     current_year = date.today().year
@@ -429,6 +452,7 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 def dashboard(request):
     autopopulate_fixed_holidays()
     auto_close_incidents()
+    auto_update_maintenance_statuses()
     
     # Run all counts in a single DB round-trip by using lazy evaluation
     from django.db import connection
@@ -1544,17 +1568,8 @@ def maintenance_list(request):
         return redirect('dashboard')
     queryset = MaintenanceRegister.objects.all().order_by('-date', '-created_at')
     
-    # Auto-mark passed maintenance windows as Completed if they are still Scheduled/In Progress
-    from django.utils import timezone
-    now = timezone.now()
-    passed_maintenances = MaintenanceRegister.objects.filter(
-        end__lt=now,
-        status__in=['Scheduled', 'In Progress']
-    )
-    if passed_maintenances.exists():
-        for maint in passed_maintenances:
-            maint.status = 'Completed'
-            maint.save() # Auto-updates success = True in save()
+    # Auto-update maintenance statuses (Scheduled -> In Progress -> Completed)
+    auto_update_maintenance_statuses()
             
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')

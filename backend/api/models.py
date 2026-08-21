@@ -303,6 +303,10 @@ class MaintenanceRegister(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        if self.start:
+            # Auto-generate change ID based on start date: CHG + DD + MM (e.g. CHG2108 for 21 Aug)
+            self.change_id = f"CHG{self.start.strftime('%d%m')}"
+
         if self.start and self.end:
             delta = self.end - self.start
             # Convert timedelta to hours

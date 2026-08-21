@@ -92,6 +92,12 @@ class ServerHealthForm(forms.ModelForm):
         }
 
 class MaintenanceRegisterForm(forms.ModelForm):
+    change_id = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Auto-generated (e.g., CHG2108)'}),
+        label="Change ID"
+    )
+
     class Meta:
         model = MaintenanceRegister
         exclude = ['created_by']
