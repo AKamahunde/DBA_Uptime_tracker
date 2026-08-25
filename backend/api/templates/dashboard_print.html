@@ -348,7 +348,7 @@
   .signoff-section {
     border-top: 1px solid var(--hairline);
     padding-top: 10px;
-    margin-top: auto;
+    margin-top: 16px;
   }
   .signoff-row {
     display: grid;
@@ -578,28 +578,28 @@
       <li><b>MySQL (nickledbnew):</b> nickledbnew (replicated to nickledbdr for DR) — Hosts critical collaboration systems, IT ServiceDesk, and the Document Management Tool (DMT).</li>
       <li><b>MS SQL Server (Pentana):</b> Windows Server Host — Powers the MKInsight (Pentana Audit) compliance framework for formal business audit reviews.</li>
     </ul>
-  </div>
 
-  <!-- Approvals Footer -->
-  <div class="signoff-section">
-    <div class="signoff-row">
-      <div class="signoff-card">
-        <b>EXTRACTED BY</b>
-        <div><span class="label">Sig:</span><span class="val">{{ extracted_by }}</span></div>
-        <div><span class="label">Name:</span><span class="val">{{ extracted_by }}</span></div>
-        <div><span class="label">Date:</span><span class="val">{{ extracted_at }}</span></div>
-      </div>
-      <div class="signoff-card">
-        <b>REVIEWED BY</b>
-        <div><span class="label">Sig:</span><span class="fill"></span></div>
-        <div><span class="label">Name:</span><span class="val">Systems Architect</span></div>
-        <div><span class="label">Date:</span><span class="fill"></span></div>
-      </div>
-      <div class="signoff-card">
-        <b>APPROVED BY</b>
-        <div><span class="label">Sig:</span><span class="fill"></span></div>
-        <div><span class="label">Name:</span><span class="val">Head of IT Operations</span></div>
-        <div><span class="label">Date:</span><span class="fill"></span></div>
+    <!-- Approvals Footer -->
+    <div class="signoff-section">
+      <div class="signoff-row">
+        <div class="signoff-card">
+          <b>EXTRACTED BY</b>
+          <div><span class="label">Sig:</span><span class="val">{{ extracted_by }}</span></div>
+          <div><span class="label">Name:</span><span class="val">{{ extracted_by }}</span></div>
+          <div><span class="label">Date:</span><span class="val">{{ extracted_at }}</span></div>
+        </div>
+        <div class="signoff-card">
+          <b>REVIEWED BY</b>
+          <div><span class="label">Sig:</span><span class="fill"></span></div>
+          <div><span class="label">Name:</span><span class="val">Systems Architect</span></div>
+          <div><span class="label">Date:</span><span class="fill"></span></div>
+        </div>
+        <div class="signoff-card">
+          <b>APPROVED BY</b>
+          <div><span class="label">Sig:</span><span class="fill"></span></div>
+          <div><span class="label">Name:</span><span class="val">Head of IT Operations</span></div>
+          <div><span class="label">Date:</span><span class="fill"></span></div>
+        </div>
       </div>
     </div>
   </div>
