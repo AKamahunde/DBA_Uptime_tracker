@@ -111,6 +111,16 @@
         margin-top: 4px;
         overflow: hidden;
     }
+    /* Bridge the 4px hover gap */
+    .export-dropdown-content::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: transparent;
+    }
     .export-dropdown:hover .export-dropdown-content {
         display: block;
     }
