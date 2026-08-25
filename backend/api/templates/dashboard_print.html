@@ -397,24 +397,31 @@
   }
 
   @media print {
+    @page {
+      size: A4 portrait;
+      margin: 8mm 12mm; /* Force narrow print margins to maximize printable height */
+    }
     body {
       background: #ffffff;
     }
     .page {
-      padding: 0;
-      max-width: 100%;
-      box-shadow: none;
+      padding: 0 !important;
+      margin: 0 !important;
+      max-width: 100% !important;
+      box-shadow: none !important;
+      min-height: auto !important; /* Discards the 297mm height limit which causes page 2 split */
+      height: auto !important;
       display: block !important; /* Force block to bypass flexbox page-break bugs in Chrome/Edge */
     }
     .signoff-section {
       display: block !important;
-      margin-top: 24px !important;
+      margin-top: 15px !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
     .signoff-row {
       display: flex !important; /* Keep horizontal alignment */
-      gap: 16px !important;
+      gap: 12px !important;
     }
     .signoff-card {
       flex: 1 !important;
