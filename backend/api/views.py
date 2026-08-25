@@ -826,11 +826,23 @@ def dashboard_print(request):
             
         mttr_hrs_str = f"{round(mttr_min / 60.0, 2)} hrs" if (isinstance(mttr_min, (int, float)) and mttr_min > 0) else '—'
         
+        # Calculate scaled width mapping the range [99.0%, 100.0%] to [0%, 100%]
+        # This provides human-readable visual differences between 99.95% target and 100% uptime
+        scaled_width = 0.0
+        if avail_str and avail_str != 'No Data':
+            try:
+                avail_val = float(avail_str.replace('%', ''))
+                if avail_val >= 99.0:
+                    scaled_width = round((avail_val - 99.0) * 100.0, 2)
+            except ValueError:
+                pass
+
         formatted_data.append({
             'database': db_type,
             'code_name': 'nmsinfra' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
             'availability': avail_str,
             'availability_num': float(avail_str.replace('%', '')) if (avail_str and avail_str != 'No Data') else 0.0,
+            'availability_scaled_num': scaled_width,
             'availability_status': item['availability_status'],
             'planned_downtime': f"{item['planned_downtime']} hrs" if isinstance(item['planned_downtime'], (int, float)) else item['planned_downtime'],
             'unplanned_downtime': f"{item['unplanned_downtime']} hrs" if isinstance(item['unplanned_downtime'], (int, float)) else item['unplanned_downtime'],
@@ -838,6 +850,7 @@ def dashboard_print(request):
             'sla_breach_count': item['sla_breach_count'],
             'mttr_str': mttr_hrs_str,
             'backup_success': item['backup_success'],
+            'restore_success': item['restore_success'],
             'replication_status': item['replication_status'],
         })
 
