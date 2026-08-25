@@ -782,22 +782,20 @@ def dashboard_print(request):
     git_log = res_log.stdout + "\n" + res_log.stderr
     
     action = request.GET.get('git_action', '')
+    custom_ref = request.GET.get('custom_ref', '')
     action_output = ''
     
-    if action:
+    if action or custom_ref:
         cmd = []
-        if action == 'checkout_head':
-            cmd = ["git", "checkout", "--", "backend/api/templates/dashboard_print.html", "backend/api/views.py"]
-        elif action == 'checkout_prev':
-            cmd = ["git", "checkout", "HEAD~1", "--", "backend/api/templates/dashboard_print.html"]
-        elif action == 'checkout_two_prev':
-            cmd = ["git", "checkout", "HEAD~2", "--", "backend/api/templates/dashboard_print.html"]
-        elif action == 'checkout_three_prev':
-            cmd = ["git", "checkout", "HEAD~3", "--", "backend/api/templates/dashboard_print.html"]
-        elif action == 'checkout_four_prev':
-            cmd = ["git", "checkout", "HEAD~4", "--", "backend/api/templates/dashboard_print.html"]
+        if custom_ref:
+            cmd = ["git", "checkout", custom_ref, "--", "backend/api/templates/dashboard_print.html"]
+        elif action == 'checkout_head':
+            cmd = ["git", "checkout", "--", "backend/api/templates/dashboard_print.html"]
         elif action == 'checkout_origin':
             cmd = ["git", "checkout", "origin/main", "--", "backend/api/templates/dashboard_print.html"]
+        elif action.startswith('checkout_head_'):
+            num = action.replace('checkout_head_', '')
+            cmd = ["git", "checkout", f"HEAD~{num}", "--", "backend/api/templates/dashboard_print.html"]
             
         if cmd:
             res_action = subprocess.run(cmd, capture_output=True, text=True, cwd=git_cwd)
@@ -807,21 +805,28 @@ def dashboard_print(request):
             res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd=git_cwd)
             git_status = res_status.stdout + "\n" + res_status.stderr
             
+    # Generate list of revert offsets
+    offsets_html = "".join([f'<li><a href="?git_action=checkout_head_{i}">Checkout template from HEAD~{i}</a></li>' for i in range(1, 16)])
+
     html = f"""
     <html>
     <head><title>Git Diagnostics & Restore Helper</title></head>
     <body style="font-family: sans-serif; padding: 20px; background: #f4f6f8;">
     <h2>Git Diagnostics & Restore Helper</h2>
+    
     <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
       <h3>Actions:</h3>
       <ul>
-        <li><a href="?git_action=checkout_head">Discard uncommitted changes (git checkout -- template and views)</a></li>
-        <li><a href="?git_action=checkout_prev">Checkout template from previous commit (HEAD~1)</a></li>
-        <li><a href="?git_action=checkout_two_prev">Checkout template from 2 commits ago (HEAD~2)</a></li>
-        <li><a href="?git_action=checkout_three_prev">Checkout template from 3 commits ago (HEAD~3)</a></li>
-        <li><a href="?git_action=checkout_four_prev">Checkout template from 4 commits ago (HEAD~4)</a></li>
+        <li><a href="?git_action=checkout_head">Discard uncommitted changes (git checkout -- template)</a></li>
         <li><a href="?git_action=checkout_origin">Checkout template from origin/main</a></li>
+        {offsets_html}
       </ul>
+      
+      <form method="GET" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+        <label for="custom_ref">Revert template to custom Commit Hash / Ref:</label><br>
+        <input type="text" id="custom_ref" name="custom_ref" placeholder="e.g. 5a1b3c2" style="padding: 6px; width: 250px; border: 1px solid #ccc; border-radius: 4px;">
+        <button type="submit" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Execute Checkout</button>
+      </form>
     </div>
     
     <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
