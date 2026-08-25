@@ -767,135 +767,74 @@ def dashboard(request):
 
 @login_required
 def dashboard_print(request):
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    selected_db = request.GET.get('database_select', 'All Databases')
-    dashboard_data, _ = _get_dashboard_data(reporting_month)
-    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
+    import subprocess
+    from django.http import HttpResponse
     
-    user_display = request.user.get_full_name()
-    if not user_display:
-        user_display = request.user.username.replace('.', ' ').title()
-
-    # Dynamic KPI & Editorial Calculations
-    formatted_data = []
-    total_incidents_all = 0
-    total_breaches_all = 0
-    all_within_sla = True
-    max_incidents_db = None
-    max_incidents_val = -1
+    # 1. Run git status
+    res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+    git_status = res_status.stdout + "\n" + res_status.stderr
     
-    uptimes = []
-    mttr_values = []
+    # 2. Run git log
+    res_log = subprocess.run(["git", "log", "-n", "15", "--oneline"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+    git_log = res_log.stdout + "\n" + res_log.stderr
     
-    for item in dashboard_data:
-        db_type = item['database']
-        avail_str = item['availability']
-        
-        is_compliant = item['availability_status'] == 'Meets SLA'
-        if not is_compliant:
-            all_within_sla = False
+    action = request.GET.get('git_action', '')
+    action_output = ''
+    
+    if action:
+        cmd = []
+        if action == 'checkout_head':
+            cmd = ["git", "checkout", "--", "backend/api/templates/dashboard_print.html", "backend/api/views.py"]
+        elif action == 'checkout_prev':
+            cmd = ["git", "checkout", "HEAD~1", "--", "backend/api/templates/dashboard_print.html"]
+        elif action == 'checkout_two_prev':
+            cmd = ["git", "checkout", "HEAD~2", "--", "backend/api/templates/dashboard_print.html"]
+        elif action == 'checkout_three_prev':
+            cmd = ["git", "checkout", "HEAD~3", "--", "backend/api/templates/dashboard_print.html"]
+        elif action == 'checkout_four_prev':
+            cmd = ["git", "checkout", "HEAD~4", "--", "backend/api/templates/dashboard_print.html"]
+        elif action == 'checkout_origin':
+            cmd = ["git", "checkout", "origin/main", "--", "backend/api/templates/dashboard_print.html"]
             
-        inc_count = item['total_incidents']
-        if isinstance(inc_count, int):
-            total_incidents_all += inc_count
-            if inc_count > max_incidents_val:
-                max_incidents_val = inc_count
-                max_incidents_db = db_type
-                
-        breach_count = item.get('sla_breach_count', 0)
-        if isinstance(breach_count, int):
-            total_breaches_all += breach_count
+        if cmd:
+            res_action = subprocess.run(cmd, capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+            action_output = f"<hr><h3>Action Executed:</h3><p>Ran: {' '.join(cmd)}</p><pre>Stdout: {res_action.stdout}\nStderr: {res_action.stderr}</pre>"
             
-        if avail_str and avail_str != 'No Data':
-            try:
-                uptimes.append(float(avail_str.replace('%', '')))
-            except ValueError:
-                pass
-                
-        mttr_min = item['mttr_mins']
-        if isinstance(mttr_min, (int, float)):
-            mttr_values.append(mttr_min)
+            # Re-fetch status after action
+            res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+            git_status = res_status.stdout + "\n" + res_status.stderr
             
-        mttr_hrs_str = f"{round(mttr_min / 60.0, 2)} hrs" if (isinstance(mttr_min, (int, float)) and mttr_min > 0) else '—'
-        
-        # Calculate scaled width mapping the range [99.0%, 100.0%] to [0%, 100%]
-        # This provides human-readable visual differences between 99.95% target and 100% uptime
-        scaled_width = 0.0
-        if avail_str and avail_str != 'No Data':
-            try:
-                avail_val = float(avail_str.replace('%', ''))
-                if avail_val >= 99.0:
-                    scaled_width = round((avail_val - 99.0) * 100.0, 2)
-            except ValueError:
-                pass
-
-        formatted_data.append({
-            'database': db_type,
-            'code_name': 'nmsinfra' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
-            'availability': avail_str,
-            'availability_num': float(avail_str.replace('%', '')) if (avail_str and avail_str != 'No Data') else 0.0,
-            'availability_scaled_num': scaled_width,
-            'availability_status': item['availability_status'],
-            'planned_downtime': f"{item['planned_downtime']} hrs" if isinstance(item['planned_downtime'], (int, float)) else item['planned_downtime'],
-            'unplanned_downtime': f"{item['unplanned_downtime']} hrs" if isinstance(item['unplanned_downtime'], (int, float)) else item['unplanned_downtime'],
-            'total_incidents': item['total_incidents'],
-            'sla_breach_count': item['sla_breach_count'],
-            'mttr_str': mttr_hrs_str,
-            'backup_success': item['backup_success'],
-            'restore_success': item['restore_success'],
-            'replication_status': item['replication_status'],
-        })
-
-    avg_uptime = f"{round(sum(uptimes)/len(uptimes), 2)}%" if uptimes else 'No Data'
-    avg_mttr = f"{round((sum(mttr_values)/len(mttr_values))/60, 2)} hrs" if mttr_values else '—'
-
-    # Build Lede Text
-    if all_within_sla:
-        lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
-    else:
-        lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
-
-    if max_incidents_db and max_incidents_val > 0:
-        others_combined = total_incidents_all - max_incidents_val
-        if max_incidents_val > others_combined:
-            compare_str = "more than the other systems combined"
-        else:
-            compare_str = "more than any other system"
-        lede_suffix = f"The one thing worth a second look: <em>{max_incidents_db} logged {max_incidents_val} incidents</em> — {compare_str} — even though its uptime never slipped."
-    else:
-        lede_suffix = "No significant incident trends were logged during this period."
+    html = f"""
+    <html>
+    <head><title>Git Diagnostics & Restore Helper</title></head>
+    <body style="font-family: sans-serif; padding: 20px; background: #f4f6f8;">
+    <h2>Git Diagnostics & Restore Helper</h2>
+    <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+      <h3>Actions:</h3>
+      <ul>
+        <li><a href="?git_action=checkout_head">Discard uncommitted changes (git checkout -- template and views)</a></li>
+        <li><a href="?git_action=checkout_prev">Checkout template from previous commit (HEAD~1)</a></li>
+        <li><a href="?git_action=checkout_two_prev">Checkout template from 2 commits ago (HEAD~2)</a></li>
+        <li><a href="?git_action=checkout_three_prev">Checkout template from 3 commits ago (HEAD~3)</a></li>
+        <li><a href="?git_action=checkout_four_prev">Checkout template from 4 commits ago (HEAD~4)</a></li>
+        <li><a href="?git_action=checkout_origin">Checkout template from origin/main</a></li>
+      </ul>
+    </div>
     
-    lede_text = f"{lede_prefix} {lede_suffix}"
-
-    # Build Watch Item Text
-    if max_incidents_db and max_incidents_val > 0:
-        watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this month. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
-    else:
-        watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
-
-    context = {
-        'dashboard_data': formatted_data,
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
-        'extracted_by': user_display,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
-        'database_detail': database_detail,
-        'selected_db': selected_db,
-        'avg_uptime': avg_uptime,
-        'total_breaches': total_breaches_all,
-        'total_incidents': total_incidents_all,
-        'avg_mttr': avg_mttr,
-        'lede_text': lede_text,
-        'watch_item_text': watch_item_text,
-    }
-    return render(request, 'dashboard_print.html', context)
+    <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+      <h3>Git Status:</h3>
+      <pre style="background: #272822; color: #f8f8f2; padding: 10px; overflow-x: auto; border-radius: 3px;">{git_status}</pre>
+    </div>
+    
+    <div style="background: white; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+      <h3>Git Log (Last 15 Commits):</h3>
+      <pre style="background: #272822; color: #f8f8f2; padding: 10px; overflow-x: auto; border-radius: 3px;">{git_log}</pre>
+    </div>
+    {action_output}
+    </body>
+    </html>
+    """
+    return HttpResponse(html)
 
 @login_required
 def dashboard_excel(request):
