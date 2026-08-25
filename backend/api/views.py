@@ -784,13 +784,116 @@ def dashboard_print(request):
     if not user_display:
         user_display = request.user.username.replace('.', ' ').title()
 
+    # Dynamic KPI & Editorial Calculations
+    formatted_data = []
+    total_incidents_all = 0
+    total_breaches_all = 0
+    all_within_sla = True
+    max_incidents_db = None
+    max_incidents_val = -1
+    
+    uptimes = []
+    mttr_values = []
+    
+    for item in dashboard_data:
+        db_type = item['database']
+        avail_str = item['availability']
+        
+        is_compliant = item['availability_status'] == 'Meets SLA'
+        if not is_compliant:
+            all_within_sla = False
+            
+        inc_count = item['total_incidents']
+        if isinstance(inc_count, int):
+            total_incidents_all += inc_count
+            if inc_count > max_incidents_val:
+                max_incidents_val = inc_count
+                max_incidents_db = db_type
+                
+        breach_count = item.get('sla_breach_count', 0)
+        if isinstance(breach_count, int):
+            total_breaches_all += breach_count
+            
+        if avail_str and avail_str != 'No Data':
+            try:
+                uptimes.append(float(avail_str.replace('%', '')))
+            except ValueError:
+                pass
+                
+        mttr_min = item['mttr_mins']
+        if isinstance(mttr_min, (int, float)):
+            mttr_values.append(mttr_min)
+            
+        mttr_hrs_str = f"{round(mttr_min / 60.0, 2)} hrs" if (isinstance(mttr_min, (int, float)) and mttr_min > 0) else '—'
+        
+        # Calculate scaled width mapping the range [99.0%, 100.0%] to [0%, 100%]
+        # This provides human-readable visual differences between 99.95% target and 100% uptime
+        scaled_width = 0.0
+        if avail_str and avail_str != 'No Data':
+            try:
+                avail_val = float(avail_str.replace('%', ''))
+                if avail_val >= 99.0:
+                    scaled_width = round((avail_val - 99.0) * 100.0, 2)
+            except ValueError:
+                pass
+
+        formatted_data.append({
+            'database': db_type,
+            'code_name': 'nmsinfra' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
+            'availability': avail_str,
+            'availability_num': float(avail_str.replace('%', '')) if (avail_str and avail_str != 'No Data') else 0.0,
+            'availability_scaled_num': scaled_width,
+            'availability_status': item['availability_status'],
+            'planned_downtime': f"{item['planned_downtime']} hrs" if isinstance(item['planned_downtime'], (int, float)) else item['planned_downtime'],
+            'unplanned_downtime': f"{item['unplanned_downtime']} hrs" if isinstance(item['unplanned_downtime'], (int, float)) else item['unplanned_downtime'],
+            'total_incidents': item['total_incidents'],
+            'sla_breach_count': item['sla_breach_count'],
+            'mttr_str': mttr_hrs_str,
+            'backup_success': item['backup_success'],
+            'restore_success': item['restore_success'],
+            'replication_status': item['replication_status'],
+        })
+
+    avg_uptime = f"{round(sum(uptimes)/len(uptimes), 2)}%" if uptimes else 'No Data'
+    avg_mttr = f"{round((sum(mttr_values)/len(mttr_values))/60, 2)} hrs" if mttr_values else '—'
+
+    # Build Lede Text
+    if all_within_sla:
+        lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+    else:
+        lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
+
+    if max_incidents_db and max_incidents_val > 0:
+        others_combined = total_incidents_all - max_incidents_val
+        if max_incidents_val > others_combined:
+            compare_str = "more than the other systems combined"
+        else:
+            compare_str = "more than any other system"
+        lede_suffix = f"The one thing worth a second look: <em>{max_incidents_db} logged {max_incidents_val} incidents</em> — {compare_str} — even though its uptime never slipped."
+    else:
+        lede_suffix = "No significant incident trends were logged during this period."
+    
+    lede_text = f"{lede_prefix} {lede_suffix}"
+
+    # Build Watch Item Text
+    if max_incidents_db and max_incidents_val > 0:
+        watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this month. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
+    else:
+        watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
+
     context = {
-        'dashboard_data': dashboard_data,
+        'dashboard_data': formatted_data,
         'reporting_month_str': reporting_month.strftime('%B %Y'),
         'extracted_by': user_display,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
         'database_detail': database_detail,
         'selected_db': selected_db,
+        'avg_uptime': avg_uptime,
+        'total_breaches': total_breaches_all,
+        'total_incidents': total_incidents_all,
+        'avg_mttr': avg_mttr,
+        'lede_text': lede_text,
+        'watch_item_text': watch_item_text,
     }
     return render(request, 'dashboard_print.html', context)
 

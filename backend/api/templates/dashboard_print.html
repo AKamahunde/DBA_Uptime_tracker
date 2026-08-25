@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
     /* Core System Colors Branding */
@@ -70,11 +70,14 @@
   .meter-track{height:5px; background:var(--hairline); position:relative;}
   .meter-fill{height:100%; background:var(--green);}
   .meter-target{position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--ink);}
+  
+  /* Prominent Stats Styling */
   .db-card .stats{display:flex; flex-direction:column; gap:4px; text-align:right;}
   .db-card .stats div{line-height:1.25;}
   .db-card .stats .val{font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--ink); font-size:13px;}
   .db-card .stats .lbl{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.02em; margin-left:4px;}
 
+  /* Detailed Table Styles */
   table{width:100%; border-collapse:collapse; margin-bottom:28px;}
   th{
     background-color: var(--ink);
@@ -102,6 +105,7 @@
   .specs .spec b{display:block; font-size:12.5px; margin-bottom:4px;}
   .specs .spec span{font-size:12px; color:var(--ink-soft);}
 
+  /* Spacious Audit Sign-off spacing */
   .signoff{
     display:grid; 
     grid-template-columns:1fr 1fr 1fr; 
@@ -128,13 +132,6 @@
     align-items:center;
     position:relative;
   }
-  .signature-area.digital {
-    color: var(--gold);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.05em;
-  }
   .signoff .line{
     border-bottom:1px solid var(--hairline); 
     height:1px; 
@@ -150,12 +147,18 @@
   @media print{
     body{background:#fff;}
     .page{padding:0 8mm;}
+    /* Prevent page break split behaviors */
+    table, tr, .db-card, .specs, .signoff, .kpi-row, .flag {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
   }
 </style>
 </head>
 <body>
 <div class="page">
 
+  <!-- Masthead with NMS Logo -->
   <div class="masthead">
     <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0;">
       <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 48px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
@@ -208,7 +211,17 @@
   <p class="section-label">Detail</p>
   <table>
     <thead>
-      <tr><th>Database</th><th>Planned Downtime</th><th>Unplanned Downtime</th><th>Incidents</th><th>Breaches</th><th>MTTR</th><th>Backup</th><th>Restore</th><th>Replication</th></tr>
+      <tr>
+        <th>Database</th>
+        <th>Planned Downtime</th>
+        <th>Unplanned Downtime</th>
+        <th>Incidents</th>
+        <th>Breaches</th>
+        <th>MTTR</th>
+        <th>Backup</th>
+        <th>Restore</th>
+        <th>Replication</th>
+      </tr>
     </thead>
     <tbody>
       {% for item in dashboard_data %}
