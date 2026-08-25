@@ -43,17 +43,17 @@
     background: var(--paper);
     color: var(--ink-soft);
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 12.5px;
-    line-height: 1.45;
+    font-size: 11.5px;
+    line-height: 1.4;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Compact container to guarantee strict single-page portrait A4 print out */
+  /* Strict container padding to guarantee one-page portrait A4 print out */
   .page {
     max-width: 820px;
     margin: 0 auto;
-    padding: 24px 32px;
+    padding: 20px 32px;
     background: var(--card);
     min-height: 297mm;
     display: flex;
@@ -67,19 +67,19 @@
     justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--primary-navy);
-    padding-bottom: 10px;
-    margin-bottom: 12px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
     gap: 16px;
   }
   .masthead .title-block {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     flex: 1;
     min-width: 0;
   }
   .masthead h1 {
-    font-size: 19px;
+    font-size: 17px;
     font-weight: 700;
     margin: 0;
     letter-spacing: -0.02em;
@@ -87,16 +87,16 @@
     line-height: 1.15;
   }
   .masthead .tagline {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--muted);
-    margin-top: 2px;
+    margin-top: 1px;
   }
   .masthead .meta {
     text-align: right;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 8.5px;
     color: var(--text-dark);
-    line-height: 1.4;
+    line-height: 1.35;
     flex-shrink: 0;
   }
 
@@ -104,31 +104,31 @@
   .meta-bar {
     display: flex;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: 9.5px;
     color: var(--text-soft);
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     border-bottom: 1px solid var(--hairline);
-    padding-bottom: 6px;
+    padding-bottom: 4px;
   }
 
   /* Executive Summary Box (using System colors) */
   .lede-box {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
     background: #e8effa; /* Soft primary blue tint */
     border-left: 4px solid var(--primary-navy);
-    padding: 10px 14px;
-    margin-bottom: 16px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
     border-radius: 4px;
   }
   .lede-box .icon {
     background: var(--primary-navy);
     color: var(--pure-white);
     font-weight: 700;
-    font-size: 10px;
-    width: 16px;
-    height: 16px;
+    font-size: 9px;
+    width: 14px;
+    height: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -138,79 +138,78 @@
   }
   .lede-box p {
     margin: 0;
-    font-size: 11.5px;
-    line-height: 1.4;
+    font-size: 11px;
+    line-height: 1.35;
     color: var(--primary-navy);
   }
 
-  /* KPI Cards deck (3-cards layout matching screenshot) */
+  /* KPI Cards deck (3-cards layout matching screenshot, slightly shorter padding) */
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: 12px;
+    margin-bottom: 14px;
   }
   .kpi {
     background: var(--card);
-    padding: 12px 16px;
+    padding: 8px 12px;
     border: 1px solid var(--hairline);
     border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.01);
   }
-  /* Distinct top-border highlight colors matching screenshot */
   .kpi.uptime-card { border-top: 3px solid var(--primary-green); }
   .kpi.breaches-card { border-top: 3px solid var(--primary-navy); }
   .kpi.incidents-card { border-top: 3px solid var(--primary-navy); }
 
   .kpi .label {
-    font-size: 9.5px;
+    font-size: 8.5px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-dark);
-    margin: 0 0 6px;
+    margin: 0 0 3px;
   }
   .kpi .value {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
-    margin: 0 0 2px;
+    margin: 0 0 1px;
     color: var(--primary-navy);
   }
   .kpi.uptime-card .value {
-    color: #1e7a00; /* Darker green value for high contrast print reading */
+    color: #1e7a00;
   }
   .kpi .subtext {
-    font-size: 9.5px;
+    font-size: 8.5px;
     color: var(--muted);
   }
 
   .section-label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--primary-navy);
-    margin: 0 0 10px;
-    padding-bottom: 4px;
+    margin: 0 0 8px;
+    padding-bottom: 3px;
     border-bottom: 1px solid var(--hairline);
   }
 
-  /* Uptime Progress Bars (Sleeker design) */
+  /* Uptime Progress Bars (Sleeker design, reduced heights & vertical padding) */
   .db-grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-bottom: 14px;
   }
   .db-card {
     background: var(--card);
     border: 1px solid var(--hairline);
     border-radius: 6px;
-    padding: 10px 14px;
+    padding: 8px 12px;
     display: grid;
-    grid-template-columns: 160px 1fr 200px;
-    gap: 20px;
+    grid-template-columns: 150px 1fr 100px;
+    gap: 16px;
     align-items: center;
   }
   .db-card .name {
@@ -226,106 +225,87 @@
   }
   .db-card .name-text b {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--primary-navy);
   }
   .db-card .name-text span {
     display: block;
-    font-size: 9.5px;
+    font-size: 9px;
     color: var(--muted);
   }
   
-  /* Meter Track Adjustments: Thinner (6px) & Sleek Track Color */
+  /* Sleek target marker and 6px height */
   .meter-wrap {
     position: relative;
-    padding-top: 14px; /* Space for target label at top */
+    padding-top: 12px;
   }
   .meter-wrap .target-lbl {
     position: absolute;
     top: 0;
     left: 95%;
     transform: translateX(-50%);
-    font-size: 8.5px;
+    font-size: 8px;
     color: var(--muted);
     font-family: 'JetBrains Mono', monospace;
     white-space: nowrap;
   }
   .meter-track {
     height: 6px;
-    background: #e8effa; /* Light blue-gray track instead of harsh gray */
+    background: #e8effa;
     position: relative;
     border-radius: 3px;
   }
   .meter-fill {
     height: 100%;
     border-radius: 3px;
-    transition: width 0.3s ease;
   }
   .meter-target {
     position: absolute;
-    top: -3px;
-    bottom: -3px;
+    top: -2px;
+    bottom: -2px;
     width: 1.5px;
     background: var(--primary-navy);
   }
   
-  /* Right-hand specs & badges block */
+  /* Right-hand metrics align */
   .db-card .stats-col {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
   }
   .db-card .stats-col .uptime-val {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 700;
     color: #1e7a00;
-    font-size: 12px;
+    font-size: 11px;
   }
   .db-card .stats-col .uptime-val.breached {
     color: var(--red);
   }
-  /* Compliance Badge matching screenshot styling */
-  .sla-badge {
-    font-size: 8.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 3px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--primary-green);
-    background: var(--green-soft);
-    color: #2c6600; /* High contrast system green */
-  }
-  .sla-badge.breached {
-    border-color: var(--red);
-    background: var(--red-soft);
-    color: var(--red);
-  }
 
-  /* Detailed Table Styles */
+  /* Detailed Table Styles (Slightly reduced paddings to conserve height) */
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
   }
   th {
     background-color: var(--card);
     color: var(--primary-navy);
-    font-size: 9.5px;
+    font-size: 8.5px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 700;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-top: 1px solid var(--hairline);
     border-bottom: 2px solid var(--primary-navy);
     text-align: center;
   }
   th:first-child, td:first-child { text-align: left; }
   td {
-    padding: 10px 12px;
-    font-size: 11px;
+    padding: 8px 10px;
+    font-size: 10.5px;
     border-bottom: 1px solid var(--hairline);
     color: var(--ink-soft);
     text-align: center;
@@ -348,16 +328,16 @@
   }
   tr:nth-child(even) { background-color: rgba(244, 247, 252, 0.5); }
 
-  /* Specifications (Loose layout for Page 2 spacing) */
+  /* Specifications (More compact specs area) */
   .specs {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     padding-left: 16px;
   }
   .specs li {
-    font-size: 11px;
-    margin-bottom: 6px;
+    font-size: 10.5px;
+    margin-bottom: 4px;
     color: var(--ink-soft);
-    line-height: 1.4;
+    line-height: 1.35;
   }
   .specs li b {
     color: var(--primary-navy);
@@ -366,7 +346,7 @@
   /* Approvals Sign-off Block (Bordered cards footer layout matching screenshot) */
   .signoff-section {
     border-top: 1px solid var(--hairline);
-    padding-top: 16px;
+    padding-top: 12px;
     margin-top: auto;
   }
   .signoff-row {
@@ -378,27 +358,27 @@
     background: var(--card);
     border: 1px solid var(--hairline);
     border-radius: 6px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.01);
   }
   .signoff-card b {
     display: block;
     color: var(--primary-navy);
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     border-bottom: 1.5px solid var(--primary-navy);
-    padding-bottom: 4px;
+    padding-bottom: 2px;
   }
   .signoff-card div {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 10.5px;
+    font-size: 10px;
     color: var(--text-dark);
   }
   .signoff-card .label {
@@ -411,7 +391,7 @@
   }
   .signoff-card .val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: 9.5px;
     color: var(--primary-navy);
   }
 
@@ -438,7 +418,7 @@
     <!-- Masthead -->
     <div class="masthead">
       <div class="title-block">
-        <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 38px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
+        <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 34px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
         <div>
           <h1>DATABASE PERFORMANCE SUMMARY</h1>
           <div class="tagline">Operations Performance &amp; Compliance Report</div>
@@ -501,9 +481,6 @@
         </div>
         <div class="stats-col">
           <span class="uptime-val {% if item.availability_status != 'Meets SLA' %}breached{% endif %}">{{ item.availability }} Uptime</span>
-          <span class="sla-badge {% if item.availability_status != 'Meets SLA' %}breached{% endif %}">
-            {% if item.availability_status == 'Meets SLA' %}SLA COMPLIANT{% else %}SLA BREACHED{% endif %}
-          </span>
         </div>
       </div>
       {% endfor %}
