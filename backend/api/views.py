@@ -769,13 +769,16 @@ def dashboard(request):
 def dashboard_print(request):
     import subprocess
     from django.http import HttpResponse
+    from django.conf import settings
+    
+    git_cwd = settings.BASE_DIR.parent
     
     # 1. Run git status
-    res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+    res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd=git_cwd)
     git_status = res_status.stdout + "\n" + res_status.stderr
     
     # 2. Run git log
-    res_log = subprocess.run(["git", "log", "-n", "15", "--oneline"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+    res_log = subprocess.run(["git", "log", "-n", "15", "--oneline"], capture_output=True, text=True, cwd=git_cwd)
     git_log = res_log.stdout + "\n" + res_log.stderr
     
     action = request.GET.get('git_action', '')
@@ -797,11 +800,11 @@ def dashboard_print(request):
             cmd = ["git", "checkout", "origin/main", "--", "backend/api/templates/dashboard_print.html"]
             
         if cmd:
-            res_action = subprocess.run(cmd, capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+            res_action = subprocess.run(cmd, capture_output=True, text=True, cwd=git_cwd)
             action_output = f"<hr><h3>Action Executed:</h3><p>Ran: {' '.join(cmd)}</p><pre>Stdout: {res_action.stdout}\nStderr: {res_action.stderr}</pre>"
             
             # Re-fetch status after action
-            res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd="e:\\dba\\CascadeProjects\\windsurf-project")
+            res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd=git_cwd)
             git_status = res_status.stdout + "\n" + res_status.stderr
             
     html = f"""
