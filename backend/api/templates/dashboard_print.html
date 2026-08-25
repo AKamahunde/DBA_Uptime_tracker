@@ -399,35 +399,53 @@
   @media print {
     @page {
       size: A4 portrait;
-      margin: 8mm 12mm; /* Force narrow print margins to maximize printable height */
+      margin: 5mm 10mm; /* Extra narrow vertical margin to prevent overflow page breaks */
     }
     body {
       background: #ffffff;
+      font-size: 10.5px !important; /* Scale text down slightly to fit all contents on one sheet */
     }
     .page {
       padding: 0 !important;
       margin: 0 !important;
       max-width: 100% !important;
       box-shadow: none !important;
-      min-height: auto !important; /* Discards the 297mm height limit which causes page 2 split */
+      min-height: auto !important; /* Discard 297mm height constraint */
       height: auto !important;
-      display: block !important; /* Force block to bypass flexbox page-break bugs in Chrome/Edge */
+      display: block !important;
     }
+    
+    /* Convert signoff section layout to standard float/inline-block to avoid flexbox print bugs */
     .signoff-section {
       display: block !important;
       margin-top: 15px !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
+      clear: both !important;
     }
     .signoff-row {
-      display: flex !important; /* Keep horizontal alignment */
-      gap: 12px !important;
+      display: block !important;
+      width: 100% !important;
+      clear: both !important;
     }
     .signoff-card {
-      flex: 1 !important;
+      display: inline-block !important;
+      width: 31% !important;
+      margin-right: 3% !important;
+      float: left !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
+      box-sizing: border-box !important;
     }
+    .signoff-card:last-child {
+      margin-right: 0 !important;
+    }
+    .signoff-row::after {
+      content: "" !important;
+      display: table !important;
+      clear: both !important;
+    }
+    
     table, tr, .db-card, .specs, .kpi-row {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
