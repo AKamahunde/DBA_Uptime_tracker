@@ -778,6 +778,11 @@ def dashboard_print(request):
 
     selected_db = request.GET.get('database_select', 'All Databases')
     dashboard_data, _ = _get_dashboard_data(reporting_month)
+    
+    # Filter dashboard_data by selected_db if a specific database is selected
+    if selected_db != 'All Databases':
+        dashboard_data = [item for item in dashboard_data if item['database'].lower() == selected_db.lower()]
+
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     
     user_display = request.user.get_full_name()
@@ -827,7 +832,6 @@ def dashboard_print(request):
         mttr_hrs_str = f"{round(mttr_min / 60.0, 2)} hrs" if (isinstance(mttr_min, (int, float)) and mttr_min > 0) else '—'
         
         # Calculate scaled width mapping the range [99.0%, 100.0%] to [0%, 100%]
-        # This provides human-readable visual differences between 99.95% target and 100% uptime
         scaled_width = 0.0
         if avail_str and avail_str != 'No Data':
             try:
@@ -858,28 +862,45 @@ def dashboard_print(request):
     avg_mttr = f"{round((sum(mttr_values)/len(mttr_values))/60, 2)} hrs" if mttr_values else '—'
 
     # Build Lede Text
-    if all_within_sla:
-        lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
-    else:
-        lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
-
-    if max_incidents_db and max_incidents_val > 0:
-        others_combined = total_incidents_all - max_incidents_val
-        if max_incidents_val > others_combined:
-            compare_str = "more than the other systems combined"
+    if selected_db != 'All Databases':
+        if all_within_sla:
+            lede_prefix = f"The {selected_db} production database held within SLA in {reporting_month.strftime('%B %Y')}."
         else:
-            compare_str = "more than any other system"
-        lede_suffix = f"The one thing worth a second look: <em>{max_incidents_db} logged {max_incidents_val} incidents</em> — {compare_str} — even though its uptime never slipped."
+            lede_prefix = f"The {selected_db} production database did not meet the SLA target in {reporting_month.strftime('%B %Y')}."
+
+        if total_incidents_all > 0:
+            lede_suffix = f"A total of {total_incidents_all} incident(s) were logged, with a mean time to resolution of {avg_mttr}."
+        else:
+            lede_suffix = "No incidents or service interruptions were logged during this period."
     else:
-        lede_suffix = "No significant incident trends were logged during this period."
+        if all_within_sla:
+            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+        else:
+            lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
+
+        if max_incidents_db and max_incidents_val > 0:
+            others_combined = total_incidents_all - max_incidents_val
+            if max_incidents_val > others_combined:
+                compare_str = "more than the other systems combined"
+            else:
+                compare_str = "more than any other system"
+            lede_suffix = f"The one thing worth a second look: <em>{max_incidents_db} logged {max_incidents_val} incidents</em> — {compare_str} — even though its uptime never slipped."
+        else:
+            lede_suffix = "No significant incident trends were logged during this period."
     
     lede_text = f"{lede_prefix} {lede_suffix}"
 
     # Build Watch Item Text
-    if max_incidents_db and max_incidents_val > 0:
-        watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this month. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
+    if selected_db != 'All Databases':
+        if total_incidents_all > 0:
+            watch_item_text = f"<strong>Watch item —</strong> {selected_db} logged {total_incidents_all} incident(s) during this period. Mean time to resolution was {avg_mttr}."
+        else:
+            watch_item_text = f"<strong>Watch item —</strong> No major watch items logged for {selected_db}. Performance is within baseline thresholds."
     else:
-        watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
+        if max_incidents_db and max_incidents_val > 0:
+            watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this month. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
+        else:
+            watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
 
     context = {
         'dashboard_data': formatted_data,

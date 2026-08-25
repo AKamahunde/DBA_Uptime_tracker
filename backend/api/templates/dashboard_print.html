@@ -574,9 +574,15 @@
     <!-- System Specifications -->
     <p class="section-label">System Context &amp; Specifications</p>
     <ul class="specs">
+      {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
       <li><b>Oracle (nmsinfra):</b> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) — Powers core NMS ERP business modules including finance, procurement, and warehousing operations.</li>
+      {% endif %}
+      {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
       <li><b>MySQL (nickledbnew):</b> nickledbnew (replicated to nickledbdr for DR) — Hosts critical collaboration systems, IT ServiceDesk, and the Document Management Tool (DMT).</li>
+      {% endif %}
+      {% if selected_db == 'All Databases' or selected_db == 'MS SQL' %}
       <li><b>MS SQL Server (Pentana):</b> Windows Server Host — Powers the MKInsight (Pentana Audit) compliance framework for formal business audit reviews.</li>
+      {% endif %}
     </ul>
 
     <!-- Approvals Footer -->
@@ -584,19 +590,19 @@
       <div class="signoff-row">
         <div class="signoff-card">
           <b>EXTRACTED BY</b>
-          <div><span class="label">Sig:</span><span class="fill"></span></div>
+          <div><span class="label">Signature:</span><span class="fill"></span></div>
           <div><span class="label">Name:</span><span class="val">{{ extracted_by }}</span></div>
           <div><span class="label">Date:</span><span class="val">{{ extracted_at }}</span></div>
         </div>
         <div class="signoff-card">
           <b>REVIEWED BY</b>
-          <div><span class="label">Sig:</span><span class="fill"></span></div>
+          <div><span class="label">Signature:</span><span class="fill"></span></div>
           <div><span class="label">Name:</span><span class="fill"></span></div>
           <div><span class="label">Date:</span><span class="fill"></span></div>
         </div>
         <div class="signoff-card">
           <b>APPROVED BY</b>
-          <div><span class="label">Sig:</span><span class="fill"></span></div>
+          <div><span class="label">Signature:</span><span class="fill"></span></div>
           <div><span class="label">Name:</span><span class="fill"></span></div>
           <div><span class="label">Date:</span><span class="fill"></span></div>
         </div>
