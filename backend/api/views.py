@@ -263,10 +263,18 @@ def _get_dashboard_data(reporting_month):
                 replication_issues = True
                 
         high_disk_usage = False
-        latest_capacity = CapacityPlanning.objects.filter(
-            database__iexact=db_type
-        ).order_by('-month').first()
-        if latest_capacity and latest_capacity.disk_used_percent and latest_capacity.disk_used_percent > 85:
+        capacity_record = CapacityPlanning.objects.filter(
+            database__iexact=db_type,
+            month__year=reporting_month.year,
+            month__month=reporting_month.month
+        ).order_by('-updated_at').first()
+        
+        if not capacity_record:
+            capacity_record = CapacityPlanning.objects.filter(
+                database__iexact=db_type
+            ).order_by('-month', '-updated_at').first()
+            
+        if capacity_record and capacity_record.disk_used_percent and capacity_record.disk_used_percent > 85:
             high_disk_usage = True
             
         if active_incidents > 0:
@@ -308,7 +316,14 @@ def _get_dashboard_data(reporting_month):
             'failed_backups': failed_backups if sla_exists else 'No Data',
             'health_status': health_status,
             'active_incidents': active_incidents,
-            'last_backup_detail': last_backup_str
+            'last_backup_detail': last_backup_str,
+            
+            # Disk space and tablespace capacity planning values
+            'database_size_gb': float(capacity_record.database_size_gb) if (capacity_record and capacity_record.database_size_gb is not None) else 'No Data',
+            'available_capacity_gb': float(capacity_record.available_capacity_gb) if (capacity_record and capacity_record.available_capacity_gb is not None) else 'No Data',
+            'disk_used_percent': float(capacity_record.disk_used_percent) if (capacity_record and capacity_record.disk_used_percent is not None) else 'No Data',
+            'tablespace_used_percent': float(capacity_record.tablespace_used_percent) if (capacity_record and capacity_record.tablespace_used_percent is not None) else 'No Data',
+            'growth_gb': float(capacity_record.growth_gb) if (capacity_record and capacity_record.growth_gb is not None) else 'No Data',
         })
     return dashboard_data, db_types
 
@@ -856,6 +871,12 @@ def dashboard_print(request):
             'backup_success': item['backup_success'],
             'restore_success': item['restore_success'],
             'replication_status': item['replication_status'],
+            
+            # Disk space and tablespace capacity planning values
+            'database_size_gb': f"{item['database_size_gb']} GB" if isinstance(item.get('database_size_gb'), (int, float)) else item.get('database_size_gb', 'No Data'),
+            'available_capacity_gb': f"{item['available_capacity_gb']} GB" if isinstance(item.get('available_capacity_gb'), (int, float)) else item.get('available_capacity_gb', 'No Data'),
+            'disk_used_percent': f"{item['disk_used_percent']}%" if isinstance(item.get('disk_used_percent'), (int, float)) else item.get('disk_used_percent', 'No Data'),
+            'tablespace_used_percent': f"{item['tablespace_used_percent']}%" if isinstance(item.get('tablespace_used_percent'), (int, float)) else item.get('tablespace_used_percent', 'No Data'),
         })
 
     avg_uptime = f"{round(sum(uptimes)/len(uptimes), 2)}%" if uptimes else 'No Data'

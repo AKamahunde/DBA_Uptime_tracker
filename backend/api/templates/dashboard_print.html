@@ -540,6 +540,8 @@
           <th>INCIDENTS</th>
           <th>BACKUP RATE</th>
           <th>REPLICATION</th>
+          <th>DISK USED</th>
+          <th>FREE SPACE</th>
         </tr>
       </thead>
       <tbody>
@@ -562,6 +564,20 @@
               {{ item.replication_status }}
             {% elif item.database == 'MS SQL' %}
               <span class="no-data">N/A (Standalone)</span>
+            {% else %}
+              <span class="no-data">[ No Data ]</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.disk_used_percent and item.disk_used_percent != 'No Data' %}
+              {{ item.disk_used_percent }}
+            {% else %}
+              <span class="no-data">[ No Data ]</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.available_capacity_gb and item.available_capacity_gb != 'No Data' %}
+              {{ item.available_capacity_gb }}
             {% else %}
               <span class="no-data">[ No Data ]</span>
             {% endif %}
