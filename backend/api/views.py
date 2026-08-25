@@ -767,82 +767,32 @@ def dashboard(request):
 
 @login_required
 def dashboard_print(request):
-    import subprocess
-    from django.http import HttpResponse
-    from django.conf import settings
-    
-    git_cwd = settings.BASE_DIR.parent
-    
-    # 1. Run git status
-    res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd=git_cwd)
-    git_status = res_status.stdout + "\n" + res_status.stderr
-    
-    # 2. Run git log
-    res_log = subprocess.run(["git", "log", "-n", "15", "--oneline"], capture_output=True, text=True, cwd=git_cwd)
-    git_log = res_log.stdout + "\n" + res_log.stderr
-    
-    action = request.GET.get('git_action', '')
-    custom_ref = request.GET.get('custom_ref', '')
-    action_output = ''
-    
-    if action or custom_ref:
-        cmd = []
-        if custom_ref:
-            cmd = ["git", "checkout", custom_ref, "--", "backend/api/templates/dashboard_print.html"]
-        elif action == 'checkout_head':
-            cmd = ["git", "checkout", "--", "backend/api/templates/dashboard_print.html"]
-        elif action == 'checkout_origin':
-            cmd = ["git", "checkout", "origin/main", "--", "backend/api/templates/dashboard_print.html"]
-        elif action.startswith('checkout_head_'):
-            num = action.replace('checkout_head_', '')
-            cmd = ["git", "checkout", f"HEAD~{num}", "--", "backend/api/templates/dashboard_print.html"]
-            
-        if cmd:
-            res_action = subprocess.run(cmd, capture_output=True, text=True, cwd=git_cwd)
-            action_output = f"<hr><h3>Action Executed:</h3><p>Ran: {' '.join(cmd)}</p><pre>Stdout: {res_action.stdout}\nStderr: {res_action.stderr}</pre>"
-            
-            # Re-fetch status after action
-            res_status = subprocess.run(["git", "status"], capture_output=True, text=True, cwd=git_cwd)
-            git_status = res_status.stdout + "\n" + res_status.stderr
-            
-    # Generate list of revert offsets
-    offsets_html = "".join([f'<li><a href="?git_action=checkout_head_{i}">Checkout template from HEAD~{i}</a></li>' for i in range(1, 16)])
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
 
-    html = f"""
-    <html>
-    <head><title>Git Diagnostics & Restore Helper</title></head>
-    <body style="font-family: sans-serif; padding: 20px; background: #f4f6f8;">
-    <h2>Git Diagnostics & Restore Helper</h2>
+    selected_db = request.GET.get('database_select', 'All Databases')
+    dashboard_data, _ = _get_dashboard_data(reporting_month)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     
-    <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-      <h3>Actions:</h3>
-      <ul>
-        <li><a href="?git_action=checkout_head">Discard uncommitted changes (git checkout -- template)</a></li>
-        <li><a href="?git_action=checkout_origin">Checkout template from origin/main</a></li>
-        {offsets_html}
-      </ul>
-      
-      <form method="GET" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
-        <label for="custom_ref">Revert template to custom Commit Hash / Ref:</label><br>
-        <input type="text" id="custom_ref" name="custom_ref" placeholder="e.g. 5a1b3c2" style="padding: 6px; width: 250px; border: 1px solid #ccc; border-radius: 4px;">
-        <button type="submit" style="padding: 6px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Execute Checkout</button>
-      </form>
-    </div>
-    
-    <div style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-      <h3>Git Status:</h3>
-      <pre style="background: #272822; color: #f8f8f2; padding: 10px; overflow-x: auto; border-radius: 3px;">{git_status}</pre>
-    </div>
-    
-    <div style="background: white; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
-      <h3>Git Log (Last 15 Commits):</h3>
-      <pre style="background: #272822; color: #f8f8f2; padding: 10px; overflow-x: auto; border-radius: 3px;">{git_log}</pre>
-    </div>
-    {action_output}
-    </body>
-    </html>
-    """
-    return HttpResponse(html)
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
+    context = {
+        'dashboard_data': dashboard_data,
+        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'extracted_by': user_display,
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
+        'database_detail': database_detail,
+        'selected_db': selected_db,
+    }
+    return render(request, 'dashboard_print.html', context)
 
 @login_required
 def dashboard_excel(request):
