@@ -10,18 +10,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#14213D;
-    --ink-soft:#3D4A6B;
-    --paper:#FAFAF8;
-    --card:#FFFFFF;
-    --hairline:#E2E0D8;
-    --gold:#C98A00;
-    --gold-soft:#F6EBD4;
-    --green:#2F6F4E;
-    --green-soft:#E7F1EC;
-    --amber:#B7791F;
-    --amber-soft:#FAF0DE;
-    --muted:#767467;
+    /* Core System Colors Branding */
+    --primary-navy: #002569;
+    --primary-green: #76B900;
+    --primary-gold: #F1AB00;
+    --bg-cool: #F4F7FC;
+    --border-mist: #D1D7E0;
+    --text-dark: #3D4A5C;
+    --text-soft: #6B6B5E;
+    --pure-white: #FFFFFF;
+
+    /* Theme Stylesheets Variables Map */
+    --ink: var(--primary-navy);
+    --ink-soft: var(--text-dark);
+    --paper: var(--bg-cool);
+    --card: var(--pure-white);
+    --hairline: var(--border-mist);
+    --gold: var(--primary-gold);
+    --gold-soft: #fff2cc;
+    --green: var(--primary-green);
+    --green-soft: #e2f0d9;
+    --amber: var(--primary-gold);
+    --amber-soft: #fff2cc;
+    --muted: var(--text-soft);
   }
   *{box-sizing:border-box;}
   body{
@@ -62,12 +73,11 @@
   .meter-target{position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--ink);}
   .db-card .stats{display:flex; flex-direction:column; gap:2px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-soft); text-align:right;}
 
-  table{width:100%; border-collapse:collapse; margin-bottom:8px;}
+  table{width:100%; border-collapse:collapse; margin-bottom:24px;}
   th{text-align:right; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); font-weight:500; padding:0 0 10px; border-bottom:1px solid var(--ink);}
   th:first-child, td:first-child{text-align:left;}
   td{text-align:right; padding:10px 0; font-family:'JetBrains Mono',monospace; font-size:12.5px; border-bottom:1px solid var(--hairline);}
   td:first-child{font-family:'Inter',sans-serif; font-weight:500; font-size:13px;}
-  .footnote{font-size:11.5px; color:var(--muted); margin:10px 0 40px;}
 
   .specs{display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:40px;}
   .specs .spec b{display:block; font-size:12.5px; margin-bottom:4px;}
@@ -88,9 +98,12 @@
 <div class="page">
 
   <div class="masthead">
-    <div>
-      <p class="brand">NMS Medical Logistics · Operations</p>
-      <h1>Database performance summary</h1>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 48px; width: auto; border-radius: 4px; border: 1px solid var(--hairline);">
+      <div>
+        <p class="brand">NMS Medical Logistics · Operations</p>
+        <h1>Database performance summary</h1>
+      </div>
     </div>
     <div class="meta">
       Period: {{ reporting_month_str }}<br>
@@ -139,7 +152,7 @@
   <p class="section-label">Detail</p>
   <table>
     <thead>
-      <tr><th>Database</th><th>Planned dt</th><th>Unplanned dt</th><th>Incidents</th><th>Breaches</th><th>MTTR</th><th>Backup</th><th>Replication</th></tr>
+      <tr><th>Database</th><th>Planned dt</th><th>Unplanned dt</th><th>Incidents</th><th>Breaches</th><th>MTTR</th><th>Backup</th><th>Restore</th><th>Replication</th></tr>
     </thead>
     <tbody>
       {% for item in dashboard_data %}
@@ -151,12 +164,12 @@
         <td>{{ item.sla_breach_count }}</td>
         <td>{{ item.mttr_str }}</td>
         <td>{{ item.backup_success }}</td>
+        <td>{{ item.restore_success }}</td>
         <td>{{ item.replication_status }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <p class="footnote">Restore-rate metrics are not yet instrumented for any of the three systems — omitted above pending that work, rather than shown as a repeated "no data" cell.</p>
 
   <p class="section-label">System specifications</p>
   <div class="specs">
