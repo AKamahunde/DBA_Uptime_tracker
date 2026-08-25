@@ -399,11 +399,11 @@
   @media print {
     @page {
       size: A4 portrait;
-      margin: 5mm 10mm; /* Extra narrow vertical margin to prevent overflow page breaks */
+      margin: 4mm 8mm; /* Extra narrow vertical margin to maximize space and prevent overflow */
     }
     body {
       background: #ffffff;
-      font-size: 10.5px !important; /* Scale text down slightly to fit all contents on one sheet */
+      font-size: 10px !important; /* Scale base font down to fit everything on one sheet */
     }
     .page {
       padding: 0 !important;
@@ -415,10 +415,29 @@
       display: block !important;
     }
     
+    /* Compact database cards and tables for print layout */
+    .db-card {
+      padding: 5px 10px !important;
+      gap: 12px !important;
+    }
+    table {
+      margin-bottom: 8px !important;
+    }
+    th, td {
+      padding: 4px 6px !important;
+    }
+    .specs {
+      margin-bottom: 6px !important;
+    }
+    .specs li {
+      margin-bottom: 2px !important;
+      line-height: 1.25 !important;
+    }
+    
     /* Convert signoff section layout to standard float/inline-block to avoid flexbox print bugs */
     .signoff-section {
       display: block !important;
-      margin-top: 15px !important;
+      margin-top: 10px !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       clear: both !important;
@@ -436,6 +455,7 @@
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       box-sizing: border-box !important;
+      padding: 6px 10px !important;
     }
     .signoff-card:last-child {
       margin-right: 0 !important;
@@ -634,9 +654,9 @@
         const downloadMode = urlParams.get('download') === 'true';
         
         if (downloadMode) {
-            const element = document.body;
+            const element = document.querySelector('.page');
             const opt = {
-                margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
+                margin:       [4, 8, 4, 8], // top, left, bottom, right in mm
                 filename:     'Database_Performance_Report_{{ reporting_month_str|slugify }}.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
