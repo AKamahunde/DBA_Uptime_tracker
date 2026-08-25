@@ -70,7 +70,10 @@
   .meter-track{height:5px; background:var(--hairline); position:relative;}
   .meter-fill{height:100%; background:var(--green);}
   .meter-target{position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--ink);}
-  .db-card .stats{display:flex; flex-direction:column; gap:2px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-soft); text-align:right;}
+  .db-card .stats{display:flex; flex-direction:column; gap:4px; text-align:right;}
+  .db-card .stats div{line-height:1.25;}
+  .db-card .stats .val{font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--ink); font-size:13px;}
+  .db-card .stats .lbl{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.02em; margin-left:4px;}
 
   table{width:100%; border-collapse:collapse; margin-bottom:28px;}
   th{
@@ -190,9 +193,9 @@
         </div>
       </div>
       <div class="stats">
-        <span>{{ item.total_incidents }} incidents</span>
-        <span>MTTR {{ item.mttr_str }}</span>
-        <span>backup rate {{ item.backup_success }}</span>
+        <div><span class="val">{{ item.total_incidents }}</span><span class="lbl">incidents</span></div>
+        <div><span class="val">{{ item.mttr_str }}</span><span class="lbl">MTTR</span></div>
+        <div><span class="val">{{ item.backup_success }}</span><span class="lbl">backup rate</span></div>
       </div>
     </div>
     {% endfor %}
