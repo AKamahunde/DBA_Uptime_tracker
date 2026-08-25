@@ -41,12 +41,11 @@
   }
   .page{max-width:880px; margin:0 auto; padding:56px 40px 64px;}
 
-  .masthead{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--ink); padding-bottom:20px; margin-bottom:28px;}
-  .masthead .brand{font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); margin:0 0 6px;}
-  .masthead h1{font-family:'Fraunces',serif; font-weight:600; font-size:30px; margin:0; letter-spacing:-0.01em;}
-  .masthead .meta{text-align:right; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-soft); line-height:1.7;}
+  .masthead{display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--ink); padding-bottom:20px; margin-bottom:28px; gap:20px;}
+  .masthead h1{font-family:'Inter',sans-serif; font-weight:600; font-size:22px; margin:0; letter-spacing:-0.015em; flex:1;}
+  .masthead .meta{text-align:right; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft); line-height:1.6; flex-shrink:0;}
 
-  .lede{font-family:'Fraunces',serif; font-weight:500; font-size:18px; line-height:1.55; color:var(--ink); margin:0 0 32px; max-width:64ch;}
+  .lede{font-family:'Inter',sans-serif; font-weight:400; font-size:15px; line-height:1.6; color:var(--ink); margin:0 0 32px; max-width:70ch;}
   .lede em{font-style:normal; color:var(--gold); background:var(--gold-soft); padding:0 4px; border-radius:2px;}
 
   .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline); margin-bottom:36px;}
@@ -98,12 +97,9 @@
 <div class="page">
 
   <div class="masthead">
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 48px; width: auto; border-radius: 4px; border: 1px solid var(--hairline);">
-      <div>
-        <p class="brand">NMS Medical Logistics · Operations</p>
-        <h1>Database performance summary</h1>
-      </div>
+    <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0;">
+      <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 48px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
+      <h1>Database performance summary</h1>
     </div>
     <div class="meta">
       Period: {{ reporting_month_str }}<br>
