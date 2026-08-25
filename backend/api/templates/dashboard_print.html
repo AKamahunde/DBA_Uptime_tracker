@@ -282,5 +282,36 @@
   </div>
 
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const downloadMode = urlParams.get('download') === 'true';
+        
+        if (downloadMode) {
+            const element = document.body;
+            const opt = {
+                margin:       [15, 10, 15, 10], // top, left, bottom, right in mm
+                filename:     'Database_Performance_Report_{{ reporting_month_str|slugify }}.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            
+            // Generate and download PDF, then close tab
+            html2pdf().set(opt).from(element).save().then(() => {
+                setTimeout(function() {
+                    window.close();
+                }, 1000);
+            }).catch(err => {
+                console.error('PDF generation error:', err);
+                window.print(); // Fallback to standard print if jsPDF fails
+            });
+        } else {
+            window.print();
+        }
+    }
+</script>
 </body>
 </html>
