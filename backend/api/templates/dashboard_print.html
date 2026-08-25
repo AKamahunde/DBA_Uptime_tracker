@@ -33,19 +33,30 @@
     background: var(--paper);
     color: var(--ink);
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 12px;
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 1.5;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Compact padding to enforce strict single-page portrait A4 print */
+  /* Page container classes */
   .page {
-    max-width: 800px;
+    max-width: 820px;
     margin: 0 auto;
-    padding: 24px 32px;
+    padding: 40px 48px;
     background: var(--card);
-    min-height: 297mm; /* Standard A4 height constraint boundary */
+    min-height: 297mm; /* Standard A4 height */
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  }
+  
+  /* Hard page-break rule for print engines */
+  .page-1 {
+    page-break-after: always;
+    break-after: always;
+    margin-bottom: 20px;
+  }
+
+  .page-2 {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -57,8 +68,8 @@
     justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--navy-blue);
-    padding-bottom: 8px;
-    margin-bottom: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
     gap: 16px;
   }
   .masthead h1 {
@@ -67,24 +78,25 @@
     margin: 0;
     letter-spacing: -0.02em;
     color: var(--navy-blue);
+    text-transform: uppercase;
   }
   .masthead .meta {
     text-align: right;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 9.5px;
     color: var(--ink-soft);
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
   /* Executive Lede Summary Callout */
   .lede {
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-weight: 500;
-    line-height: 1.45;
+    line-height: 1.5;
     color: var(--navy-blue);
-    margin: 0 0 12px;
+    margin: 0 0 20px;
     background: var(--paper);
-    padding: 10px 14px;
+    padding: 12px 16px;
     border-radius: 6px;
     border-left: 4px solid var(--navy-blue);
   }
@@ -94,43 +106,43 @@
     color: var(--navy-blue);
   }
 
-  /* KPI Card Grid (3-cards layout matching Wireframe 1) */
+  /* KPI Card Grid (4-cards layout matching Wireframe 2) */
   .kpi-row {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
   }
   .kpi {
     background: var(--card);
-    padding: 8px 12px;
+    padding: 12px 16px;
     border: 1px solid var(--hairline);
     border-radius: 6px;
   }
   .kpi .label {
-    font-size: 9px;
+    font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--muted);
-    margin: 0 0 2px;
+    margin: 0 0 4px;
   }
   .kpi .value {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     margin: 0;
     color: var(--navy-blue);
   }
 
   .section-label {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
-    margin: 0 0 8px;
-    padding-bottom: 3px;
+    margin: 0 0 12px;
+    padding-bottom: 4px;
     border-bottom: 1px solid var(--hairline);
   }
 
@@ -138,17 +150,17 @@
   .db-grid {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-bottom: 14px;
+    gap: 10px;
+    margin-bottom: 28px;
   }
   .db-card {
     background: var(--card);
     border: 1px solid var(--hairline);
     border-radius: 6px;
-    padding: 8px 12px;
+    padding: 12px 16px;
     display: grid;
     grid-template-columns: 140px 1fr 180px;
-    gap: 16px;
+    gap: 20px;
     align-items: center;
   }
   .db-card .name {
@@ -164,33 +176,33 @@
   }
   .db-card .name-text b {
     display: block;
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 700;
     color: var(--navy-blue);
   }
   .db-card .name-text span {
     display: block;
-    font-size: 9px;
+    font-size: 9.5px;
     color: var(--muted);
     font-family: 'JetBrains Mono', monospace;
   }
   .meter-wrap .meter-label {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 9.5px;
     color: var(--muted);
-    margin-bottom: 3px;
+    margin-bottom: 4px;
     font-family: 'JetBrains Mono', monospace;
   }
   .meter-track {
-    height: 4px;
+    height: 5px;
     background: var(--hairline);
     position: relative;
-    border-radius: 2px;
+    border-radius: 2.5px;
   }
   .meter-fill {
     height: 100%;
-    border-radius: 2px;
+    border-radius: 2.5px;
   }
   .meter-target {
     position: absolute;
@@ -206,8 +218,8 @@
     text-align: right;
   }
   .db-card .stats div {
-    font-size: 10px;
-    line-height: 1.15;
+    font-size: 11px;
+    line-height: 1.25;
   }
   .db-card .stats .val {
     font-family: 'JetBrains Mono', monospace;
@@ -215,34 +227,53 @@
     color: var(--navy-blue);
   }
   .db-card .stats .lbl {
-    font-size: 8px;
+    font-size: 8.5px;
     color: var(--muted);
     text-transform: uppercase;
     margin-left: 2px;
   }
 
-  /* Detailed Table */
+  /* Callout Exception Box */
+  .flag {
+    display: flex;
+    gap: 12px;
+    background: var(--gold-soft);
+    border-left: 3px solid var(--gold);
+    padding: 12px 16px;
+    border-radius: 4px;
+  }
+  .flag p {
+    margin: 0;
+    font-size: 12px;
+    color: #78350f;
+  }
+  .flag strong {
+    color: #78350f;
+    font-weight: 700;
+  }
+
+  /* High-Contrast Detailed Table */
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 14px;
+    margin-bottom: 8px;
   }
   th {
     background-color: var(--navy-blue);
     color: var(--card);
-    font-size: 8.5px;
+    font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 600;
-    padding: 6px 8px;
+    padding: 8px 10px;
     border: 1px solid var(--hairline);
     text-align: center;
   }
   th:first-child, td:first-child { text-align: left; }
   td {
-    padding: 6px 8px;
+    padding: 8px 10px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px;
+    font-size: 11px;
     border: 1px solid var(--hairline);
     color: var(--ink);
     text-align: center;
@@ -257,46 +288,53 @@
     font-style: italic;
   }
   tr:nth-child(even) { background-color: var(--paper); }
+  
+  .table-note {
+    font-size: 10.5px;
+    color: var(--muted);
+    margin: 4px 0 24px;
+    font-style: italic;
+  }
 
-  /* Specifications (Tight bulleted layout matching Wireframe 1) */
+  /* Specifications (Loose layout for Page 2 spacing) */
   .specs {
-    margin-bottom: 16px;
+    margin-bottom: 28px;
     padding-left: 16px;
   }
   .specs li {
-    font-size: 11px;
-    margin-bottom: 4px;
+    font-size: 11.5px;
+    margin-bottom: 8px;
     color: var(--ink-soft);
-    line-height: 1.4;
+    line-height: 1.45;
   }
   .specs li b {
     color: var(--navy-blue);
   }
 
-  /* approvals footer signatures row (Strictly compact and non-spilling) */
+  /* Approvals Sign-off Block (Full Matrix style) */
   .signoff-section {
     border-top: 1px solid var(--hairline);
-    padding-top: 12px;
-    margin-top: auto; /* Push approvals to the very bottom */
+    padding-top: 16px;
+    margin-top: auto;
   }
   .signoff-title {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
   .signoff-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
+    gap: 32px;
   }
   .signoff-col {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    font-size: 10.5px;
+    gap: 8px;
+    font-size: 11px;
     color: var(--ink-soft);
   }
   .signoff-col div {
@@ -326,7 +364,11 @@
     .page {
       padding: 0;
       max-width: 100%;
-      min-height: 100%;
+      box-shadow: none;
+    }
+    .page-1 {
+      page-break-after: always;
+      break-after: always;
     }
     table, tr, .db-card, .specs, .signoff-section, .kpi-row {
       page-break-inside: avoid !important;
@@ -336,82 +378,111 @@
 </style>
 </head>
 <body>
-<div class="page">
+
+<!-- ==================== PAGE 1: EXECUTIVE DASHBOARD ==================== -->
+<div class="page page-1">
+  <!-- Masthead -->
+  <div class="masthead">
+    <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+      <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 38px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
+      <h1>Executive performance summary</h1>
+    </div>
+    <div class="meta">
+      Period: {{ reporting_month_str }}<br>
+      Run Date: {{ extracted_at }} EAT<br>
+      Databases monitored: {{ dashboard_data|length }}
+    </div>
+  </div>
+
+  <!-- Executive Headline Lede -->
+  <p class="lede">{{ lede_text|safe }}</p>
+
+  <!-- Metric Overview KPI cards (4-cards layout) -->
+  <p class="section-label">Metric Overview</p>
+  <div class="kpi-row">
+    <div class="kpi">
+      <p class="label">Avg uptime</p>
+      <p class="value">{{ avg_uptime }}</p>
+    </div>
+    <div class="kpi">
+      <p class="label">SLA breaches</p>
+      <p class="value">{{ total_breaches }}</p>
+    </div>
+    <div class="kpi">
+      <p class="label">Total incidents</p>
+      <p class="value">{{ total_incidents }}</p>
+    </div>
+    <div class="kpi">
+      <p class="label">Avg MTTR</p>
+      <p class="value">{{ avg_mttr }}</p>
+    </div>
+  </div>
+
+  <!-- SLA Compliance Monitor progress bars -->
+  <p class="section-label">SLA Compliance Monitor (Target: 99.95%) <span style="font-size: 8.5px; font-weight: normal; color: var(--muted); text-transform: none; margin-left: 8px;">(Visualized range: 99.0% to 100.0%)</span></p>
+  <div class="db-grid">
+    {% for item in dashboard_data %}
+    <div class="db-card">
+      <div class="name">
+        <span class="dot" style="background: {% if item.availability_status == 'Meets SLA' %}var(--green){% else %}var(--red){% endif %};"></span>
+        <div class="name-text">
+          <b>{{ item.database }}</b>
+          <span>{{ item.code_name }}</span>
+        </div>
+      </div>
+      <div class="meter-wrap">
+        <div class="meter-label">
+          <span>{{ item.availability }}</span>
+          <span>target 99.95%</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill" style="width:{{ item.availability_scaled_num }}%; background: {% if item.availability_status == 'Meets SLA' %}var(--green){% else %}var(--red){% endif %};"></div>
+          <div class="meter-target" style="left:95%"></div>
+        </div>
+      </div>
+      <div class="stats">
+        <div><span class="val">{{ item.total_incidents }}</span><span class="lbl">incidents</span></div>
+        <div><span class="val">{{ item.mttr_str }}</span><span class="lbl">MTTR</span></div>
+        <div><span class="val">{{ item.backup_success }}</span><span class="lbl">backup rate</span></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Active Watch Items Callout -->
+  <p class="section-label">Active Watch Items</p>
+  <div class="flag">
+    <p>{{ watch_item_text|safe }}</p>
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: OPERATIONS APPENDIX & SIGN-OFF ==================== -->
+<div class="page page-2">
   <div>
     <!-- Masthead -->
     <div class="masthead">
       <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
-        <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 36px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
-        <h1>Database performance summary</h1>
+        <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 38px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
+        <h1>Detailed performance appendix</h1>
       </div>
       <div class="meta">
         Period: {{ reporting_month_str }}<br>
-        Run Date: {{ extracted_at }} EAT<br>
-        Databases monitored: {{ dashboard_data|length }}
+        Run Date: {{ extracted_at }} EAT
       </div>
     </div>
 
-    <!-- Executive Headline Callout -->
-    <p class="lede">{{ lede_text|safe }}</p>
-
-    <!-- KPI summary cards (3-card layout) -->
-    <div class="kpi-row">
-      <div class="kpi">
-        <p class="label">Avg uptime</p>
-        <p class="value">{{ avg_uptime }}</p>
-      </div>
-      <div class="kpi">
-        <p class="label">SLA breaches</p>
-        <p class="value">{{ total_breaches }}</p>
-      </div>
-      <div class="kpi">
-        <p class="label">Total incidents</p>
-        <p class="value">{{ total_incidents }}</p>
-      </div>
-    </div>
-
-    <!-- Uptime visual progress bars (zoomed scale 99.0% to 100.0%) -->
-    <p class="section-label">Uptime vs. SLA target — 99.95% <span style="font-size: 8.5px; font-weight: normal; color: var(--muted); text-transform: none; margin-left: 8px;">(Visualized range: 99.0% to 100.0%)</span></p>
-    <div class="db-grid">
-      {% for item in dashboard_data %}
-      <div class="db-card">
-        <div class="name">
-          <span class="dot" style="background: {% if item.availability_status == 'Meets SLA' %}var(--green){% else %}var(--red){% endif %};"></span>
-          <div class="name-text">
-            <b>{{ item.database }}</b>
-            <span>{{ item.code_name }}</span>
-          </div>
-        </div>
-        <div class="meter-wrap">
-          <div class="meter-label">
-            <span>{{ item.availability }}</span>
-            <span>target 99.95%</span>
-          </div>
-          <div class="meter-track">
-            <div class="meter-fill" style="width:{{ item.availability_scaled_num }}%; background: {% if item.availability_status == 'Meets SLA' %}var(--green){% else %}var(--red){% endif %};"></div>
-            <div class="meter-target" style="left:95%"></div>
-          </div>
-        </div>
-        <div class="stats">
-          <div><span class="val">{{ item.total_incidents }}</span><span class="lbl">incidents</span></div>
-          <div><span class="val">{{ item.mttr_str }}</span><span class="lbl">MTTR</span></div>
-          <div><span class="val">{{ item.backup_success }}</span><span class="lbl">backup rate</span></div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Detailed Performance Metrics Table -->
-    <p class="section-label">Detailed Performance Metrics</p>
+    <!-- Detailed Operational Metrics Table -->
+    <p class="section-label">Detailed Operational Metrics</p>
     <table>
       <thead>
         <tr>
           <th>Database</th>
           <th>Uptime</th>
-          <th>Downtime (P/U)</th>
+          <th>Planned Down</th>
+          <th>Unplanned Down</th>
           <th>Incidents</th>
-          <th>Backup Status</th>
-          <th>Replication Status</th>
+          <th>Backup</th>
+          <th>Replication</th>
         </tr>
       </thead>
       <tbody>
@@ -419,10 +490,13 @@
         <tr>
           <td>{{ item.database }}</td>
           <td>{{ item.availability }}</td>
-          <td>{{ item.planned_downtime }} / {{ item.unplanned_downtime }}</td>
+          <td>{{ item.planned_downtime }}</td>
+          <td>{{ item.unplanned_downtime }}</td>
           <td>{{ item.total_incidents }}</td>
           <td>
-            {% if item.backup_success and item.backup_success != '—' and item.backup_success != 'No Data' %}
+            {% if item.database == 'Oracle' %}
+              N/A*
+            {% elif item.backup_success and item.backup_success != '—' and item.backup_success != 'No Data' %}
               {{ item.backup_success }}
             {% else %}
               <span class="no-data">[ No Data ]</span>
@@ -432,7 +506,7 @@
             {% if item.replication_status and item.replication_status != '—' and item.replication_status != 'No Data' and item.replication_status != 'N/A' %}
               {{ item.replication_status }}
             {% elif item.database == 'MS SQL' %}
-              N/A (Standalone)
+              N/A
             {% else %}
               <span class="no-data">[ No Data ]</span>
             {% endif %}
@@ -441,22 +515,23 @@
         {% endfor %}
       </tbody>
     </table>
+    <p class="table-note">*Note: External backup pipeline integration pending for Oracle environment.</p>
 
     <!-- System Specifications -->
     <p class="section-label">System Specifications</p>
     <ul class="specs">
-      <li><b>Oracle (nmsinfra):</b> Powers the NMS ERP suite — finance, procurement, warehousing.</li>
-      <li><b>MySQL (nickledbnew):</b> Hosts collaboration and support systems — NMS360, IT ServiceDesk, DMT.</li>
-      <li><b>MS SQL Server (Pentana):</b> Windows Server host. Hosts MKInsight (Pentana Audit) for audit and compliance reviews.</li>
+      <li><b>Oracle (nmsinfra):</b> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) - Powers ERP Suite (finance, procurement, warehousing).</li>
+      <li><b>MySQL (nickledbnew):</b> nickledbnew (replicated to nickledbdr) - Hosts collaboration and support systems (NMS360, IT ServiceDesk, DMT).</li>
+      <li><b>MS SQL Server (Pentana):</b> Windows Server Host - Hosts MKInsight (Pentana Audit) for audit and compliance reviews.</li>
     </ul>
   </div>
 
-  <!-- Approvals & Sign-off Footer -->
+  <!-- Formal Sign-off Matrix -->
   <div class="signoff-section">
-    <p class="signoff-title">Approvals &amp; Sign-off</p>
+    <p class="signoff-title">Formal Sign-off Matrix</p>
     <div class="signoff-row">
       <div class="signoff-col">
-        <div><span class="label">Extracted By:</span><span class="val">{{ extracted_by }}</span></div>
+        <div><span class="label">Prepared By:</span><span class="val">{{ extracted_by }}</span></div>
         <div><span class="label">Signature:</span><span class="fill"></span></div>
         <div><span class="label">Date:</span><span class="val">{{ extracted_at }}</span></div>
       </div>
@@ -472,7 +547,6 @@
       </div>
     </div>
   </div>
-
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -484,7 +558,7 @@
         if (downloadMode) {
             const element = document.body;
             const opt = {
-                margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
+                margin:       [0, 0, 0, 0], // Zero margin since pages have padding built-in
                 filename:     'Database_Performance_Report_{{ reporting_month_str|slugify }}.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
