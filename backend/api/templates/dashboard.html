@@ -173,21 +173,11 @@
             </div>
         </form>
         
-        <!-- Export dropdown button in header -->
+        <!-- Export Performance Report Button in header -->
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-            <div class="export-dropdown">
-                <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
-                    Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
-                </button>
-                <div class="export-dropdown-content">
-                    <a href="javascript:void(0)" onclick="openExportModal()">
-                        📄 Generate PDF Report
-                    </a>
-                    <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download>
-                        📊 Export Excel Summary
-                    </a>
-                </div>
-            </div>
+            <button class="btn btn-primary" type="button" onclick="openExportModal()" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;" onmouseover="this.style.opacity='0.95'" onmouseout="this.style.opacity='1'">
+                ⬇ Export Performance Report
+            </button>
         </div>
     </div>
 </div>
@@ -697,11 +687,18 @@
             </div>
             
             <!-- Action Buttons -->
-            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
-                <button type="button" onclick="closeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
-                <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                    Generate PDF Report
-                </button>
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
+                <!-- Secondary Excel Action -->
+                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" style="color: #64748b; font-size: 0.72rem; text-decoration: underline; font-weight: 600; font-family: inherit;" download onclick="closeExportModal()">
+                    Export raw Excel summary instead
+                </a>
+                
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" onclick="closeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
+                    <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                        Generate PDF Report
+                    </button>
+                </div>
             </div>
         </form>
     </div>
