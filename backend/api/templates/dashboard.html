@@ -191,9 +191,19 @@
         
         <!-- Export Performance Report Button in header -->
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-            <button class="btn btn-primary" type="button" onclick="openExportModal()" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;" onmouseover="this.style.opacity='0.95'" onmouseout="this.style.opacity='1'">
-                ⬇ Export Performance Report
-            </button>
+            <div class="export-dropdown">
+                <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
+                    ⬇ Export Performance Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
+                </button>
+                <div class="export-dropdown-content" style="min-width: 170px;">
+                    <a href="javascript:void(0)" onclick="openExportModal()">
+                        📄 Export PDF Report
+                    </a>
+                    <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download>
+                        📊 Export Excel Summary
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -253,15 +263,33 @@
                         </div>
                     </div>
 
-                    <!-- Database Identity Block -->
-                    <div style="margin-bottom: 1.5rem;">
-                        <h2 style="margin: 0; font-size: 1.45rem; font-weight: 800; color: var(--primary-navy); line-height: 1.2;">{{ row.database }}</h2>
-                        <div style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: #0284c7; margin-top: 0.2rem;">
-                            {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
+                    <!-- Database Identity Block with Logo -->
+                    <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <!-- Logo Thumbnail Container -->
+                        <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 130px; height: 60px; background-color: #f8fafc; border: 1px dashed rgba(90, 123, 156, 0.15); border-radius: 4px; padding: 0.25rem;">
+                            {% if row.database == 'Oracle' %}
+                                <img src="/static/oracle_logo.png" alt="Oracle Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% elif row.database == 'MySQL' %}
+                                <img src="/static/mysql_logo.png" alt="MySQL Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% elif row.database == 'MS SQL Server' %}
+                                <img src="/static/windows_logo.png" alt="Windows Server Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% elif row.database == 'PostgreSQL' %}
+                                <img src="/static/postgres_logo.png" alt="PostgreSQL Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% else %}
+                                <span style="font-size: 2rem;">🗄️</span>
+                            {% endif %}
                         </div>
-                        <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
-                            {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Database{% else %}MKInsight Audit Database{% endif %}
-                        </p>
+
+                        <!-- Database Info Text -->
+                        <div>
+                            <h2 style="margin: 0; font-size: 1.45rem; font-weight: 800; color: var(--primary-navy); line-height: 1.2;">{{ row.database }}</h2>
+                            <div style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: #0284c7; margin-top: 0.2rem;">
+                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
+                            </div>
+                            <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
+                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Database{% else %}MKInsight Audit Database{% endif %}
+                            </p>
+                        </div>
                     </div>
 
                     <!-- Database Metrics Grid -->

@@ -468,6 +468,29 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 
 @login_required
 def dashboard(request):
+    # Auto-copy uploaded logo files to static dir if running locally
+    try:
+        import shutil
+        from django.conf import settings
+        static_path = os.path.join(settings.BASE_DIR, 'static')
+        user_uploaded = r"C:\Users\ashley.atim\.gemini\antigravity\brain\d34d1287-6933-4d10-a0c7-cbdb822a4095\.user_uploaded"
+        if os.path.exists(user_uploaded):
+            src_mysql = os.path.join(user_uploaded, "media_1787727806202.png")
+            src_oracle = os.path.join(user_uploaded, "media_1787727834799.png")
+            src_windows = os.path.join(user_uploaded, "media_1787727861319.png")
+            src_postgres = os.path.join(user_uploaded, "media_1787727884009.png")
+            
+            if os.path.exists(src_mysql):
+                shutil.copy(src_mysql, os.path.join(static_path, "mysql_logo.png"))
+            if os.path.exists(src_oracle):
+                shutil.copy(src_oracle, os.path.join(static_path, "oracle_logo.png"))
+            if os.path.exists(src_windows):
+                shutil.copy(src_windows, os.path.join(static_path, "windows_logo.png"))
+            if os.path.exists(src_postgres):
+                shutil.copy(src_postgres, os.path.join(static_path, "postgres_logo.png"))
+    except Exception:
+        pass
+
     autopopulate_fixed_holidays()
     auto_close_incidents()
     auto_update_maintenance_statuses()
