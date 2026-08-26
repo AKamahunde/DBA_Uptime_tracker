@@ -619,8 +619,8 @@
                 <line x1="40" y1="85" x2="360" y2="85" stroke="#f1f5f9" stroke-width="1" />
                 
                 <!-- SLA Reference Line (Dynamic) -->
-                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
-                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA {{ target_sla_val }}%</text>
+                <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1" stroke-dasharray="2,2" />
+                <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="6" font-weight="bold" alignment-baseline="middle">SLA {{ target_sla_val }}%</text>
 
                 <!-- Value Area Shading -->
                 {% if trend_area_points %}
@@ -628,20 +628,20 @@
                 {% endif %}
 
                 <!-- Value Polyline -->
-                <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                <polyline fill="none" stroke="#2563eb" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
                 
                 <!-- Data Point Circles -->
                 {% for m in trend_months %}
                     {% if m.has_data %}
-                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="2.2" fill="#2563eb" stroke="white" stroke-width="1" />
                         <!-- Value Label -->
-                        <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                        <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="6.8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
                     {% else %}
                         <!-- No Data Label -->
-                        <text x="{{ m.x }}" y="85" fill="#94a3b8" font-size="7.5" font-weight="600" text-anchor="middle" font-style="italic">No Data</text>
+                        <text x="{{ m.x }}" y="85" fill="#94a3b8" font-size="6.5" font-weight="600" text-anchor="middle" font-style="italic">No Data</text>
                     {% endif %}
                     <!-- Month Label -->
-                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
+                    <text x="{{ m.x }}" y="100" fill="#64748b" font-size="7.2" font-weight="600" text-anchor="middle">{{ m.name }}</text>
                 {% endfor %}
             </svg>
         </div>
