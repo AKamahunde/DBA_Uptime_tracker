@@ -871,10 +871,12 @@ def dashboard_print(request):
         month_str = request.POST.get('month', '')
         selected_db = request.POST.get('database_select', 'All Databases')
         summary_narrative = request.POST.get('summary_narrative', '').strip()
+        download_mode = request.POST.get('download', 'false')
     else:
         month_str = request.GET.get('month', '')
         selected_db = request.GET.get('database_select', 'All Databases')
         summary_narrative = request.GET.get('summary_narrative', '').strip()
+        download_mode = request.GET.get('download', 'false')
 
     if month_str:
         try:
@@ -1048,6 +1050,7 @@ def dashboard_print(request):
         'lede_text': lede_text,
         'watch_item_text': watch_item_text,
         'target_sla_val': target_sla_val,
+        'download_mode': download_mode,
     }
     return render(request, 'dashboard_print.html', context)
 
