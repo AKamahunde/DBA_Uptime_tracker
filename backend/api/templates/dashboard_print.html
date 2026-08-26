@@ -508,7 +508,7 @@
       <div class="kpi uptime-card">
         <p class="label">Average System Uptime</p>
         <p class="value">{{ avg_uptime }}</p>
-        <p class="subtext">SLA Target: 99.95%</p>
+        <p class="subtext">SLA Target: {{ target_sla_val }}%</p>
       </div>
       <div class="kpi breaches-card">
         <p class="label">Active SLA Breaches</p>
@@ -523,7 +523,7 @@
     </div>
 
     <!-- SLA Compliance Status (Progress Bars) -->
-    <p class="section-label">Service Level Agreement Target Status (Uptime vs. SLA Target: 99.95%)</p>
+    <p class="section-label">Service Level Agreement Target Status (Uptime vs. SLA Target: {{ target_sla_val }}%)</p>
     <div class="db-grid">
       {% for item in dashboard_data %}
       <div class="db-card">
@@ -535,10 +535,10 @@
           </div>
         </div>
         <div class="meter-wrap">
-          <span class="target-lbl">Target: 99.95%</span>
+          <span class="target-lbl">Target: {{ item.target_sla_val }}%</span>
           <div class="meter-track">
             <div class="meter-fill" style="width:{{ item.availability_scaled_num }}%; background: {% if item.availability_status == 'Meets SLA' %}var(--primary-green){% else %}var(--red){% endif %};"></div>
-            <div class="meter-target" style="left:95%"></div>
+            <div class="meter-target" style="left:{{ item.target_sla_scaled }}%"></div>
           </div>
         </div>
         <div class="stats-col">

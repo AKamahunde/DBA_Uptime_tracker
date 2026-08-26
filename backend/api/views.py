@@ -294,10 +294,13 @@ def _get_dashboard_data(reporting_month):
         if last_backup:
             last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
 
+        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else 99.95)
+
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
-            'availability_status': get_status(avail_str, 99.95, '>=') if sla_exists else 'N/A',
+            'target_sla_val': target_pct,
+            'availability_status': get_status(avail_str, target_pct, '>=') if sla_exists else 'N/A',
             'planned_downtime': round(planned, 2) if sla_exists else 'No Data',
             'planned_downtime_status': get_status(planned, 48.0, '<=') if sla_exists else 'N/A',
             'unplanned_downtime': round(unplanned, 2) if sla_exists else 'No Data',
@@ -640,7 +643,18 @@ def dashboard(request):
             'value': avg_avail,
         })
         
-    min_val = min([m['value'] for m in trend_months] + [99.95])
+    # Calculate dynamic target SLA based on database configurations
+    target_sla_val = 99.95
+    if selected_db != 'All Databases':
+        sla_conf = SLAConfig.objects.filter(
+            database__iexact=selected_db, month__year=reporting_month.year, month__month=reporting_month.month
+        ).first()
+        if sla_conf:
+            target_sla_val = float(sla_conf.sla_percent)
+        elif selected_db.lower() == 'mysql':
+            target_sla_val = 99.50
+
+    min_val = min([m['value'] for m in trend_months] + [target_sla_val])
     if min_val <= 0.0:
         y_min = 0.0
     else:
@@ -657,7 +671,7 @@ def dashboard(request):
         m['y'] = y
         m['text_y'] = y - 8
     trend_polyline_points = " ".join(points)
-    sla_y_coord = 20 + (100.0 - 99.95) * 80 / y_range
+    sla_y_coord = 20 + (100.0 - target_sla_val) * 80 / y_range
     
     # 7. Attention Required Alerts
     attention_items = []
@@ -814,6 +828,7 @@ def dashboard(request):
         'selected_db': selected_db,
         'reporting_month': reporting_month.strftime('%Y-%m'),
         'default_lede_text': default_lede_text,
+        'target_sla_val': target_sla_val,
         
         # New Redesign KPIs
         'kpi_availability': kpi_availability,
@@ -860,6 +875,17 @@ def dashboard_print(request):
         dashboard_data = [item for item in dashboard_data if item['database'].lower() == selected_db.lower()]
 
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
+    
+    # Calculate target SLA dynamically for print view
+    target_sla_val = 99.95
+    if selected_db != 'All Databases':
+        sla_conf = SLAConfig.objects.filter(
+            database__iexact=selected_db, month__year=reporting_month.year, month__month=reporting_month.month
+        ).first()
+        if sla_conf:
+            target_sla_val = float(sla_conf.sla_percent)
+        elif selected_db.lower() == 'mysql':
+            target_sla_val = 99.50
     
     user_display = request.user.get_full_name()
     if not user_display:
@@ -917,6 +943,9 @@ def dashboard_print(request):
             except ValueError:
                 pass
 
+        target_val = item.get('target_sla_val', 99.95)
+        target_scaled = round((target_val - 99.0) * 100.0, 2) if target_val >= 99.0 else 0.0
+
         formatted_data.append({
             'database': db_type,
             'code_name': 'nmsinfra' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
@@ -932,6 +961,8 @@ def dashboard_print(request):
             'backup_success': item['backup_success'],
             'restore_success': item['restore_success'],
             'replication_status': item['replication_status'],
+            'target_sla_val': target_val,
+            'target_sla_scaled': target_scaled,
             
             # Disk space and tablespace capacity planning values
             'database_size_gb': f"{item['database_size_gb']} GB" if isinstance(item.get('database_size_gb'), (int, float)) else item.get('database_size_gb', 'No Data'),
@@ -1000,6 +1031,7 @@ def dashboard_print(request):
         'avg_mttr': avg_mttr,
         'lede_text': lede_text,
         'watch_item_text': watch_item_text,
+        'target_sla_val': target_sla_val,
     }
     return render(request, 'dashboard_print.html', context)
 
