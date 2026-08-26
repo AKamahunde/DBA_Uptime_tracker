@@ -227,55 +227,58 @@
             </div>
         </div>
     {% else %}
-        <!-- Scoped Mode: Render ONLY the selected database environment card (100% width) -->
+        <!-- Scoped Mode: Render Scoped DATABASE PROFILE card (100% width) -->
         {% for row in dashboard_data %}
             {% if row.database == selected_db %}
-                <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); border-left: 5px solid {% if row.database == 'Oracle' %}var(--primary-navy){% elif row.database == 'MySQL' %}var(--primary-gold){% else %}var(--accent-muted-blue){% endif %}; margin-bottom: 1.5rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); border-left: 5px solid {% if row.database == 'Oracle' %}var(--primary-navy){% elif row.database == 'MySQL' %}var(--primary-gold){% else %}var(--accent-muted-blue){% endif %}; margin-bottom: 1.5rem;">
+                    <!-- Card Top Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+                        <span style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Database Profile</span>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <strong style="font-size: 1.05rem; color: var(--primary-navy);">{{ row.database }} Database Environment</strong>
-                            <span style="font-size: 0.72rem; background: #e0f2fe; color: #0369a1; padding: 0.15rem 0.45rem; border-radius: 3px; font-weight: 600; font-family: monospace;">
-                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
-                            </span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                            <!-- Health Status Indicator Badge -->
+                            <span style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
                                         {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
                                         {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
                                         {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
-                                {% if row.health_status == 'HEALTHY' %} Healthy{% elif row.health_status == 'WARNING' %} Warning{% else %} Outage{% endif %}
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if row.health_status == 'HEALTHY' %}#137333{% elif row.health_status == 'WARNING' %}#b06000{% else %}#c5221f{% endif %};"></span>
+                                {% if row.health_status == 'HEALTHY' %}Healthy{% elif row.health_status == 'WARNING' %}Warning{% else %}Outage{% endif %}
                             </span>
-                            <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.75rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1;">&larr; Back to Fleet Overview</a>
+                            <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.72rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 0.25rem;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f1f5f9'">&larr; Back to Fleet Overview</a>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem;">
+
+                    <!-- Database Identity Block -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <h2 style="margin: 0; font-size: 1.45rem; font-weight: 800; color: var(--primary-navy); line-height: 1.2;">{{ row.database }}</h2>
+                        <div style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: #0284c7; margin-top: 0.2rem;">
+                            {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
+                        </div>
+                        <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
+                            {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Database{% else %}MKInsight Audit Database{% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Database Metrics Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; border-top: 1px solid rgba(90, 123, 156, 0.08); padding-top: 1.25rem;">
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Availability</div>
-                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.availability }}</div>
-                            <div style="font-size: 0.7rem; color: {% if row.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: 600; margin-top: 0.15rem;">
-                                {% if row.availability_status == 'Meets SLA' %} Meets SLA Target (≥99.95%){% else %} Below SLA Target{% endif %}
-                            </div>
+                            <strong style="font-size: 1.45rem; font-weight: 800; color: #0f172a; display: block; line-height: 1.1;">{{ row.availability }}</strong>
+                            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">Availability</span>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Active Outages &amp; Volume</div>
-                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.active_incidents }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">active / {{ row.total_incidents }} total</span></div>
-                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
-                                {{ row.sla_breach_count }} SLA breach{{ row.sla_breach_count|pluralize }} detected
-                            </div>
+                            <strong style="font-size: 1.45rem; font-weight: 800; color: {% if row.active_incidents > 0 %}#c5221f{% else %}#0f172a{% endif %}; display: block; line-height: 1.1;">
+                                {{ row.active_incidents }}
+                            </strong>
+                            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">Active Outages</span>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Backup Status</div>
-                            <div style="font-size: 1.45rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ row.backup_success }}</div>
-                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Last: {{ row.last_backup_detail }}">
-                                Last: {{ row.last_backup_detail }}
-                            </div>
+                            <strong style="font-size: 1.45rem; font-weight: 800; color: #0f172a; display: block; line-height: 1.1;">{{ row.backup_success }}</strong>
+                            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">Backup Success</span>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replication</div>
-                            <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; margin-top: 0.25rem;">{{ row.replication_status }}</div>
-                            <div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 0.15rem;">
-                                {% if row.replication_status == 'Healthy' %}Live sync active{% else %}No active stream alert{% endif %}
-                            </div>
+                            <strong style="font-size: 1.45rem; font-weight: 800; color: {% if row.replication_status == 'Healthy' %}#137333{% elif row.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %}; display: block; line-height: 1.1;">
+                                {{ row.replication_status }}
+                            </strong>
+                            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">Replication</span>
                         </div>
                     </div>
                 </div>
@@ -551,9 +554,14 @@
                 
                 <!-- Data Point Circles -->
                 {% for m in trend_months %}
-                    <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
-                    <!-- Value Label -->
-                    <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    {% if m.has_data %}
+                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3.5" fill="#2563eb" stroke="white" stroke-width="1.5" />
+                        <!-- Value Label -->
+                        <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#1e293b" font-size="8" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
+                    {% else %}
+                        <!-- No Data Label -->
+                        <text x="{{ m.x }}" y="85" fill="#94a3b8" font-size="7.5" font-weight="600" text-anchor="middle" font-style="italic">No Data</text>
+                    {% endif %}
                     <!-- Month Label -->
                     <text x="{{ m.x }}" y="100" fill="#64748b" font-size="8.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
                 {% endfor %}

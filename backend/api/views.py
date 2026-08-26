@@ -654,7 +654,7 @@ def dashboard(request):
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
 
-    min_val = min([m['value'] for m in trend_months] + [target_sla_val])
+    min_val = min([m['value'] for m in trend_months if m['value'] > 0.0] + [target_sla_val])
     if min_val <= 0.0:
         y_min = 0.0
     else:
@@ -665,11 +665,17 @@ def dashboard(request):
     points = []
     for idx, m in enumerate(trend_months):
         x = 40 + idx * 64
-        y = 20 + (100.0 - m['value']) * 80 / y_range
-        points.append(f"{x},{y}")
         m['x'] = x
-        m['y'] = y
-        m['text_y'] = y - 8
+        if m['value'] > 0.0:
+            y = 20 + (100.0 - m['value']) * 80 / y_range
+            points.append(f"{x},{y}")
+            m['y'] = y
+            m['text_y'] = y - 8
+            m['has_data'] = True
+        else:
+            m['y'] = 100
+            m['text_y'] = 85
+            m['has_data'] = False
     trend_polyline_points = " ".join(points)
     sla_y_coord = 20 + (100.0 - target_sla_val) * 80 / y_range
     
