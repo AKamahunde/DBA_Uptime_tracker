@@ -622,6 +622,11 @@
                 <line x1="40" y1="{{ sla_y_coord }}" x2="360" y2="{{ sla_y_coord }}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3" />
                 <text x="365" y="{{ sla_y_coord }}" fill="#ef4444" font-size="7" font-weight="bold" alignment-baseline="middle">SLA {{ target_sla_val }}%</text>
 
+                <!-- Value Area Shading -->
+                {% if trend_area_points %}
+                <polygon fill="rgba(37, 99, 235, 0.06)" points="{{ trend_area_points }}" />
+                {% endif %}
+
                 <!-- Value Polyline -->
                 <polyline fill="none" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
                 

@@ -468,29 +468,6 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 
 @login_required
 def dashboard(request):
-    # Auto-copy uploaded logo files to static dir if running locally
-    try:
-        import shutil
-        from django.conf import settings
-        static_path = os.path.join(settings.BASE_DIR, 'static')
-        user_uploaded = r"C:\Users\ashley.atim\.gemini\antigravity\brain\d34d1287-6933-4d10-a0c7-cbdb822a4095\.user_uploaded"
-        if os.path.exists(user_uploaded):
-            src_mysql = os.path.join(user_uploaded, "media_1787727806202.png")
-            src_oracle = os.path.join(user_uploaded, "media_1787727834799.png")
-            src_windows = os.path.join(user_uploaded, "media_1787727861319.png")
-            src_postgres = os.path.join(user_uploaded, "media_1787727884009.png")
-            
-            if os.path.exists(src_mysql):
-                shutil.copy(src_mysql, os.path.join(static_path, "mysql_logo.png"))
-            if os.path.exists(src_oracle):
-                shutil.copy(src_oracle, os.path.join(static_path, "oracle_logo.png"))
-            if os.path.exists(src_windows):
-                shutil.copy(src_windows, os.path.join(static_path, "windows_logo.png"))
-            if os.path.exists(src_postgres):
-                shutil.copy(src_postgres, os.path.join(static_path, "postgres_logo.png"))
-    except Exception:
-        pass
-
     autopopulate_fixed_holidays()
     auto_close_incidents()
     auto_update_maintenance_statuses()
@@ -696,10 +673,19 @@ def dashboard(request):
             m['text_y'] = y - 8
             m['has_data'] = True
         else:
-            m['y'] = 100
-            m['text_y'] = 85
+            # Plot at baseline y=100 (bottom of visual chart area)
+            y = 100
+            points.append(f"{x},{y}")
+            m['y'] = y
+            m['text_y'] = 92
             m['has_data'] = False
     trend_polyline_points = " ".join(points)
+    # Generate polygon points for the area chart fill
+    trend_area_points = ""
+    if points:
+        first_x = trend_months[0]['x']
+        last_x = trend_months[-1]['x']
+        trend_area_points = f"{first_x},100 " + trend_polyline_points + f" {last_x},100"
     sla_y_coord = 20 + (100.0 - target_sla_val) * 80 / y_range
     
     # 7. Attention Required Alerts
@@ -870,6 +856,7 @@ def dashboard(request):
         'kpi_replication_status': kpi_replication_status,
         'trend_months': trend_months,
         'trend_polyline_points': trend_polyline_points,
+        'trend_area_points': trend_area_points,
         'sla_y_coord': sla_y_coord,
         'y_min': y_min,
         'y_max': y_max,
