@@ -193,14 +193,14 @@
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <div class="export-dropdown">
                 <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
-                    ⬇ Export Performance Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
+                    Export Performance Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
                 </button>
                 <div class="export-dropdown-content" style="min-width: 170px;">
                     <a href="javascript:void(0)" onclick="openExportModal()">
-                        📄 Export PDF Report
+                        Export PDF Report
                     </a>
                     <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download>
-                        📊 Export Excel Summary
+                        Export Excel Summary
                     </a>
                 </div>
             </div>
@@ -214,7 +214,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
             <!-- 1. Overall Uptime -->
             <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid var(--primary-green); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Overall Fleet Uptime</span>
+                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Overall Database Uptime</span>
                 <strong style="color: #137333; font-size: 1.45rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_availability }}</strong>
                 <span style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; display: block;">Target SLA: &ge; 99.95%</span>
             </div>
@@ -259,14 +259,14 @@
                                 <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if row.health_status == 'HEALTHY' %}#137333{% elif row.health_status == 'WARNING' %}#b06000{% else %}#c5221f{% endif %};"></span>
                                 {% if row.health_status == 'HEALTHY' %}Healthy{% elif row.health_status == 'WARNING' %}Warning{% else %}Outage{% endif %}
                             </span>
-                            <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.72rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 0.25rem;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f1f5f9'">&larr; Back to Fleet Overview</a>
+                            <a href="?database_select=All Databases&month={{ reporting_month }}" style="font-size: 0.72rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 0.25rem;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f1f5f9'">&larr; Back to Database Overview</a>
                         </div>
                     </div>
 
                     <!-- Database Identity Block with Logo -->
                     <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem;">
                         <!-- Logo Thumbnail Container -->
-                        <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 130px; height: 60px; background-color: #f8fafc; border: 1px dashed rgba(90, 123, 156, 0.15); border-radius: 4px; padding: 0.25rem;">
+                        <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 130px; height: 60px; padding: 0.25rem;">
                             {% if row.database == 'Oracle' %}
                                 <img src="/static/oracle_logo.png" alt="Oracle Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                             {% elif row.database == 'MySQL' %}
@@ -606,7 +606,7 @@
     <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
             <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
-                {% if selected_db == 'All Databases' %}Fleet Availability Trend{% else %}{{ selected_db }} Availability Trend{% endif %}
+                {% if selected_db == 'All Databases' %}Overall Availability Trend{% else %}{{ selected_db }} Availability Trend{% endif %}
             </h3>
             <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.78rem;">Last 6 months trend (Target SLA threshold: &ge; {{ target_sla_val }}%)</p>
         </div>
@@ -712,7 +712,7 @@
                     Application Instance
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
-                    {% if selected_db == 'Oracle' %}nmsebs{% elif selected_db == 'MySQL' %}NMS360 / ServiceDesk{% else %}N/A (Standalone){% endif %}
+                    {% if selected_db == 'Oracle' %}nmsebs{% elif selected_db == 'MySQL' %}NMS360 / ServiceDesk / DMT{% else %}MKInsight{% endif %}
                 </div>
             </div>
         </div>
@@ -744,7 +744,7 @@
                     Backup Monitoring
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                    {% if selected_db == 'MS SQL Server' %}No Data / Not Configured{% else %}Active (Daily Backup Logs Checked){% endif %}
+                    Active (Daily Backup Logs Checked)
                 </div>
             </div>
             <div>
@@ -764,7 +764,7 @@
                     Host / Server
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
-                    {% if selected_db == 'Oracle' %}nmsdb01.nms.go.ug{% elif selected_db == 'MySQL' %}NMS360.IT{% else %}Windows Server Host{% endif %}
+                    {% if selected_db == 'Oracle' %}nmsinfra/nmsebs{% elif selected_db == 'MySQL' %}nickledbnew{% else %}Pentana Server{% endif %}
                 </div>
             </div>
             <div>
