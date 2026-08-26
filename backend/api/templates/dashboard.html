@@ -180,11 +180,11 @@
                     Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
                 </button>
                 <div class="export-dropdown-content">
-                    <a href="{% url 'dashboard_print' %}?month={{ reporting_month }}&database_select={{ selected_db }}&download=true" target="_blank">
-                        📄 Export PDF
+                    <a href="javascript:void(0)" onclick="openExportModal()">
+                        📄 Generate PDF Report
                     </a>
                     <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" download>
-                        📊 Export Excel
+                        📊 Export Excel Summary
                     </a>
                 </div>
             </div>
@@ -576,4 +576,82 @@
         </div>
     </div>
 </div>
+
+<!-- Export Performance Report Preview Modal -->
+<div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
+        <!-- Modal Header -->
+        <div style="background-color: var(--primary-navy); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family: inherit;">Generate Performance Report</h3>
+            <button type="button" onclick="closeExportModal()" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.8); font-size: 1.25rem; cursor: pointer; line-height: 1; padding: 0;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'">&times;</button>
+        </div>
+        
+        <!-- Modal Form -->
+        <form action="{% url 'dashboard_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeExportModal, 500)" style="margin: 0; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+            {% csrf_token %}
+            <input type="hidden" name="download" value="true">
+            
+            <!-- Metadata Fields (Readonly side-by-side) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
+                    <input type="text" value="{{ reporting_month }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
+                    <input type="hidden" name="month" value="{{ reporting_month }}">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                    <input type="text" value="{{ selected_db }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
+                    <input type="hidden" name="database_select" value="{{ selected_db }}">
+                </div>
+            </div>
+            
+            <!-- Report Contents Checklist -->
+            <div style="background-color: #f4f7fc; border-radius: 6px; padding: 0.75rem 1rem; border: 1px dashed rgba(90, 123, 156, 0.25);">
+                <span style="font-size: 0.72rem; font-weight: 700; color: var(--primary-navy); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.35rem; font-family: inherit;">Included Sections</span>
+                <ul style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: #475569; line-height: 1.45;">
+                    <li>Executive performance summary and editorial analysis</li>
+                    <li>Uptime vs. SLA target (99.95%) progress meters</li>
+                    <li>Detailed metrics grid (Downtime, incidents, backups, replication)</li>
+                    <li>Capacity tracking overview (Disk used % &amp; available space)</li>
+                    <li>Bulleted system Specifications &amp; Context</li>
+                    <li>Formal sign-off matrix for approvals</li>
+                </ul>
+            </div>
+            
+            <!-- Narrative Summary (Editable) -->
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Executive Summary Narrative</label>
+                <textarea id="summary_narrative" name="summary_narrative" rows="4" style="padding: 0.5rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; font-family: inherit; line-height: 1.4; resize: vertical; color: #1e293b; width: 100%;" placeholder="Add custom narrative context...">{{ default_lede_text }}</textarea>
+                <span style="font-size: 0.68rem; color: #64748b; font-style: italic;">Note: You can edit or append custom commentary directly in the text box above to override the automated summary text.</span>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
+                <button type="button" onclick="closeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
+                <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    Generate PDF Report
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openExportModal() {
+        const modal = document.getElementById('exportReportModal');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+    function closeExportModal() {
+        const modal = document.getElementById('exportReportModal');
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    // Close modal on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeExportModal();
+        }
+    });
+</script>
 {% endblock %}

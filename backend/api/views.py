@@ -748,6 +748,59 @@ def dashboard(request):
     activities.sort(key=lambda x: x['sort_time'], reverse=True)
     recent_activity = activities[:8]
 
+    # Calculate Default Lede narrative for modal preview
+    all_within_sla_dashboard = True
+    total_incidents_all_dashboard = 0
+    max_incidents_db_dashboard = None
+    max_incidents_val_dashboard = -1
+    
+    mttr_values_dashboard = []
+    
+    for item in filtered_dashboard_data:
+        if item['availability_status'] != 'Meets SLA':
+            all_within_sla_dashboard = False
+            
+        inc_count = item['total_incidents']
+        if isinstance(inc_count, int):
+            total_incidents_all_dashboard += inc_count
+            if inc_count > max_incidents_val_dashboard:
+                max_incidents_val_dashboard = inc_count
+                max_incidents_db_dashboard = item['database']
+                
+        mttr_min = item['mttr_mins']
+        if isinstance(mttr_min, (int, float)):
+            mttr_values_dashboard.append(mttr_min)
+            
+    avg_mttr_dashboard = f"{round((sum(mttr_values_dashboard)/len(mttr_values_dashboard))/60, 2)} hrs" if mttr_values_dashboard else '—'
+
+    if selected_db != 'All Databases':
+        if all_within_sla_dashboard:
+            lede_prefix = f"The {selected_db} production database held within SLA in {reporting_month.strftime('%B %Y')}."
+        else:
+            lede_prefix = f"The {selected_db} production database did not meet the SLA target in {reporting_month.strftime('%B %Y')}."
+
+        if total_incidents_all_dashboard > 0:
+            lede_suffix = f"A total of {total_incidents_all_dashboard} incident(s) were logged, with a mean time to resolution of {avg_mttr_dashboard}."
+        else:
+            lede_suffix = "No incidents or service interruptions were logged during this period."
+    else:
+        if all_within_sla_dashboard:
+            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+        else:
+            lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
+
+        if max_incidents_db_dashboard and max_incidents_val_dashboard > 0:
+            others_combined = total_incidents_all_dashboard - max_incidents_val_dashboard
+            if max_incidents_val_dashboard > others_combined:
+                compare_str = "more than the other systems combined"
+            else:
+                compare_str = "more than any other system"
+            lede_suffix = f"The one thing worth a second look: {max_incidents_db_dashboard} logged {max_incidents_val_dashboard} incidents — {compare_str} — even though its uptime never slipped."
+        else:
+            lede_suffix = "No significant incident trends were logged during this period."
+            
+    default_lede_text = f"{lede_prefix} {lede_suffix}"
+
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -760,6 +813,7 @@ def dashboard(request):
         'database_detail': database_detail,
         'selected_db': selected_db,
         'reporting_month': reporting_month.strftime('%Y-%m'),
+        'default_lede_text': default_lede_text,
         
         # New Redesign KPIs
         'kpi_availability': kpi_availability,
@@ -782,7 +836,15 @@ def dashboard(request):
 
 @login_required
 def dashboard_print(request):
-    month_str = request.GET.get('month', '')
+    if request.method == 'POST':
+        month_str = request.POST.get('month', '')
+        selected_db = request.POST.get('database_select', 'All Databases')
+        summary_narrative = request.POST.get('summary_narrative', '').strip()
+    else:
+        month_str = request.GET.get('month', '')
+        selected_db = request.GET.get('database_select', 'All Databases')
+        summary_narrative = request.GET.get('summary_narrative', '').strip()
+
     if month_str:
         try:
             reporting_month = datetime.strptime(month_str, '%Y-%m').date()
@@ -791,7 +853,6 @@ def dashboard_print(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
-    selected_db = request.GET.get('database_select', 'All Databases')
     dashboard_data, _ = _get_dashboard_data(reporting_month)
     
     # Filter dashboard_data by selected_db if a specific database is selected
@@ -909,7 +970,10 @@ def dashboard_print(request):
         else:
             lede_suffix = "No significant incident trends were logged during this period."
     
-    lede_text = f"{lede_prefix} {lede_suffix}"
+    if summary_narrative:
+        lede_text = summary_narrative
+    else:
+        lede_text = f"{lede_prefix} {lede_suffix}"
 
     # Build Watch Item Text
     if selected_db != 'All Databases':
