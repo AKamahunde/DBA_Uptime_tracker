@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Database Performance Report — {{ reporting_month_str }} — NMS Medical Logistics</title>
+<title>{% if selected_db == 'All Databases' %}Overall Database{% else %}{{ selected_db }}{% endif %} Performance Report — {{ reporting_month_str }} — NMS Medical Logistics</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -464,7 +464,17 @@
       <div class="title-block">
         <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 34px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
         <div>
-          <h1>DATABASE PERFORMANCE SUMMARY</h1>
+          <h1>
+            {% if selected_db == 'All Databases' %}
+              DATABASE PERFORMANCE SUMMARY
+            {% elif selected_db == 'Oracle' %}
+              ORACLE DATABASE PERFORMANCE SUMMARY
+            {% elif selected_db == 'MySQL' %}
+              MYSQL DATABASE PERFORMANCE SUMMARY
+            {% else %}
+              {{ selected_db|upper }} PERFORMANCE SUMMARY
+            {% endif %}
+          </h1>
           <div class="tagline">Operations Performance &amp; Compliance Report</div>
         </div>
       </div>
