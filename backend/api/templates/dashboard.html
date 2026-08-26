@@ -134,8 +134,24 @@
         transition: background-color 0.15s;
         text-align: left;
     }
-    .export-dropdown-content a:hover {
-        background-color: #f8fafc;
+    /* Responsive Grid for Scoped/Fleet Layout */
+    .scoped-grid {
+        display: grid;
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    @media (min-width: 1101px) {
+        .scoped-grid-3col {
+            grid-template-columns: 4.2fr 3.3fr 2.5fr !important;
+        }
+        .scoped-grid-2col {
+            grid-template-columns: 1fr 1fr !important;
+        }
+    }
+    @media (max-width: 1100px) {
+        .scoped-grid-3col, .scoped-grid-2col {
+            grid-template-columns: 1fr !important;
+        }
     }
 </style>
 
@@ -277,143 +293,6 @@
     {% endif %}
 </div>
 
-<!-- Database detail metrics table (displays when specific database scope is selected) -->
-{% if database_detail %}
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 0.5rem;">
-        <div>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">SLA Compliance &amp; Operational Metrics</h3>
-            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Showing detailed SLA configuration parameters for <strong>{{ database_detail.database }}</strong></p>
-        </div>
-    </div>
-    
-    <div style="overflow-x: auto;">
-        <table class="modern-table" style="font-size: 0.85rem; width: 100%;">
-            <thead>
-                <tr>
-                    <th>Metric Row</th>
-                    <th>Overall Availability</th>
-                    <th>Planned Downtime (hrs)</th>
-                    <th>Unplanned Downtime (hrs)</th>
-                    <th>Total Incidents</th>
-                    <th>MTTR (mins)</th>
-                    <th>Backup Success Rate</th>
-                    <th>Restore Success Rate</th>
-                    <th>Replication Status</th>
-                    <th>Failed Backups</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Current Row -->
-                <tr>
-                    <td style="font-weight: 600; color: #0f172a; text-align: left; background-color: #f8fafc;">Current Month</td>
-                    <td>{{ database_detail.current.availability }}</td>
-                    <td>{{ database_detail.current.planned_downtime }}</td>
-                    <td>{{ database_detail.current.unplanned_downtime }}</td>
-                    <td>
-                        <div style="font-weight: 600;">{{ database_detail.current.total_incidents }}</div>
-                        {% if database_detail.current.sla_breach_count > 0 %}
-                            <div style="font-size: 0.7rem; font-weight: 600; color: #b91c1c; margin-top: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
-                                <span style="display: inline-block; width: 5px; height: 5px; background-color: #b91c1c; border-radius: 50%;"></span>
-                                {{ database_detail.current.sla_breach_count }} breach{{ database_detail.current.sla_breach_count|pluralize }}
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td>{{ database_detail.current.mttr_mins }}</td>
-                    <td>{{ database_detail.current.backup_success }}</td>
-                    <td>{{ database_detail.current.restore_success }}</td>
-                    <td>{{ database_detail.current.replication_status }}</td>
-                    <td>{{ database_detail.current.failed_backups }}</td>
-                </tr>
-                <!-- Target Row -->
-                <tr style="color: #64748b; font-style: italic; background-color: #fbfcfd;">
-                    <td style="font-weight: 600; color: #475569; text-align: left; background-color: #f8fafc;">SLA Target</td>
-                    <td>&ge; {{ target_sla_val }}%</td>
-                    <td>&le; 48 hrs</td>
-                    <td>&le; 2 hrs</td>
-                    <td>&le; 4/month</td>
-                    <td>&le; 240 mins</td>
-                    <td>&ge; 95%</td>
-                    <td>&ge; 80%</td>
-                    <td>Healthy</td>
-                    <td>0</td>
-                </tr>
-                <!-- Status Row -->
-                <tr>
-                    <td style="font-weight: 600; color: #0f172a; text-align: left; background-color: #f8fafc;">SLA Status</td>
-                    <td class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'Warning' %}cell-warning{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.availability }}
-                    </td>
-                    <td class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.planned_downtime }}
-                    </td>
-                    <td class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.unplanned_downtime }}
-                    </td>
-                    <td class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'Warning' %}cell-warning{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.total_incidents }}
-                    </td>
-                    <td class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'Warning' %}cell-warning{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.mttr_mins }}
-                    </td>
-                    <td class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'Warning' %}cell-warning{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.backup_success }}
-                    </td>
-                    <td class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'Warning' %}cell-warning{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.restore_success }}
-                    </td>
-                    <td class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.replication_status }}
-                    </td>
-                    <td class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'Warning' %}cell-warning{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
-                        {{ database_detail.status.failed_backups }}
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15); display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem; font-size: 0.8rem; line-height: 1.45;">
-        <!-- Left: Traffic-Light Legend -->
-        <div>
-            <strong style="color: var(--primary-navy); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.02em; display: block; margin-bottom: 0.5rem;">SLA Status Legend</strong>
-            <div style="display: flex; gap: 1.25rem; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--primary-green);"></span>
-                    <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA)
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--primary-gold);"></span>
-                    <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Warning)
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #c62828;"></span>
-                    <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA)
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.35rem;">
-                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-soft);"></span>
-                    <span style="color: var(--text-soft); font-weight: 700;">Grey</span> (No Data / NA)
-                </div>
-            </div>
-        </div>
-        
-        <!-- Right: Scoped System Specs -->
-        <div style="max-width: 550px;">
-            <strong style="color: var(--primary-navy); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.02em; display: block; margin-bottom: 0.4rem;">System Specifications</strong>
-            {% if selected_db == 'Oracle' %}
-                <span style="color: var(--primary-navy); font-weight: 700;">Oracle (nmsinfra / nmsebs)</span> &mdash; nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)
-                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.</p>
-            {% elif selected_db == 'MySQL' %}
-                <span style="color: var(--primary-navy); font-weight: 700;">MySQL (nickledbnew)</span> &mdash; nickledbnew (replicated to nickeldbdr)
-                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts NMS360, IT ServiceDesk ticketing, and Delivery Monitoring Tool(DMT).</p>
-            {% elif selected_db == 'MS SQL Server' %}
-                <span style="color: var(--primary-navy); font-weight: 700;">MS SQL (Pentana)</span> &mdash; Windows Server host
-                <p style="color: #64748b; margin: 0.2rem 0 0 0; font-size: 0.76rem;">Hosts MKInsight (Pentana Audit) system used by internal auditors for auditing purposes.</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
-{% endif %}
 
 {% if selected_db == 'All Databases' %}
 <!-- Row 2: Database Comparison Table (Full-Width Card) -->
@@ -517,8 +396,184 @@
 </div>
 {% endif %}
 
-<!-- Row 3: Trend Chart & Alerts Side-by-Side -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+<!-- Row 3: Grid (3-column if scoped, 2-column if fleet) -->
+<div class="scoped-grid {% if selected_db != 'All Databases' %}scoped-grid-3col{% else %}scoped-grid-2col{% endif %}" style="margin-bottom: 2rem;">
+    {% if selected_db != 'All Databases' %}
+    <!-- Column 1: SLA Compliance & Operational Metrics Table -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem; margin-bottom: 1rem;">SLA Compliance &amp; Metrics</h3>
+            
+            <div style="overflow-x: auto;">
+                <table class="modern-table" style="font-size: 0.76rem; width: 100%; border-collapse: collapse; text-align: center;">
+                    <thead>
+                        <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
+                            <th style="padding: 0.5rem 0.35rem; text-align: left; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.5px;">Metric</th>
+                            <th style="padding: 0.5rem 0.35rem; text-align: center; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.5px;">Current</th>
+                            <th style="padding: 0.5rem 0.35rem; text-align: center; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.5px;">Target</th>
+                            <th style="padding: 0.5rem 0.35rem; text-align: center; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.5px;">SLA Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Row 1: Overall Availability -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.availability == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.availability == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                Availability
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.availability }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &ge; {{ target_sla_val }}%
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.availability == 'Meets SLA' %}cell-meets{% elif database_detail.status.availability == 'Warning' %}cell-warning{% elif database_detail.status.availability == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.availability }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 2: Planned Downtime -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.planned_downtime == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.planned_downtime == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                Planned Down
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {% if database_detail.current.planned_downtime != 'No Data' %}{{ database_detail.current.planned_downtime }} hrs{% else %}No Data{% endif %}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &le; 48 hrs
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.planned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.planned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.planned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.planned_downtime }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 3: Unplanned Downtime -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.unplanned_downtime == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                Unplanned Down
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {% if database_detail.current.unplanned_downtime != 'No Data' %}{{ database_detail.current.unplanned_downtime }} hrs{% else %}No Data{% endif %}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &le; 2 hrs
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.unplanned_downtime == 'Meets SLA' %}cell-meets{% elif database_detail.status.unplanned_downtime == 'Warning' %}cell-warning{% elif database_detail.status.unplanned_downtime == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.unplanned_downtime }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 4: Total Incidents -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.total_incidents == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.total_incidents == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                Total Incidents
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.total_incidents }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &le; 4/mo
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.total_incidents == 'Meets SLA' %}cell-meets{% elif database_detail.status.total_incidents == 'Warning' %}cell-warning{% elif database_detail.status.total_incidents == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.total_incidents }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 5: MTTR -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.mttr_mins == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.mttr_mins == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                MTTR (Mins)
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {% if database_detail.current.mttr_mins != 'No Data' %}{{ database_detail.current.mttr_mins }}{% else %}No Data{% endif %}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &le; 240m
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.mttr_mins == 'Meets SLA' %}cell-meets{% elif database_detail.status.mttr_mins == 'Warning' %}cell-warning{% elif database_detail.status.mttr_mins == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.mttr_mins }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 6: Backup Success Rate -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.backup_success == 'Meets SLA' %}#137333{% elif database_detail.status.backup_success == 'N/A' %}#64748b{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.backup_success == 'Meets SLA' %}✓{% elif database_detail.status.backup_success == 'N/A' %}—{% else %}✗{% endif %}</span>
+                                Backup Success
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.backup_success }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &ge; 95%
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.backup_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.backup_success == 'Warning' %}cell-warning{% elif database_detail.status.backup_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.backup_success }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 7: Restore Success Rate -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.restore_success == 'Meets SLA' %}#137333{% elif database_detail.status.restore_success == 'N/A' %}#64748b{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.restore_success == 'Meets SLA' %}✓{% elif database_detail.status.restore_success == 'N/A' %}—{% else %}✗{% endif %}</span>
+                                Restore Success
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.restore_success }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                &ge; 80%
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.restore_success == 'Meets SLA' %}cell-meets{% elif database_detail.status.restore_success == 'Warning' %}cell-warning{% elif database_detail.status.restore_success == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.restore_success }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 8: Replication Status -->
+                        <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.replication_status == 'Meets SLA' %}#137333{% elif database_detail.status.replication_status == 'N/A' %}#64748b{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.replication_status == 'Meets SLA' %}✓{% elif database_detail.status.replication_status == 'N/A' %}—{% else %}✗{% endif %}</span>
+                                Replication Status
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.replication_status }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                {% if selected_db == 'MS SQL Server' %}N/A{% else %}Healthy{% endif %}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.replication_status }}
+                            </td>
+                        </tr>
+
+                        <!-- Row 9: Failed Backups -->
+                        <tr style="border-bottom: none;">
+                            <td style="padding: 0.45rem 0.35rem; text-align: left; font-weight: 600; color: #334155; display: flex; align-items: center; gap: 0.25rem;">
+                                <span style="color: {% if database_detail.status.failed_backups == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %}; font-weight: bold;">{% if database_detail.status.failed_backups == 'Meets SLA' %}✓{% else %}✗{% endif %}</span>
+                                Failed Backups (SOD)
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; font-weight: 700; color: #0f172a;">
+                                {{ database_detail.current.failed_backups }}
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
+                                0
+                            </td>
+                            <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.failed_backups == 'Meets SLA' %}cell-meets{% elif database_detail.status.failed_backups == 'Warning' %}cell-warning{% elif database_detail.status.failed_backups == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
+                                {{ database_detail.status.failed_backups }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Left: Availability Trend Card -->
     <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
@@ -602,36 +657,95 @@
 
 {% if selected_db != 'All Databases' %}
 <!-- Database Details Specs Panel -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
     <h3 style="margin: 0 0 1.25rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">Database Details</h3>
     
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
-        <div>
-            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Primary Instance</div>
-            <div style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                {% if selected_db == 'Oracle' %}nmsinfra.nms.go.ug{% elif selected_db == 'MySQL' %}nickledbnew{% else %}Pentana Audit Host{% endif %}
+    <div class="specs-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+        <!-- Column 1: Platform & Instances -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    📊 Database Platform
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
+                    {{ selected_db }}
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    🗄️ Database Instance
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
+                    {% if selected_db == 'Oracle' %}nmsinfra{% elif selected_db == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    💻 Application Instance
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
+                    {% if selected_db == 'Oracle' %}nmsebs{% elif selected_db == 'MySQL' %}NMS360 / ServiceDesk{% else %}N/A (Standalone){% endif %}
+                </div>
             </div>
         </div>
-        <div>
-            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Replica / DR Host</div>
-            <div style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                {% if selected_db == 'Oracle' %}nmsebs.nms.go.ug (App Sync){% elif selected_db == 'MySQL' %}nickeldbdr{% else %}N/A (Standalone){% endif %}
+
+        <!-- Column 2: Scope & Purpose -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    🌐 Environment
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
+                    Production
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    🎯 Purpose
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-top: 0.25rem; line-height: 1.4;">
+                    {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors.{% endif %}
+                </div>
             </div>
         </div>
-        <div>
-            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Environment</div>
-            <div style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">Production</div>
-        </div>
-        <div>
-            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Database Engine</div>
-            <div style="font-size: 0.9rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                {% if selected_db == 'Oracle' %}Oracle Database 19c{% elif selected_db == 'MySQL' %}MySQL 8.0{% else %}Microsoft SQL Server 2019{% endif %}
+
+        <!-- Column 3: Backup & Replication -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    💾 Backup Monitoring
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
+                    {% if selected_db == 'MS SQL Server' %}No Data / Not Configured{% else %}Active (Daily Backup Logs Checked){% endif %}
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    🔄 Replication
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
+                    {% if selected_db == 'Oracle' %}Not Configured{% elif selected_db == 'MySQL' %}Replicated to nickeldbdr{% else %}Not Applicable{% endif %}
+                </div>
             </div>
         </div>
-        <div style="grid-column: span 2;">
-            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Purpose &amp; Application Scope</div>
-            <div style="font-size: 0.9rem; font-weight: 600; color: #475569; margin-top: 0.25rem;">
-                {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors for compliance auditing.{% endif %}
+
+        <!-- Column 4: Host & Owner -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    🖥️ Host / Server
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
+                    {% if selected_db == 'Oracle' %}nmsdb01.nms.go.ug{% elif selected_db == 'MySQL' %}NMS360.IT{% else %}Windows Server Host{% endif %}
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.35rem;">
+                    👤 Owner / Team
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
+                    ICT - Database Administration
+                </div>
             </div>
         </div>
     </div>
