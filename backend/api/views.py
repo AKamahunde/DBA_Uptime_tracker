@@ -966,7 +966,7 @@ def dashboard_print(request):
 
         formatted_data.append({
             'database': db_type,
-            'code_name': 'nmsinfra' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
+            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
             'availability': avail_str,
             'availability_num': float(avail_str.replace('%', '')) if (avail_str and avail_str != 'No Data') else 0.0,
             'availability_scaled_num': scaled_width,
@@ -2843,11 +2843,17 @@ def incident_ingest(request):
         ).first()
         
         maint_ticket = None
-        root_cause = data.get('root_cause', 'AUTO-LOGGED: MySQL restart detected in systemd journal. Awaiting DBA review.')
+        root_cause = data.get('root_cause', 'AUTO-LOGGED: Outage detected. Awaiting DBA review.')
+        status = 'Awaiting Review'
+        maint_record = None
+        processed_at = None
         
         if maintenance:
             maint_ticket = maintenance.change_id
-            root_cause = f"AUTO-LOGGED: MySQL restart detected within scheduled Maintenance Window ({maint_ticket})."
+            maint_record = maintenance
+            status = 'Promoted to Maintenance'
+            processed_at = timezone.now()
+            root_cause = f"AUTO-LOGGED: Outage occurred within scheduled Maintenance Window ({maint_ticket})."
         else:
             # Highlight that this graceful restart was unplanned
             root_cause = root_cause.replace(
@@ -2863,10 +2869,16 @@ def incident_ingest(request):
             end=end_dt,
             duration_hrs=duration_hrs,
             root_cause=root_cause,
-            status='Awaiting Review'
+            status=status,
+            maintenance_record=maint_record,
+            processed_at=processed_at
         )
         
-        return JsonResponse({'status': 'success', 'id': staging.id})
+        return JsonResponse({
+            'status': 'success',
+            'id': staging.id,
+            'maint_linked': maint_ticket is not None
+        })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
