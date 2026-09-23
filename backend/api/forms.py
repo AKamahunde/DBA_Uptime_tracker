@@ -15,12 +15,20 @@ class IncidentRegisterForm(forms.ModelForm):
         model = IncidentRegister
         exclude = ['duration_hrs', 'created_by']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'root_cause': forms.Textarea(attrs={'rows': 3}),
             'business_impact': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
+        if 'start' in self.fields:
+            self.fields['start'].input_formats = iso_formats
+        if 'end' in self.fields:
+            self.fields['end'].input_formats = iso_formats
 
     def clean(self):
         cleaned_data = super().clean()
@@ -62,9 +70,9 @@ class BackupRecoveryForm(forms.ModelForm):
         model = BackupRecovery
         exclude = ['created_by']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'comments': forms.Textarea(attrs={'rows': 3}),
             'failure_reason': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for backup failure (if any)'}),
             'location': forms.HiddenInput(),
@@ -78,6 +86,11 @@ class BackupRecoveryForm(forms.ModelForm):
         self.fields['comments'].required = False
         self.fields['failure_reason'].required = False
         self.fields['tested_by'].required = False
+        iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
+        if 'start' in self.fields:
+            self.fields['start'].input_formats = iso_formats
+        if 'end' in self.fields:
+            self.fields['end'].input_formats = iso_formats
 
 class ServerHealthForm(forms.ModelForm):
     class Meta:
@@ -102,12 +115,24 @@ class MaintenanceRegisterForm(forms.ModelForm):
         model = MaintenanceRegister
         exclude = ['created_by']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'end': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'activity': forms.Textarea(attrs={'rows': 3}),
             'rollback_plan': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'duration_hrs' in self.fields:
+            self.fields['duration_hrs'].required = False
+        if 'rollback_plan' in self.fields:
+            self.fields['rollback_plan'].required = False
+        iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
+        if 'start' in self.fields:
+            self.fields['start'].input_formats = iso_formats
+        if 'end' in self.fields:
+            self.fields['end'].input_formats = iso_formats
 
 class CapacityPlanningForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))

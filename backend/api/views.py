@@ -3083,7 +3083,7 @@ def incident_staging_list(request):
 
 @login_required
 def staging_promote_incident(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
         messages.error(request, 'You do not have permission to create incidents.')
         return redirect('incident_staging_list')
         
@@ -3106,19 +3106,30 @@ def staging_promote_incident(request, pk):
             messages.success(request, f"Staged alert successfully promoted to Incident: {incident.ticket}")
             return redirect('incident_staging_list')
     else:
-        # Pre-populate fields from the staging record
+        # Determine appropriate severity default from alert text
+        severity = 'Medium'
+        rc_upper = (staging_item.root_cause or '').upper()
+        if 'CRITICAL' in rc_upper:
+            severity = 'Critical'
+        elif 'HIGH' in rc_upper:
+            severity = 'High'
+        elif 'LOW' in rc_upper:
+            severity = 'Low'
+
         ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
         initial = {
             'ticket': ticket_id,
             'date': staging_item.start.date(),
             'start': staging_item.start,
             'end': staging_item.end,
+            'severity': severity,
             'system': staging_item.system,
             'database': staging_item.database,
             'root_cause': staging_item.root_cause,
             'resolved_by': 'System',
             'status': 'Resolved',
-            'business_impact': 'Awaiting DBA business impact assessment.'
+            'business_impact': 'Awaiting DBA business impact assessment.',
+            'assigned_to': request.user.username if request.user.is_authenticated else ''
         }
         form = IncidentRegisterForm(initial=initial)
         
@@ -3132,7 +3143,7 @@ def staging_promote_incident(request, pk):
 
 @login_required
 def staging_promote_maintenance(request, pk):
-    if not (request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
         messages.error(request, 'You do not have permission to log maintenance activities.')
         return redirect('incident_staging_list')
         
@@ -3162,7 +3173,12 @@ def staging_promote_maintenance(request, pk):
             'system': staging_item.system,
             'start': staging_item.start,
             'end': staging_item.end,
+            'duration_hrs': staging_item.duration_hrs,
             'activity': staging_item.root_cause,
+            'risk': 'Medium',
+            'rollback_plan': 'Self-heal recovery / Planned restart verification',
+            'approved_by': request.user.username if request.user.is_authenticated else '',
+            'status': 'Completed',
             'success': True
         }
         form = MaintenanceRegisterForm(initial=initial)
@@ -3178,7 +3194,7 @@ def staging_promote_maintenance(request, pk):
 @login_required
 def staging_delete(request, pk):
     # Check permissions (admins or users with delete rights)
-    if not (request.user.is_admin or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.delete_incidentstaging')):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.delete_incidentstaging')):
         messages.error(request, 'You do not have permission to delete staging records.')
         return redirect('incident_staging_list')
         
