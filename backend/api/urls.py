@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from users import views as user_views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
@@ -9,7 +8,7 @@ urlpatterns = [
     path('dashboard/excel/', views.dashboard_excel, name='dashboard_excel'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
-    path('password-change/', user_views.password_change_required, name='password_change_required'),
+    path('password-change/', views.password_change_required, name='password_change_required'),
     path('about/', views.about, name='about'),
     
     # Incident Register
