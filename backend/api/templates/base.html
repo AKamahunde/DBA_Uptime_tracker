@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Database Monitoring Tool{% endblock %}</title>
+    <title>{% block title %}DBTRAC - Database Tracking for Reliability, Administration and Compliance{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -392,7 +392,12 @@
                     <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
                     <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
                 </svg>
-                <h1><span>Database</span> Monitoring Tool</h1>
+                <div style="display: flex; flex-direction: column; line-height: 1.15;">
+                    <div style="font-size: 1.35rem; font-weight: 900; letter-spacing: 1.5px; color: white; display: flex; align-items: center;">
+                        <span style="color: var(--primary-gold);">DB</span>TRAC
+                    </div>
+                    <span style="font-size: 0.65rem; color: rgba(255, 255, 255, 0.75); font-style: italic; font-family: 'Georgia', serif; letter-spacing: 0.2px;">Database Tracking for Reliability, Administration and Compliance</span>
+                </div>
             </a>
             <div class="nav-links">
                 {% if user.is_authenticated %}
@@ -591,7 +596,7 @@
     </script>
 
     <footer class="footer">
-        <p>&copy; 2026 Database Monitoring Tool{% if request.resolver_match.url_name == 'dashboard' %} | <a href="{% url 'about' %}">About DB Tool</a>{% endif %}</p>
+        <p>&copy; 2026 DBTRAC &mdash; Database Tracking for Reliability, Administration and Compliance{% if request.resolver_match.url_name == 'dashboard' %} | <a href="{% url 'about' %}">About DBTRAC</a>{% endif %}</p>
     </footer>
 </body>
 </html>

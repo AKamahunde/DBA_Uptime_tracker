@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - Database Monitoring Tool{% endblock %}
+{% block title %}Dashboard - DBTRAC{% endblock %}
 
 {% block content %}
 <style>
@@ -287,7 +287,7 @@
                                 {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
                             </div>
                             <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
-                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Database{% else %}MKInsight Audit Database{% endif %}
+                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Tool{% else %}MKInsight Audit Database{% endif %}
                             </p>
                         </div>
                     </div>

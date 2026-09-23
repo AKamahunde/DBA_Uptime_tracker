@@ -37,3 +37,29 @@ def login_view(request):
 def user_profile(request):
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import update_session_auth_hash
+from django.contrib import messages
+from .forms import ForcedPasswordChangeForm
+
+@login_required
+def password_change_required(request):
+    if not request.user.must_change_password and request.method != 'POST':
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = ForcedPasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            form.save()
+            update_session_auth_hash(request, request.user)
+            messages.success(request, "Your password has been updated successfully. Welcome to DBTRAC!")
+            return redirect('dashboard')
+    else:
+        form = ForcedPasswordChangeForm(user=request.user)
+
+    return render(request, 'password_change_required.html', {
+        'form': form,
+        'title': 'Change Password Required - DBTRAC'
+    })

@@ -61,8 +61,8 @@ def get_meaningful_summary(outage_type, logs):
         )
 
 def main():
-    api_url = "http://localhost:8000/api/incident/ingest/"  # Adjust as needed or use arg
-    api_key = ""  # Will be read from environment or arguments
+    api_url = "http://192.168.35.38:90/api/incident/ingest/"  # Points to tracker server
+    api_key = "uptimetracker_api_9f2c1d8e45x9"  # Default tracker ingestion API key
     timeframe = "24 hours ago"
     db_type = "MySQL"
     system_name = socket.gethostname()
