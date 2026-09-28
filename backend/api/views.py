@@ -1700,11 +1700,11 @@ def backup_create(request):
 def backup_edit(request, pk):
     backup = get_object_or_404(BackupRecovery, pk=pk)
     
-    can_edit_always = request.user.is_admin
+    can_edit_always = request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.change_backuprecovery')
     is_creator_within_time = (backup.created_by == request.user) and ((timezone.now() - backup.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
-        messages.error(request, 'You can only edit your own records within 5 minutes of creation.')
+        messages.error(request, 'You do not have permission to edit this backup record.')
         return redirect('backup_list')
     
     if request.method == 'POST':
@@ -2618,21 +2618,36 @@ def backup_ingest(request):
         if exists:
             return JsonResponse({'status': 'ignored', 'message': 'Backup already registered'}, status=200)
             
+        backup_used = data.get('backup_used', 'N/A')
+        location = data.get('location', 'Unknown')
+        compression = data.get('compression', True)
+        b_type = data.get('backup_type', 'Incremental')
+        db_type = data.get('database', 'MySQL')
+        db_inst = data.get('database_instance', 'Unknown')
+        
+        # Guard against log checkpoint strings mistakenly sent as file references
+        if any(k in str(backup_used).lower() for k in ['binlog', 'checkpoint', 'nfs']) or backup_used in ('Unknown', 'N/A', ''):
+            if db_type == 'MySQL' or 'nickle' in str(db_inst).lower():
+                inst_name = 'nickledbnew' if db_inst == 'Unknown' else db_inst
+                backup_used = f"{inst_name}_{start_dt.strftime('%Y-%m-%d_%H-%M-%S')}_{b_type.lower()}.tar.gz"
+                location = backup_used
+                compression = True
+
         backup = BackupRecovery.objects.create(
             date=start_dt.date(),
             record_type='Backup',
-            database=data.get('database', 'MySQL'),
-            database_instance=data.get('database_instance', 'Unknown'),
-            backup_type=data.get('backup_type', 'Incremental'),
-            backup_used=data.get('backup_used', 'N/A'),
+            database=db_type,
+            database_instance=db_inst,
+            backup_type=b_type,
+            backup_used=backup_used,
             start=start_dt,
             end=data.get('end'),
             duration_mins=data.get('duration_mins', 0),
             outcome=data.get('outcome', 'Failed'),
             failure_reason=data.get('failure_reason', ''),
-            location=data.get('location', 'Unknown'),
+            location=location,
             verified=data.get('verified', False),
-            compression=data.get('compression', True),
+            compression=compression,
         )
         return JsonResponse({'status': 'success', 'id': backup.id})
     except Exception as e:

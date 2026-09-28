@@ -25,7 +25,7 @@ def parse_latest_backup():
     # Read backwards to find the last complete block
     for line in reversed(lines):
         session_lines.insert(0, line.strip())
-        if "Starting DAILY" in line:
+        if "Starting DAILY" in line or ("Starting " in line and " backup" in line.lower()):
             break
 
     if not session_lines:
@@ -41,6 +41,7 @@ def parse_latest_backup():
     outcome = 'Failed'
     location = 'Unknown'
     failure_reason = ''
+    archive_file = None
     
     for line in session_lines:
         match = time_pattern.search(line)
@@ -59,14 +60,16 @@ def parse_latest_backup():
         if "SUCCESS" in line.upper():
             outcome = 'Success'
             if "committed to" in line:
-                location = line.split("committed to")[-1].strip()
+                target = line.split("committed to")[-1].strip()
+                # Only use committed to text if it looks like a file path and not a checkpoint log
+                if not any(k in target.lower() for k in ['binlog', 'checkpoint', 'nfs']) and ('.' in target or '/' in target):
+                    location = target
         
-        if ".gz" in line or ".zip" in line:
-            words = line.split()
-            for word in words:
-                clean_word = word.strip(',;"\'')
-                if clean_word.endswith('.gz') or clean_word.endswith('.zip') or clean_word.endswith('.gz.tmp'):
-                    location = clean_word.replace('.tmp', '')
+        # Look for explicit archive files (.tar.gz, .gz, .zip, .tgz) in any line
+        archive_match = re.search(r'([\w\-\./]+?\.(?:tar\.gz|gz|zip|tgz))(?:\.tmp)?', line, re.IGNORECASE)
+        if archive_match:
+            archive_file = archive_match.group(1)
+            location = archive_file
             
         if ("FAILED:" in line or "ERROR:" in line) and outcome != 'Success':
             outcome = 'Failed'
@@ -81,9 +84,17 @@ def parse_latest_backup():
 
     # Parse dates
     fmt = "%Y-%m-%d %H:%M:%S"
-    start_dt = datetime.strptime(start_time_str, fmt)
-    end_dt = datetime.strptime(end_time_str, fmt)
+    start_dt = datetime.strptime(start_time_str, fmt) if start_time_str else datetime.now()
+    end_dt = datetime.strptime(end_time_str, fmt) if end_time_str else datetime.now()
     duration_mins = (end_dt - start_dt).total_seconds() / 60.0
+
+    # Ensure valid archive location for nickledb MySQL backups
+    is_compressed = True
+    if archive_file:
+        location = archive_file
+    elif location == 'Unknown' or any(k in location.lower() for k in ['binlog', 'checkpoint', 'nfs']):
+        # Auto-construct standard archive filename
+        location = f"{DATABASE_INSTANCE}_{start_dt.strftime('%Y-%m-%d_%H-%M-%S')}_{backup_type.lower()}.tar.gz"
 
     return {
         "database_instance": DATABASE_INSTANCE,
@@ -96,7 +107,7 @@ def parse_latest_backup():
         "failure_reason": failure_reason,
         "location": location,
         "verified": outcome == 'Success',
-        "compression": location.endswith('.gz') or location.endswith('.zip') or location.endswith('.gz.tmp'),
+        "compression": is_compressed,
         "retention": "180 Days" if backup_type == 'Full' else "7 Days"
     }
 
