@@ -3249,3 +3249,18 @@ def password_change_required(request):
     })
 
 
+from django.contrib.auth import views as auth_views
+from django.contrib.auth import login as auth_login
+
+class CustomLoginView(auth_views.LoginView):
+    template_name = 'login.html'
+
+    def form_valid(self, form):
+        auth_login(self.request, form.get_user())
+        user = form.get_user()
+        if getattr(user, 'must_change_password', False):
+            return redirect('password_change_required')
+        return redirect(self.get_success_url())
+
+
+
