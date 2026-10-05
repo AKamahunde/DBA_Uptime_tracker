@@ -3227,22 +3227,25 @@ from users.forms import ForcedPasswordChangeForm
 
 @login_required
 def password_change_required(request):
-    if not request.user.must_change_password and request.method != 'POST':
-        return redirect('dashboard')
+    is_forced = getattr(request.user, 'must_change_password', False)
 
     if request.method == 'POST':
         form = ForcedPasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
             form.save()
             update_session_auth_hash(request, request.user)
-            messages.success(request, "Your password has been updated successfully. Welcome to DBTRAC!")
+            messages.success(
+                request,
+                "Your password has been updated successfully. Welcome to DBTRAC!" if is_forced else "Your password has been changed successfully."
+            )
             return redirect('dashboard')
     else:
         form = ForcedPasswordChangeForm(user=request.user)
 
     return render(request, 'password_change_required.html', {
         'form': form,
-        'title': 'Change Password Required - DBTRAC'
+        'title': 'Change Password Required - DBTRAC' if is_forced else 'Change Password - DBTRAC',
+        'is_forced': is_forced,
     })
 
 

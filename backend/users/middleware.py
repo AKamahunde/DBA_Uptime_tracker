@@ -22,15 +22,24 @@ class PasswordChangeRequiredMiddleware:
             except Exception:
                 logout_url = '/logout/'
 
-            # Exempt paths that the user can access while in forced password change state
+            # Exempt strictly the password change URL, logout URLs, and asset paths
             exempt_prefixes = [
                 change_url,
                 logout_url,
                 '/admin/logout/',
-                settings.STATIC_URL,
             ]
-            if hasattr(settings, 'MEDIA_URL') and settings.MEDIA_URL:
-                exempt_prefixes.append(settings.MEDIA_URL)
+
+            static_url = getattr(settings, 'STATIC_URL', '/static/')
+            if static_url and static_url != '/':
+                if not static_url.startswith('/'):
+                    static_url = '/' + static_url
+                exempt_prefixes.append(static_url)
+
+            media_url = getattr(settings, 'MEDIA_URL', '')
+            if media_url and media_url != '/':
+                if not media_url.startswith('/'):
+                    media_url = '/' + media_url
+                exempt_prefixes.append(media_url)
 
             path = request.path
             is_exempt = any(path.startswith(prefix) for prefix in exempt_prefixes)
