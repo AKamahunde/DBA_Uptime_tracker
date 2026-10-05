@@ -43,8 +43,15 @@
     .modern-table td:last-child {
         border-right: none;
     }
-    .modern-table tr:hover {
-        background-color: #e6eefb; /* Mild Cool Lunar Hover */
+    .modern-table tbody tr {
+        background-color: #ffffff !important;
+    }
+    .modern-table tbody tr:hover {
+        background-color: #f8fafc !important;
+    }
+    h2, h3 {
+        border-left: none !important;
+        padding-left: 0 !important;
     }
     
     /* Cell Status Color Overrides (Premium Soft Badge Style) */
@@ -156,20 +163,11 @@
 </style>
 
 <!-- Header & Scope Selection -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
-    <div style="display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;">
-        <div>
-            <h2 style="margin: 0; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.75rem;">
-                Database Operations Overview
-            </h2>
-            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time performance and SLA tracking console.</p>
-        </div>
-        
-        <!-- Glassmorphic Scope Badge -->
-        <div style="background: rgba(0, 37, 105, 0.05); color: var(--primary-navy); border: 1px solid rgba(0, 37, 105, 0.12); border-radius: 9999px; padding: 0.3rem 0.85rem; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem; font-family: monospace;">
-            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if selected_db == 'All Databases' %}#2563eb{% else %}var(--primary-green){% endif %};"></span>
-            SCOPE: {{ selected_db|upper }}
-        </div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h2 style="margin: 0; font-weight: 700; color: #00205B; font-size: 1.45rem;">
+            Database Operations Overview
+        </h2>
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
@@ -189,11 +187,11 @@
             </div>
         </form>
         
-        <!-- Export Performance Report Button in header -->
+        <!-- Export Report Button in header -->
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <div class="export-dropdown">
                 <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
-                    Export Performance Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
+                    Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
                 </button>
                 <div class="export-dropdown-content" style="min-width: 170px;">
                     <a href="javascript:void(0)" onclick="openExportModal()">
@@ -211,35 +209,35 @@
 <div style="margin-bottom: 1.5rem;">
     {% if selected_db == 'All Databases' %}
         <!-- Fleet Summary Cards Row -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
             <!-- 1. Overall Uptime -->
-            <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid var(--primary-green); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Overall Database Uptime</span>
-                <strong style="color: #137333; font-size: 1.45rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_availability }}</strong>
-                <span style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; display: block;">Target SLA: &ge; 99.95%</span>
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Overall Database Uptime</span>
+                <strong style="color: #16a34a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_availability }}</strong>
+                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">Target SLA: &ge; 99.95%</span>
             </div>
 
             <!-- 2. SLA Compliance -->
-            <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid var(--primary-navy); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">SLA Compliance Targets</span>
-                <strong style="color: #00205B; font-size: 1.45rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_sla_compliance }}</strong>
-                <span style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; display: block;">Monitored engines meeting SLA</span>
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">SLA Compliance</span>
+                <strong style="color: #00205B; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_sla_compliance }}</strong>
+                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">Engines meeting SLA</span>
             </div>
 
             <!-- 3. Active Outages -->
-            <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid #c5221f; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Active Outages</span>
-                <strong style="color: {% if kpi_incidents_open > 0 %}#c5221f{% else %}#137333{% endif %}; font-size: 1.45rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Active Outages</span>
+                <strong style="color: {% if kpi_incidents_open > 0 %}#dc2626{% else %}#16a34a{% endif %}; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">
                     {{ kpi_incidents_open }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">active / {{ kpi_incidents_total }} total</span>
                 </strong>
-                <span style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; display: block;">Unresolved system incidents</span>
+                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">Unresolved incidents</span>
             </div>
 
             <!-- 4. Backup Success -->
-            <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); border-left: 4px solid var(--primary-gold); transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">
-                <span style="color: #64748b; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Backup Success Rate</span>
-                <strong style="color: #0f172a; font-size: 1.45rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_backup_success }}</strong>
-                <span style="font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; display: block;">Job verification rate</span>
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Backup Success Rate</span>
+                <strong style="color: #0f172a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_backup_success }}</strong>
+                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">Verified backups</span>
             </div>
         </div>
     {% else %}
@@ -323,103 +321,68 @@
 
 
 {% if selected_db == 'All Databases' %}
-<!-- Row 2: Database Comparison Table (Full-Width Card) -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <div>
-        <h3 style="margin: 0 0 0.25rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">Database Performance Matrix</h3>
-        <p style="margin: 0 0 1rem 0; color: #64748b; font-size: 0.78rem;">Detailed SLA compliance and health logs across all monitored database engines.</p>
-        
-        <div style="overflow-x: auto;">
-            <table class="modern-table" style="font-size: 0.82rem; width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Database Engine</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Uptime SLA</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Planned Down (hrs)</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down (hrs)</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">SLA Breaches</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">MTTR (mins)</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Backup Success</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Restore Success</th>
-                        <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Replication</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in dashboard_data %}
-                    <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
-                        <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
-                            {{ item.database }} 
-                            <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
-                                ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
-                            </span>
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
-                            {{ item.availability }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.planned_downtime }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.unplanned_downtime }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                            {{ item.total_incidents }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.sla_breach_count > 0 %}#c5221f{% else %}#137333{% endif %};">
-                            {{ item.sla_breach_count }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                            {{ item.mttr_mins }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                            {{ item.backup_success }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                            {{ item.restore_success }}
-                        </td>
-                        <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
-                            {{ item.replication_status }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<!-- Row 2: Database Summary Table (Full-Width Card) -->
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); margin-bottom: 1.5rem;">
+    <div style="margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #00205B;">Database Performance</h3>
     </div>
-
-    <!-- SLA Status Legend and Specifications inside the comparison card -->
-    <div style="margin-top: 1.25rem; border-top: 1px solid rgba(90, 123, 156, 0.12); padding-top: 0.75rem; font-size: 0.75rem; line-height: 1.45;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
-            <!-- SLA Legend -->
-            <div>
-                <h4 style="margin: 0 0 0.4rem 0; font-size: 0.78rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em;">SLA Compliance Thresholds</h4>
-                <div style="display: flex; gap: 1.25rem; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 0.35rem;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-green);"></span>
-                        <span style="color: var(--primary-green); font-weight: 700;">Green</span> (Meets SLA)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.35rem;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: var(--primary-gold);"></span>
-                        <span style="color: var(--primary-gold); font-weight: 700;">Yellow</span> (Warning)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.35rem;">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: #c62828;"></span>
-                        <span style="color: #c62828; font-weight: 700;">Red</span> (Below SLA)
-                    </div>
-                </div>
-            </div>
-
-            <!-- Environment details -->
-            <div>
-                <h4 style="margin: 0 0 0.4rem 0; font-size: 0.78rem; color: var(--primary-navy); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em;">System Specifications</h4>
-                <div style="color: #475569; font-size: 0.72rem;">
-                    <strong>Oracle:</strong> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App)<br>
-                    <strong>MySQL:</strong> nickledbnew (replicated to nickeldbdr)<br>
-                    <strong>MS SQL:</strong> Windows Server host (Pentana Audit)
-                </div>
-            </div>
-        </div>
+        
+    <div style="overflow-x: auto;">
+        <table class="modern-table" style="font-size: 0.82rem; width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Database Engine</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Uptime SLA</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Planned Down (hrs)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down (hrs)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">SLA Breaches</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">MTTR (mins)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Backup Success</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Restore Success</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Replication</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dashboard_data %}
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
+                    <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
+                        {{ item.database }} 
+                        <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
+                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
+                        </span>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
+                        {{ item.availability }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
+                        {{ item.planned_downtime }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
+                        {{ item.unplanned_downtime }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
+                        {{ item.total_incidents }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.sla_breach_count > 0 %}#c5221f{% else %}#334155{% endif %};">
+                        {{ item.sla_breach_count }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
+                        {{ item.mttr_mins }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
+                        {{ item.backup_success }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
+                        {{ item.restore_success }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
+                        {{ item.replication_status }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}
