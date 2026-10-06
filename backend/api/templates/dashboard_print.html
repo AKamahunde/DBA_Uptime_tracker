@@ -3,452 +3,412 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{% if selected_db == 'All Databases' %}Overall Database{% else %}{{ selected_db }}{% endif %} Performance Report — {{ reporting_month_str }} — NMS Medical Logistics</title>
+<title>{% if selected_db == 'All Databases' %}Overall Database{% else %}{{ selected_db }}{% endif %} Performance Report — {{ reporting_month_str }} — DBTRAC</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* Official NMS Corporate System Branding Colors */
-    --primary-navy: #002569;
-    --primary-green: #76B900;
-    --primary-gold: #F1AB00;
-    --bg-cool: #F4F7FC;
-    --border-mist: #D1D7E0;
-    --text-dark: #3D4A5C;
-    --text-soft: #6B6B5E;
-    --pure-white: #FFFFFF;
-
-    /* Semantic Mappings */
-    --ink: var(--primary-navy);
-    --ink-soft: var(--text-dark);
-    --paper: var(--bg-cool);
-    --card: var(--pure-white);
-    --hairline: var(--border-mist);
-    
-    --green: var(--primary-green);
-    --green-soft: #e2f0d9;
-    --red: #c5221f;
-    --red-soft: #fce8e6;
-    --gold: var(--primary-gold);
-    --gold-soft: #fff2cc;
-    --muted: var(--text-soft);
+    --primary-navy: #00205B;
+    --primary-green: #15803d;
+    --primary-gold: #b45309;
+    --bg-cool: #f8fafc;
+    --border-mist: #e2e8f0;
+    --text-dark: #1e293b;
+    --text-soft: #64748b;
+    --pure-white: #ffffff;
+    --red: #dc2626;
+    --green-badge: #e6f4ea;
+    --green-text: #137333;
+    --red-badge: #fce8e6;
+    --red-text: #c5221f;
   }
 
   * { box-sizing: border-box; }
   
   body {
     margin: 0;
-    background: var(--paper);
-    color: var(--ink-soft);
-    font-family: 'Inter', system-ui, sans-serif;
-    font-size: 11.5px;
+    background: #eef2f6;
+    color: var(--text-dark);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 11px;
     line-height: 1.4;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Strict container padding to guarantee one-page portrait A4 print out */
-  /* Strict container padding to guarantee one-page portrait A4 print out */
-  .page {
+  /* Screen toolbar (hidden in print) */
+  .screen-toolbar {
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-mist);
+    padding: 0.65rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .toolbar-content {
     max-width: 820px;
     margin: 0 auto;
-    padding: 12px 32px; /* Tight padding */
-    background: var(--card);
-    min-height: 280mm;
     display: flex;
-    flex-direction: column;
     justify-content: space-between;
+    align-items: center;
+  }
+  .toolbar-title {
+    font-size: 0.85rem;
+    color: var(--text-soft);
+  }
+  .toolbar-title strong {
+    color: var(--primary-navy);
+  }
+  .toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .btn-print {
+    background: var(--primary-navy);
+    color: #ffffff;
+    border: none;
+    padding: 0.45rem 1rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .btn-print:hover {
+    background: #001740;
+  }
+  .btn-close {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid var(--border-mist);
+    padding: 0.45rem 0.85rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .btn-close:hover {
+    background: #e2e8f0;
   }
 
-  /* Header Section */
+  /* Page container strictly calibrated for single-page A4 print */
+  .page {
+    max-width: 820px;
+    margin: 1.25rem auto 2rem auto;
+    padding: 22px 28px;
+    background: var(--pure-white);
+    border: 1px solid var(--border-mist);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 32, 91, 0.06);
+  }
+
+  /* Masthead */
   .masthead {
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid var(--primary-navy);
-    padding-bottom: 6px;
+    padding-bottom: 8px;
     margin-bottom: 8px;
-    gap: 16px;
   }
-  .masthead .title-block {
+  .masthead-left {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1;
-    min-width: 0;
   }
-  .masthead h1 {
-    font-size: 16px;
+  .masthead-logo {
+    height: 38px;
+    width: auto;
+    object-fit: contain;
+  }
+  .masthead-title h1 {
+    font-size: 15px;
     font-weight: 700;
     margin: 0;
-    letter-spacing: -0.02em;
     color: var(--primary-navy);
-    line-height: 1.15;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
   }
-  .masthead .tagline {
-    font-size: 9.5px;
-    color: var(--muted);
-    margin-top: 1px;
-  }
-  .masthead .meta {
-    text-align: right;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
-    color: var(--text-dark);
-    line-height: 1.3;
-    flex-shrink: 0;
-  }
-
-  /* Meta Bar under header */
-  .meta-bar {
-    display: flex;
-    justify-content: space-between;
+  .masthead-title p {
+    margin: 2px 0 0 0;
     font-size: 9px;
     color: var(--text-soft);
+  }
+  .masthead-meta {
+    text-align: right;
+    font-size: 8.5px;
+    color: var(--text-soft);
+    line-height: 1.35;
+  }
+  .masthead-meta strong {
+    color: var(--primary-navy);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Executive Summary Box */
+  .summary-box {
+    background: #f8fafc;
+    border: 1px solid var(--border-mist);
+    border-left: 3px solid var(--primary-navy);
+    border-radius: 4px;
+    padding: 6px 10px;
     margin-bottom: 8px;
-    border-bottom: 1px solid var(--hairline);
-    padding-bottom: 4px;
   }
-
-  /* Executive Summary Box (using System colors) */
-  .lede-box {
-    margin: 8px 0 12px 0;
-    padding: 6px 0;
-    border-top: 1px solid var(--hairline);
-    border-bottom: 1px solid var(--hairline);
+  .summary-box-label {
+    font-size: 7.5px;
+    font-weight: 700;
+    color: var(--primary-navy);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 2px;
   }
-  .lede-box p {
+  .summary-box-text {
     margin: 0;
-    font-size: 11px;
-    line-height: 1.45;
+    font-size: 10px;
     color: #334155;
+    line-height: 1.4;
   }
 
-  /* KPI Cards deck (3-cards layout matching screenshot) */
-  .kpi-row {
+  /* KPI Summary Cards (Clean, Uniform) */
+  .kpi-deck {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 8px;
   }
-  .kpi {
-    background: var(--card);
-    padding: 6px 12px; /* Tight padding */
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+  .kpi-card {
+    background: #ffffff;
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 6px 10px;
   }
-  .kpi.uptime-card { border-top: 3px solid var(--primary-green); }
-  .kpi.breaches-card { border-top: 3px solid var(--primary-navy); }
-  .kpi.incidents-card { border-top: 3px solid var(--primary-navy); }
-
-  .kpi .label {
-    font-size: 8px;
+  .kpi-label {
+    font-size: 7.5px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-dark);
-    margin: 0 0 2px;
+    color: var(--text-soft);
+    margin: 0 0 2px 0;
   }
-  .kpi .value {
+  .kpi-value {
     font-family: 'JetBrains Mono', monospace;
     font-size: 16px;
     font-weight: 700;
-    margin: 0 0 1px;
+    margin: 0 0 1px 0;
     color: var(--primary-navy);
+    line-height: 1.1;
   }
-  .kpi.uptime-card .value {
-    color: #1e7a00;
+  .kpi-value.green {
+    color: var(--primary-green);
   }
-  .kpi .subtext {
-    font-size: 8px;
-    color: var(--muted);
+  .kpi-subtext {
+    font-size: 7.5px;
+    color: #94a3b8;
+    margin: 0;
   }
 
-  .section-label {
-    font-size: 8.5px;
+  /* Section Titles */
+  .section-heading {
+    font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     color: var(--primary-navy);
-    margin: 0 0 6px;
+    margin: 8px 0 4px 0;
     padding-bottom: 2px;
-    border-bottom: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--border-mist);
   }
 
-  /* Uptime Progress Bars (Sleeker design, reduced heights & vertical padding) */
-  .db-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 4px; /* Tight gap */
-    margin-bottom: 10px;
-  }
-  .db-card {
-    background: var(--card);
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
-    padding: 6px 12px; /* Tight padding */
-    display: grid;
-    grid-template-columns: 150px 1fr 100px;
-    gap: 16px;
-    align-items: center;
-  }
-  .db-card .name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .db-card .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .db-card .name-text b {
-    display: block;
-    font-size: 10.5px;
-    font-weight: 700;
-    color: var(--primary-navy);
-  }
-  .db-card .name-text span {
-    display: block;
-    font-size: 8.5px;
-    color: var(--muted);
-  }
-  
-  /* Sleek target marker and 6px height */
-  .meter-wrap {
-    position: relative;
-    padding-top: 12px;
-  }
-  .meter-wrap .target-lbl {
-    position: absolute;
-    top: 0;
-    left: 95%;
-    transform: translateX(-50%);
-    font-size: 7.5px;
-    color: var(--muted);
-    font-family: 'JetBrains Mono', monospace;
-    white-space: nowrap;
-  }
-  .meter-track {
-    height: 6px;
-    background: #e8effa;
-    position: relative;
-    border-radius: 3px;
-  }
-  .meter-fill {
-    height: 100%;
-    border-radius: 3px;
-  }
-  .meter-target {
-    position: absolute;
-    top: -2px;
-    bottom: -2px;
-    width: 1.5px;
-    background: var(--primary-navy);
-  }
-  
-  /* Right-hand metrics align */
-  .db-card .stats-col {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-  }
-  .db-card .stats-col .uptime-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: #1e7a00;
-    font-size: 10.5px;
-  }
-  .db-card .stats-col .uptime-val.breached {
-    color: var(--red);
-  }
-
-  /* Detailed Table Styles */
-  table {
+  /* Tables */
+  table.report-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    font-size: 9px;
   }
-  th {
-    background-color: var(--card);
+  table.report-table th {
+    background: #f1f5f9;
     color: var(--primary-navy);
-    font-size: 8px;
+    font-weight: 700;
+    font-size: 7.5px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 700;
-    padding: 6px 8px;
-    border-top: 1px solid var(--hairline);
-    border-bottom: 2px solid var(--primary-navy);
+    letter-spacing: 0.04em;
+    padding: 5px 6px;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1.5px solid var(--primary-navy);
     text-align: center;
   }
-  th:first-child, td:first-child { text-align: left; }
-  td {
-    padding: 6px 8px;
-    font-size: 9.5px;
-    border-bottom: 1px solid var(--hairline);
-    color: var(--ink-soft);
+  table.report-table th:first-child { text-align: left; }
+  table.report-table td {
+    padding: 4.5px 6px;
+    border-bottom: 1px solid var(--border-mist);
+    color: var(--text-dark);
     text-align: center;
+    vertical-align: middle;
   }
-  td:first-child {
-    font-family: 'Inter', sans-serif;
+  table.report-table td:first-child { text-align: left; }
+  table.report-table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  /* Status Badges */
+  .badge-compliant {
+    display: inline-block;
+    padding: 1.5px 5px;
+    border-radius: 3px;
+    font-size: 7.5px;
     font-weight: 700;
-    color: var(--primary-navy);
+    background: var(--green-badge);
+    color: var(--green-text);
+    text-transform: uppercase;
   }
-  td .uptime-tbl {
+  .badge-breached {
+    display: inline-block;
+    padding: 1.5px 5px;
+    border-radius: 3px;
+    font-size: 7.5px;
+    font-weight: 700;
+    background: var(--red-badge);
+    color: var(--red-text);
+    text-transform: uppercase;
+  }
+  .badge-neutral {
+    display: inline-block;
+    padding: 1.5px 5px;
+    border-radius: 3px;
+    font-size: 7.5px;
     font-weight: 600;
-    color: #1e7a00;
+    background: #f1f5f9;
+    color: #475569;
   }
-  td .uptime-tbl.breached {
-    color: var(--red);
-  }
-  .no-data {
-    color: var(--muted);
-    font-style: italic;
-  }
-  tr:nth-child(even) { background-color: rgba(244, 247, 252, 0.5); }
 
-  /* Specifications */
-  .specs {
-    margin-bottom: 10px;
-    padding-left: 16px;
+  /* Thin Progress Meter */
+  .slim-meter {
+    height: 3px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 3px;
+    width: 100%;
   }
-  .specs li {
-    font-size: 9.5px;
-    margin-bottom: 3px;
-    color: var(--ink-soft);
-    line-height: 1.3;
+  .slim-fill {
+    height: 100%;
+    border-radius: 2px;
   }
-  .specs li b {
+
+  /* Specifications Table */
+  table.spec-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 8.5px;
+  }
+  table.spec-table th {
+    background: #f8fafc;
+    color: var(--primary-navy);
+    font-weight: 700;
+    font-size: 7.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 4px 6px;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1px solid var(--border-mist);
+    text-align: left;
+  }
+  table.spec-table td {
+    padding: 3.5px 6px;
+    border-bottom: 1px solid var(--border-mist);
+    color: #334155;
+    vertical-align: middle;
+  }
+  table.spec-table td strong {
     color: var(--primary-navy);
   }
 
-  /* Approvals Sign-off Block */
-  .signoff-section {
-    border-top: 1px solid var(--hairline);
-    padding-top: 10px;
-    margin-top: 16px;
-  }
-  .signoff-row {
+  /* Sign-off Section */
+  .signoff-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 10px;
+    margin-top: 6px;
   }
-  .signoff-card {
-    background: var(--card);
-    border: 1px solid var(--hairline);
-    border-radius: 6px;
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+  .signoff-box {
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 6px 8px;
+    background: #ffffff;
   }
-  .signoff-card b {
-    display: block;
-    color: var(--primary-navy);
-    font-size: 9.5px;
+  .signoff-header {
+    font-size: 7.5px;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 2px;
+    color: var(--primary-navy);
     border-bottom: 1.5px solid var(--primary-navy);
     padding-bottom: 2px;
+    margin-bottom: 4px;
   }
-  .signoff-card div {
+  .signoff-row {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    font-size: 9px;
-    color: var(--text-dark);
+    font-size: 8px;
+    color: #475569;
+    margin-bottom: 2px;
   }
-  .signoff-card .label {
-    font-weight: 600;
-  }
-  .signoff-card .fill {
-    border-bottom: 1px dotted var(--muted);
+  .signoff-line {
+    border-bottom: 1px dotted #94a3b8;
     flex-grow: 1;
     margin: 0 4px;
+    height: 0;
   }
-  .signoff-card .val {
+  .signoff-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8.5px;
+    font-size: 7.5px;
     color: var(--primary-navy);
+    font-weight: 600;
   }
 
+  /* Print Settings */
   @media print {
+    .no-print {
+      display: none !important;
+    }
     @page {
       size: A4 portrait;
-      margin: 4mm 8mm; /* Extra narrow vertical margin to maximize space and prevent overflow */
+      margin: 5mm 8mm;
     }
     body {
-      background: #ffffff;
-      font-size: 10px !important; /* Scale base font down to fit everything on one sheet */
+      background: #ffffff !important;
+      font-size: 9.5px !important;
     }
     .page {
+      box-shadow: none !important;
+      border: none !important;
       padding: 0 !important;
       margin: 0 !important;
       max-width: 100% !important;
-      box-shadow: none !important;
-      min-height: auto !important; /* Discard 297mm height constraint */
-      height: auto !important;
-      display: block !important;
     }
-    
-    /* Compact database cards and tables for print layout */
-    .db-card {
-      padding: 5px 10px !important;
-      gap: 12px !important;
+    table.report-table th, table.report-table td {
+      padding: 3.5px 5px !important;
     }
-    table {
-      margin-bottom: 8px !important;
+    table.spec-table th, table.spec-table td {
+      padding: 3px 5px !important;
     }
-    th, td {
-      padding: 4px 6px !important;
-    }
-    .specs {
+    .summary-box {
+      padding: 5px 8px !important;
       margin-bottom: 6px !important;
     }
-    .specs li {
-      margin-bottom: 2px !important;
-      line-height: 1.25 !important;
+    .kpi-deck {
+      margin-bottom: 6px !important;
     }
-    
-    /* Convert signoff section layout to standard float/inline-block to avoid flexbox print bugs */
-    .signoff-section {
-      display: block !important;
-      margin-top: 10px !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      clear: both !important;
-    }
-    .signoff-row {
-      display: block !important;
-      width: 100% !important;
-      clear: both !important;
-    }
-    .signoff-card {
-      display: inline-block !important;
-      width: 31% !important;
-      margin-right: 3% !important;
-      float: left !important;
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-      box-sizing: border-box !important;
-      padding: 6px 10px !important;
-    }
-    .signoff-card:last-child {
-      margin-right: 0 !important;
-    }
-    .signoff-row::after {
-      content: "" !important;
-      display: table !important;
-      clear: both !important;
-    }
-    
-    table, tr, .db-card, .specs, .kpi-row {
+    .signoff-grid {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -457,215 +417,260 @@
 </head>
 <body>
 
+<!-- Interactive Screen Toolbar (hidden in print) -->
+<div class="screen-toolbar no-print">
+  <div class="toolbar-content">
+    <div class="toolbar-title">
+      <strong>Report Ready:</strong> {{ reporting_month_str }} Performance Summary
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" onclick="window.print()" class="btn-print">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        Print / Save as PDF
+      </button>
+      <button type="button" onclick="window.close()" class="btn-close">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="page">
-  <div>
-    <!-- Masthead -->
-    <div class="masthead">
-      <div class="title-block">
-        <img src="{% static 'logo.jpg' %}" alt="Logo" style="height: 34px; width: auto; border-radius: 4px; border: 1px solid var(--hairline); flex-shrink: 0;">
-        <div>
-          <h1>
-            {% if selected_db == 'All Databases' %}
-              DATABASE PERFORMANCE SUMMARY
-            {% elif selected_db == 'Oracle' %}
-              ORACLE DATABASE PERFORMANCE SUMMARY
-            {% elif selected_db == 'MySQL' %}
-              MYSQL DATABASE PERFORMANCE SUMMARY
-            {% else %}
-              {{ selected_db|upper }} PERFORMANCE SUMMARY
-            {% endif %}
-          </h1>
-          <div class="tagline">Operations Performance &amp; Compliance Report</div>
-        </div>
-      </div>
-      <div class="meta">
-        Period: {{ reporting_month_str }}
+  <!-- Masthead -->
+  <div class="masthead">
+    <div class="masthead-left">
+      <img src="{% static 'logo.jpg' %}" alt="DBTRAC Logo" class="masthead-logo">
+      <div class="masthead-title">
+        <h1>
+          {% if selected_db == 'All Databases' %}
+            DATABASE PERFORMANCE &amp; SLA COMPLIANCE REPORT
+          {% elif selected_db == 'Oracle' %}
+            ORACLE DATABASE PERFORMANCE &amp; SLA REPORT
+          {% elif selected_db == 'MySQL' %}
+            MYSQL DATABASE PERFORMANCE &amp; SLA REPORT
+          {% else %}
+            {{ selected_db|upper }} PERFORMANCE &amp; SLA REPORT
+          {% endif %}
+        </h1>
+        <p>National Medical Stores • Database Tracking for Reliability, Administration and Compliance</p>
       </div>
     </div>
-
-    <!-- Meta Bar -->
-    <div class="meta-bar">
-      <div>Run Date: {{ extracted_at }} EAT</div>
-      <div>Databases Monitored: {{ dashboard_data|length }}</div>
+    <div class="masthead-meta">
+      <div>Period: <strong>{{ reporting_month_str }}</strong></div>
+      <div>Extracted: <strong>{{ extracted_at }} EAT</strong></div>
+      <div>Scope: <strong>{{ selected_db }}</strong></div>
     </div>
+  </div>
 
-    <!-- Summary Paragraph -->
-    <div class="lede-box">
-      <p><strong>Summary:</strong> <span style="font-style: italic; color: #475569;">{{ lede_text|striptags }}</span></p>
+  <!-- Executive Summary -->
+  <div class="summary-box">
+    <div class="summary-box-label">Executive Summary</div>
+    <p class="summary-box-text">{{ lede_text|striptags }}</p>
+  </div>
+
+  <!-- 3 Key Metric Cards -->
+  <div class="kpi-deck">
+    <div class="kpi-card">
+      <div class="kpi-label">Average System Uptime</div>
+      <div class="kpi-value green">{{ avg_uptime }}</div>
+      <div class="kpi-subtext">Target SLA: &ge; {{ target_sla_val }}%</div>
     </div>
-
-    <!-- KPI Summary Card Row -->
-    <div class="kpi-row">
-      <div class="kpi uptime-card">
-        <p class="label">Average System Uptime</p>
-        <p class="value">{{ avg_uptime }}</p>
-        <p class="subtext">SLA Target: {{ target_sla_val }}%</p>
-      </div>
-      <div class="kpi breaches-card">
-        <p class="label">Active SLA Breaches</p>
-        <p class="value">{{ total_breaches }}</p>
-        <p class="subtext">Threshold: 0</p>
-      </div>
-      <div class="kpi incidents-card">
-        <p class="label">Total Incidents</p>
-        <p class="value">{{ total_incidents }}</p>
-        <p class="subtext">Threshold: &lt; 4</p>
-      </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active SLA Breaches</div>
+      <div class="kpi-value">{{ total_breaches }}</div>
+      <div class="kpi-subtext">Threshold: 0 breaches</div>
     </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Outages &amp; Incidents</div>
+      <div class="kpi-value">{{ total_incidents }}</div>
+      <div class="kpi-subtext">Baseline: &lt; 4 incidents</div>
+    </div>
+  </div>
 
-    <!-- SLA Compliance Status (Progress Bars) -->
-    <p class="section-label">Service Level Agreement Target Status (Uptime vs. SLA Target: {{ target_sla_val }}%)</p>
-    <div class="db-grid">
+  <!-- 1. SLA Performance Scorecard -->
+  <div class="section-heading">Service Level Agreement (SLA) Compliance Scorecard</div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th style="width: 28%;">Database Engine</th>
+        <th style="width: 32%;">System Role</th>
+        <th style="width: 12%;">Target SLA</th>
+        <th style="width: 14%;">Monthly Uptime</th>
+        <th style="width: 14%;">Compliance Status</th>
+      </tr>
+    </thead>
+    <tbody>
       {% for item in dashboard_data %}
-      <div class="db-card">
-        <div class="name">
-          <span class="dot" style="background: {% if item.availability_status == 'Meets SLA' %}var(--primary-green){% else %}var(--red){% endif %};"></span>
-          <div class="name-text">
-            <b>{{ item.database }} ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})</b>
-            <span>{% if item.database == 'Oracle' %}NMS ERP Suite Database{% elif item.database == 'MySQL' %}NMS360 / ServiceDesk Database{% else %}MKInsight Audit Database{% endif %}</span>
+      <tr>
+        <td>
+          <strong style="color: var(--primary-navy);">{{ item.database }}</strong>
+          <span style="color: var(--text-soft); font-family: 'JetBrains Mono', monospace; font-size: 7.5px;">({{ item.code_name }})</span>
+        </td>
+        <td style="color: #475569; font-size: 8.5px;">{{ item.role_desc }}</td>
+        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ item.target_sla_val }}%</td>
+        <td>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
+            {{ item.availability }}
+          </span>
+          <div class="slim-meter">
+            <div class="slim-fill" style="width: {{ item.availability_scaled_num }}%; background-color: {% if item.availability_status == 'Meets SLA' %}var(--primary-green){% else %}var(--red){% endif %};"></div>
           </div>
-        </div>
-        <div class="meter-wrap">
-          <span class="target-lbl">Target: {{ item.target_sla_val }}%</span>
-          <div class="meter-track">
-            <div class="meter-fill" style="width:{{ item.availability_scaled_num }}%; background: {% if item.availability_status == 'Meets SLA' %}var(--primary-green){% else %}var(--red){% endif %};"></div>
-            <div class="meter-target" style="left:{{ item.target_sla_scaled }}%"></div>
-          </div>
-        </div>
-        <div class="stats-col">
-          <span class="uptime-val {% if item.availability_status != 'Meets SLA' %}breached{% endif %}">{{ item.availability }} Uptime</span>
-        </div>
-      </div>
+        </td>
+        <td>
+          {% if item.availability_status == 'Meets SLA' %}
+            <span class="badge-compliant">✓ Meets SLA</span>
+          {% else %}
+            <span class="badge-breached">✗ Below SLA</span>
+          {% endif %}
+        </td>
+      </tr>
       {% endfor %}
-    </div>
+    </tbody>
+  </table>
 
-    <!-- Detailed Performance Appendix Table -->
-    <p class="section-label">Detailed Performance &amp; Disaster Recovery Metrics</p>
-    <table>
-      <thead>
-        <tr>
-          <th>DATABASE SYSTEM</th>
-          <th>UPTIME</th>
-          <th>PLANNED DOWN</th>
-          <th>UNPLANNED</th>
-          <th>INCIDENTS</th>
-          <th>BACKUP RATE</th>
-          <th>REPLICATION</th>
-          <th>DISK USED</th>
-          <th>FREE SPACE</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in dashboard_data %}
-        <tr>
-          <td><b>{{ item.database }} ({% if item.database == 'Oracle' %}nmsinfra{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})</b></td>
-          <td><span class="uptime-tbl {% if item.availability_status != 'Meets SLA' %}breached{% endif %}">{{ item.availability }}</span></td>
-          <td>{{ item.planned_downtime }}</td>
-          <td>{{ item.unplanned_downtime }}</td>
-          <td>{{ item.total_incidents }}</td>
-          <td>
-            {% if item.backup_success and item.backup_success != '—' and item.backup_success != 'No Data' %}
-              {{ item.backup_success }}
-            {% else %}
-              <span class="no-data">[ No Data ]</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if item.replication_status and item.replication_status != '—' and item.replication_status != 'No Data' and item.replication_status != 'N/A' %}
-              {{ item.replication_status }}
-            {% elif item.database == 'MS SQL' %}
-              <span class="no-data">N/A (Standalone)</span>
-            {% else %}
-              <span class="no-data">[ No Data ]</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if item.disk_used_percent and item.disk_used_percent != 'No Data' %}
-              {{ item.disk_used_percent }}
-            {% else %}
-              <span class="no-data">[ No Data ]</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if item.available_capacity_gb and item.available_capacity_gb != 'No Data' %}
-              {{ item.available_capacity_gb }}
-            {% else %}
-              <span class="no-data">[ No Data ]</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <!-- 2. Detailed Performance & Disaster Recovery Metrics -->
+  <div class="section-heading">Operational Performance &amp; Disaster Recovery Metrics</div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th>Database Engine</th>
+        <th>Uptime</th>
+        <th>Planned Down</th>
+        <th>Unplanned Down</th>
+        <th>Incidents</th>
+        <th>Backup Success</th>
+        <th>Replication</th>
+        <th>Disk Used</th>
+        <th>Free Space</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in dashboard_data %}
+      <tr>
+        <td>
+          <strong>{{ item.database }}</strong>
+          <span style="color: var(--text-soft); font-family: 'JetBrains Mono', monospace; font-size: 7px;">({{ item.code_name }})</span>
+        </td>
+        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
+          {{ item.availability }}
+        </td>
+        <td>{{ item.planned_downtime }}</td>
+        <td>{{ item.unplanned_downtime }}</td>
+        <td>{{ item.total_incidents }}</td>
+        <td>
+          {% if item.backup_success and item.backup_success != '—' and item.backup_success != 'No Data' %}
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ item.backup_success }}</span>
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.replication_status == 'Healthy' %}
+            <span class="badge-compliant">Healthy</span>
+          {% elif item.database == 'MS SQL Server' %}
+            <span class="badge-neutral">N/A (Standalone)</span>
+          {% elif item.replication_status and item.replication_status != 'No Data' and item.replication_status != '—' and item.replication_status != 'N/A' %}
+            <span class="badge-breached">{{ item.replication_status }}</span>
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.disk_used_percent and item.disk_used_percent != 'No Data' %}
+            <span style="font-family: 'JetBrains Mono', monospace;">{{ item.disk_used_percent }}</span>
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.available_capacity_gb and item.available_capacity_gb != 'No Data' %}
+            <span style="font-family: 'JetBrains Mono', monospace;">{{ item.available_capacity_gb }}</span>
+          {% else %}
+            <span style="color: #94a3b8;">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-    <!-- System Specifications -->
-    <p class="section-label">System Context &amp; Specifications</p>
-    <ul class="specs">
-      {% if selected_db == 'All Databases' or selected_db == 'Oracle' %}
-      <li><b>Oracle (nmsinfra):</b> nmsinfra.nms.go.ug (DB) &amp; nmsebs.nms.go.ug (App) — Powers core NMS ERP business modules including finance, procurement, and warehousing operations.</li>
-      {% endif %}
-      {% if selected_db == 'All Databases' or selected_db == 'MySQL' %}
-      <li><b>MySQL (nickledbnew):</b> nickledbnew (replicated to nickledbdr for DR) — Hosts critical collaboration systems, IT ServiceDesk, and the Document Management Tool (DMT).</li>
-      {% endif %}
-      {% if selected_db == 'All Databases' or selected_db == 'MS SQL' %}
-      <li><b>MS SQL Server (Pentana):</b> Windows Server Host — Powers the MKInsight (Pentana Audit) compliance framework for formal business audit reviews.</li>
-      {% endif %}
-    </ul>
+  <!-- 3. Infrastructure Architecture & Scope -->
+  <div class="section-heading">Infrastructure Context &amp; Specifications</div>
+  <table class="spec-table">
+    <thead>
+      <tr>
+        <th style="width: 22%;">Database System</th>
+        <th style="width: 40%;">Host / Node Architecture</th>
+        <th style="width: 38%;">Business Workload &amp; Scope</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in dashboard_data %}
+      <tr>
+        <td><strong>{{ item.database }}</strong> ({{ item.code_name }})</td>
+        <td style="font-family: 'JetBrains Mono', monospace; font-size: 7.5px; color: #475569;">{{ item.host_desc }}</td>
+        <td style="font-size: 8px;">{{ item.role_desc }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-    <!-- Approvals Footer -->
-    <div class="signoff-section">
+  <!-- 4. Formal Review & Sign-Off -->
+  <div class="section-heading">Formal Review &amp; Sign-Off</div>
+  <div class="signoff-grid">
+    <div class="signoff-box">
+      <div class="signoff-header">Prepared / Extracted By</div>
       <div class="signoff-row">
-        <div class="signoff-card">
-          <b>EXTRACTED BY</b>
-          <div><span class="label">Signature:</span><span class="fill"></span></div>
-          <div><span class="label">Name:</span><span class="val">{{ extracted_by }}</span></div>
-          <div><span class="label">Date:</span><span class="val">{{ extracted_at }}</span></div>
-        </div>
-        <div class="signoff-card">
-          <b>REVIEWED BY</b>
-          <div><span class="label">Signature:</span><span class="fill"></span></div>
-          <div><span class="label">Name:</span><span class="fill"></span></div>
-          <div><span class="label">Date:</span><span class="fill"></span></div>
-        </div>
-        <div class="signoff-card">
-          <b>APPROVED BY</b>
-          <div><span class="label">Signature:</span><span class="fill"></span></div>
-          <div><span class="label">Name:</span><span class="fill"></span></div>
-          <div><span class="label">Date:</span><span class="fill"></span></div>
-        </div>
+        <span>Signature:</span>
+        <span class="signoff-line"></span>
+      </div>
+      <div class="signoff-row">
+        <span>Name:</span>
+        <span class="signoff-val">{{ extracted_by }}</span>
+      </div>
+      <div class="signoff-row">
+        <span>Date:</span>
+        <span class="signoff-val">{{ extracted_at }}</span>
+      </div>
+    </div>
+    <div class="signoff-box">
+      <div class="signoff-header">Reviewed By (Lead DBA)</div>
+      <div class="signoff-row">
+        <span>Signature:</span>
+        <span class="signoff-line"></span>
+      </div>
+      <div class="signoff-row">
+        <span>Name:</span>
+        <span class="signoff-line" style="margin-left: 35px;"></span>
+      </div>
+      <div class="signoff-row">
+        <span>Date:</span>
+        <span class="signoff-line" style="margin-left: 35px;"></span>
+      </div>
+    </div>
+    <div class="signoff-box">
+      <div class="signoff-header">Approved By (IT Management)</div>
+      <div class="signoff-row">
+        <span>Signature:</span>
+        <span class="signoff-line"></span>
+      </div>
+      <div class="signoff-row">
+        <span>Name:</span>
+        <span class="signoff-line" style="margin-left: 35px;"></span>
+      </div>
+      <div class="signoff-row">
+        <span>Date:</span>
+        <span class="signoff-line" style="margin-left: 35px;"></span>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
-    window.onload = function() {
-        const downloadMode = "{{ download_mode }}" === "true";
-        
-        if (downloadMode) {
-            const element = document.querySelector('.page');
-            const opt = {
-                margin:       [4, 8, 4, 8], // top, left, bottom, right in mm
-                filename:     'Database_Performance_Report_{{ reporting_month_str|slugify }}.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            
-            // Generate and download PDF, then close tab
-            html2pdf().set(opt).from(element).save().then(() => {
-                setTimeout(function() {
-                    window.close();
-                }, 6000);
-            }).catch(err => {
-                console.error('PDF generation error:', err);
-                window.print(); // Fallback to standard print if jsPDF fails
-            });
-        } else {
-            window.print();
-        }
-    }
+  window.addEventListener('DOMContentLoaded', function() {
+    // Automatically trigger browser native print dialog for 100% vector PDF output
+    setTimeout(function() {
+      window.print();
+    }, 400);
+  });
 </script>
 </body>
 </html>
