@@ -217,10 +217,10 @@
 
                     <!-- Status -->
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
-                        <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
-                                    {% if health.status == 'Healthy' %}background: #e6f4ea; color: #137333;
-                                    {% elif health.status == 'Critical' %}background: #fce8e6; color: #c5221f;
-                                    {% else %}background: #fef7e0; color: #b06000;{% endif %}">
+                        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                                    {% if health.status == 'Healthy' %}color: #137333;
+                                    {% elif health.status == 'Critical' %}color: #c5221f;
+                                    {% else %}color: #b06000;{% endif %}">
                             {{ health.status }}
                         </span>
                     </td>

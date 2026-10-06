@@ -250,10 +250,10 @@
                         <span style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Database Profile</span>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <!-- Health Status Indicator Badge -->
-                            <span style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-                                        {% if row.health_status == 'HEALTHY' %}background: #e6f4ea; color: #137333;
-                                        {% elif row.health_status == 'WARNING' %}background: #fef7e0; color: #b06000;
-                                        {% else %}background: #fce8e6; color: #c5221f;{% endif %}">
+                            <span style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+                                        {% if row.health_status == 'HEALTHY' %}color: #137333;
+                                        {% elif row.health_status == 'WARNING' %}color: #b06000;
+                                        {% else %}color: #c5221f;{% endif %}">
                                 <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if row.health_status == 'HEALTHY' %}#137333{% elif row.health_status == 'WARNING' %}#b06000{% else %}#c5221f{% endif %};"></span>
                                 {% if row.health_status == 'HEALTHY' %}Healthy{% elif row.health_status == 'WARNING' %}Warning{% else %}Outage{% endif %}
                             </span>
@@ -284,7 +284,7 @@
                                 {% if row.database == 'Oracle' %}
                                     Core Enterprise ERP Suite
                                 {% elif row.database == 'MySQL' %}
-                                    NMS360 &amp; DMT (Delivery Monitoring Tool)
+                                    NMS360, DMT and other in-house applications
                                 {% elif row.database == 'MS SQL Server' %}
                                     MKInsight Audit Framework
                                 {% else %}
@@ -295,7 +295,7 @@
                                 {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% else %}Pentana (Standalone){% endif %}
                             </div>
                             <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
-                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Tool{% else %}MKInsight Audit Database for governance and compliance.{% endif %}
+                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif row.database == 'MySQL' %}NMS360, DMT, and other in-house applications{% else %}MKInsight Audit Database for governance and compliance.{% endif %}
                             </p>
                         </div>
                     </div>
@@ -729,7 +729,7 @@
                     Purpose
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-top: 0.25rem; line-height: 1.4;">
-                    {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, and Delivery Monitoring Tool (DMT).{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors.{% endif %}
+                    {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, DMT, and other in-house applications.{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors.{% endif %}
                 </div>
             </div>
         </div>
@@ -741,7 +741,7 @@
                     Backup Monitoring
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                    Active (Daily Backup Logs Checked)
+                    {% if selected_db == 'MS SQL Server' %}Active (Weekly Backup Logs Checked){% else %}Active (Daily Backup Logs Checked){% endif %}
                 </div>
             </div>
             <div>

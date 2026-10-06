@@ -207,10 +207,10 @@
         <div class="db-util-col">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong style="color: var(--primary-navy); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.02em;">{{ db.database }}</strong>
-                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
-                            {% if db.status_class == 'success' %}background: #e2f0d9; color: #385723;
-                            {% elif db.status_class == 'warning' or db.status_class == 'orange' %}background: #fff2cc; color: #d59400;
-                            {% else %}background: #fce4d6; color: #c65911;{% endif %}">
+                <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                            {% if db.status_class == 'success' %}color: #137333;
+                            {% elif db.status_class == 'warning' or db.status_class == 'orange' %}color: #d59400;
+                            {% else %}color: #c5221f;{% endif %}">
                     {{ db.status }}
                 </span>
             </div>
