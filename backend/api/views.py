@@ -654,6 +654,9 @@ def dashboard(request):
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
 
+    valid_trend_vals = [m['value'] for m in trend_months if m['value'] > 0.0]
+    trend_recent_avg = round(sum(valid_trend_vals) / len(valid_trend_vals), 2) if valid_trend_vals else 100.0
+
     min_val = min([m['value'] for m in trend_months if m['value'] > 0.0] + [target_sla_val])
     if min_val <= 0.0:
         y_min = 0.0
@@ -664,20 +667,20 @@ def dashboard(request):
     
     points = []
     for idx, m in enumerate(trend_months):
-        x = 40 + idx * 64
+        x = 42 + idx * 63
         m['x'] = x
         if m['value'] > 0.0:
-            y = 20 + (100.0 - m['value']) * 80 / y_range
+            y = 22 + (100.0 - m['value']) * 96 / y_range
             points.append(f"{x},{y}")
             m['y'] = y
-            m['text_y'] = y - 8
+            m['text_y'] = y - 7
             m['has_data'] = True
         else:
-            # Plot at baseline y=100 (bottom of visual chart area)
-            y = 100
+            # Plot at baseline y=118 (bottom of visual chart area)
+            y = 118
             points.append(f"{x},{y}")
             m['y'] = y
-            m['text_y'] = 92
+            m['text_y'] = 110
             m['has_data'] = False
     trend_polyline_points = " ".join(points)
     # Generate polygon points for the area chart fill
@@ -685,8 +688,8 @@ def dashboard(request):
     if points:
         first_x = trend_months[0]['x']
         last_x = trend_months[-1]['x']
-        trend_area_points = f"{first_x},100 " + trend_polyline_points + f" {last_x},100"
-    sla_y_coord = 20 + (100.0 - target_sla_val) * 80 / y_range
+        trend_area_points = f"{first_x},118 " + trend_polyline_points + f" {last_x},118"
+    sla_y_coord = 22 + (100.0 - target_sla_val) * 96 / y_range
     
     # 7. Attention Required Alerts
     attention_items = []
@@ -855,6 +858,7 @@ def dashboard(request):
         'kpi_backup_failed': kpi_backup_failed,
         'kpi_replication_status': kpi_replication_status,
         'trend_months': trend_months,
+        'trend_recent_avg': trend_recent_avg,
         'trend_polyline_points': trend_polyline_points,
         'trend_area_points': trend_area_points,
         'sla_y_coord': sla_y_coord,
