@@ -291,10 +291,8 @@
                                     {{ row.database }} Profile
                                 {% endif %}
                             </h2>
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem;">
-                                <span style="font-family: monospace; font-size: 0.8rem; font-weight: 700; color: #0284c7; background: #f0f9ff; padding: 0.15rem 0.5rem; border-radius: 4px; border: 1px solid #bae6fd;">
-                                    {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% else %}Pentana (Standalone){% endif %}
-                                </span>
+                            <div style="font-family: monospace; font-size: 0.82rem; font-weight: 700; color: #0284c7; margin-top: 0.25rem;">
+                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% else %}Pentana (Standalone){% endif %}
                             </div>
                             <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
                                 {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, and warehouse workflows.{% elif row.database == 'MySQL' %}NMS360 / ServiceDesk / Delivery Monitoring Tool{% else %}MKInsight Audit Database for governance and compliance.{% endif %}
