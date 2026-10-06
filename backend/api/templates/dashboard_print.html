@@ -142,16 +142,14 @@
     font-weight: 500;
   }
   .report-meta-strip {
-    display: inline-flex;
+    display: flex;
+    justify-content: center;
     align-items: center;
     gap: 14px;
     font-size: 8.5px;
     color: #475569;
-    background: #f8fafc;
-    border: 1px solid var(--border-mist);
-    border-radius: 4px;
-    padding: 5px 14px;
-    margin: 0 auto;
+    margin: 4px auto 0 auto;
+    padding: 0;
   }
   .meta-item {
     display: inline-flex;
@@ -172,28 +170,24 @@
     font-weight: bold;
   }
 
-  /* Summary Box */
+  /* Summary Section (Plain, clean prose) */
   .summary-box {
-    background: #f8fafc;
-    border: 1px solid var(--border-mist);
-    border-left: 3px solid var(--primary-navy);
-    border-radius: 4px;
-    padding: 7px 12px;
-    margin-bottom: 10px;
+    margin: 0 0 10px 0;
+    padding: 0;
   }
   .summary-box-label {
-    font-size: 7.5px;
+    font-size: 8px;
     font-weight: 700;
     color: var(--primary-navy);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     margin-bottom: 2px;
   }
   .summary-box-text {
     margin: 0;
     font-size: 9.5px;
     color: #334155;
-    line-height: 1.4;
+    line-height: 1.45;
   }
 
   /* KPI Summary Cards */
@@ -280,49 +274,36 @@
     background-color: #f8fafc;
   }
 
-  /* Status Badges */
+  /* Status Indicators (Plain text, standing on its own) */
   .badge-compliant {
-    display: inline-block;
-    padding: 1.5px 6px;
-    border-radius: 3px;
-    font-size: 7.5px;
+    font-size: 8.5px;
     font-weight: 700;
-    background: var(--green-badge);
     color: var(--green-text);
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    padding: 0;
+    border-radius: 0;
   }
   .badge-breached {
-    display: inline-block;
-    padding: 1.5px 6px;
-    border-radius: 3px;
-    font-size: 7.5px;
+    font-size: 8.5px;
     font-weight: 700;
-    background: var(--red-badge);
     color: var(--red-text);
-    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    padding: 0;
+    border-radius: 0;
   }
   .badge-neutral {
-    display: inline-block;
-    padding: 1.5px 6px;
-    border-radius: 3px;
-    font-size: 7.5px;
+    font-size: 8.5px;
     font-weight: 600;
-    background: #f1f5f9;
-    color: #475569;
-  }
-
-  /* Thin Progress Meter */
-  .slim-meter {
-    height: 3px;
-    background: #e2e8f0;
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 3px;
-    width: 100%;
-  }
-  .slim-fill {
-    height: 100%;
-    border-radius: 2px;
+    color: #64748b;
+    background: none;
+    padding: 0;
+    border-radius: 0;
   }
 
   /* Specifications Table */
@@ -455,7 +436,7 @@
       padding: 4px 6px !important;
     }
     .summary-box {
-      padding: 6px 10px !important;
+      padding: 0 !important;
       margin-bottom: 8px !important;
     }
     .kpi-deck {
@@ -581,9 +562,6 @@
           <span style="font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
             {{ item.availability }}
           </span>
-          <div class="slim-meter">
-            <div class="slim-fill" style="width: {{ item.availability_scaled_num }}%; background-color: {% if item.availability_status == 'Meets SLA' %}var(--primary-green){% else %}var(--red){% endif %};"></div>
-          </div>
         </td>
         <td>
           {% if item.availability_status == 'Meets SLA' %}
