@@ -964,7 +964,7 @@ def dashboard_print(request):
         target_val = item.get('target_sla_val', 99.95)
         target_scaled = round((target_val - 99.0) * 100.0, 2) if target_val >= 99.0 else 0.0
 
-        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('IT ServiceDesk & Collaboration' if db_type == 'MySQL' else 'MKInsight Audit Framework')
+        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360 & DMT (Delivery Monitoring Tool)' if db_type == 'MySQL' else 'MKInsight Audit Framework')
         host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else 'Windows Server Host (Standalone)')
 
         formatted_data.append({

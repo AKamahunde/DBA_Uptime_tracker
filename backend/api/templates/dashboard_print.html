@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --primary-navy: #00205B;
@@ -97,68 +97,86 @@
     background: #e2e8f0;
   }
 
-  /* Page container strictly calibrated for single-page A4 print */
+  /* Page container with generous margins */
   .page {
     max-width: 820px;
-    margin: 1.25rem auto 2rem auto;
-    padding: 22px 28px;
+    margin: 2rem auto 3rem auto;
+    padding: 32px 34px;
     background: var(--pure-white);
     border: 1px solid var(--border-mist);
     border-radius: 6px;
     box-shadow: 0 4px 16px rgba(0, 32, 91, 0.06);
   }
 
-  /* Masthead */
-  .masthead {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  /* Centered Masthead */
+  .masthead-center {
+    text-align: center;
     border-bottom: 2px solid var(--primary-navy);
-    padding-bottom: 8px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+  .masthead-logo-wrap {
     margin-bottom: 8px;
   }
-  .masthead-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
   .masthead-logo {
-    height: 38px;
+    height: 46px;
     width: auto;
     object-fit: contain;
   }
-  .masthead-title h1 {
-    font-size: 15px;
-    font-weight: 700;
-    margin: 0;
+  .report-title {
+    font-size: 15.5px;
+    font-weight: 800;
     color: var(--primary-navy);
+    margin: 0 0 3px 0;
     letter-spacing: -0.01em;
-    line-height: 1.2;
+    line-height: 1.25;
+    text-transform: uppercase;
   }
-  .masthead-title p {
-    margin: 2px 0 0 0;
+  .report-org-subtitle {
     font-size: 9px;
     color: var(--text-soft);
+    margin-bottom: 9px;
+    font-weight: 500;
   }
-  .masthead-meta {
-    text-align: right;
+  .report-meta-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
     font-size: 8.5px;
-    color: var(--text-soft);
-    line-height: 1.35;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 5px 14px;
+    margin: 0 auto;
   }
-  .masthead-meta strong {
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .meta-label {
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+  .meta-value {
     color: var(--primary-navy);
-    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-divider {
+    color: #cbd5e1;
+    font-weight: bold;
   }
 
-  /* Executive Summary Box */
+  /* Summary Box */
   .summary-box {
     background: #f8fafc;
     border: 1px solid var(--border-mist);
     border-left: 3px solid var(--primary-navy);
     border-radius: 4px;
-    padding: 6px 10px;
-    margin-bottom: 8px;
+    padding: 7px 12px;
+    margin-bottom: 10px;
   }
   .summary-box-label {
     font-size: 7.5px;
@@ -170,23 +188,23 @@
   }
   .summary-box-text {
     margin: 0;
-    font-size: 10px;
+    font-size: 9.5px;
     color: #334155;
     line-height: 1.4;
   }
 
-  /* KPI Summary Cards (Clean, Uniform) */
+  /* KPI Summary Cards */
   .kpi-deck {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: 10px;
+    margin-bottom: 10px;
   }
   .kpi-card {
     background: #ffffff;
     border: 1px solid var(--border-mist);
     border-radius: 4px;
-    padding: 6px 10px;
+    padding: 7px 12px;
   }
   .kpi-label {
     font-size: 7.5px;
@@ -197,12 +215,12 @@
     margin: 0 0 2px 0;
   }
   .kpi-value {
-    font-family: 'JetBrains Mono', monospace;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 800;
     margin: 0 0 1px 0;
     color: var(--primary-navy);
-    line-height: 1.1;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
   }
   .kpi-value.green {
     color: var(--primary-green);
@@ -211,6 +229,7 @@
     font-size: 7.5px;
     color: #94a3b8;
     margin: 0;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Section Titles */
@@ -220,16 +239,16 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--primary-navy);
-    margin: 8px 0 4px 0;
+    margin: 10px 0 5px 0;
     padding-bottom: 2px;
-    border-bottom: 1px solid var(--border-mist);
+    border-bottom: 1.5px solid var(--border-mist);
   }
 
   /* Tables */
   table.report-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-size: 9px;
   }
   table.report-table th {
@@ -239,18 +258,19 @@
     font-size: 7.5px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    padding: 5px 6px;
+    padding: 5.5px 7px;
     border-top: 1px solid var(--border-mist);
     border-bottom: 1.5px solid var(--primary-navy);
     text-align: center;
   }
   table.report-table th:first-child { text-align: left; }
   table.report-table td {
-    padding: 4.5px 6px;
+    padding: 5px 7px;
     border-bottom: 1px solid var(--border-mist);
     color: var(--text-dark);
     text-align: center;
     vertical-align: middle;
+    font-variant-numeric: tabular-nums;
   }
   table.report-table td:first-child { text-align: left; }
   table.report-table tbody tr:hover {
@@ -260,7 +280,7 @@
   /* Status Badges */
   .badge-compliant {
     display: inline-block;
-    padding: 1.5px 5px;
+    padding: 1.5px 6px;
     border-radius: 3px;
     font-size: 7.5px;
     font-weight: 700;
@@ -270,7 +290,7 @@
   }
   .badge-breached {
     display: inline-block;
-    padding: 1.5px 5px;
+    padding: 1.5px 6px;
     border-radius: 3px;
     font-size: 7.5px;
     font-weight: 700;
@@ -280,7 +300,7 @@
   }
   .badge-neutral {
     display: inline-block;
-    padding: 1.5px 5px;
+    padding: 1.5px 6px;
     border-radius: 3px;
     font-size: 7.5px;
     font-weight: 600;
@@ -306,7 +326,7 @@
   table.spec-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-size: 8.5px;
   }
   table.spec-table th {
@@ -316,13 +336,13 @@
     font-size: 7.5px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    padding: 4px 6px;
+    padding: 5px 8px;
     border-top: 1px solid var(--border-mist);
     border-bottom: 1px solid var(--border-mist);
     text-align: left;
   }
   table.spec-table td {
-    padding: 3.5px 6px;
+    padding: 4.5px 8px;
     border-bottom: 1px solid var(--border-mist);
     color: #334155;
     vertical-align: middle;
@@ -331,18 +351,22 @@
     color: var(--primary-navy);
   }
 
-  /* Sign-off Section */
+  /* Sign-off Section (Spacious and Comfortable) */
   .signoff-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 12px;
     margin-top: 6px;
   }
   .signoff-box {
     border: 1px solid var(--border-mist);
     border-radius: 4px;
-    padding: 6px 8px;
+    padding: 10px 12px;
     background: #ffffff;
+    min-height: 105px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
   .signoff-header {
     font-size: 7.5px;
@@ -351,28 +375,54 @@
     letter-spacing: 0.05em;
     color: var(--primary-navy);
     border-bottom: 1.5px solid var(--primary-navy);
-    padding-bottom: 2px;
-    margin-bottom: 4px;
+    padding-bottom: 3px;
+    margin-bottom: 8px;
+  }
+  .signoff-sig-field {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 8px;
+    height: 28px;
+  }
+  .signoff-sig-label {
+    font-size: 8px;
+    color: #475569;
+    width: 52px;
+    flex-shrink: 0;
+  }
+  .signoff-sig-line {
+    border-bottom: 1px solid #94a3b8;
+    flex-grow: 1;
+    height: 0;
+    margin-bottom: 2px;
   }
   .signoff-row {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
     font-size: 8px;
     color: #475569;
-    margin-bottom: 2px;
+    margin-bottom: 5px;
+  }
+  .signoff-row:last-child {
+    margin-bottom: 0;
+  }
+  .signoff-label {
+    width: 52px;
+    flex-shrink: 0;
   }
   .signoff-line {
-    border-bottom: 1px dotted #94a3b8;
+    border-bottom: 1px dotted #cbd5e1;
     flex-grow: 1;
-    margin: 0 4px;
+    margin-left: 2px;
     height: 0;
+    margin-bottom: 2px;
   }
   .signoff-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 7.5px;
+    font-size: 8px;
     color: var(--primary-navy);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-left: 2px;
   }
 
   /* Print Settings */
@@ -382,7 +432,7 @@
     }
     @page {
       size: A4 portrait;
-      margin: 5mm 8mm;
+      margin: 10mm 10mm 8mm 10mm;
     }
     body {
       background: #ffffff !important;
@@ -396,21 +446,25 @@
       max-width: 100% !important;
     }
     table.report-table th, table.report-table td {
-      padding: 3.5px 5px !important;
+      padding: 4px 6px !important;
     }
     table.spec-table th, table.spec-table td {
-      padding: 3px 5px !important;
+      padding: 4px 6px !important;
     }
     .summary-box {
-      padding: 5px 8px !important;
-      margin-bottom: 6px !important;
+      padding: 6px 10px !important;
+      margin-bottom: 8px !important;
     }
     .kpi-deck {
-      margin-bottom: 6px !important;
+      margin-bottom: 8px !important;
     }
     .signoff-grid {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
+    }
+    .signoff-box {
+      padding: 8px 10px !important;
+      min-height: 98px !important;
     }
   }
 </style>
@@ -434,35 +488,49 @@
 </div>
 
 <div class="page">
-  <!-- Masthead -->
-  <div class="masthead">
-    <div class="masthead-left">
-      <img src="{% static 'logo.jpg' %}" alt="DBTRAC Logo" class="masthead-logo">
-      <div class="masthead-title">
-        <h1>
-          {% if selected_db == 'All Databases' %}
-            DATABASE PERFORMANCE &amp; SLA COMPLIANCE REPORT
-          {% elif selected_db == 'Oracle' %}
-            ORACLE DATABASE PERFORMANCE &amp; SLA REPORT
-          {% elif selected_db == 'MySQL' %}
-            MYSQL DATABASE PERFORMANCE &amp; SLA REPORT
-          {% else %}
-            {{ selected_db|upper }} PERFORMANCE &amp; SLA REPORT
-          {% endif %}
-        </h1>
-        <p>National Medical Stores • Database Tracking for Reliability, Administration and Compliance</p>
-      </div>
+  <!-- Centered Masthead Header -->
+  <div class="masthead-center">
+    <!-- 1. Center aligned NMS logo -->
+    <div class="masthead-logo-wrap">
+      <img src="{% static 'logo.jpg' %}" alt="National Medical Stores Logo" class="masthead-logo">
     </div>
-    <div class="masthead-meta">
-      <div>Period: <strong>{{ reporting_month_str }}</strong></div>
-      <div>Extracted: <strong>{{ extracted_at }} EAT</strong></div>
-      <div>Scope: <strong>{{ selected_db }}</strong></div>
+
+    <!-- 2. Report header just below -->
+    <h1 class="report-title">
+      {% if selected_db == 'All Databases' %}
+        DATABASE PERFORMANCE &amp; SLA COMPLIANCE REPORT
+      {% elif selected_db == 'Oracle' %}
+        ORACLE DATABASE PERFORMANCE &amp; SLA REPORT
+      {% elif selected_db == 'MySQL' %}
+        MYSQL DATABASE PERFORMANCE &amp; SLA REPORT
+      {% else %}
+        {{ selected_db|upper }} PERFORMANCE &amp; SLA REPORT
+      {% endif %}
+    </h1>
+    <div class="report-org-subtitle">National Medical Stores • Database Tracking for Reliability, Administration and Compliance (DBTRAC)</div>
+
+    <!-- 3. Period, Scope, and Extraction Metadata Strip -->
+    <div class="report-meta-strip">
+      <div class="meta-item">
+        <span class="meta-label">Period:</span>
+        <span class="meta-value">{{ reporting_month_str }}</span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Scope:</span>
+        <span class="meta-value">{{ selected_db }}</span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Extracted:</span>
+        <span class="meta-value">{{ extracted_at }} EAT</span>
+      </div>
     </div>
   </div>
 
-  <!-- Executive Summary -->
+  <!-- Summary Section -->
   <div class="summary-box">
-    <div class="summary-box-label">Executive Summary</div>
+    <div class="summary-box-label">Summary</div>
     <p class="summary-box-text">{{ lede_text|striptags }}</p>
   </div>
 
@@ -491,10 +559,10 @@
     <thead>
       <tr>
         <th style="width: 28%;">Database Engine</th>
-        <th style="width: 32%;">System Role</th>
+        <th style="width: 34%;">System Role</th>
         <th style="width: 12%;">Target SLA</th>
-        <th style="width: 14%;">Monthly Uptime</th>
-        <th style="width: 14%;">Compliance Status</th>
+        <th style="width: 13%;">Monthly Uptime</th>
+        <th style="width: 13%;">Compliance Status</th>
       </tr>
     </thead>
     <tbody>
@@ -502,12 +570,12 @@
       <tr>
         <td>
           <strong style="color: var(--primary-navy);">{{ item.database }}</strong>
-          <span style="color: var(--text-soft); font-family: 'JetBrains Mono', monospace; font-size: 7.5px;">({{ item.code_name }})</span>
+          <span style="color: var(--text-soft); font-size: 8px;">({{ item.code_name }})</span>
         </td>
         <td style="color: #475569; font-size: 8.5px;">{{ item.role_desc }}</td>
-        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ item.target_sla_val }}%</td>
+        <td style="font-weight: 600;">{{ item.target_sla_val }}%</td>
         <td>
-          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
+          <span style="font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
             {{ item.availability }}
           </span>
           <div class="slim-meter">
@@ -547,9 +615,9 @@
       <tr>
         <td>
           <strong>{{ item.database }}</strong>
-          <span style="color: var(--text-soft); font-family: 'JetBrains Mono', monospace; font-size: 7px;">({{ item.code_name }})</span>
+          <span style="color: var(--text-soft); font-size: 7.5px;">({{ item.code_name }})</span>
         </td>
-        <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
+        <td style="font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
           {{ item.availability }}
         </td>
         <td>{{ item.planned_downtime }}</td>
@@ -557,7 +625,7 @@
         <td>{{ item.total_incidents }}</td>
         <td>
           {% if item.backup_success and item.backup_success != '—' and item.backup_success != 'No Data' %}
-            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">{{ item.backup_success }}</span>
+            <span style="font-weight: 600;">{{ item.backup_success }}</span>
           {% else %}
             <span style="color: #94a3b8;">—</span>
           {% endif %}
@@ -575,14 +643,14 @@
         </td>
         <td>
           {% if item.disk_used_percent and item.disk_used_percent != 'No Data' %}
-            <span style="font-family: 'JetBrains Mono', monospace;">{{ item.disk_used_percent }}</span>
+            <span>{{ item.disk_used_percent }}</span>
           {% else %}
             <span style="color: #94a3b8;">—</span>
           {% endif %}
         </td>
         <td>
           {% if item.available_capacity_gb and item.available_capacity_gb != 'No Data' %}
-            <span style="font-family: 'JetBrains Mono', monospace;">{{ item.available_capacity_gb }}</span>
+            <span>{{ item.available_capacity_gb }}</span>
           {% else %}
             <span style="color: #94a3b8;">—</span>
           {% endif %}
@@ -592,22 +660,20 @@
     </tbody>
   </table>
 
-  <!-- 3. Infrastructure Architecture & Scope -->
+  <!-- 3. Infrastructure Architecture & Scope (Removed Business Workload & Scope column) -->
   <div class="section-heading">Infrastructure Context &amp; Specifications</div>
   <table class="spec-table">
     <thead>
       <tr>
-        <th style="width: 22%;">Database System</th>
-        <th style="width: 40%;">Host / Node Architecture</th>
-        <th style="width: 38%;">Business Workload &amp; Scope</th>
+        <th style="width: 30%;">Database System</th>
+        <th style="width: 70%;">Host / Node Architecture</th>
       </tr>
     </thead>
     <tbody>
       {% for item in dashboard_data %}
       <tr>
-        <td><strong>{{ item.database }}</strong> ({{ item.code_name }})</td>
-        <td style="font-family: 'JetBrains Mono', monospace; font-size: 7.5px; color: #475569;">{{ item.host_desc }}</td>
-        <td style="font-size: 8px;">{{ item.role_desc }}</td>
+        <td><strong>{{ item.database }}</strong> <span style="color: var(--text-soft); font-size: 8px;">({{ item.code_name }})</span></td>
+        <td style="font-size: 8.5px; color: #334155;">{{ item.host_desc }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -616,49 +682,54 @@
   <!-- 4. Formal Review & Sign-Off -->
   <div class="section-heading">Formal Review &amp; Sign-Off</div>
   <div class="signoff-grid">
+    <!-- Box 1: Prepared / Extracted By -->
     <div class="signoff-box">
       <div class="signoff-header">Prepared / Extracted By</div>
-      <div class="signoff-row">
-        <span>Signature:</span>
-        <span class="signoff-line"></span>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
       </div>
       <div class="signoff-row">
-        <span>Name:</span>
+        <span class="signoff-label">Name:</span>
         <span class="signoff-val">{{ extracted_by }}</span>
       </div>
       <div class="signoff-row">
-        <span>Date:</span>
+        <span class="signoff-label">Date:</span>
         <span class="signoff-val">{{ extracted_at }}</span>
       </div>
     </div>
+
+    <!-- Box 2: Reviewed By (SDBA) -->
     <div class="signoff-box">
-      <div class="signoff-header">Reviewed By (Lead DBA)</div>
-      <div class="signoff-row">
-        <span>Signature:</span>
-        <span class="signoff-line"></span>
+      <div class="signoff-header">Reviewed By (SDBA)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
       </div>
       <div class="signoff-row">
-        <span>Name:</span>
-        <span class="signoff-line" style="margin-left: 35px;"></span>
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
       </div>
       <div class="signoff-row">
-        <span>Date:</span>
-        <span class="signoff-line" style="margin-left: 35px;"></span>
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
       </div>
     </div>
+
+    <!-- Box 3: Approved By (CICTO) -->
     <div class="signoff-box">
-      <div class="signoff-header">Approved By (IT Management)</div>
-      <div class="signoff-row">
-        <span>Signature:</span>
-        <span class="signoff-line"></span>
+      <div class="signoff-header">Approved By (CICTO)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
       </div>
       <div class="signoff-row">
-        <span>Name:</span>
-        <span class="signoff-line" style="margin-left: 35px;"></span>
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
       </div>
       <div class="signoff-row">
-        <span>Date:</span>
-        <span class="signoff-line" style="margin-left: 35px;"></span>
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
       </div>
     </div>
   </div>
