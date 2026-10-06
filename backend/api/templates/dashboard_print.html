@@ -581,7 +581,6 @@
     <thead>
       <tr>
         <th>Database Engine</th>
-        <th>Uptime</th>
         <th>Planned Down</th>
         <th>Unplanned Down</th>
         <th>Incidents</th>
@@ -597,9 +596,6 @@
         <td>
           <strong>{{ item.database }}</strong>
           <span style="color: var(--text-soft); font-size: 7.5px;">({{ item.code_name }})</span>
-        </td>
-        <td style="font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}var(--green-text){% else %}var(--red-text){% endif %};">
-          {{ item.availability }}
         </td>
         <td>{{ item.planned_downtime }}</td>
         <td>{{ item.unplanned_downtime }}</td>
