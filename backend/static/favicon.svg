@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="dbtrac-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00205B" />
+      <stop offset="100%" stop-color="#001640" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#dbtrac-grad)"/>
+  <g transform="translate(10, 10) scale(1.833)" stroke="#F2A900" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+  </g>
+</svg>
