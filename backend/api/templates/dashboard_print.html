@@ -565,9 +565,9 @@
         </td>
         <td>
           {% if item.availability_status == 'Meets SLA' %}
-            <span class="badge-compliant">✓ Meets SLA</span>
+            <span style="color: var(--green-text); font-weight: 700;">✓ Meets SLA</span>
           {% else %}
-            <span class="badge-breached">✗ Below SLA</span>
+            <span style="color: var(--red-text); font-weight: 700;">✗ Below SLA</span>
           {% endif %}
         </td>
       </tr>
@@ -613,11 +613,11 @@
         </td>
         <td>
           {% if item.replication_status == 'Healthy' %}
-            <span class="badge-compliant">Healthy</span>
+            <span style="color: var(--green-text); font-weight: 700;">Healthy</span>
           {% elif item.database == 'MS SQL Server' %}
-            <span class="badge-neutral">N/A (Standalone)</span>
+            <span style="color: #64748b; font-weight: 600;">N/A (Standalone)</span>
           {% elif item.replication_status and item.replication_status != 'No Data' and item.replication_status != '—' and item.replication_status != 'N/A' %}
-            <span class="badge-breached">{{ item.replication_status }}</span>
+            <span style="color: var(--red-text); font-weight: 700;">{{ item.replication_status }}</span>
           {% else %}
             <span style="color: #94a3b8;">—</span>
           {% endif %}
