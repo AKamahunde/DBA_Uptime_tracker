@@ -173,6 +173,26 @@
             color: white !important;
             font-weight: 600;
         }
+        .nav-dropdown-content .dropdown-logout-btn {
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.9);
+            padding: 0.6rem 1.2rem;
+            font-size: 0.82rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: 500;
+            display: block;
+        }
+        .nav-dropdown-content .dropdown-logout-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fca5a5;
+            font-weight: 600;
+        }
         .nav-dropdown:hover .nav-dropdown-content {
             display: block;
         }
@@ -446,12 +466,12 @@
                         </button>
                         <div class="nav-dropdown-content">
                             <a href="{% url 'password_change_required' %}">Change Password</a>
+                            <form id="logout-form" method="post" action="{% url 'logout' %}" style="margin: 0;">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-logout-btn">Logout</button>
+                            </form>
                         </div>
                     </div>
-                    <form id="logout-form" method="post" action="{% url 'logout' %}" style="display:inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="nav-logout-btn">Logout</button>
-                    </form>
                 {% else %}
                     <a href="{% url 'login' %}">Login</a>
                 {% endif %}
