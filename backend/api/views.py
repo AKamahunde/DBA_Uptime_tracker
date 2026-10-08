@@ -24,6 +24,7 @@ from .forms import (
 )
 from users.models import User
 from django.db.models import Sum, Count, Avg
+from .sla_utils import calculate_operational_downtime
 
 def about(request):
     return render(request, 'about.html')
@@ -189,8 +190,8 @@ def _get_dashboard_data(reporting_month):
         now = timezone.now()
         for inc in unplanned_incidents:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                diff = now - inc.start
-                unplanned += float(diff.total_seconds() / 3600.0)
+                active_downtime = calculate_operational_downtime(inc.start, now, inc.database)
+                unplanned += float(active_downtime)
             elif inc.duration_hrs:
                 unplanned += float(inc.duration_hrs)
                 target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
@@ -2849,8 +2850,7 @@ def incident_ingest(request):
         start_dt = parse_dt(start_str)
         end_dt = parse_dt(end_str)
         
-        duration_delta = end_dt - start_dt
-        duration_hrs = Decimal(str(round(duration_delta.total_seconds() / 3600.0, 2)))
+        duration_hrs = calculate_operational_downtime(start_dt, end_dt, db_type)
         
         # De-duplication check: avoid double registering the same outage in staging or active register
         if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():

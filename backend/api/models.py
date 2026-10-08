@@ -48,12 +48,12 @@ class IncidentRegister(models.Model):
         if self.status in ['Resolved', 'Closed'] and not self.end:
             self.end = timezone.now()
 
+        from api.sla_utils import calculate_operational_downtime
+
         if self.end and self.start:
-            diff = self.end - self.start
-            self.duration_hrs = round(diff.total_seconds() / 3600.0, 2)
+            self.duration_hrs = calculate_operational_downtime(self.start, self.end, self.database)
         elif self.start and self.status not in ['Resolved', 'Closed']:
-            diff = timezone.now() - self.start
-            self.duration_hrs = round(diff.total_seconds() / 3600.0, 2)
+            self.duration_hrs = calculate_operational_downtime(self.start, timezone.now(), self.database)
         else:
             self.duration_hrs = 0
             
