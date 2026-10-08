@@ -294,9 +294,11 @@
                             <div style="font-family: monospace; font-size: 0.82rem; font-weight: 700; color: #0284c7; margin-top: 0.25rem;">
                                 {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% else %}Pentana (Standalone){% endif %}
                             </div>
+                            {% if row.database != 'MySQL' %}
                             <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
-                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif row.database == 'MySQL' %}NMS360, DMT, and other in-house applications{% else %}MKInsight Audit Database for governance and compliance.{% endif %}
+                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif row.database == 'MS SQL Server' %}MKInsight Audit Database for governance and compliance.{% endif %}
                             </p>
+                            {% endif %}
                         </div>
                     </div>
 
