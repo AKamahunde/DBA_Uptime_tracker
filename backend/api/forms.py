@@ -128,6 +128,8 @@ class MaintenanceRegisterForm(forms.ModelForm):
             self.fields['duration_hrs'].required = False
         if 'rollback_plan' in self.fields:
             self.fields['rollback_plan'].required = False
+        if 'status' in self.fields and not self.fields['status'].initial:
+            self.fields['status'].initial = 'Scheduled'
         iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
         if 'start' in self.fields:
             self.fields['start'].input_formats = iso_formats
