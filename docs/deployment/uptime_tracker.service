@@ -9,6 +9,7 @@ WorkingDirectory=/opt/Uptime_tracker/backend
 ExecStart=/opt/Uptime_tracker/backend/venv/bin/gunicorn \
           --access-logfile - \
           --workers 3 \
+          --timeout 120 \
           --bind unix:/run/gunicorn.sock \
           dba_tracker.wsgi:application
 
