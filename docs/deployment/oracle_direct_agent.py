@@ -19,9 +19,9 @@ from datetime import datetime, timedelta, timezone
 # ============================================================
 DB_HOST         = "nmsinfra.nms.go.ug"   # Target Database Hostname
 DB_PORT         = 1530
-DB_SID          = "INFRA"                # CDB Container SID
-DB_SERVICE_NAME = "NMS"                  # Target ERP Pluggable Database (PDB) Service Name
-DB_USER         = "system"               # Database admin user
+DB_SID          = "INFRA"                # CDB Container SID (where RMAN backups live)
+DB_SERVICE_NAME = ""                     # Service Name (blank connects directly to CDB SID INFRA)
+DB_USER         = "sys"                  # Database admin user
 DB_PASS         = "F0rtEBBnms"
 
 API_KEY         = "uptimetracker_api_9f2c1d8e45x9"
@@ -42,10 +42,11 @@ except ImportError:
         exit(1)
 
 def connect_to_database(db_user, db_pass, db_host, db_port, db_sid=None, db_service=None):
-    # Try specified user, fallback to sys as sysdba, then fallback to dbsnmp (using same password)
+    # Try sys as sysdba first (required for CDB backup catalog), fallback to specified user and others
     attempts = [
-        {"user": db_user, "mode": None},
         {"user": "sys", "mode": "sysdba"},
+        {"user": db_user, "mode": None},
+        {"user": "apps", "mode": None},
         {"user": "dbsnmp", "mode": None}
     ]
     
@@ -133,7 +134,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Oracle Direct DB Agent")
-    parser.add_argument("days", type=int, nargs="?", default=1, help="Lookback days")
+    parser.add_argument("days", type=int, nargs="?", default=7, help="Lookback days (default: 7)")
     parser.add_argument("-u", "--user", default=DB_USER, help="Database username")
     parser.add_argument("-p", "--password", default=DB_PASS, help="Database password")
     parser.add_argument("-H", "--host", default=DB_HOST, help="Database host")
@@ -239,15 +240,20 @@ if __name__ == "__main__":
         return round(tablespace_used_percent, 2), round(free_gb, 2)
 
     print("\nQuerying database size & capacity planning stats directly from database...")
-    capacity_sql = """
-    SELECT 
-        (SELECT SUM(bytes)/1024/1024/1024 FROM dba_data_files) AS size_gb,
-        (SELECT NVL(SUM(bytes),0)/1024/1024/1024 FROM dba_free_space) AS free_gb
-    FROM dual
-    """
-    
+    # In Multitenant Oracle, switch container to PDB NMS for accurate ERP capacity metrics
     try:
-        cursor.execute(capacity_sql)
+        cursor.execute("ALTER SESSION SET CONTAINER = NMS")
+        print("Switched session container to PDB 'NMS' for ERP capacity metrics.")
+    except Exception as e:
+        pass
+
+    try:
+        cursor.execute("""
+        SELECT 
+            (SELECT SUM(bytes)/1024/1024/1024 FROM dba_data_files) AS size_gb,
+            (SELECT NVL(SUM(bytes),0)/1024/1024/1024 FROM dba_free_space) AS free_gb
+        FROM dual
+        """)
         columns = [col[0].lower() for col in cursor.description]
         row = cursor.fetchone()
         
@@ -261,13 +267,13 @@ if __name__ == "__main__":
             # Retrieve largest table dynamically with size (excluding system schemas)
             largest_table = "None"
             try:
-                # 1st Attempt: Use oracle_maintained flag (Oracle 12c+)
+                # 1st Attempt: Use cdb_segments (Multitenant CDB)
                 try:
                     cursor.execute("""
                         SELECT owner, segment_name, bytes FROM (
                             SELECT s.owner, s.segment_name, s.bytes 
-                            FROM dba_segments s
-                            JOIN dba_users u ON s.owner = u.username
+                            FROM cdb_segments s
+                            JOIN cdb_users u ON s.owner = u.username AND s.con_id = u.con_id
                             WHERE s.segment_type = 'TABLE' 
                               AND u.oracle_maintained = 'N'
                               AND s.owner NOT IN ('SYS', 'SYSTEM', 'SYS_AUDIT', 'AUDSYS')
@@ -276,8 +282,24 @@ if __name__ == "__main__":
                         ) WHERE ROWNUM = 1
                     """)
                     table_row = cursor.fetchone()
-                except Exception as e_12c:
-                    print(f"Oracle 12c+ query failed (likely on Oracle 11g or lack of dba_users privileges): {e_12c}. Retrying with 11g compatibility query...")
+                except Exception:
+                    # 2nd Attempt: dba_segments with oracle_maintained flag
+                    try:
+                        cursor.execute("""
+                            SELECT owner, segment_name, bytes FROM (
+                                SELECT s.owner, s.segment_name, s.bytes 
+                                FROM dba_segments s
+                                JOIN dba_users u ON s.owner = u.username
+                                WHERE s.segment_type = 'TABLE' 
+                                  AND u.oracle_maintained = 'N'
+                                  AND s.owner NOT IN ('SYS', 'SYSTEM', 'SYS_AUDIT', 'AUDSYS')
+                                  AND s.owner NOT LIKE 'SYS_%'
+                                ORDER BY s.bytes DESC
+                            ) WHERE ROWNUM = 1
+                        """)
+                        table_row = cursor.fetchone()
+                    except Exception as e_12c:
+                        print(f"Oracle query failed: {e_12c}. Retrying with compatibility query...")
                     # 2nd Attempt: Compatibility mode (Oracle 11g) with broad exclusions and LIKE filters
                     cursor.execute("""
                         SELECT owner, segment_name, bytes FROM (
