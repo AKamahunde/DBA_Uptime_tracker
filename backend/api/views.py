@@ -868,6 +868,8 @@ def dashboard(request):
         'attention_items': attention_items,
         'recent_activity': recent_activity,
     }
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    context.update(_build_node_dashboard_context(selected_node=selected_node))
     return render(request, 'dashboard.html', context)
 
 @login_required
@@ -1763,17 +1765,11 @@ def server_health_sync_prometheus(request):
     return redirect('server_health_list')
 
 
-@login_required
-def server_health_list(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
-        messages.error(request, 'You do not have permission to view server health records.')
-        return redirect('dashboard')
-
+def _build_node_dashboard_context(selected_node='All Nodes'):
     from django.db.models import Avg, Q
     import math
     from etl.services.rest_client import PROMETHEUS_URL, sync_all_nodes_from_prometheus
 
-    # Auto-sync once per day if no Prometheus records exist yet for today
     today_dt = timezone.now().date()
     if not ServerHealth.objects.filter(date=today_dt, entered_by='Prometheus').exists():
         try:
@@ -1781,36 +1777,6 @@ def server_health_list(request):
         except Exception:
             pass
 
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    current_db = request.GET.get('database', '')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
-
-    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
-
-    if selected_node == 'OLKVM':
-        queryset = queryset.filter(
-            Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
-        )
-    elif selected_node == 'Proxmox':
-        queryset = queryset.filter(
-            Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
-        )
-    elif selected_node != 'All Nodes':
-        queryset = queryset.filter(server__iexact=selected_node)
-
-    if current_db:
-        queryset = queryset.filter(database=current_db)
-    if start_date:
-        queryset = queryset.filter(date__gte=start_date)
-    if end_date:
-        queryset = queryset.filter(date__lte=end_date)
-
-    paginator = Paginator(queryset, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    # ── Build Node-Level Overview Data (2 OLKVM Nodes + 3 Proxmox Nodes) ──
     node_definitions = [
         {
             'node_key': 'nmsinfra.nms.go.ug',
@@ -1919,7 +1885,6 @@ def server_health_list(request):
             d3_size = float(latest_rec.disk_3_size_gb or 0.0)
             d3_used = float(latest_rec.disk_3_used_gb or 0.0)
 
-            # Check if a prior month's ServerHealth record exists for month-over-month growth comparison
             first_of_rec_month = latest_rec.date.replace(day=1)
             prev_month_rec = (
                 ServerHealth.objects.filter(nd['filter_q'], date__lt=first_of_rec_month)
@@ -1943,7 +1908,7 @@ def server_health_list(request):
                     'free_gb': round(max(0.0, d1_size - d1_used), 2),
                     'percent': round(d1_pct, 2),
                     'status': _disk_status(d1_pct),
-                    'is_shared': True,  # Disk 1 is shared NFS (nmsddbkp on OLKVM, VMSAN on Proxmox)
+                    'is_shared': True,
                 },
                 {
                     'slot': 2,
@@ -2076,7 +2041,6 @@ def server_health_list(request):
 
     scoped_node_detail = filtered_nodes[0] if (len(filtered_nodes) == 1) else None
 
-    # ── Shared Storage Records (VSAN on Proxmox & DataDomain NFS on OLKVM) ──
     shared_storage_records = []
     seen_shared = set()
     for n in filtered_nodes:
@@ -2102,7 +2066,6 @@ def server_health_list(request):
                 'date': n['date'] or today_dt,
             })
 
-    # ── Node Capacity Records (matching Capacity tab format: MONTH | NODE | STORAGE TIER | CAPACITY | USED | FREE | UTILISATION % | GROWTH | GROWTH %) ──
     node_capacity_records = []
     for n in filtered_nodes:
         rec_month = (n['date'] or today_dt)
@@ -2140,7 +2103,6 @@ def server_health_list(request):
             'is_shared': True,
         })
 
-    # ── Top Summary KPIs (Deduplicating Shared NFS Storage per Hypervisor Cluster) ──
     active_nodes = [n for n in filtered_nodes if n['has_data']]
     if active_nodes:
         avg_node_up = round(sum(n['uptime_percent'] for n in active_nodes) / len(active_nodes), 2)
@@ -2155,17 +2117,14 @@ def server_health_list(request):
     kpi_total_ram_gb = round(sum(n['memory_total_gb'] for n in filtered_nodes), 1)
     kpi_used_ram_gb = round(sum(n['memory_used_gb'] for n in filtered_nodes), 1)
 
-    # Calculate storage without double-counting shared NFS (Disk 1) within the same hypervisor cluster
     seen_shared_clusters = set()
     dedup_total_gb = 0.0
     dedup_used_gb = 0.0
     for n in filtered_nodes:
         if not n['has_data']:
             continue
-        # Add local/LVM disks (Disk 2 + Disk 3)
         dedup_total_gb += n['disk_2']['size_gb'] + n['disk_3']['size_gb']
         dedup_used_gb += n['disk_2']['used_gb'] + n['disk_3']['used_gb']
-        # Add shared NFS (Disk 1) once per hypervisor cluster (OLKVM nmsddbkp, Proxmox VMSAN)
         if n['node_name'] not in seen_shared_clusters:
             seen_shared_clusters.add(n['node_name'])
             dedup_total_gb += n['disk_1']['size_gb']
@@ -2180,13 +2139,6 @@ def server_health_list(request):
         else (round(sum(n['disk_percent'] for n in active_nodes) / len(active_nodes), 1) if active_nodes else 0.0)
     )
 
-    kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
-    avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
-    avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
-    kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
-    kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
-
-    # ── 6-Month Node Uptime Trend SVG Graph ──
     today_date = timezone.now().date().replace(day=1)
     target_node_sla = 99.90
     node_trend_months = []
@@ -2255,13 +2207,12 @@ def server_health_list(request):
         node_trend_area_points = f"{node_trend_months[0]['x']},118 {node_trend_polyline_points} {node_trend_months[-1]['x']},118"
     node_sla_y_coord = 22 + (100.0 - target_node_sla) * 96 / y_range
 
-    # ── Attention Required Alerts (Node Level) ──
     node_attention_items = []
     for n in filtered_nodes:
         if not n['has_data']:
             node_attention_items.append({
                 'type': 'warning',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}):</strong> No Prometheus telemetry synced yet. Click 'Sync Prometheus' or run <code>prometheus_node_agent.py</code>."
+                'message': f"<strong>{n['display_name']} ({n['node_name']}):</strong> No Prometheus telemetry synced yet."
             })
             continue
 
@@ -2305,13 +2256,8 @@ def server_health_list(request):
                     'message': f"<strong>{n['display_name']} — {d['type']}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
 
-    return render(request, 'server_health/list.html', {
-        'page_obj': page_obj,
-        'is_admin': request.user.is_admin,
+    return {
         'selected_node': selected_node,
-        'current_db': current_db,
-        'start_date': start_date,
-        'end_date': end_date,
         'prometheus_url': PROMETHEUS_URL,
         'node_overview_data': node_overview_data,
         'filtered_nodes': filtered_nodes,
@@ -2327,9 +2273,6 @@ def server_health_list(request):
         'kpi_used_storage_gb': kpi_used_storage_gb,
         'kpi_free_storage_gb': kpi_free_storage_gb,
         'kpi_storage_used_pct': kpi_storage_used_pct,
-        'kpi_unhealthy_count': kpi_unhealthy_count,
-        'kpi_avg_cpu': kpi_avg_cpu,
-        'kpi_avg_mem': kpi_avg_mem,
         'target_node_sla': target_node_sla,
         'node_trend_months': node_trend_months,
         'node_trend_recent_avg': node_trend_recent_avg,
@@ -2337,7 +2280,66 @@ def server_health_list(request):
         'node_trend_area_points': node_trend_area_points,
         'node_sla_y_coord': node_sla_y_coord,
         'node_attention_items': node_attention_items,
-    })
+    }
+
+
+@login_required
+def server_health_list(request):
+    if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
+        messages.error(request, 'You do not have permission to view server health records.')
+        return redirect('dashboard')
+
+    from django.db.models import Avg, Q
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    current_db = request.GET.get('database', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+
+    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
+
+    if selected_node == 'OLKVM':
+        queryset = queryset.filter(
+            Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
+        )
+    elif selected_node == 'Proxmox':
+        queryset = queryset.filter(
+            Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
+        )
+    elif selected_node != 'All Nodes':
+        queryset = queryset.filter(server__iexact=selected_node)
+
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
+
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
+    avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
+    avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
+    kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
+    kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
+
+    ctx = {
+        'page_obj': page_obj,
+        'is_admin': request.user.is_admin,
+        'current_db': current_db,
+        'start_date': start_date,
+        'end_date': end_date,
+        'kpi_unhealthy_count': kpi_unhealthy_count,
+        'kpi_avg_cpu': kpi_avg_cpu,
+        'kpi_avg_mem': kpi_avg_mem,
+    }
+    ctx.update(node_ctx)
+    return render(request, 'server_health/list.html', ctx)
 
 @login_required
 def server_health_create(request):

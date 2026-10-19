@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Node & Server Health - DBTRAC{% endblock %}
+{% block title %}Server Health - DBTRAC{% endblock %}
 
 {% block content %}
 <style>
@@ -8,7 +8,7 @@
         width: 100%;
         border-collapse: collapse;
         text-align: center;
-        font-size: 0.82rem;
+        font-size: 0.85rem;
         background-color: var(--pure-white);
         border: 1px solid rgba(90, 123, 156, 0.15);
         border-radius: 6px;
@@ -19,9 +19,9 @@
         color: var(--primary-navy);
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.7rem;
+        font-size: 0.72rem;
         letter-spacing: 0.5px;
-        padding: 0.75rem 0.6rem;
+        padding: 0.85rem 0.75rem;
         border-bottom: 2px solid rgba(90, 123, 156, 0.15);
         border-right: 1px solid rgba(90, 123, 156, 0.12);
     }
@@ -30,9 +30,10 @@
     }
     .modern-table th:first-child, .modern-table td:first-child {
         text-align: left;
+        font-weight: 600;
     }
     .modern-table td {
-        padding: 0.7rem 0.6rem;
+        padding: 0.75rem 0.75rem;
         border-bottom: 1px solid rgba(90, 123, 156, 0.1);
         border-right: 1px solid rgba(90, 123, 156, 0.1);
         font-weight: 500;
@@ -43,25 +44,37 @@
     }
     .modern-table tbody tr {
         background-color: #ffffff !important;
-        transition: background-color 0.15s ease;
     }
     .modern-table tbody tr:hover {
         background-color: #f8fafc !important;
     }
-
-    .scoped-grid-2col {
-        display: grid;
-        grid-template-columns: 1.35fr 1fr;
-        gap: 1.25rem;
-        margin-bottom: 1.5rem;
+    h2, h3 {
+        border-left: none !important;
+        padding-left: 0 !important;
     }
-    @media (max-width: 1024px) {
-        .scoped-grid-2col {
-            grid-template-columns: 1fr;
+    .kpi-metric-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        border-right: 1px solid rgba(90, 123, 156, 0.15);
+        padding-right: 1.5rem;
+    }
+    .kpi-metric-col:last-child {
+        border-right: none;
+        padding-right: 0;
+    }
+    @media (max-width: 900px) {
+        .kpi-metric-col {
+            border-right: none;
+            border-bottom: 1px solid rgba(90, 123, 156, 0.15);
+            padding-right: 0;
+            padding-bottom: 1rem;
+        }
+        .kpi-metric-col:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
         }
     }
-
-    /* Dropdown Actions Menu styling */
     .actions-dropdown {
         position: relative;
         display: inline-block;
@@ -70,347 +83,109 @@
         display: none;
         position: absolute;
         right: 0;
-        background: var(--pure-white);
-        box-shadow: var(--shadow);
-        border: 1px solid rgba(90, 123, 156, 0.15);
-        border-radius: 6px;
-        z-index: 100;
+        background-color: #ffffff;
         min-width: 110px;
-        overflow: hidden;
-    }
-    .actions-dropdown-content a, 
-    .actions-dropdown-content button {
-        display: block;
-        width: 100%;
-        padding: 0.5rem 1rem;
-        color: var(--text-dark);
-        text-decoration: none;
-        font-size: 0.82rem;
-        text-align: left;
-        font-weight: 500;
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-family: inherit;
-    }
-    .actions-dropdown-content a:hover, 
-    .actions-dropdown-content button:hover {
-        background-color: var(--bg-cool);
-    }
-
-    .disk-tier-col {
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        padding: 0.85rem 1rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+        box-shadow: 0px 8px 16px 0px rgba(15, 23, 42, 0.12);
+        border: 1px solid rgba(90, 123, 156, 0.2);
         border-radius: 6px;
+        z-index: 50;
+        overflow: hidden;
+        text-align: left;
+    }
+    .actions-dropdown-content a, .actions-dropdown-content button {
+        color: #1e293b;
+        padding: 0.5rem 0.75rem;
+        text-decoration: none;
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+    .actions-dropdown-content a:hover, .actions-dropdown-content button:hover {
+        background-color: #f1f5f9;
     }
 </style>
 
-<!-- Page Header with Node Scope & Prometheus Sync -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+<!-- Header & Filter Bar -->
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
-        <h2 style="margin: 0; font-weight: 700; color: var(--primary-navy); font-size: 1.45rem;">Node Infrastructure &amp; Health Overview</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.88rem;">Prometheus node-level telemetry, 3-tier disk capacity, and hypervisor uptime across <strong>OLKVM</strong> and <strong>Proxmox</strong>.</p>
+        <h2 style="margin: 0; font-weight: 700; color: var(--primary-navy); font-size: 1.45rem;">Server Health</h2>
+        <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.85rem;">Node-level storage capacity across 3 disk tiers, resource utilization, and server health logs.</p>
     </div>
-    
+
     <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
-        <form method="GET" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin: 0;">
+        <form method="get" style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
                 <select name="node_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
-                    <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes (OLKVM &amp; Proxmox)</option>
-                    <optgroup label="OLKVM Hypervisor">
-                        <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>All OLKVM Nodes</option>
-                        <option value="nmsinfra.nms.go.ug" {% if selected_node == 'nmsinfra.nms.go.ug' %}selected{% endif %}>nmsinfra.nms.go.ug (Oracle DB)</option>
-                        <option value="nmsebs.nms.go.ug" {% if selected_node == 'nmsebs.nms.go.ug' %}selected{% endif %}>nmsebs.nms.go.ug (Oracle EBS App)</option>
-                    </optgroup>
-                    <optgroup label="Proxmox Cluster">
-                        <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>All Proxmox Nodes</option>
-                        <option value="pvenode1" {% if selected_node == 'pvenode1' %}selected{% endif %}>pvenode1 (tomcatvm)</option>
-                        <option value="pvenode2" {% if selected_node == 'pvenode2' %}selected{% endif %}>pvenode2 (jumphost / monitoring)</option>
-                        <option value="pvenode3" {% if selected_node == 'pvenode3' %}selected{% endif %}>pvenode3 (databasevm)</option>
-                    </optgroup>
+                    <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
+                    <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM Cluster</option>
+                    <option value="nmsinfra.nms.go.ug" {% if selected_node == 'nmsinfra.nms.go.ug' %}selected{% endif %}>nmsinfra.nms.go.ug</option>
+                    <option value="nmsebs.nms.go.ug" {% if selected_node == 'nmsebs.nms.go.ug' %}selected{% endif %}>nmsebs.nms.go.ug</option>
+                    <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox Cluster</option>
+                    <option value="pvenode1" {% if selected_node == 'pvenode1' %}selected{% endif %}>pvenode1</option>
+                    <option value="pvenode2" {% if selected_node == 'pvenode2' %}selected{% endif %}>pvenode2</option>
+                    <option value="pvenode3" {% if selected_node == 'pvenode3' %}selected{% endif %}>pvenode3</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
                 <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
                 <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
-            {% if start_date or end_date or selected_node != 'All Nodes' or current_db %}
+            {% if start_date or end_date or selected_node != 'All Nodes' %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 0.9rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
             </div>
             {% endif %}
         </form>
 
         {% if is_admin or perms.api.add_serverhealth %}
-        <!-- Sync from Prometheus Button -->
-        <form method="POST" action="{% url 'server_health_sync_prometheus' %}" style="margin: 0; align-self: flex-end;">
+        <form method="post" action="{% url 'server_health_sync_prometheus' %}" style="margin: 0;">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success" title="Pull latest node metrics from Prometheus API ({{ prometheus_url }})" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; border-radius: 4px; height: 34px; line-height: 20px; display: inline-flex; align-items: center; gap: 0.35rem;">
-                &#x21bb; Sync Prometheus
+            <button type="submit" class="btn btn-secondary" style="background-color: #f1f5f9; color: var(--primary-navy); border: 1px solid #cbd5e1; padding: 0.45rem 0.9rem; font-weight: 600; font-size: 0.82rem; border-radius: 4px; height: 34px; cursor: pointer;">
+                Sync Prometheus
             </button>
         </form>
-
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-            <a href="{% url 'server_health_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.1rem; font-size: 0.85rem; font-weight: 600; border-radius: 4px; height: 34px; line-height: 20px;">+ New Record</a>
+            <a href="{% url 'server_health_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
         </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Row 1: Fleet Summary KPIs (All Nodes / Cluster Scope) OR Scoped Node Profile Card -->
-<div style="margin-bottom: 1.5rem;">
-    {% if not scoped_node_detail %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem;">
-            <!-- 1. Overall Node Uptime -->
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Overall Node Uptime</span>
-                <strong style="color: #16a34a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_node_uptime }}</strong>
-                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">Target Node SLA: &ge; {{ target_node_sla }}%</span>
-            </div>
-
-            <!-- 2. Nodes Healthy -->
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Hypervisor Nodes</span>
-                <strong style="color: #00205B; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_nodes_healthy }}</strong>
-                <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">OLKVM &amp; Proxmox clusters</span>
-            </div>
-
-            <!-- 3. Combined 3-Tier Disk Storage (Deduplicated Shared NFS) -->
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Node Disk Storage (Deduplicated)</span>
-                <strong style="color: #0f172a; font-size: 1.5rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">
-                    {% if kpi_total_storage_gb > 0 %}
-                        {{ kpi_used_storage_gb }} <span style="font-size: 0.85rem; color: #64748b; font-weight: 600;">/ {{ kpi_total_storage_gb }} GB</span>
-                    {% else %}
-                        {{ kpi_storage_used_pct }}%
-                    {% endif %}
-                </strong>
-                <span style="font-size: 0.72rem; color: {% if kpi_storage_used_pct > 80 %}#dc2626{% else %}#94a3b8{% endif %}; margin-top: 0.25rem; display: block;">
-                    {% if kpi_total_storage_gb > 0 %}{{ kpi_storage_used_pct }}% used &bull; {{ kpi_free_storage_gb }} GB free{% else %}Peak disk utilisation{% endif %}
-                </span>
-            </div>
-
-            <!-- 4. Avg CPU & RAM -->
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-                <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Avg CPU / Memory</span>
-                <strong style="color: #0f172a; font-size: 1.5rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">
-                    {{ kpi_avg_cpu }} <span style="color: #94a3b8; font-weight: 400;">/</span> {{ kpi_avg_mem }}
-                </strong>
-                <span style="font-size: 0.72rem; color: {% if kpi_unhealthy_count > 0 %}#dc2626{% else %}#16a34a{% endif %}; margin-top: 0.25rem; display: block;">
-                    {{ kpi_unhealthy_count }} warning/critical log(s)
-                </span>
-            </div>
-        </div>
-    {% elif scoped_node_detail %}
-        <!-- Scoped Node Profile Card (mirrors Database Profile Card on Dashboard) -->
-        <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); border-left: 5px solid {% if scoped_node_detail.node_name == 'OLKVM' %}var(--primary-navy){% else %}var(--primary-gold){% endif %};">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.12); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
-                <span style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Hypervisor Node Profile ({{ scoped_node_detail.node_name }})</span>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <span style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-                                {% if scoped_node_detail.status == 'Healthy' %}color: #137333;
-                                {% elif scoped_node_detail.status == 'Warning' %}color: #b06000;
-                                {% elif scoped_node_detail.status == 'Critical' %}color: #c5221f;
-                                {% else %}color: #64748b;{% endif %}">
-                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: {% if scoped_node_detail.status == 'Healthy' %}#137333{% elif scoped_node_detail.status == 'Warning' %}#b06000{% elif scoped_node_detail.status == 'Critical' %}#c5221f{% else %}#64748b{% endif %};"></span>
-                        {{ scoped_node_detail.status }}
-                    </span>
-                    <a href="?node_select=All Nodes" style="font-size: 0.72rem; color: #475569; text-decoration: none; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 4px; background: #f1f5f9; border: 1px solid #cbd5e1;">&larr; Back to All Nodes</a>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
-                <div>
-                    <h2 style="margin: 0; font-size: 1.35rem; font-weight: 800; color: var(--primary-navy);">
-                        {{ scoped_node_detail.display_name }} &mdash; {{ scoped_node_detail.role_title }}
-                    </h2>
-                    <div style="font-family: monospace; font-size: 0.82rem; font-weight: 700; color: #0284c7; margin-top: 0.25rem;">
-                        Hypervisor: {{ scoped_node_detail.node_name }} | Workloads: {{ scoped_node_detail.hosted_systems }}
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.25rem; border-top: 1px solid rgba(90, 123, 156, 0.08); padding-top: 1.15rem;">
-                <div>
-                    <strong style="font-size: 1.4rem; font-weight: 800; color: #137333; display: block;">{{ scoped_node_detail.uptime_str }}</strong>
-                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Node Uptime ({{ scoped_node_detail.uptime_days }}d up)</span>
-                </div>
-                <div>
-                    <strong style="font-size: 1.4rem; font-weight: 800; color: #0f172a; display: block;">{{ scoped_node_detail.cpu_percent }}%</strong>
-                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">CPU Utilisation</span>
-                </div>
-                <div>
-                    <strong style="font-size: 1.4rem; font-weight: 800; color: #0f172a; display: block;">
-                        {{ scoped_node_detail.memory_percent }}%
-                        {% if scoped_node_detail.memory_total_gb > 0 %}
-                        <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">({{ scoped_node_detail.memory_used_gb }}/{{ scoped_node_detail.memory_total_gb }} GB)</span>
-                        {% endif %}
-                    </strong>
-                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Memory Utilisation</span>
-                </div>
-                <div>
-                    <strong style="font-size: 1.4rem; font-weight: 800; color: #0f172a; display: block;">
-                        {% if scoped_node_detail.total_disk_capacity_gb > 0 %}
-                            {{ scoped_node_detail.total_disk_used_gb }} / {{ scoped_node_detail.total_disk_capacity_gb }} GB
-                        {% else %}
-                            {{ scoped_node_detail.disk_percent }}%
-                        {% endif %}
-                    </strong>
-                    <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Total Storage (3 Disk Types)</span>
-                </div>
-            </div>
-        </div>
-    {% endif %}
-</div>
-
-<!-- Row 2: Capacity & Performance Records — Per Node Table -->
-<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); margin-bottom: 1.5rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">Capacity &amp; Performance Records &mdash; Per Node (OLKVM &amp; Proxmox)</h3>
-            <p style="margin: 0.15rem 0 0 0; font-size: 0.76rem; color: #64748b;">OLKVM nodes (<code>nmsinfra.nms.go.ug</code>, <code>nmsebs.nms.go.ug</code>) and Proxmox nodes (<code>pvenode1</code>, <code>pvenode2</code>, <code>pvenode3</code>). Click any row to scope.</p>
-        </div>
+<!-- Three Server Health KPIs Summary Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Unhealthy Logs</span>
+        <strong style="color: {% if kpi_unhealthy_count > 0 %}#c5221f{% else %}#137333{% endif %}; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_unhealthy_count }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Warning or critical status alerts</span>
     </div>
 
-    <div style="overflow-x: auto;">
-        <table class="modern-table">
-            <thead>
-                <tr>
-                    <th>Node / Hypervisor</th>
-                    <th>Node Uptime</th>
-                    <th>Node-Local Storage (GiB)</th>
-                    <th>Node-Local Storage Util (%)</th>
-                    <th>Total Memory (GiB)</th>
-                    <th>Memory Util (%)</th>
-                    <th>Total Logical CPUs</th>
-                    <th>CPU Util (%)</th>
-                    <th>Storage Growth (%)</th>
-                    <th>3 Disk Tiers (Shared / LVM / Local)</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for node in filtered_nodes %}
-                <tr onclick="window.location.href='?node_select={{ node.node_key }}'" style="cursor: pointer; {% if selected_node == node.node_key %}background-color: #f0f7ff !important;{% endif %}">
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 0.45rem;">
-                            <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.12rem 0.4rem; border-radius: 3px; {% if node.node_name == 'OLKVM' %}background: rgba(0, 32, 91, 0.1); color: var(--primary-navy);{% else %}background: rgba(212, 175, 55, 0.18); color: #856404;{% endif %}">
-                                {{ node.node_name }}
-                            </span>
-                            <span style="font-weight: 700; color: var(--primary-navy); font-size: 0.86rem; font-family: monospace;">{{ node.display_name }}</span>
-                        </div>
-                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.15rem;">{{ node.hosted_systems }}</div>
-                    </td>
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Avg CPU Utilisation</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_avg_cpu }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Average processing workload</span>
+    </div>
 
-                    <!-- Node Uptime -->
-                    <td style="font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %};">
-                        <div>{{ node.uptime_str }}</div>
-                        {% if node.uptime_days > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b; font-weight: 500;">{{ node.uptime_days }}d up</div>
-                        {% endif %}
-                    </td>
-
-                    <!-- Node-Local Storage (GiB) -->
-                    <td>
-                        {% if node.has_data and node.local_disk_capacity_gb > 0 %}
-                        <div style="font-weight: 700; color: #0f172a;">{{ node.local_disk_capacity_gb }} GiB</div>
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ node.local_disk_used_gb }} GiB used</div>
-                        {% else %}
-                        <span style="color: #94a3b8;">No Data</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- Node-Local Storage Utilisation (%) -->
-                    <td style="{% if node.has_data %}background-color: {% if node.local_disk_util_pct > 85 %}#fce8e6{% elif node.local_disk_util_pct > 75 %}#fef7e0{% else %}#e6f4ea{% endif %};{% endif %}">
-                        {% if node.has_data %}
-                        <strong style="color: {% if node.local_disk_util_pct > 85 %}#c5221f{% elif node.local_disk_util_pct > 75 %}#b06000{% else %}#137333{% endif %};">{{ node.local_disk_util_pct }}%</strong>
-                        {% else %}
-                        <span style="color: #94a3b8;">No Data</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- Total Memory (GiB) -->
-                    <td>
-                        {% if node.has_data and node.memory_total_gb > 0 %}
-                        <div style="font-weight: 700; color: #0f172a;">{{ node.memory_total_gb }} GiB</div>
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ node.memory_used_gb }} GiB used</div>
-                        {% else %}
-                        <span style="color: #94a3b8;">No Data</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- Memory Utilisation (%) -->
-                    <td style="{% if node.has_data %}background-color: {% if node.memory_percent > 85 %}#fce8e6{% elif node.memory_percent > 80 %}#fef7e0{% else %}#e6f4ea{% endif %};{% endif %}">
-                        {% if node.has_data %}
-                        <strong style="color: {% if node.memory_percent > 85 %}#c5221f{% elif node.memory_percent > 80 %}#b06000{% else %}#137333{% endif %};">{{ node.memory_percent }}%</strong>
-                        {% else %}
-                        <span style="color: #94a3b8;">No Data</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- Total Logical CPUs -->
-                    <td style="font-weight: 700; color: var(--primary-navy);">
-                        {{ node.logical_cpus }}
-                    </td>
-
-                    <!-- CPU Utilisation (%) -->
-                    <td style="{% if node.has_data %}background-color: {% if node.cpu_percent > 85 %}#fce8e6{% elif node.cpu_percent > 75 %}#fef7e0{% else %}#e6f4ea{% endif %};{% endif %}">
-                        {% if node.has_data %}
-                        <strong style="color: {% if node.cpu_percent > 85 %}#c5221f{% elif node.cpu_percent > 75 %}#b06000{% else %}#137333{% endif %};">{{ node.cpu_percent }}%</strong>
-                        {% else %}
-                        <span style="color: #94a3b8;">No Data</span>
-                        {% endif %}
-                    </td>
-
-                    <!-- Storage Growth (%) -->
-                    <td style="font-family: monospace; font-size: 0.78rem; color: #334155;">
-                        {% if node.has_data %}
-                            {{ node.storage_growth_pct|floatformat:3 }}%
-                        {% else %}
-                            0.000%
-                        {% endif %}
-                    </td>
-
-                    <!-- 3 Disk Tiers Summary -->
-                    <td style="text-align: left; font-size: 0.71rem; line-height: 1.35; min-width: 215px;">
-                        <div><strong>D1:</strong> {{ node.disk_1.type }} &mdash; <strong>{{ node.disk_1.percent }}%</strong> <span style="color:#64748b;">({{ node.disk_1.used_gb }}/{{ node.disk_1.size_gb }} GiB)</span></div>
-                        <div><strong>D2:</strong> {{ node.disk_2.type }} &mdash; <strong>{{ node.disk_2.percent }}%</strong> <span style="color:#64748b;">({{ node.disk_2.used_gb }}/{{ node.disk_2.size_gb }} GiB)</span></div>
-                        <div><strong>D3:</strong> {{ node.disk_3.type }} &mdash; <strong>{{ node.disk_3.percent }}%</strong> <span style="color:#64748b;">({{ node.disk_3.used_gb }}/{{ node.disk_3.size_gb }} GiB)</span></div>
-                    </td>
-
-                    <!-- Status -->
-                    <td>
-                        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 4px;
-                                    {% if node.status == 'Healthy' %}background: #e6f4ea; color: #137333;
-                                    {% elif node.status == 'Critical' %}background: #fce8e6; color: #c5221f;
-                                    {% elif node.status == 'Warning' %}background: #fef7e0; color: #b06000;
-                                    {% else %}background: #f1f5f9; color: #64748b;{% endif %}">
-                            {{ node.status }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Avg Memory Utilisation</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_avg_mem }}</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Average RAM consumption</span>
     </div>
 </div>
 
-<!-- Row 2B: Node Capacity Records Table (Matching Capacity Tab Format: MONTH | NODE | STORAGE TIER | CAPACITY | USED | FREE | UTILISATION % | GROWTH | GROWTH %) -->
+<!-- Node Capacity Records Table (Matching Capacity Tab Format) -->
 <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.1rem; flex-wrap: wrap; gap: 1rem;">
-        <div>
-            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Node Capacity Records</h3>
-            <p style="margin: 0.15rem 0 0 0; font-size: 0.76rem; color: #64748b;">Node-level storage capacity, consumption, free space, and 30-day / month-over-month growth across OLKVM &amp; Proxmox nodes.</p>
-        </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Node Capacity Records</h3>
     </div>
 
     <div style="overflow-x: auto;">
@@ -430,17 +205,13 @@
             </thead>
             <tbody>
                 {% for cap in node_capacity_records %}
-                <tr onclick="window.location.href='?node_select={{ cap.node_key }}'" style="cursor: pointer;">
+                <tr>
                     <td style="font-weight: 600;">{{ cap.month|date:"F Y" }}</td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 0.4rem;">
-                            <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.12rem 0.4rem; border-radius: 3px; {% if cap.node_name == 'OLKVM' %}background: rgba(0, 32, 91, 0.1); color: var(--primary-navy);{% else %}background: rgba(212, 175, 55, 0.18); color: #856404;{% endif %}">
-                                {{ cap.node_name }}
-                            </span>
-                            <strong>{{ cap.display_name }}</strong>
-                        </div>
+                        <strong>{{ cap.display_name }}</strong>
+                        <span style="font-weight: normal; color: #64748b; font-size: 0.76rem; margin-left: 0.25rem;">({{ cap.node_name }})</span>
                     </td>
-                    <td style="font-size: 0.78rem; color: #475569;">{{ cap.storage_tier }}</td>
+                    <td style="color: #475569;">{{ cap.storage_tier }}</td>
                     <td>{{ cap.capacity_gb }} GB</td>
                     <td>{{ cap.used_gb }} GB</td>
                     <td>{{ cap.free_gb }} GB</td>
@@ -464,240 +235,106 @@
     </div>
 </div>
 
-<!-- Row 3: Storage Capacity, Used, Free & Utilisation by Node / Resource (3 Disk Tiers) -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <h3 style="margin: 0 0 1rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
-        Storage Capacity, Used, Free &amp; Utilisation by Node / Resource (3 Disk Tiers)
-    </h3>
-
-    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
-        {% for node in filtered_nodes %}
-        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem 1.25rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
-                <div>
-                    <span style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.12rem 0.4rem; border-radius: 3px; margin-right: 0.35rem; {% if node.node_name == 'OLKVM' %}background: rgba(0, 32, 91, 0.1); color: var(--primary-navy);{% else %}background: rgba(212, 175, 55, 0.18); color: #856404;{% endif %}">
-                        {{ node.node_name }}
-                    </span>
-                    <strong style="color: var(--primary-navy); font-size: 0.92rem; font-family: monospace;">{{ node.display_name }}</strong>
-                    <span style="color: #64748b; font-size: 0.78rem; margin-left: 0.5rem;">&mdash; {{ node.hosted_systems }}</span>
-                </div>
-                <div style="font-size: 0.78rem; color: #475569; font-weight: 600;">
-                    Node-Local Storage: <strong>{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }} GiB ({{ node.local_disk_util_pct }}%)</strong> &bull; Total w/ Shared: <strong>{{ node.total_disk_used_gb }} / {{ node.total_disk_capacity_gb }} GiB</strong>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
-                {% for d in node.disks %}
-                <div class="disk-tier-col">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="font-size: 0.8rem; color: #0f172a; font-family: monospace;">{{ d.type }}</strong>
-                        <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-                                    {% if d.status == 'Healthy' %}color: #137333;
-                                    {% elif d.status == 'Warning' %}color: #b06000;
-                                    {% elif d.status == 'Critical' %}color: #c5221f;
-                                    {% else %}color: #64748b;{% endif %}">
-                            {{ d.percent }}% ({{ d.status }})
-                        </span>
-                    </div>
-
-                    <div style="background: #e2e8f0; border-radius: 9999px; height: 8px; overflow: hidden; margin: 0.25rem 0;">
-                        <div style="height: 100%; border-radius: 9999px; width: {{ d.percent }}%;
-                                    {% if d.percent > 90 %}background-color: #ef4444;
-                                    {% elif d.percent > 80 %}background-color: #f59e0b;
-                                    {% else %}background-color: #10b981;{% endif %}"></div>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #475569;">
-                        <span>Used: <strong style="color: #0f172a;">{{ d.used_gb }} GiB</strong></span>
-                        <span>Free: <strong style="color: #137333;">{{ d.free_gb }} GiB</strong></span>
-                        <span>Cap: <strong>{{ d.size_gb }} GiB</strong></span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
+<!-- Server Health Registry Table Panel -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Server &amp; Node Health Log</h3>
     </div>
-</div>
-
-<!-- Row 4: Node Uptime Trend Graph (SVG) & Attention Required Alerts -->
-<div class="scoped-grid-2col">
-    <!-- Left: Node Uptime Trend Card -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.65rem; margin-bottom: 0.75rem;">
-            <div>
-                <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
-                    {% if selected_node == 'All Nodes' %}Overall Node Uptime Trend (OLKVM &amp; Proxmox){% else %}{{ selected_node }} Node Uptime Trend{% endif %}
-                </h3>
-                <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.76rem;">Last 6 months node availability trend</p>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">6-Mo Avg</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: {% if node_trend_recent_avg >= target_node_sla %}#137333{% else %}#c5221f{% endif %}; line-height: 1.1;">{{ node_trend_recent_avg }}%</div>
-            </div>
-        </div>
-
-        <div style="position: relative; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 185px;">
-            <svg viewBox="0 0 400 150" style="width: 100%; height: auto; max-height: 230px; overflow: visible;">
-                <!-- Grid Lines -->
-                <line x1="40" y1="22" x2="360" y2="22" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="54" x2="360" y2="54" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="86" x2="360" y2="86" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="118" x2="360" y2="118" stroke="#f1f5f9" stroke-width="1" />
-
-                <!-- SLA Reference Line -->
-                <line x1="40" y1="{{ node_sla_y_coord }}" x2="360" y2="{{ node_sla_y_coord }}" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3" />
-                <text x="363" y="{{ node_sla_y_coord }}" fill="#ef4444" font-size="6.5" font-weight="700" alignment-baseline="middle">SLA {{ target_node_sla }}%</text>
-
-                {% if node_trend_area_points %}
-                <polygon fill="rgba(37, 99, 235, 0.07)" points="{{ node_trend_area_points }}" />
-                {% endif %}
-
-                <polyline fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="{{ node_trend_polyline_points }}" />
-
-                {% for m in node_trend_months %}
-                    {% if m.has_data %}
-                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
-                        <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#0f172a" font-size="7" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
-                    {% else %}
-                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="2" fill="#cbd5e1" stroke="#ffffff" stroke-width="1" />
-                        <text x="{{ m.x }}" y="110" fill="#94a3b8" font-size="6.5" font-weight="600" text-anchor="middle" font-style="italic">No Data</text>
-                    {% endif %}
-                    <text x="{{ m.x }}" y="136" fill="#64748b" font-size="7.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-                {% endfor %}
-            </svg>
-        </div>
-
-        <div style="display: flex; align-items: center; justify-content: center; gap: 1.25rem; margin-top: auto; padding-top: 0.65rem; border-top: 1px solid rgba(90, 123, 156, 0.1); font-size: 0.72rem; color: #64748b;">
-            <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <span style="display: inline-block; width: 12px; height: 3px; background-color: #2563eb; border-radius: 2px;"></span>
-                <span>Node Uptime %</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <span style="display: inline-block; width: 12px; height: 0; border-top: 1.5px dashed #ef4444;"></span>
-                <span>Target Node SLA (&ge; {{ target_node_sla }}%)</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Right: Attention Required Alerts Card -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column;">
-        <h3 style="margin: 0 0 1rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">
-            {% if selected_node == 'All Nodes' %}Node Attention Required Alerts{% else %}{{ selected_node }} Node Status &amp; Alerts{% endif %}
-        </h3>
-
-        <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 230px; overflow-y: auto; padding-right: 0.25rem;">
-            {% for item in node_attention_items %}
-                <div style="display: flex; align-items: flex-start; gap: 0.45rem; padding: 0.45rem 0.6rem; background: {% if item.type == 'danger' %}#fef2f2{% else %}#fffbeb{% endif %}; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; border-radius: 4px; font-size: 0.76rem; color: #334155;">
-                    <div style="font-weight: 500; line-height: 1.4;">{{ item.message|safe }}</div>
-                </div>
-            {% empty %}
-                <div style="display: flex; flex-direction: column; gap: 0.65rem; width: 100%; padding: 0.35rem 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #137333; font-weight: 600;">
-                        <span style="font-size: 0.95rem; font-weight: bold;">✓</span> All monitored nodes meeting uptime SLA (&ge; {{ target_node_sla }}%)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #137333; font-weight: 600;">
-                        <span style="font-size: 0.95rem; font-weight: bold;">✓</span> CPU and Memory utilisation within normal thresholds
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #137333; font-weight: 600;">
-                        <span style="font-size: 0.95rem; font-weight: bold;">✓</span> All 3 disk tiers have sufficient free storage capacity
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-
-<!-- Row 5: Historical Server & Node Health Registry Table -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <h3 style="margin: 0 0 1rem 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Node &amp; Server Health Telemetry Log</h3>
 
     <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
             <thead>
                 <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem;">Timestamp</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem;">Node / Server</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Uptime</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">CPU</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Memory</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Disk 1</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Disk 2</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Disk 3</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; text-align: center;">Status</th>
-                    <th style="padding: 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.7rem;">Source</th>
-                    <th style="padding: 0.75rem; width: 45px;"></th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Timestamp</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Node / Server</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Uptime</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">CPU</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.72rem; text-align: center;">Disk 1</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Disk 2</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Disk 3</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Logged By</th>
+                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for health in page_obj %}
                 <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
-                    <td style="padding: 0.65rem 0.75rem;">
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.date|date:"d M Y" }}</div>
-                        <div style="font-size: 0.7rem; color: #64748b;">{{ health.updated_at|time:"H:i" }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.updated_at|time:"H:i" }}</div>
                     </td>
-                    <td style="padding: 0.65rem 0.75rem;">
-                        <div style="font-weight: 700; color: var(--primary-navy);">
-                            {{ health.node_name|default:"Proxmox" }} &mdash;
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">
                             {% if health.database == 'MS SQL Server' %}Pentana{% else %}{{ health.server }}{% endif %}
+                            {% if health.node_name %}<span style="font-weight: normal; color: #64748b; font-size: 0.75rem;">({{ health.node_name }})</span>{% endif %}
                         </div>
-                        <div style="font-size: 0.7rem; color: #64748b;">{{ health.hosted_systems|default:health.database }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.hosted_systems|default:health.database }}</div>
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center; font-weight: 700; color: #137333;">
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #137333;">
                         {{ health.uptime_percent|default:"100.00" }}%
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center; font-weight: 600; color: {% if health.cpu_percent > 75 %}#c5221f{% else %}#0f172a{% endif %};">
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
                         {{ health.cpu_percent }}%
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <div style="font-weight: 600; color: {% if health.memory_percent > 80 %}#c5221f{% else %}#0f172a{% endif %};">{{ health.memory_percent }}%</div>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.memory_percent }}%</div>
                         {% if health.memory_total_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.memory_used_gb }}/{{ health.memory_total_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <div style="font-weight: 600;">{% if health.disk_1_percent > 0 %}{{ health.disk_1_percent }}%{% else %}{{ health.disk_percent }}%{% endif %}</div>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{% if health.disk_1_percent > 0 %}{{ health.disk_1_percent }}%{% else %}{{ health.disk_percent }}%{% endif %}</div>
                         {% if health.disk_1_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_1_type }}">{{ health.disk_1_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_1_type }}">{{ health.disk_1_used_gb }} / {{ health.disk_1_size_gb }} GB</div>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <div style="font-weight: 600;">{{ health.disk_2_percent }}%</div>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.disk_2_percent }}%</div>
                         {% if health.disk_2_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_2_type }}">{{ health.disk_2_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_2_type }}">{{ health.disk_2_used_gb }} / {{ health.disk_2_size_gb }} GB</div>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <div style="font-weight: 600;">{{ health.disk_3_percent }}%</div>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.disk_3_percent }}%</div>
                         {% if health.disk_3_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_3_type }}">{{ health.disk_3_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_3_type }}">{{ health.disk_3_used_gb }} / {{ health.disk_3_size_gb }} GB</div>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;">
-                        <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <span style="font-size: 0.75rem; font-weight: 600;
                                     {% if health.status == 'Healthy' %}color: #137333;
                                     {% elif health.status == 'Critical' %}color: #c5221f;
                                     {% else %}color: #b06000;{% endif %}">
                             {{ health.status }}
                         </span>
                     </td>
-                    <td style="padding: 0.65rem 0.75rem;">
-                        {% if health.entered_by == 'Prometheus' %}
-                            <span style="display: inline-block; background: #dbeafe; color: #1e40af; font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.45rem; border-radius: 9999px;">Prometheus</span>
-                        {% elif health.entered_by == 'Script' %}
-                            <span style="display: inline-block; background: #e2e8f0; color: #475569; font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.45rem; border-radius: 9999px;">Script</span>
-                        {% elif health.created_by %}
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-weight: 500; color: #475569;">
+                        {% if health.created_by %}
                             {{ health.created_by.username }}
+                        {% elif health.entered_by %}
+                            {{ health.entered_by }}
                         {% else %}
-                            <span style="color: #94a3b8; font-style: italic;">System</span>
+                            System
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.75rem; text-align: center;" onclick="event.stopPropagation()">
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
                         {% if health.entered_by in 'Script,Prometheus' and not is_admin %}
-                            <span style="color: var(--text-soft); font-size: 0.7rem; font-style: italic;" title="Automated metrics cannot be modified manually">Auto</span>
+                            <span style="color: var(--text-soft); font-size: 0.72rem; font-style: italic;" title="Automated metrics cannot be modified manually">Auto</span>
                         {% else %}
                             <div class="actions-dropdown">
-                                <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ health.pk }}')" style="background: none; border: none; font-size: 1.2rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.2rem 0.45rem;">⋮</button>
+                                <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ health.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
                                 <div id="actions-{{ health.pk }}" class="actions-dropdown-content">
                                     {% if health.entered_by != 'Script' and health.entered_by != 'Prometheus' %}
                                         <a href="{% url 'server_health_edit' health.pk %}">Edit</a>
@@ -715,7 +352,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No node or server health records found.</td>
+                    <td colspan="11" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No server health records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -723,7 +360,7 @@
     </div>
 
     {% if page_obj.has_other_pages %}
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
         <div style="color: #64748b; font-size: 0.8rem; font-weight: 500;">
             Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
         </div>
@@ -731,10 +368,17 @@
             {% if page_obj.has_previous %}
                 <a href="?page=1&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
                 <a href="?page={{ page_obj.previous_page_number }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
+            {% else %}
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
+                <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
             {% endif %}
+
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy);">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy);">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+            {% else %}
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
+                <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
             {% endif %}
         </div>
     </div>
