@@ -35,6 +35,7 @@ urlpatterns = [
     
     # Server Health
     path('server-health/', views.server_health_list, name='server_health_list'),
+    path('server-health/sync-prometheus/', views.server_health_sync_prometheus, name='server_health_sync_prometheus'),
     path('server-health/create/', views.server_health_create, name='server_health_create'),
     path('server-health/<int:pk>/edit/', views.server_health_edit, name='server_health_edit'),
     path('server-health/<int:pk>/delete/', views.server_health_delete, name='server_health_delete'),

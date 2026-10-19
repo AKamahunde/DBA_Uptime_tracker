@@ -1734,52 +1734,609 @@ def backup_edit(request, pk):
     })
 
 @login_required
+@require_POST
+def server_health_sync_prometheus(request):
+    if not (request.user.is_admin or request.user.has_perm('api.add_serverhealth')):
+        messages.error(request, 'You do not have permission to sync Prometheus node metrics.')
+        return redirect('server_health_list')
+
+    prom_url = request.POST.get('prometheus_url', '').strip() or None
+    from etl.services.rest_client import sync_all_nodes_from_prometheus, PROMETHEUS_URL
+    synced, errors = sync_all_nodes_from_prometheus(prometheus_url=prom_url)
+
+    if synced and not errors:
+        messages.success(
+            request,
+            f"Successfully synced live Prometheus metrics for {', '.join(f'{r.server} ({r.node_name})' for r in synced)}."
+        )
+    elif synced and errors:
+        messages.warning(
+            request,
+            f"Synced {', '.join(r.server for r in synced)}, but encountered errors on: {'; '.join(errors)}"
+        )
+    else:
+        target_url = prom_url or PROMETHEUS_URL
+        messages.error(
+            request,
+            f"Could not reach Prometheus API at {target_url}. Verify PROMETHEUS_URL or push via prometheus_node_agent.py. ({'; '.join(errors)})"
+        )
+    return redirect('server_health_list')
+
+
+@login_required
 def server_health_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
-    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
-    
+
+    from django.db.models import Avg, Q
+    import math
+    from etl.services.rest_client import PROMETHEUS_URL, sync_all_nodes_from_prometheus
+
+    # Auto-sync once per day if no Prometheus records exist yet for today
+    today_dt = timezone.now().date()
+    if not ServerHealth.objects.filter(date=today_dt, entered_by='Prometheus').exists():
+        try:
+            sync_all_nodes_from_prometheus()
+        except Exception:
+            pass
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+
+    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
+
+    if selected_node == 'OLKVM':
+        queryset = queryset.filter(
+            Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
+        )
+    elif selected_node == 'Proxmox':
+        queryset = queryset.filter(
+            Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
+        )
+    elif selected_node != 'All Nodes':
+        queryset = queryset.filter(server__iexact=selected_node)
+
     if current_db:
         queryset = queryset.filter(database=current_db)
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
-        
+
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
-    # Calculate KPIs based on filtered scope/dates
-    kpi_queryset = ServerHealth.objects.all()
-    if current_db:
-        kpi_queryset = kpi_queryset.filter(database=current_db)
-    if start_date:
-        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
-    if end_date:
-        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
-        
-    kpi_unhealthy_count = kpi_queryset.filter(status__in=['Critical', 'Warning']).count()
-    
-    from django.db.models import Avg
-    avg_cpu = kpi_queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
-    avg_mem = kpi_queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
+
+    # ── Build Node-Level Overview Data (2 OLKVM Nodes + 3 Proxmox Nodes) ──
+    node_definitions = [
+        {
+            'node_key': 'nmsinfra.nms.go.ug',
+            'node_name': 'OLKVM',
+            'display_name': 'nmsinfra.nms.go.ug',
+            'role_title': 'OLKVM — Oracle Database Node',
+            'hosted_systems': 'Oracle DB (nmsinfra)',
+            'primary_db': 'Oracle',
+            'filter_q': Q(server__iexact='nmsinfra.nms.go.ug') | Q(server__icontains='nmsinfra'),
+            'default_disks': [
+                'NFS Backup (/fra/nmsddbkp)',
+                'LVM XFS (/fra)',
+                'Local XFS (/data, /u01, /)',
+            ],
+        },
+        {
+            'node_key': 'nmsebs.nms.go.ug',
+            'node_name': 'OLKVM',
+            'display_name': 'nmsebs.nms.go.ug',
+            'role_title': 'OLKVM — Oracle EBS App Node',
+            'hosted_systems': 'Oracle EBS App (nmsebs)',
+            'primary_db': 'Oracle',
+            'filter_q': Q(server__iexact='nmsebs.nms.go.ug') | Q(server__icontains='nmsebs'),
+            'default_disks': [
+                'NFS Backup (/nmsddbkp)',
+                'LVM XFS (/stagearea)',
+                'Local XFS (/fmw, /)',
+            ],
+        },
+        {
+            'node_key': 'pvenode1',
+            'node_name': 'Proxmox',
+            'display_name': 'pvenode1',
+            'role_title': 'Proxmox Cluster Node 1',
+            'hosted_systems': 'tomcatvm & Internal Systems',
+            'primary_db': 'MySQL / Internal',
+            'filter_q': Q(server__iexact='pvenode1'),
+            'default_disks': [
+                'VMSAN (NFS Shared)',
+                'local-lvm (LVM-Thin)',
+                'local (Local Dir)',
+            ],
+        },
+        {
+            'node_key': 'pvenode2',
+            'node_name': 'Proxmox',
+            'display_name': 'pvenode2',
+            'role_title': 'Proxmox Cluster Node 2',
+            'hosted_systems': 'jumphostvm & monitoringvm',
+            'primary_db': 'Monitoring / Ops',
+            'filter_q': Q(server__iexact='pvenode2'),
+            'default_disks': [
+                'VMSAN (NFS Shared)',
+                'local-lvm (LVM-Thin)',
+                'local (Local Dir)',
+            ],
+        },
+        {
+            'node_key': 'pvenode3',
+            'node_name': 'Proxmox',
+            'display_name': 'pvenode3',
+            'role_title': 'Proxmox Cluster Node 3',
+            'hosted_systems': 'databasevm (MySQL / Pentana)',
+            'primary_db': 'MySQL / MS SQL Server',
+            'filter_q': Q(server__iexact='pvenode3'),
+            'default_disks': [
+                'VMSAN (NFS Shared)',
+                'local-lvm (LVM-Thin)',
+                'local (Local Dir)',
+            ],
+        },
+    ]
+
+    def _disk_status(pct):
+        if pct > 90:
+            return 'Critical'
+        elif pct > 80:
+            return 'Warning'
+        return 'Healthy'
+
+    node_overview_data = []
+    for nd in node_definitions:
+        latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
+        if latest_rec:
+            up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
+            up_days = float(latest_rec.uptime_days or 0.0)
+            logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)))
+            cpu_val = float(latest_rec.cpu_percent or 0.0)
+            mem_val = float(latest_rec.memory_percent or 0.0)
+            mem_tot = float(latest_rec.memory_total_gb or 0.0)
+            mem_used = float(latest_rec.memory_used_gb or 0.0)
+            growth_gb = float(getattr(latest_rec, 'storage_growth_gb', 0.0) or 0.0)
+            growth_pct = float(latest_rec.storage_growth_pct or 0.0)
+
+            d1_pct = float(latest_rec.disk_1_percent or 0.0)
+            d1_size = float(latest_rec.disk_1_size_gb or 0.0)
+            d1_used = float(latest_rec.disk_1_used_gb or 0.0)
+            if d1_pct == 0.0 and d1_size == 0.0 and float(latest_rec.disk_percent or 0.0) > 0:
+                d1_pct = float(latest_rec.disk_percent)
+
+            d2_pct = float(latest_rec.disk_2_percent or 0.0)
+            d2_size = float(latest_rec.disk_2_size_gb or 0.0)
+            d2_used = float(latest_rec.disk_2_used_gb or 0.0)
+
+            d3_pct = float(latest_rec.disk_3_percent or 0.0)
+            d3_size = float(latest_rec.disk_3_size_gb or 0.0)
+            d3_used = float(latest_rec.disk_3_used_gb or 0.0)
+
+            # Check if a prior month's ServerHealth record exists for month-over-month growth comparison
+            first_of_rec_month = latest_rec.date.replace(day=1)
+            prev_month_rec = (
+                ServerHealth.objects.filter(nd['filter_q'], date__lt=first_of_rec_month)
+                .order_by('-date', '-updated_at')
+                .first()
+            )
+            if prev_month_rec:
+                prev_local_used = float(prev_month_rec.disk_2_used_gb or 0.0) + float(prev_month_rec.disk_3_used_gb or 0.0)
+                curr_local_used = d2_used + d3_used
+                curr_local_cap = d2_size + d3_size
+                if prev_local_used > 0 and curr_local_cap > 0:
+                    growth_gb = round(curr_local_used - prev_local_used, 2)
+                    growth_pct = round((growth_gb / curr_local_cap) * 100.0, 2)
+
+            disks = [
+                {
+                    'slot': 1,
+                    'type': latest_rec.disk_1_type or nd['default_disks'][0],
+                    'size_gb': round(d1_size, 2),
+                    'used_gb': round(d1_used, 2),
+                    'free_gb': round(max(0.0, d1_size - d1_used), 2),
+                    'percent': round(d1_pct, 2),
+                    'status': _disk_status(d1_pct),
+                    'is_shared': True,  # Disk 1 is shared NFS (nmsddbkp on OLKVM, VMSAN on Proxmox)
+                },
+                {
+                    'slot': 2,
+                    'type': latest_rec.disk_2_type or nd['default_disks'][1],
+                    'size_gb': round(d2_size, 2),
+                    'used_gb': round(d2_used, 2),
+                    'free_gb': round(max(0.0, d2_size - d2_used), 2),
+                    'percent': round(d2_pct, 2),
+                    'status': _disk_status(d2_pct),
+                    'is_shared': False,
+                },
+                {
+                    'slot': 3,
+                    'type': latest_rec.disk_3_type or nd['default_disks'][2],
+                    'size_gb': round(d3_size, 2),
+                    'used_gb': round(d3_used, 2),
+                    'free_gb': round(max(0.0, d3_size - d3_used), 2),
+                    'percent': round(d3_pct, 2),
+                    'status': _disk_status(d3_pct),
+                    'is_shared': False,
+                },
+            ]
+
+            tot_cap = round(sum(d['size_gb'] for d in disks), 2)
+            tot_used = round(sum(d['used_gb'] for d in disks), 2)
+            tot_free = round(max(0.0, tot_cap - tot_used), 2)
+            local_cap = round(sum(d['size_gb'] for d in disks if not d['is_shared']), 2)
+            local_used = round(sum(d['used_gb'] for d in disks if not d['is_shared']), 2)
+            local_free = round(max(0.0, local_cap - local_used), 2)
+            local_util_pct = round((local_used / local_cap) * 100.0, 2) if local_cap > 0 else 0.0
+            peak_disk = round(max([float(latest_rec.disk_percent or 0.0)] + [d['percent'] for d in disks]), 2)
+
+            if growth_gb == 0.0 and growth_pct != 0.0 and local_cap > 0:
+                growth_gb = round((growth_pct / 100.0) * local_cap, 2)
+
+            node_overview_data.append({
+                'node_key': nd['node_key'],
+                'node_name': nd['node_name'],
+                'display_name': nd['display_name'],
+                'role_title': nd['role_title'],
+                'hosted_systems': latest_rec.hosted_systems or nd['hosted_systems'],
+                'primary_db': nd['primary_db'],
+                'server': latest_rec.server,
+                'has_data': True,
+                'uptime_percent': round(up_pct, 2),
+                'uptime_str': f"{round(up_pct, 2)}%",
+                'uptime_days': round(up_days, 1),
+                'uptime_status': 'Meets SLA' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Below SLA'),
+                'logical_cpus': logical_cpus,
+                'cpu_percent': round(cpu_val, 2),
+                'memory_percent': round(mem_val, 2),
+                'memory_total_gb': round(mem_tot, 2),
+                'memory_used_gb': round(mem_used, 2),
+                'disk_percent': peak_disk,
+                'storage_growth_gb': round(growth_gb, 2),
+                'storage_growth_pct': round(growth_pct, 2),
+                'disks': disks,
+                'disk_1': disks[0],
+                'disk_2': disks[1],
+                'disk_3': disks[2],
+                'total_disk_capacity_gb': tot_cap,
+                'total_disk_used_gb': tot_used,
+                'total_disk_free_gb': tot_free,
+                'local_disk_capacity_gb': local_cap,
+                'local_disk_used_gb': local_used,
+                'local_disk_free_gb': local_free,
+                'local_disk_util_pct': local_util_pct,
+                'total_disk_used_pct': round((tot_used / tot_cap * 100.0), 1) if tot_cap > 0 else peak_disk,
+                'connections': latest_rec.connections,
+                'threads': latest_rec.threads,
+                'slow_queries': latest_rec.slow_queries,
+                'status': latest_rec.status,
+                'entered_by': latest_rec.entered_by,
+                'updated_at': latest_rec.updated_at,
+                'date': latest_rec.date,
+            })
+        else:
+            empty_disks = [
+                {'slot': i + 1, 'type': nd['default_disks'][i], 'size_gb': 0.0, 'used_gb': 0.0, 'free_gb': 0.0, 'percent': 0.0, 'status': 'No Data', 'is_shared': i == 0}
+                for i in range(3)
+            ]
+            node_overview_data.append({
+                'node_key': nd['node_key'],
+                'node_name': nd['node_name'],
+                'display_name': nd['display_name'],
+                'role_title': nd['role_title'],
+                'hosted_systems': nd['hosted_systems'],
+                'primary_db': nd['primary_db'],
+                'server': nd['display_name'],
+                'has_data': False,
+                'uptime_percent': 0.0,
+                'uptime_str': 'No Data',
+                'uptime_days': 0.0,
+                'uptime_status': 'N/A',
+                'logical_cpus': 48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16),
+                'cpu_percent': 0.0,
+                'memory_percent': 0.0,
+                'memory_total_gb': 0.0,
+                'memory_used_gb': 0.0,
+                'disk_percent': 0.0,
+                'storage_growth_gb': 0.0,
+                'storage_growth_pct': 0.0,
+                'disks': empty_disks,
+                'disk_1': empty_disks[0],
+                'disk_2': empty_disks[1],
+                'disk_3': empty_disks[2],
+                'total_disk_capacity_gb': 0.0,
+                'total_disk_used_gb': 0.0,
+                'total_disk_free_gb': 0.0,
+                'local_disk_capacity_gb': 0.0,
+                'local_disk_used_gb': 0.0,
+                'local_disk_free_gb': 0.0,
+                'local_disk_util_pct': 0.0,
+                'total_disk_used_pct': 0.0,
+                'connections': 0,
+                'threads': 0,
+                'slow_queries': 0,
+                'status': 'No Data',
+                'entered_by': 'Prometheus',
+                'updated_at': None,
+                'date': None,
+            })
+
+    if selected_node == 'All Nodes':
+        filtered_nodes = node_overview_data
+    elif selected_node in ('OLKVM', 'Proxmox'):
+        filtered_nodes = [n for n in node_overview_data if n['node_name'].lower() == selected_node.lower()]
+    else:
+        filtered_nodes = [n for n in node_overview_data if n['node_key'].lower() == selected_node.lower()]
+
+    scoped_node_detail = filtered_nodes[0] if (len(filtered_nodes) == 1) else None
+
+    # ── Shared Storage Records (VSAN on Proxmox & DataDomain NFS on OLKVM) ──
+    shared_storage_records = []
+    seen_shared = set()
+    for n in filtered_nodes:
+        if not n['has_data'] or n['node_name'] in seen_shared:
+            continue
+        seen_shared.add(n['node_name'])
+        d1 = n['disk_1']
+        if d1['size_gb'] > 0:
+            shared_growth_pct = 0.01 if n['node_name'] == 'Proxmox' else 0.02
+            shared_growth_gb = round((shared_growth_pct / 100.0) * d1['size_gb'], 2)
+            shared_storage_records.append({
+                'cluster': n['node_name'],
+                'storage_id': 'storage/pvenode1/VMSAN' if n['node_name'] == 'Proxmox' else 'nmsdd.nms.go.ug:/data/col1/ebsprodbackup (/nmsddbkp)',
+                'type_label': d1['type'],
+                'total_gb': d1['size_gb'],
+                'total_tb': round(d1['size_gb'] / 1024.0, 2),
+                'used_gb': d1['used_gb'],
+                'free_gb': d1['free_gb'],
+                'percent': d1['percent'],
+                'growth_gb': shared_growth_gb,
+                'growth_pct': shared_growth_pct,
+                'status': d1['status'],
+                'date': n['date'] or today_dt,
+            })
+
+    # ── Node Capacity Records (matching Capacity tab format: MONTH | NODE | STORAGE TIER | CAPACITY | USED | FREE | UTILISATION % | GROWTH | GROWTH %) ──
+    node_capacity_records = []
+    for n in filtered_nodes:
+        rec_month = (n['date'] or today_dt)
+        node_capacity_records.append({
+            'month': rec_month,
+            'node_key': n['node_key'],
+            'node_name': n['node_name'],
+            'display_name': n['display_name'],
+            'hosted_systems': n['hosted_systems'],
+            'storage_tier': f"Local + LVM ({n['disk_2']['type']} & {n['disk_3']['type']})",
+            'capacity_gb': n['local_disk_capacity_gb'],
+            'used_gb': n['local_disk_used_gb'],
+            'free_gb': n['local_disk_free_gb'],
+            'used_percent': n['local_disk_util_pct'],
+            'growth_gb': n['storage_growth_gb'],
+            'growth_percent': n['storage_growth_pct'],
+            'has_data': n['has_data'],
+            'is_shared': False,
+        })
+    for sr in shared_storage_records:
+        node_capacity_records.append({
+            'month': sr['date'],
+            'node_key': sr['cluster'],
+            'node_name': sr['cluster'],
+            'display_name': f"{sr['cluster']} Shared Storage",
+            'hosted_systems': sr['storage_id'],
+            'storage_tier': sr['type_label'],
+            'capacity_gb': sr['total_gb'],
+            'used_gb': sr['used_gb'],
+            'free_gb': sr['free_gb'],
+            'used_percent': sr['percent'],
+            'growth_gb': sr['growth_gb'],
+            'growth_percent': sr['growth_pct'],
+            'has_data': True,
+            'is_shared': True,
+        })
+
+    # ── Top Summary KPIs (Deduplicating Shared NFS Storage per Hypervisor Cluster) ──
+    active_nodes = [n for n in filtered_nodes if n['has_data']]
+    if active_nodes:
+        avg_node_up = round(sum(n['uptime_percent'] for n in active_nodes) / len(active_nodes), 2)
+        kpi_node_uptime = f"{avg_node_up}%"
+        healthy_nodes = sum(1 for n in active_nodes if n['status'] == 'Healthy')
+        kpi_nodes_healthy = f"{healthy_nodes}/{len(filtered_nodes)} Healthy"
+    else:
+        kpi_node_uptime = "No Data"
+        kpi_nodes_healthy = f"0/{len(filtered_nodes)} Synced"
+
+    kpi_total_logical_cpus = sum(n['logical_cpus'] for n in filtered_nodes)
+    kpi_total_ram_gb = round(sum(n['memory_total_gb'] for n in filtered_nodes), 1)
+    kpi_used_ram_gb = round(sum(n['memory_used_gb'] for n in filtered_nodes), 1)
+
+    # Calculate storage without double-counting shared NFS (Disk 1) within the same hypervisor cluster
+    seen_shared_clusters = set()
+    dedup_total_gb = 0.0
+    dedup_used_gb = 0.0
+    for n in filtered_nodes:
+        if not n['has_data']:
+            continue
+        # Add local/LVM disks (Disk 2 + Disk 3)
+        dedup_total_gb += n['disk_2']['size_gb'] + n['disk_3']['size_gb']
+        dedup_used_gb += n['disk_2']['used_gb'] + n['disk_3']['used_gb']
+        # Add shared NFS (Disk 1) once per hypervisor cluster (OLKVM nmsddbkp, Proxmox VMSAN)
+        if n['node_name'] not in seen_shared_clusters:
+            seen_shared_clusters.add(n['node_name'])
+            dedup_total_gb += n['disk_1']['size_gb']
+            dedup_used_gb += n['disk_1']['used_gb']
+
+    kpi_total_storage_gb = round(dedup_total_gb, 1)
+    kpi_used_storage_gb = round(dedup_used_gb, 1)
+    kpi_free_storage_gb = round(max(0.0, kpi_total_storage_gb - kpi_used_storage_gb), 1)
+    kpi_storage_used_pct = (
+        round((kpi_used_storage_gb / kpi_total_storage_gb) * 100.0, 1)
+        if kpi_total_storage_gb > 0
+        else (round(sum(n['disk_percent'] for n in active_nodes) / len(active_nodes), 1) if active_nodes else 0.0)
+    )
+
+    kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
+    avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
+    avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
     kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
     kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
-    
+
+    # ── 6-Month Node Uptime Trend SVG Graph ──
+    today_date = timezone.now().date().replace(day=1)
+    target_node_sla = 99.90
+    node_trend_months = []
+
+    for i in range(5, -1, -1):
+        m_year = today_date.year
+        m_month = today_date.month - i
+        while m_month <= 0:
+            m_month += 12
+            m_year -= 1
+        t_month = today_date.replace(year=m_year, month=m_month)
+
+        month_qs = ServerHealth.objects.filter(date__year=t_month.year, date__month=t_month.month)
+        if selected_node == 'OLKVM':
+            month_qs = month_qs.filter(
+                Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
+            )
+        elif selected_node == 'Proxmox':
+            month_qs = month_qs.filter(Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
+        elif selected_node != 'All Nodes':
+            month_qs = month_qs.filter(server__iexact=selected_node)
+
+        if t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
+            val = 0.0
+            has_m_data = False
+        elif month_qs.exists():
+            avg_up = month_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
+            val = round(float(avg_up), 2) if avg_up is not None else 100.0
+            has_m_data = True
+        else:
+            val = 0.0
+            has_m_data = False
+
+        node_trend_months.append({
+            'name': t_month.strftime('%b'),
+            'value': val,
+            'has_data': has_m_data,
+        })
+
+    valid_vals = [m['value'] for m in node_trend_months if m['has_data'] and m['value'] > 0.0]
+    node_trend_recent_avg = round(sum(valid_vals) / len(valid_vals), 2) if valid_vals else 100.0
+
+    min_v = min((valid_vals or [100.0]) + [target_node_sla])
+    y_min = math.floor(min_v - 0.2) if min_v < 98.0 else 98.0
+    y_max = 100.0
+    y_range = max(0.1, y_max - y_min)
+
+    pts = []
+    for idx, m in enumerate(node_trend_months):
+        x = 42 + idx * 63
+        m['x'] = x
+        if m['has_data'] and m['value'] > 0.0:
+            y = 22 + (100.0 - m['value']) * 96 / y_range
+            pts.append(f"{x},{y}")
+            m['y'] = y
+            m['text_y'] = y - 7
+        else:
+            y = 118
+            pts.append(f"{x},{y}")
+            m['y'] = y
+            m['text_y'] = 110
+
+    node_trend_polyline_points = " ".join(pts)
+    node_trend_area_points = ""
+    if pts:
+        node_trend_area_points = f"{node_trend_months[0]['x']},118 {node_trend_polyline_points} {node_trend_months[-1]['x']},118"
+    node_sla_y_coord = 22 + (100.0 - target_node_sla) * 96 / y_range
+
+    # ── Attention Required Alerts (Node Level) ──
+    node_attention_items = []
+    for n in filtered_nodes:
+        if not n['has_data']:
+            node_attention_items.append({
+                'type': 'warning',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}):</strong> No Prometheus telemetry synced yet. Click 'Sync Prometheus' or run <code>prometheus_node_agent.py</code>."
+            })
+            continue
+
+        if n['uptime_percent'] < target_node_sla:
+            node_attention_items.append({
+                'type': 'danger',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}) Uptime:</strong> Node availability ({n['uptime_percent']}%) is below the {target_node_sla}% SLA target."
+            })
+
+        if n['cpu_percent'] > 90:
+            node_attention_items.append({
+                'type': 'danger',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}) CPU Critical:</strong> CPU utilisation is at {n['cpu_percent']}% (&gt; 90% threshold)."
+            })
+        elif n['cpu_percent'] > 75:
+            node_attention_items.append({
+                'type': 'warning',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}) CPU Warning:</strong> Elevated CPU utilisation at {n['cpu_percent']}%."
+            })
+
+        if n['memory_percent'] > 90:
+            node_attention_items.append({
+                'type': 'danger',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}) Memory Critical:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
+            })
+        elif n['memory_percent'] > 80:
+            node_attention_items.append({
+                'type': 'warning',
+                'message': f"<strong>{n['display_name']} ({n['node_name']}) Memory Warning:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
+            })
+
+        for d in n['disks']:
+            if d['percent'] > 90:
+                node_attention_items.append({
+                    'type': 'danger',
+                    'message': f"<strong>{n['display_name']} — {d['type']}:</strong> Critical disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
+                })
+            elif d['percent'] > 80:
+                node_attention_items.append({
+                    'type': 'warning',
+                    'message': f"<strong>{n['display_name']} — {d['type']}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
+                })
+
     return render(request, 'server_health/list.html', {
-        'page_obj': page_obj, 
+        'page_obj': page_obj,
         'is_admin': request.user.is_admin,
+        'selected_node': selected_node,
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
+        'prometheus_url': PROMETHEUS_URL,
+        'node_overview_data': node_overview_data,
+        'filtered_nodes': filtered_nodes,
+        'scoped_node_detail': scoped_node_detail,
+        'shared_storage_records': shared_storage_records,
+        'node_capacity_records': node_capacity_records,
+        'kpi_node_uptime': kpi_node_uptime,
+        'kpi_nodes_healthy': kpi_nodes_healthy,
+        'kpi_total_logical_cpus': kpi_total_logical_cpus,
+        'kpi_total_ram_gb': kpi_total_ram_gb,
+        'kpi_used_ram_gb': kpi_used_ram_gb,
+        'kpi_total_storage_gb': kpi_total_storage_gb,
+        'kpi_used_storage_gb': kpi_used_storage_gb,
+        'kpi_free_storage_gb': kpi_free_storage_gb,
+        'kpi_storage_used_pct': kpi_storage_used_pct,
         'kpi_unhealthy_count': kpi_unhealthy_count,
         'kpi_avg_cpu': kpi_avg_cpu,
-        'kpi_avg_mem': kpi_avg_mem
+        'kpi_avg_mem': kpi_avg_mem,
+        'target_node_sla': target_node_sla,
+        'node_trend_months': node_trend_months,
+        'node_trend_recent_avg': node_trend_recent_avg,
+        'node_trend_polyline_points': node_trend_polyline_points,
+        'node_trend_area_points': node_trend_area_points,
+        'node_sla_y_coord': node_sla_y_coord,
+        'node_attention_items': node_attention_items,
     })
 
 @login_required
@@ -1804,8 +2361,8 @@ def server_health_create(request):
 def server_health_edit(request, pk):
     health = get_object_or_404(ServerHealth, pk=pk)
     
-    if health.entered_by == 'Script':
-        messages.error(request, 'Server health records generated by automated scripts cannot be edited.')
+    if health.entered_by in ['Script', 'Prometheus']:
+        messages.error(request, 'Server health records generated by automated scripts or Prometheus cannot be edited.')
         return redirect('server_health_list')
         
     can_edit_always = request.user.is_admin
@@ -2675,59 +3232,90 @@ def server_health_ingest(request):
     try:
         data = json.loads(request.body)
         
-        # Calculate status based on thresholds
         cpu = float(data.get('cpu_percent', 0))
         memory = float(data.get('memory_percent', 0))
-        disk = float(data.get('disk_percent', 0))
+        d1_pct = float(data.get('disk_1_percent', 0))
+        d2_pct = float(data.get('disk_2_percent', 0))
+        d3_pct = float(data.get('disk_3_percent', 0))
+        disk = max(float(data.get('disk_percent', 0)), d1_pct, d2_pct, d3_pct)
+        uptime_pct = float(data.get('uptime_percent', 100.0))
         
         status = 'Healthy'
-        if cpu > 90 or memory > 90 or disk > 90:
+        if cpu > 90 or memory > 90 or disk > 90 or uptime_pct < 99.0:
             status = 'Critical'
-        elif cpu > 75 or memory > 80 or disk > 80:
+        elif cpu > 75 or memory > 80 or disk > 80 or uptime_pct < 99.9:
             status = 'Warning'
             
         # Check for optional custom date override (for backfilling)
         date_str = data.get('date')
         if date_str:
             health_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-          
         else:
             health_date = datetime.now().date()
-            
-        # Find the first existing entry for this server/date combination (handles pre-existing duplicate logs cleanly)
+
+        node_name = data.get('node_name', '')
+        server_name = data.get('server', 'Unknown')
+        db_name = data.get('database', 'MySQL')
+        if not node_name:
+            if db_name == 'Oracle' or any(k in server_name.lower() for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']):
+                node_name = 'OLKVM'
+            else:
+                node_name = 'Proxmox'
+
+        source = data.get('entered_by', 'Prometheus' if 'disk_1_type' in data or 'node_name' in data else 'Script')
+
+        # Find existing entry for this server/node/date combination
         health = ServerHealth.objects.filter(
             date=health_date,
-            server=data.get('server', 'Unknown'),
-            database=data.get('database', 'MySQL')
+            server=server_name,
+            database=db_name
         ).first()
-        
+
+        fields_map = {
+            'node_name': node_name,
+            'hosted_systems': data.get('hosted_systems', ''),
+            'entered_by': source,
+            'uptime_percent': uptime_pct,
+            'uptime_days': float(data.get('uptime_days', 0)),
+            'logical_cpus': int(data.get('logical_cpus', data.get('threads', 0))),
+            'cpu_percent': cpu,
+            'memory_percent': memory,
+            'memory_total_gb': float(data.get('memory_total_gb', 0)),
+            'memory_used_gb': float(data.get('memory_used_gb', 0)),
+            'disk_percent': disk,
+            'storage_growth_gb': float(data.get('storage_growth_gb', 0)),
+            'storage_growth_pct': float(data.get('storage_growth_pct', 0)),
+            'disk_1_type': data.get('disk_1_type', 'Disk 1 (SSD / OS)'),
+            'disk_1_size_gb': float(data.get('disk_1_size_gb', 0)),
+            'disk_1_used_gb': float(data.get('disk_1_used_gb', 0)),
+            'disk_1_percent': d1_pct if d1_pct > 0 else disk,
+            'disk_2_type': data.get('disk_2_type', 'Disk 2 (SAS / Data)'),
+            'disk_2_size_gb': float(data.get('disk_2_size_gb', 0)),
+            'disk_2_used_gb': float(data.get('disk_2_used_gb', 0)),
+            'disk_2_percent': d2_pct,
+            'disk_3_type': data.get('disk_3_type', 'Disk 3 (SAN / Backup)'),
+            'disk_3_size_gb': float(data.get('disk_3_size_gb', 0)),
+            'disk_3_used_gb': float(data.get('disk_3_used_gb', 0)),
+            'disk_3_percent': d3_pct,
+            'tablespace_percent': float(data.get('tablespace_percent', disk)),
+            'connections': int(data.get('connections', 0)),
+            'slow_queries': int(data.get('slow_queries', 0)),
+            'threads': int(data.get('threads', 0)),
+            'status': status,
+        }
+
         if health:
-            health.entered_by = 'Script'
-            health.cpu_percent = cpu
-            health.memory_percent = memory
-            health.disk_percent = disk
-            health.tablespace_percent = float(data.get('tablespace_percent', 0))
-            health.connections = int(data.get('connections', 0))
-            health.slow_queries = int(data.get('slow_queries', 0))
-            health.threads = int(data.get('threads', 0))
-            health.status = status
+            for k, v in fields_map.items():
+                setattr(health, k, v)
             health.save()
         else:
             health = ServerHealth.objects.create(
                 date=health_date,
-                server=data.get('server', 'Unknown'),
-                database=data.get('database', 'MySQL'),
-                entered_by='Script',
-                cpu_percent=cpu,
-                memory_percent=memory,
-                disk_percent=disk,
-                tablespace_percent=float(data.get('tablespace_percent', 0)),
-                connections=int(data.get('connections', 0)),
-                slow_queries=int(data.get('slow_queries', 0)),
-                threads=int(data.get('threads', 0)),
-                status=status
+                server=server_name,
+                database=db_name,
+                **fields_map
             )
-        return JsonResponse({'status': 'success', 'id': health.id})
+        return JsonResponse({'status': 'success', 'id': health.id, 'node_name': health.node_name})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
  

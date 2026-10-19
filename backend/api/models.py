@@ -220,11 +220,25 @@ class BackupRecovery(models.Model):
 
 class ServerHealth(models.Model):
     date = models.DateField()
+    node_name = models.CharField(max_length=50, choices=[
+        ('OLKVM', 'OLKVM Node'),
+        ('Proxmox', 'Proxmox Node'),
+    ], default='Proxmox', blank=True)
+    hosted_systems = models.CharField(max_length=200, blank=True, default='')
     server = models.CharField(max_length=100)
     entered_by = models.CharField(max_length=20, choices=[
         ('User', 'User'),
-        ('Script', 'Script')
+        ('Script', 'Script'),
+        ('Prometheus', 'Prometheus')
     ], default='User')
+    uptime_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=100.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    uptime_days = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    logical_cpus = models.IntegerField(default=0)
     cpu_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,
@@ -235,9 +249,41 @@ class ServerHealth(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
+    memory_total_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    memory_used_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     disk_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    storage_growth_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    storage_growth_pct = models.DecimalField(max_digits=7, decimal_places=3, default=0.000)
+    # 3 Disk Types (Categorized by Size & Type)
+    disk_1_type = models.CharField(max_length=100, blank=True, default='Disk 1 (SSD / OS)')
+    disk_1_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_1_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_1_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    disk_2_type = models.CharField(max_length=100, blank=True, default='Disk 2 (SAS / Data)')
+    disk_2_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_2_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_2_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    disk_3_type = models.CharField(max_length=100, blank=True, default='Disk 3 (SAN / Backup)')
+    disk_3_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_3_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    disk_3_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0.00,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     tablespace_percent = models.DecimalField(
@@ -245,9 +291,9 @@ class ServerHealth(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
-    connections = models.IntegerField()
-    slow_queries = models.IntegerField()
-    threads = models.IntegerField()
+    connections = models.IntegerField(default=0)
+    slow_queries = models.IntegerField(default=0)
+    threads = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=[
         ('Healthy', 'Healthy'),
         ('Warning', 'Warning'),
@@ -262,6 +308,61 @@ class ServerHealth(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def disk_1_free_gb(self):
+        return round(max(0.0, float(self.disk_1_size_gb or 0) - float(self.disk_1_used_gb or 0)), 2)
+
+    @property
+    def disk_2_free_gb(self):
+        return round(max(0.0, float(self.disk_2_size_gb or 0) - float(self.disk_2_used_gb or 0)), 2)
+
+    @property
+    def disk_3_free_gb(self):
+        return round(max(0.0, float(self.disk_3_size_gb or 0) - float(self.disk_3_used_gb or 0)), 2)
+
+    @property
+    def total_disk_capacity_gb(self):
+        return round(float(self.disk_1_size_gb or 0) + float(self.disk_2_size_gb or 0) + float(self.disk_3_size_gb or 0), 2)
+
+    @property
+    def total_disk_used_gb(self):
+        return round(float(self.disk_1_used_gb or 0) + float(self.disk_2_used_gb or 0) + float(self.disk_3_used_gb or 0), 2)
+
+    @property
+    def total_disk_free_gb(self):
+        return round(max(0.0, self.total_disk_capacity_gb - self.total_disk_used_gb), 2)
+
+    def save(self, *args, **kwargs):
+        srv_lower = (self.server or '').lower()
+        if not self.node_name or (self.node_name == 'Proxmox' and (self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']))):
+            if self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']):
+                self.node_name = 'OLKVM'
+            else:
+                self.node_name = 'Proxmox'
+
+        if not self.hosted_systems:
+            if 'nmsinfra' in srv_lower:
+                self.hosted_systems = 'Oracle DB (nmsinfra - 192.168.30.26)'
+            elif 'nmsebs' in srv_lower:
+                self.hosted_systems = 'Oracle EBS App (nmsebs - 192.168.30.25)'
+            elif 'pvenode1' in srv_lower:
+                self.hosted_systems = 'tomcatvm (qemu/102) & Internal Systems'
+            elif 'pvenode2' in srv_lower:
+                self.hosted_systems = 'jumphostvm (qemu/100) & monitoringvm (qemu/101)'
+            elif 'pvenode3' in srv_lower:
+                self.hosted_systems = 'databasevm (qemu/103 - MySQL / Pentana)'
+            elif self.node_name == 'OLKVM':
+                self.hosted_systems = 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
+            else:
+                self.hosted_systems = 'MySQL (nickledbnew), MS SQL (Pentana) & Internal Systems'
+
+        # If 3-disk percentages are provided and overall disk_percent is 0, set disk_percent to highest disk utilization
+        max_disk_pct = max(float(self.disk_1_percent or 0), float(self.disk_2_percent or 0), float(self.disk_3_percent or 0))
+        if max_disk_pct > 0 and float(self.disk_percent or 0) == 0:
+            self.disk_percent = round(max_disk_pct, 2)
+
+        super().save(*args, **kwargs)
+
     class Meta:
         db_table = 'server_health'
         verbose_name = 'Server Health'
@@ -269,7 +370,7 @@ class ServerHealth(models.Model):
         default_permissions = ('add', 'view')
 
     def __str__(self):
-        return f"{self.server} - {self.date}"
+        return f"{self.node_name} ({self.server}) - {self.date}"
 
 class MaintenanceRegister(models.Model):
     date = models.DateField()

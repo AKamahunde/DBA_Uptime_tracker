@@ -96,13 +96,31 @@ class ServerHealthForm(forms.ModelForm):
     class Meta:
         model = ServerHealth
         fields = [
-            'date', 'entered_by', 'server', 'cpu_percent', 'memory_percent', 
-            'disk_percent', 'tablespace_percent', 'connections', 'slow_queries', 
-            'threads', 'status', 'database'
+            'date', 'node_name', 'hosted_systems', 'server', 'database', 'entered_by',
+            'uptime_percent', 'uptime_days', 'cpu_percent', 'memory_percent',
+            'memory_total_gb', 'memory_used_gb', 'disk_percent',
+            'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
+            'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
+            'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
+            'tablespace_percent', 'connections', 'slow_queries', 'threads', 'status'
         ]
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        optional_fields = [
+            'node_name', 'hosted_systems', 'uptime_percent', 'uptime_days',
+            'memory_total_gb', 'memory_used_gb',
+            'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
+            'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
+            'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
+            'tablespace_percent', 'connections', 'slow_queries', 'threads'
+        ]
+        for fname in optional_fields:
+            if fname in self.fields:
+                self.fields[fname].required = False
 
 class MaintenanceRegisterForm(forms.ModelForm):
     change_id = forms.CharField(

@@ -7,59 +7,154 @@
     <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
     <form method="post">
         {% csrf_token %}
-        <div class="form-group">
-            <label for="{{ form.date.id_for_label }}">Date:</label>
-            {{ form.date }}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.date.id_for_label }}">Date:</label>
+                {{ form.date }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.node_name.id_for_label }}">Infrastructure Node:</label>
+                {{ form.node_name }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.server.id_for_label }}">Server / Hostname:</label>
+                {{ form.server }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.database.id_for_label }}">Primary Database Workload:</label>
+                {{ form.database }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.hosted_systems.id_for_label }}">Hosted Systems:</label>
+                {{ form.hosted_systems }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.entered_by.id_for_label }}">Entered By / Source:</label>
+                {{ form.entered_by }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.entered_by.id_for_label }}">Entered By:</label>
-            {{ form.entered_by }}
+
+        <h3 style="margin: 1.25rem 0 0.75rem 0; font-size: 0.95rem; color: var(--primary-navy); border-bottom: 1px solid #e2e8f0; padding-bottom: 0.4rem;">Node Uptime, CPU &amp; Memory</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.uptime_percent.id_for_label }}">Node Uptime %:</label>
+                {{ form.uptime_percent }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.uptime_days.id_for_label }}">Continuous Uptime (Days):</label>
+                {{ form.uptime_days }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.cpu_percent.id_for_label }}">CPU %:</label>
+                {{ form.cpu_percent }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.memory_percent.id_for_label }}">Memory %:</label>
+                {{ form.memory_percent }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.memory_total_gb.id_for_label }}">Total Memory (GB):</label>
+                {{ form.memory_total_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.memory_used_gb.id_for_label }}">Used Memory (GB):</label>
+                {{ form.memory_used_gb }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.server.id_for_label }}">Server:</label>
-            {{ form.server }}
+
+        <h3 style="margin: 1.25rem 0 0.75rem 0; font-size: 0.95rem; color: var(--primary-navy); border-bottom: 1px solid #e2e8f0; padding-bottom: 0.4rem;">3 Disk Types (Categorized by Size &amp; Type)</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.disk_1_type.id_for_label }}">Disk 1 Type / Mount:</label>
+                {{ form.disk_1_type }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_1_size_gb.id_for_label }}">Disk 1 Total Size (GB):</label>
+                {{ form.disk_1_size_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_1_used_gb.id_for_label }}">Disk 1 Used (GB):</label>
+                {{ form.disk_1_used_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_1_percent.id_for_label }}">Disk 1 Used %:</label>
+                {{ form.disk_1_percent }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.cpu_percent.id_for_label }}">CPU %:</label>
-            {{ form.cpu_percent }}
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.disk_2_type.id_for_label }}">Disk 2 Type / Mount:</label>
+                {{ form.disk_2_type }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_2_size_gb.id_for_label }}">Disk 2 Total Size (GB):</label>
+                {{ form.disk_2_size_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_2_used_gb.id_for_label }}">Disk 2 Used (GB):</label>
+                {{ form.disk_2_used_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_2_percent.id_for_label }}">Disk 2 Used %:</label>
+                {{ form.disk_2_percent }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.memory_percent.id_for_label }}">Memory %:</label>
-            {{ form.memory_percent }}
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.disk_3_type.id_for_label }}">Disk 3 Type / Mount:</label>
+                {{ form.disk_3_type }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_3_size_gb.id_for_label }}">Disk 3 Total Size (GB):</label>
+                {{ form.disk_3_size_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_3_used_gb.id_for_label }}">Disk 3 Used (GB):</label>
+                {{ form.disk_3_used_gb }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.disk_3_percent.id_for_label }}">Disk 3 Used %:</label>
+                {{ form.disk_3_percent }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.disk_percent.id_for_label }}">Disk %:</label>
-            {{ form.disk_percent }}
+
+        <h3 style="margin: 1.25rem 0 0.75rem 0; font-size: 0.95rem; color: var(--primary-navy); border-bottom: 1px solid #e2e8f0; padding-bottom: 0.4rem;">Overall Disk &amp; Database Telemetry</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label for="{{ form.disk_percent.id_for_label }}">Peak / Overall Disk %:</label>
+                {{ form.disk_percent }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.tablespace_percent.id_for_label }}">Tablespace %:</label>
+                {{ form.tablespace_percent }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.connections.id_for_label }}">Connections:</label>
+                {{ form.connections }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.slow_queries.id_for_label }}">Slow Queries:</label>
+                {{ form.slow_queries }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.threads.id_for_label }}">Threads:</label>
+                {{ form.threads }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.status.id_for_label }}">Status:</label>
+                {{ form.status }}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="{{ form.tablespace_percent.id_for_label }}">Tablespace %:</label>
-            {{ form.tablespace_percent }}
-        </div>
-        <div class="form-group">
-            <label for="{{ form.connections.id_for_label }}">Connections:</label>
-            {{ form.connections }}
-        </div>
-        <div class="form-group">
-            <label for="{{ form.slow_queries.id_for_label }}">Slow Queries:</label>
-            {{ form.slow_queries }}
-        </div>
-        <div class="form-group">
-            <label for="{{ form.threads.id_for_label }}">Threads:</label>
-            {{ form.threads }}
-        </div>
-        <div class="form-group">
-            <label for="{{ form.status.id_for_label }}">Status:</label>
-            {{ form.status }}
-        </div>
-        <div class="form-group">
-            <label for="{{ form.database.id_for_label }}">Database:</label>
-            {{ form.database }}
-        </div>
+
         {% if can_edit == False %}
         <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
         {% endif %}
-        <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
-        <a href="{% url 'server_health_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+        <div style="margin-top: 1rem;">
+            <button type="submit" class="btn btn-success" {% if can_edit == False %}disabled{% endif %}>Save</button>
+            <a href="{% url 'server_health_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
+        </div>
     </form>
 </div>
 {% endblock %}
