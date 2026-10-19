@@ -194,7 +194,6 @@
                 <tr>
                     <th>Month</th>
                     <th>Node</th>
-                    <th>Storage Tier</th>
                     <th>Capacity</th>
                     <th>Used</th>
                     <th>Free</th>
@@ -211,7 +210,6 @@
                         <strong>{{ cap.display_name }}</strong>
                         <span style="font-weight: normal; color: #64748b; font-size: 0.76rem; margin-left: 0.25rem;">({{ cap.node_name }})</span>
                     </td>
-                    <td style="color: #475569;">{{ cap.storage_tier }}</td>
                     <td>{{ cap.capacity_gb }} GB</td>
                     <td>{{ cap.used_gb }} GB</td>
                     <td>{{ cap.free_gb }} GB</td>
@@ -227,7 +225,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
