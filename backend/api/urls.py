@@ -6,6 +6,8 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('dashboard/print/', views.dashboard_print, name='dashboard_print'),
     path('dashboard/excel/', views.dashboard_excel, name='dashboard_excel'),
+    path('dashboard/node/print/', views.dashboard_node_print, name='dashboard_node_print'),
+    path('dashboard/node/excel/', views.dashboard_node_excel, name='dashboard_node_excel'),
     path('login/', views.CustomLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('password-change/', views.password_change_required, name='password_change_required'),

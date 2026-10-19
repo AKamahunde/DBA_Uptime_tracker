@@ -2256,6 +2256,19 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                     'message': f"<strong>{n['display_name']} — {d['type']}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
 
+    all_nodes_healthy = all(n['status'] == 'Healthy' for n in active_nodes) if active_nodes else True
+    scope_label = "all monitored OLKVM and Proxmox nodes" if selected_node == 'All Nodes' else f"the {selected_node} node scope"
+    if all_nodes_healthy:
+        default_node_lede_text = (
+            f"Infrastructure telemetry across {scope_label} held within the {target_node_sla}% availability SLA target ({kpi_node_uptime} average uptime). "
+            f"Compute and storage capacity across {kpi_total_logical_cpus} logical CPUs, {kpi_total_ram_gb} GB RAM, and {kpi_total_storage_gb} GB provisioned storage ({kpi_storage_used_pct}% utilized) remain within normal operational thresholds."
+        )
+    else:
+        default_node_lede_text = (
+            f"Infrastructure telemetry for {scope_label} recorded {kpi_nodes_healthy} with an average availability of {kpi_node_uptime}. "
+            f"Total provisioned storage stands at {kpi_total_storage_gb} GB ({kpi_used_storage_gb} GB used, {kpi_storage_used_pct}%)."
+        )
+
     return {
         'selected_node': selected_node,
         'prometheus_url': PROMETHEUS_URL,
@@ -2280,7 +2293,224 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
         'node_trend_area_points': node_trend_area_points,
         'node_sla_y_coord': node_sla_y_coord,
         'node_attention_items': node_attention_items,
+        'default_node_lede_text': default_node_lede_text,
     }
+
+
+@login_required
+def dashboard_node_print(request):
+    if request.method == 'POST':
+        month_str = request.POST.get('month', '')
+        selected_node = request.POST.get('node_select', 'All Nodes')
+        summary_narrative = request.POST.get('summary_narrative', '').strip()
+    else:
+        month_str = request.GET.get('month', '')
+        selected_node = request.GET.get('node_select', 'All Nodes')
+        summary_narrative = request.GET.get('summary_narrative', '').strip()
+
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
+    lede_text = summary_narrative if summary_narrative else node_ctx['default_node_lede_text']
+
+    ctx = {
+        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'extracted_by': user_display,
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
+        'lede_text': lede_text,
+    }
+    ctx.update(node_ctx)
+    return render(request, 'dashboard_node_print.html', ctx)
+
+
+@login_required
+def dashboard_node_excel(request):
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+    filtered_nodes = node_ctx['filtered_nodes']
+    node_capacity_records = node_ctx['node_capacity_records']
+    month_display = reporting_month.strftime('%B %Y')
+
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Node Performance & Capacity"
+
+        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
+        font_section = Font(name='Segoe UI', size=11, bold=True, color='002569')
+        font_header = Font(name='Segoe UI', size=10, bold=True, color='FFFFFF')
+        font_body = Font(name='Segoe UI', size=10)
+
+        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
+        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
+
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
+
+        border_thin = Border(
+            left=Side(style='thin', color='D1D7E0'),
+            right=Side(style='thin', color='D1D7E0'),
+            top=Side(style='thin', color='D1D7E0'),
+            bottom=Side(style='thin', color='D1D7E0')
+        )
+
+        ws.merge_cells('A1:I1')
+        ws['A1'] = f"Node Infrastructure Performance & Capacity Summary ({selected_node}) - {month_display}"
+        ws['A1'].font = font_title
+        ws['A1'].alignment = align_left
+        ws.row_dimensions[1].height = 30
+
+        ws.append([])
+        row_num = 3
+
+        headers = [
+            "Node", "Hypervisor", "Workloads", "Uptime (%)", "Local Storage (Used / Total GB)",
+            "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"
+        ]
+        ws.append(headers)
+        ws.row_dimensions[row_num].height = 24
+        for col_num in range(1, len(headers) + 1):
+            c = ws.cell(row=row_num, column=col_num)
+            c.font = font_header
+            c.fill = fill_header
+            c.alignment = align_center
+            c.border = border_thin
+        row_num += 1
+
+        for n in filtered_nodes:
+            r_data = [
+                n['display_name'],
+                n['node_name'],
+                n['hosted_systems'],
+                f"{n['uptime_percent']}%" if n['has_data'] else "No Data",
+                f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}" if n['has_data'] else "No Data",
+                f"{n['local_disk_util_pct']}%" if n['has_data'] else "No Data",
+                f"{n['memory_used_gb']} / {n['memory_total_gb']}" if n['has_data'] else "No Data",
+                f"{n['memory_percent']}%" if n['has_data'] else "No Data",
+                n['logical_cpus'],
+                f"{n['cpu_percent']}%" if n['has_data'] else "No Data",
+                n['status'],
+            ]
+            ws.append(r_data)
+            ws.row_dimensions[row_num].height = 20
+            for col_num in range(1, len(headers) + 1):
+                c = ws.cell(row=row_num, column=col_num)
+                c.font = font_body
+                c.border = border_thin
+                if row_num % 2 == 0:
+                    c.fill = fill_even
+                c.alignment = align_left if col_num in (1, 2, 3) else align_center
+            row_num += 1
+
+        ws.append([])
+        row_num += 1
+        ws.cell(row=row_num, column=1, value="Node Capacity Records (3 Disk Tiers & Shared Storage)").font = font_section
+        row_num += 1
+
+        cap_headers = [
+            "Month", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"
+        ]
+        ws.append(cap_headers)
+        ws.row_dimensions[row_num].height = 24
+        for col_num in range(1, len(cap_headers) + 1):
+            c = ws.cell(row=row_num, column=col_num)
+            c.font = font_header
+            c.fill = fill_header
+            c.alignment = align_center
+            c.border = border_thin
+        row_num += 1
+
+        for cap in node_capacity_records:
+            c_data = [
+                cap['month'].strftime('%B %Y') if hasattr(cap['month'], 'strftime') else str(cap['month']),
+                cap['display_name'],
+                cap['node_name'],
+                cap['storage_tier'],
+                cap['capacity_gb'],
+                cap['used_gb'],
+                cap['free_gb'],
+                f"{cap['used_percent']}%",
+                cap['growth_gb'],
+                f"{cap['growth_percent']}%",
+            ]
+            ws.append(c_data)
+            ws.row_dimensions[row_num].height = 20
+            for col_num in range(1, len(cap_headers) + 1):
+                c = ws.cell(row=row_num, column=col_num)
+                c.font = font_body
+                c.border = border_thin
+                if row_num % 2 == 0:
+                    c.fill = fill_even
+                c.alignment = align_left if col_num in (1, 2, 3, 4) else align_center
+            row_num += 1
+
+        ws.append([])
+        row_num += 1
+        ws.cell(row=row_num, column=1, value=f"Extracted by {user_display} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}").font = Font(name='Segoe UI', size=9, italic=True)
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col:
+                if cell.row == 1 or cell.row >= row_num:
+                    continue
+                if cell.value is not None:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        safe_scope = selected_node.replace(' ', '_').replace('.', '_')
+        filename = f"Node_Performance_Report_{safe_scope}_{reporting_month.strftime('%Y_%m')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+    except Exception:
+        import csv
+        response = HttpResponse(content_type='text/csv')
+        safe_scope = selected_node.replace(' ', '_').replace('.', '_')
+        filename = f"Node_Performance_Report_{safe_scope}_{reporting_month.strftime('%Y_%m')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        writer = csv.writer(response)
+        writer.writerow([f"Node Infrastructure Performance & Capacity Summary ({selected_node}) - {month_display}"])
+        writer.writerow([])
+        writer.writerow(["Node", "Hypervisor", "Workloads", "Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
+        for n in filtered_nodes:
+            writer.writerow([
+                n['display_name'], n['node_name'], n['hosted_systems'],
+                f"{n['uptime_percent']}%", f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}",
+                f"{n['local_disk_util_pct']}%", f"{n['memory_used_gb']} / {n['memory_total_gb']}",
+                f"{n['memory_percent']}%", n['logical_cpus'], f"{n['cpu_percent']}%", n['status']
+            ])
+        return response
+
 
 
 @login_required
