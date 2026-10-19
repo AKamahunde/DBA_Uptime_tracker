@@ -242,20 +242,20 @@
     </div>
 
     <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+        <table class="modern-table">
             <thead>
-                <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Timestamp</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Node / Server</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Uptime</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">CPU</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.72rem; text-align: center;">Disk 1</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Disk 2</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Disk 3</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Logged By</th>
-                    <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
+                <tr>
+                    <th>Timestamp</th>
+                    <th style="text-align: left;">Node / Server</th>
+                    <th>Uptime</th>
+                    <th>CPU</th>
+                    <th>Memory</th>
+                    <th>Shared Storage</th>
+                    <th>Data / LVM</th>
+                    <th>Local / OS</th>
+                    <th>Status</th>
+                    <th>Logged By</th>
+                    <th style="width: 50px;"></th>
                 </tr>
             </thead>
             <tbody>
@@ -266,7 +266,7 @@
                         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.updated_at|time:"H:i" }}</div>
                     </td>
 
-                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle;">
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left;">
                         <div style="font-weight: 600; color: #0f172a;">
                             {% if health.database == 'MS SQL Server' %}Pentana{% else %}{{ health.server }}{% endif %}
                             {% if health.node_name %}<span style="font-weight: normal; color: #64748b; font-size: 0.75rem;">({{ health.node_name }})</span>{% endif %}

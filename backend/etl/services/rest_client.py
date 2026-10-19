@@ -451,9 +451,9 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
             'percent': min(100.0, max(0.0, pct)),
         }
 
-    d1 = _get_pve_storage('VMSAN', f'storage/{pve_node}/VMSAN')
-    d2 = _get_pve_storage('local-lvm', f'storage/{pve_node}/local-lvm')
-    d3 = _get_pve_storage('local', f'storage/{pve_node}/local')
+    d1 = _get_pve_storage('VMSAN', 'VMSAN (Shared)')
+    d2 = _get_pve_storage('local-lvm', 'local-lvm (LVM-Thin)')
+    d3 = _get_pve_storage('local', 'local (Root / ISO)')
 
     max_disk_pct = round(max(d1['percent'], d2['percent'], d3['percent']), 2)
 

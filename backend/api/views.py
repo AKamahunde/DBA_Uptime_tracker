@@ -1857,6 +1857,26 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             return 'Warning'
         return 'Healthy'
 
+    def _clean_disk_label(raw_label, default_label):
+        lbl = (raw_label or default_label or '').strip()
+        if lbl.startswith('storage/'):
+            parts = lbl.split('/')
+            lbl = parts[-1] if len(parts) >= 3 else lbl
+        low = lbl.lower()
+        if 'vmsan' in low:
+            return 'VMSAN (Shared)'
+        if 'local-lvm' in low:
+            return 'local-lvm (LVM-Thin)'
+        if low == 'local' or 'local (' in low:
+            return 'local (Root / ISO)'
+        if 'nmsddbkp' in low:
+            return '/nmsddbkp (Shared NFS)'
+        if '/u01' in low:
+            return '/u01 (Oracle Data)'
+        if 'root' in low or lbl == '/':
+            return '/ (OS Root)'
+        return lbl
+
     node_overview_data = []
     for nd in node_definitions:
         latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
@@ -1902,7 +1922,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             disks = [
                 {
                     'slot': 1,
-                    'type': latest_rec.disk_1_type or nd['default_disks'][0],
+                    'type': _clean_disk_label(latest_rec.disk_1_type, nd['default_disks'][0]),
                     'size_gb': round(d1_size, 2),
                     'used_gb': round(d1_used, 2),
                     'free_gb': round(max(0.0, d1_size - d1_used), 2),
@@ -1912,7 +1932,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                 },
                 {
                     'slot': 2,
-                    'type': latest_rec.disk_2_type or nd['default_disks'][1],
+                    'type': _clean_disk_label(latest_rec.disk_2_type, nd['default_disks'][1]),
                     'size_gb': round(d2_size, 2),
                     'used_gb': round(d2_used, 2),
                     'free_gb': round(max(0.0, d2_size - d2_used), 2),
@@ -1922,7 +1942,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                 },
                 {
                     'slot': 3,
-                    'type': latest_rec.disk_3_type or nd['default_disks'][2],
+                    'type': _clean_disk_label(latest_rec.disk_3_type, nd['default_disks'][2]),
                     'size_gb': round(d3_size, 2),
                     'used_gb': round(d3_used, 2),
                     'free_gb': round(max(0.0, d3_size - d3_used), 2),
@@ -1987,7 +2007,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             })
         else:
             empty_disks = [
-                {'slot': i + 1, 'type': nd['default_disks'][i], 'size_gb': 0.0, 'used_gb': 0.0, 'free_gb': 0.0, 'percent': 0.0, 'status': 'No Data', 'is_shared': i == 0}
+                {'slot': i + 1, 'type': _clean_disk_label(nd['default_disks'][i], nd['default_disks'][i]), 'size_gb': 0.0, 'used_gb': 0.0, 'free_gb': 0.0, 'percent': 0.0, 'status': 'No Data', 'is_shared': i == 0}
                 for i in range(3)
             ]
             node_overview_data.append({
@@ -2053,7 +2073,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             shared_growth_gb = round((shared_growth_pct / 100.0) * d1['size_gb'], 2)
             shared_storage_records.append({
                 'cluster': n['node_name'],
-                'storage_id': 'storage/pvenode1/VMSAN' if n['node_name'] == 'Proxmox' else 'nmsdd.nms.go.ug:/data/col1/ebsprodbackup (/nmsddbkp)',
+                'storage_id': 'VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp',
                 'type_label': d1['type'],
                 'total_gb': d1['size_gb'],
                 'total_tb': round(d1['size_gb'] / 1024.0, 2),
@@ -2069,28 +2089,30 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
     node_capacity_records = []
     for n in filtered_nodes:
         rec_month = (n['date'] or today_dt)
-        node_capacity_records.append({
-            'month': rec_month,
-            'node_key': n['node_key'],
-            'node_name': n['node_name'],
-            'display_name': n['display_name'],
-            'hosted_systems': n['hosted_systems'],
-            'storage_tier': f"Local + LVM ({n['disk_2']['type']} & {n['disk_3']['type']})",
-            'capacity_gb': n['local_disk_capacity_gb'],
-            'used_gb': n['local_disk_used_gb'],
-            'free_gb': n['local_disk_free_gb'],
-            'used_percent': n['local_disk_util_pct'],
-            'growth_gb': n['storage_growth_gb'],
-            'growth_percent': n['storage_growth_pct'],
-            'has_data': n['has_data'],
-            'is_shared': False,
-        })
+        for d in (n['disk_2'], n['disk_3']):
+            tier_growth_gb = round(n['storage_growth_gb'] * (d['size_gb'] / n['local_disk_capacity_gb']), 2) if n['local_disk_capacity_gb'] > 0 else 0.0
+            node_capacity_records.append({
+                'month': rec_month,
+                'node_key': n['node_key'],
+                'node_name': n['node_name'],
+                'display_name': n['display_name'],
+                'hosted_systems': n['hosted_systems'],
+                'storage_tier': d['type'],
+                'capacity_gb': d['size_gb'],
+                'used_gb': d['used_gb'],
+                'free_gb': d['free_gb'],
+                'used_percent': d['percent'],
+                'growth_gb': tier_growth_gb,
+                'growth_percent': n['storage_growth_pct'],
+                'has_data': n['has_data'],
+                'is_shared': False,
+            })
     for sr in shared_storage_records:
         node_capacity_records.append({
             'month': sr['date'],
             'node_key': sr['cluster'],
             'node_name': sr['cluster'],
-            'display_name': f"{sr['cluster']} Shared Storage",
+            'display_name': f"{sr['cluster']} Shared",
             'hosted_systems': sr['storage_id'],
             'storage_tier': sr['type_label'],
             'capacity_gb': sr['total_gb'],
