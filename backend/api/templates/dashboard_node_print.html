@@ -481,7 +481,7 @@
   <table class="report-table">
     <thead>
       <tr>
-        <th>Month</th>
+        <th>Timestamp</th>
         <th>Node</th>
         <th>Storage Tier</th>
         <th>Capacity</th>
@@ -495,9 +495,17 @@
     <tbody>
       {% for cap in node_capacity_records %}
       <tr>
-        <td>{{ cap.month|date:"F Y" }}</td>
         <td>
-          <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
+          <div style="font-weight: 600;">{{ cap.date|date:"d M Y" }}</div>
+          <div style="font-size: 7.5pt; color: #64748b;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
+        </td>
+        <td>
+          {% if cap.node_name == 'OLKVM' %}
+            <strong>OLKVM</strong>
+            <div style="font-size: 7.5pt; color: #64748b;">{{ cap.hosted_systems }}</div>
+          {% else %}
+            <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
+          {% endif %}
         </td>
         <td style="text-align: left; color: #475569;">{{ cap.storage_tier }}</td>
         <td>{{ cap.capacity_gb }} GB</td>

@@ -245,7 +245,7 @@
         <table class="modern-table">
             <thead>
                 <tr>
-                    <th>Month</th>
+                    <th>Timestamp</th>
                     <th>Node</th>
                     <th>Storage Tier</th>
                     <th>Capacity</th>
@@ -259,7 +259,10 @@
             <tbody>
                 {% for cap in node_capacity_records %}
                 <tr>
-                    <td style="font-weight: 600;">{{ cap.month|date:"F Y" }}</td>
+                    <td style="vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ cap.date|date:"d M Y" }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
+                    </td>
                     <td>
                         {% if cap.node_name == 'OLKVM' %}
                             <strong>OLKVM</strong>

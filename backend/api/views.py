@@ -2130,15 +2130,20 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                 'growth_pct': shared_growth_pct,
                 'status': d1['status'],
                 'date': n['date'] or today_dt,
+                'updated_at': n.get('updated_at'),
             })
 
     node_capacity_records = []
     for n in filtered_nodes:
         rec_month = (n['date'] or today_dt)
+        rec_date = n.get('date') or today_dt
+        rec_updated = n.get('updated_at')
         for d in (n['disk_2'], n['disk_3']):
             tier_growth_gb = round(n['storage_growth_gb'] * (d['size_gb'] / n['local_disk_capacity_gb']), 2) if n['local_disk_capacity_gb'] > 0 else 0.0
             node_capacity_records.append({
                 'month': rec_month,
+                'date': rec_date,
+                'updated_at': rec_updated,
                 'node_key': n['node_key'],
                 'node_name': n['node_name'],
                 'display_name': n['display_name'],
@@ -2156,6 +2161,8 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
     for sr in shared_storage_records:
         node_capacity_records.append({
             'month': sr['date'],
+            'date': sr['date'],
+            'updated_at': sr.get('updated_at'),
             'node_key': sr['cluster'],
             'node_name': sr['cluster'],
             'display_name': f"{sr['cluster']} Shared",
@@ -2524,7 +2531,7 @@ def dashboard_node_excel(request):
         row_num += 1
 
         cap_headers = [
-            "Month", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"
+            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"
         ]
         ws.append(cap_headers)
         ws.row_dimensions[row_num].height = 24
@@ -2538,8 +2545,20 @@ def dashboard_node_excel(request):
 
         for cap in node_capacity_records:
             cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
+            
+            # Format timestamp as '20 Oct 2026 09:15'
+            cap_ts = ""
+            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
+                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
+            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
+                cap_ts = cap['date'].strftime('%d %b %Y')
+            elif hasattr(cap.get('month'), 'strftime'):
+                cap_ts = cap['month'].strftime('%d %b %Y')
+            else:
+                cap_ts = str(cap.get('date') or cap.get('month') or "")
+
             c_data = [
-                cap['month'].strftime('%B %Y') if hasattr(cap['month'], 'strftime') else str(cap['month']),
+                cap_ts,
                 cap_node_lbl,
                 cap['node_name'],
                 cap['storage_tier'],
