@@ -488,8 +488,9 @@
         <th>Used</th>
         <th>Free</th>
         <th>Utilisation %</th>
-        <th>Growth</th>
-        <th>Growth %</th>
+        <th>24h Delta</th>
+        <th>24h Delta %</th>
+        <th>Runway</th>
       </tr>
     </thead>
     <tbody>
@@ -512,8 +513,9 @@
         <td>{{ cap.used_gb }} GB</td>
         <td>{{ cap.free_gb }} GB</td>
         <td style="font-weight: 700; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
-        <td>{% if cap.growth_gb > 0 %}+{{ cap.growth_gb }} GB{% else %}{{ cap.growth_gb }} GB{% endif %}</td>
-        <td style="font-weight: 600;">{{ cap.growth_percent }}%</td>
+        <td>{% if cap.delta_24h_gb > 0 %}+{{ cap.delta_24h_gb }} GB{% else %}{{ cap.delta_24h_gb }} GB{% endif %}</td>
+        <td style="font-weight: 600;">{% if cap.delta_24h_percent > 0 %}+{{ cap.delta_24h_percent }}%{% else %}{{ cap.delta_24h_percent }}%{% endif %}</td>
+        <td style="font-weight: 700; color: {% if cap.runway_badge == 'critical' %}#b91c1c{% elif cap.runway_badge == 'warning' %}#b45309{% else %}#15803d{% endif %};">{{ cap.runway_text }}</td>
       </tr>
       {% endfor %}
     </tbody>

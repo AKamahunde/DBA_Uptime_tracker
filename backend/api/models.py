@@ -608,6 +608,32 @@ class CapacityPlanning(models.Model):
         used_pct = float(self.disk_used_percent)
         return round(cap * used_pct / 100.0, 2)
 
+    @property
+    def runway_info(self):
+        growth = float(self.growth_gb or 0.0)
+        free = float(self.available_capacity_gb or 0.0)
+        if growth > 0.01 and free > 0:
+            daily_burn = growth / 30.4
+            days = int(free / daily_burn) if daily_burn > 0 else 9999
+            if days <= 30:
+                return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
+            elif days <= 90:
+                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
+            elif days <= 365:
+                mos = round(days / 30.4, 1)
+                return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
+            else:
+                return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
+        return {'days': 9999, 'text': "Stable", 'badge': 'stable'}
+
+    @property
+    def runway_text(self):
+        return self.runway_info['text']
+
+    @property
+    def runway_badge(self):
+        return self.runway_info['badge']
+
     class Meta:
         db_table = 'capacity_planning'
         verbose_name = 'Capacity Planning'

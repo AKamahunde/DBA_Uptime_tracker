@@ -1916,6 +1916,20 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             return '/ (OS Root)'
         return lbl
 
+    def _calculate_runway(free_gb, daily_burn_gb):
+        if daily_burn_gb and daily_burn_gb > 0.01 and free_gb > 0:
+            days = int(free_gb / daily_burn_gb)
+            if days <= 30:
+                return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
+            elif days <= 90:
+                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
+            elif days <= 365:
+                mos = round(days / 30.4, 1)
+                return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
+            else:
+                return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
+        return {'days': 9999, 'text': "Stable", 'badge': 'stable'}
+
     node_overview_data = []
     for nd in node_definitions:
         # Prefer latest Prometheus or telemetry-rich record over legacy zero-disk script records
@@ -1966,27 +1980,47 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d3_used = float(latest_rec.disk_3_used_gb or 0.0)
 
             # Baseline confirmed telemetry starts from October 1, 2026
+            # Daily 24h Delta: compare against yesterday's run (most recent prior run)
             oct_baseline_date = datetime(2026, 10, 1).date()
-            if latest_rec.date <= oct_baseline_date:
-                # Initial baseline: no confirmed prior data
-                growth_gb = 0.0
-                growth_pct = 0.0
-            else:
-                # Compare against the prior confirmed record (within or since October 2026)
-                prev_month_rec = (
+            prev_run_rec = None
+            if latest_rec.date > oct_baseline_date:
+                prev_run_rec = (
                     ServerHealth.objects.filter(nd['filter_q'], date__lt=latest_rec.date, date__gte=oct_baseline_date)
                     .order_by('-date', '-updated_at')
                     .first()
                 )
-                if prev_month_rec:
-                    prev_local_used = float(prev_month_rec.disk_2_used_gb or 0.0) + float(prev_month_rec.disk_3_used_gb or 0.0)
-                    curr_local_used = d2_used + d3_used
-                    if prev_local_used > 0:
-                        growth_gb = round(curr_local_used - prev_local_used, 2)
-                        growth_pct = round((growth_gb / prev_local_used) * 100.0, 2)
-                else:
-                    growth_gb = 0.0
-                    growth_pct = 0.0
+
+            if prev_run_rec:
+                prev_d1_used = float(prev_run_rec.disk_1_used_gb or 0.0)
+                prev_d2_used = float(prev_run_rec.disk_2_used_gb or 0.0)
+                prev_d3_used = float(prev_run_rec.disk_3_used_gb or 0.0)
+                prev_local_used = prev_d2_used + prev_d3_used
+                curr_local_used = d2_used + d3_used
+
+                d1_delta_gb = round(d1_used - prev_d1_used, 2)
+                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if prev_d1_used > 0 else 0.0
+
+                d2_delta_gb = round(d2_used - prev_d2_used, 2)
+                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if prev_d2_used > 0 else 0.0
+
+                d3_delta_gb = round(d3_used - prev_d3_used, 2)
+                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if prev_d3_used > 0 else 0.0
+
+                local_delta_gb = round(curr_local_used - prev_local_used, 2)
+                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if prev_local_used > 0 else 0.0
+            else:
+                d1_delta_gb = 0.0
+                d1_delta_pct = 0.0
+                d2_delta_gb = 0.0
+                d2_delta_pct = 0.0
+                d3_delta_gb = 0.0
+                d3_delta_pct = 0.0
+                local_delta_gb = 0.0
+                local_delta_pct = 0.0
+
+            d1_runway = _calculate_runway(max(0.0, d1_size - d1_used), d1_delta_gb)
+            d2_runway = _calculate_runway(max(0.0, d2_size - d2_used), d2_delta_gb)
+            d3_runway = _calculate_runway(max(0.0, d3_size - d3_used), d3_delta_gb)
 
             disks = [
                 {
@@ -1998,6 +2032,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                     'percent': round(d1_pct, 2),
                     'status': _disk_status(d1_pct),
                     'is_shared': True,
+                    'delta_24h_gb': d1_delta_gb,
+                    'delta_24h_pct': d1_delta_pct,
+                    'runway_days': d1_runway['days'],
+                    'runway_text': d1_runway['text'],
+                    'runway_badge': d1_runway['badge'],
                 },
                 {
                     'slot': 2,
@@ -2008,6 +2047,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                     'percent': round(d2_pct, 2),
                     'status': _disk_status(d2_pct),
                     'is_shared': False,
+                    'delta_24h_gb': d2_delta_gb,
+                    'delta_24h_pct': d2_delta_pct,
+                    'runway_days': d2_runway['days'],
+                    'runway_text': d2_runway['text'],
+                    'runway_badge': d2_runway['badge'],
                 },
                 {
                     'slot': 3,
@@ -2018,6 +2062,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                     'percent': round(d3_pct, 2),
                     'status': _disk_status(d3_pct),
                     'is_shared': False,
+                    'delta_24h_gb': d3_delta_gb,
+                    'delta_24h_pct': d3_delta_pct,
+                    'runway_days': d3_runway['days'],
+                    'runway_text': d3_runway['text'],
+                    'runway_badge': d3_runway['badge'],
                 },
             ]
 
@@ -2030,8 +2079,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             local_util_pct = round((local_used / local_cap) * 100.0, 2) if local_cap > 0 else 0.0
             peak_disk = round(max([float(latest_rec.disk_percent or 0.0)] + [d['percent'] for d in disks]), 2)
 
-            if growth_gb == 0.0 and growth_pct != 0.0 and local_cap > 0:
-                growth_gb = round((growth_pct / 100.0) * local_cap, 2)
+            node_runway = _calculate_runway(local_free, local_delta_gb)
 
             clean_hosted = latest_rec.hosted_systems or nd['hosted_systems']
             import re
@@ -2067,8 +2115,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'memory_total_gb': round(mem_tot, 2),
                 'memory_used_gb': round(mem_used, 2),
                 'disk_percent': peak_disk,
-                'storage_growth_gb': round(growth_gb, 2),
-                'storage_growth_pct': round(growth_pct, 2),
+                'storage_growth_gb': round(local_delta_gb, 2),
+                'storage_growth_pct': round(local_delta_pct, 2),
+                'delta_24h_gb': round(local_delta_gb, 2),
+                'delta_24h_pct': round(local_delta_pct, 2),
+                'runway_days': node_runway['days'],
+                'runway_text': node_runway['text'],
+                'runway_badge': node_runway['badge'],
                 'disks': disks,
                 'disk_1': disks[0],
                 'disk_2': disks[1],
@@ -2155,23 +2208,6 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         seen_shared.add(n['node_name'])
         d1 = n['disk_1']
         if d1['size_gb'] > 0:
-            oct_baseline_date = datetime(2026, 10, 1).date()
-            if not n.get('date') or n['date'] <= oct_baseline_date:
-                shared_growth_gb = 0.0
-                shared_growth_pct = 0.0
-            else:
-                prev_sh_rec = (
-                    ServerHealth.objects.filter(nd['filter_q'], date__lt=n['date'], date__gte=oct_baseline_date)
-                    .order_by('-date', '-updated_at')
-                    .first()
-                )
-                if prev_sh_rec and float(prev_sh_rec.disk_1_used_gb or 0.0) > 0:
-                    prev_sh_used = float(prev_sh_rec.disk_1_used_gb)
-                    shared_growth_gb = round(d1['used_gb'] - prev_sh_used, 2)
-                    shared_growth_pct = round((shared_growth_gb / prev_sh_used) * 100.0, 2)
-                else:
-                    shared_growth_gb = 0.0
-                    shared_growth_pct = 0.0
             shared_storage_records.append({
                 'cluster': n['node_name'],
                 'storage_id': 'VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp',
@@ -2181,8 +2217,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'used_gb': d1['used_gb'],
                 'free_gb': d1['free_gb'],
                 'percent': d1['percent'],
-                'growth_gb': shared_growth_gb,
-                'growth_pct': shared_growth_pct,
+                'growth_gb': d1.get('delta_24h_gb', 0.0),
+                'growth_pct': d1.get('delta_24h_pct', 0.0),
+                'delta_24h_gb': d1.get('delta_24h_gb', 0.0),
+                'delta_24h_pct': d1.get('delta_24h_pct', 0.0),
+                'runway_days': d1.get('runway_days', 9999),
+                'runway_text': d1.get('runway_text', 'Stable'),
+                'runway_badge': d1.get('runway_badge', 'stable'),
                 'status': d1['status'],
                 'date': n['date'] or today_dt,
                 'updated_at': n.get('updated_at'),
@@ -2194,7 +2235,6 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         rec_date = n.get('date') or today_dt
         rec_updated = n.get('updated_at')
         for d in (n['disk_2'], n['disk_3']):
-            tier_growth_gb = round(n['storage_growth_gb'] * (d['size_gb'] / n['local_disk_capacity_gb']), 2) if n['local_disk_capacity_gb'] > 0 else 0.0
             node_capacity_records.append({
                 'month': rec_month,
                 'date': rec_date,
@@ -2208,8 +2248,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'used_gb': d['used_gb'],
                 'free_gb': d['free_gb'],
                 'used_percent': d['percent'],
-                'growth_gb': tier_growth_gb,
-                'growth_percent': n['storage_growth_pct'],
+                'growth_gb': d.get('delta_24h_gb', 0.0),
+                'growth_percent': d.get('delta_24h_pct', 0.0),
+                'delta_24h_gb': d.get('delta_24h_gb', 0.0),
+                'delta_24h_percent': d.get('delta_24h_pct', 0.0),
+                'runway_days': d.get('runway_days', 9999),
+                'runway_text': d.get('runway_text', 'Stable'),
+                'runway_badge': d.get('runway_badge', 'stable'),
                 'has_data': n['has_data'],
                 'is_shared': False,
             })
@@ -2227,8 +2272,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'used_gb': sr['used_gb'],
             'free_gb': sr['free_gb'],
             'used_percent': sr['percent'],
-            'growth_gb': sr['growth_gb'],
-            'growth_percent': sr['growth_pct'],
+            'growth_gb': sr['delta_24h_gb'],
+            'growth_percent': sr['delta_24h_pct'],
+            'delta_24h_gb': sr['delta_24h_gb'],
+            'delta_24h_percent': sr['delta_24h_pct'],
+            'runway_days': sr['runway_days'],
+            'runway_text': sr['runway_text'],
+            'runway_badge': sr['runway_badge'],
             'has_data': True,
             'is_shared': True,
         })
@@ -2588,7 +2638,7 @@ def dashboard_node_excel(request):
         row_num += 1
 
         cap_headers = [
-            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"
+            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Runway (Days to Full)"
         ]
         ws.append(cap_headers)
         ws.row_dimensions[row_num].height = 24
@@ -2623,8 +2673,9 @@ def dashboard_node_excel(request):
                 cap['used_gb'],
                 cap['free_gb'],
                 f"{cap['used_percent']}%",
-                cap['growth_gb'],
-                f"{cap['growth_percent']}%",
+                cap['delta_24h_gb'],
+                f"{cap['delta_24h_percent']}%",
+                cap['runway_text'],
             ]
             ws.append(c_data)
             ws.row_dimensions[row_num].height = 20
@@ -2679,7 +2730,7 @@ def dashboard_node_excel(request):
 
         writer.writerow([])
         writer.writerow(["Node Capacity Records (3 Disk Tiers & Shared Storage)"])
-        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"])
+        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Runway (Days to Full)"])
         for cap in node_capacity_records:
             cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
             cap_ts = ""
@@ -2694,7 +2745,8 @@ def dashboard_node_excel(request):
             writer.writerow([
                 cap_ts, cap_node_lbl, cap['node_name'], cap['storage_tier'],
                 cap['capacity_gb'], cap['used_gb'], cap['free_gb'],
-                f"{cap['used_percent']}%", cap['growth_gb'], f"{cap['growth_percent']}%"
+                f"{cap['used_percent']}%", cap['delta_24h_gb'], f"{cap['delta_24h_percent']}%",
+                cap['runway_text']
             ])
         return response
 
@@ -3050,6 +3102,8 @@ def capacity_list(request):
             
             if avg_growth > 0:
                 headroom_months = space_left_gb / avg_growth
+                daily_burn = avg_growth / 30.4
+                runway_days = int(free / daily_burn) if daily_burn > 0 else 9999
                 if headroom_months < 0:
                     headroom_str = "Exceeded threshold"
                     est_date_str = "Exceeded"
@@ -3064,13 +3118,31 @@ def capacity_list(request):
             else:
                 headroom_str = "Infinite"
                 est_date_str = "Safe"
+                runway_days = 9999
+
+            if runway_days <= 30:
+                runway_text = f"{runway_days} days"
+                runway_badge = 'critical'
+            elif runway_days <= 90:
+                runway_text = f"{runway_days} days"
+                runway_badge = 'warning'
+            elif runway_days <= 365:
+                mos = round(runway_days / 30.4, 1)
+                runway_text = f"{mos} mos ({runway_days}d)"
+                runway_badge = 'healthy'
+            else:
+                runway_text = "> 1 Year"
+                runway_badge = 'stable'
                 
             forecast_info = {
                 'database': current_db,
                 'current_used_pct': round(used_pct, 1),
                 'avg_growth': round(avg_growth, 2),
                 'headroom_months': headroom_str,
-                'est_date': est_date_str
+                'est_date': est_date_str,
+                'runway_days': runway_days,
+                'runway_text': runway_text,
+                'runway_badge': runway_badge,
             }
     else:
         # Fleet-wide scope (All Databases combined)
@@ -3116,6 +3188,9 @@ def capacity_list(request):
                 
                 if avg_growth > 0:
                     headroom_months = space_left_gb / avg_growth
+                    fleet_free = cap - latest['used_gb']
+                    daily_burn = avg_growth / 30.4
+                    runway_days = int(fleet_free / daily_burn) if daily_burn > 0 else 9999
                     if headroom_months < 0:
                         headroom_str = "Exceeded threshold"
                         est_date_str = "Exceeded"
@@ -3130,13 +3205,31 @@ def capacity_list(request):
                 else:
                     headroom_str = "Infinite"
                     est_date_str = "Safe"
+                    runway_days = 9999
+
+                if runway_days <= 30:
+                    runway_text = f"{runway_days} days"
+                    runway_badge = 'critical'
+                elif runway_days <= 90:
+                    runway_text = f"{runway_days} days"
+                    runway_badge = 'warning'
+                elif runway_days <= 365:
+                    mos = round(runway_days / 30.4, 1)
+                    runway_text = f"{mos} mos ({runway_days}d)"
+                    runway_badge = 'healthy'
+                else:
+                    runway_text = "> 1 Year"
+                    runway_badge = 'stable'
                     
                 forecast_info = {
                     'database': 'All Databases',
                     'current_used_pct': round(used_pct, 1),
                     'avg_growth': round(avg_growth, 2),
                     'headroom_months': headroom_str,
-                    'est_date': est_date_str
+                    'est_date': est_date_str,
+                    'runway_days': runway_days,
+                    'runway_text': runway_text,
+                    'runway_badge': runway_badge,
                 }
     
     return render(request, 'capacity/list.html', {

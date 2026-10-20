@@ -227,6 +227,11 @@
                         <span>Free: <strong style="color: #137333;">{{ d.free_gb }} GB</strong></span>
                         <span>Cap: <strong>{{ d.size_gb }} GB</strong></span>
                     </div>
+
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
+                        <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
+                        <span>Runway: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -252,8 +257,9 @@
                     <th>Used</th>
                     <th>Free</th>
                     <th>Utilisation %</th>
-                    <th>Growth</th>
-                    <th>Growth %</th>
+                    <th>24h Delta</th>
+                    <th>24h Delta %</th>
+                    <th>Runway (Days to Full)</th>
                 </tr>
             </thead>
             <tbody>
@@ -277,17 +283,36 @@
                     <td>{{ cap.free_gb }} GB</td>
                     <td style="font-weight: bold; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
                     <td>
-                        {% if cap.growth_gb > 0 %}
-                            <span style="color: #ef4444; font-weight: 600;">+{{ cap.growth_gb }} GB</span>
+                        {% if cap.delta_24h_gb > 0 %}
+                            <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
+                        {% elif cap.delta_24h_gb < 0 %}
+                            <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
                         {% else %}
-                            <span style="color: #10b981; font-weight: 600;">{{ cap.growth_gb }} GB</span>
+                            <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
                         {% endif %}
                     </td>
-                    <td style="font-weight: 600;">{{ cap.growth_percent }}%</td>
+                    <td style="font-weight: 600;">
+                        {% if cap.delta_24h_percent > 0 %}
+                            <span style="color: #ef4444;">+{{ cap.delta_24h_percent }}%</span>
+                        {% elif cap.delta_24h_percent < 0 %}
+                            <span style="color: #10b981;">{{ cap.delta_24h_percent }}%</span>
+                        {% else %}
+                            <span style="color: #64748b;">0.00%</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
+                            {% if cap.runway_badge == 'critical' %}background: #fee2e2; color: #991b1b;
+                            {% elif cap.runway_badge == 'warning' %}background: #fef3c7; color: #92400e;
+                            {% elif cap.runway_badge == 'healthy' %}background: #dcfce7; color: #166534;
+                            {% else %}background: #e0f2fe; color: #0369a1;{% endif %}">
+                            {{ cap.runway_text }}
+                        </span>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
