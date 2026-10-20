@@ -824,27 +824,27 @@
     </div>
 </div>
 
-<!-- Node Summary Cards Row -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+<!-- Node Summary Metrics Row (Flat borderless stats, card-free) -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; padding: 0.25rem 0;">
+    <div>
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;" title="Aggregated monthly average uptime across all active nodes">Node Uptime (Monthly Avg)</span>
         <strong style="color: #16a34a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_node_uptime }}</strong>
         <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_nodes_healthy }} &bull; Target: &ge; {{ target_node_sla }}%</span>
     </div>
 
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+    <div>
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Logical CPUs</span>
         <strong style="color: #00205B; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_logical_cpus }} vCPUs</strong>
         <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">OLKVM &amp; Proxmox compute</span>
     </div>
 
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+    <div>
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Node Memory</span>
         <strong style="color: #0f172a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_ram_gb }} GB</strong>
         <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_used_ram_gb }} GB in use</span>
     </div>
 
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
+    <div>
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Node Storage</span>
         <strong style="color: #0f172a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_storage_gb }} GB</strong>
         <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_used_storage_gb }} GB used ({{ kpi_storage_used_pct }}%)</span>
