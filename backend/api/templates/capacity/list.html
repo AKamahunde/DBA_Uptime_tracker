@@ -108,7 +108,7 @@
         <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Capacity Tracking</h2>
         <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">
             {% if current_tab == 'infrastructure' %}
-            Infrastructure storage tier allocation, 24h consumption delta, and runway forecasting across host nodes.
+            Infrastructure storage tier allocation, 24h consumption delta, and headroom forecasting across host nodes.
             {% else %}
             Database tablespace utilization, database growth metrics, and capacity projections.
             {% endif %}
@@ -267,7 +267,7 @@
         <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
             Storage Capacity, Used, Free &amp; Utilisation by Node (3 Disk Tiers)
         </h3>
-        <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">Live storage allocation and consumption across Shared, Data/LVM, and Local/OS tiers with 24h delta and runway forecasting.</p>
+        <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">Live storage allocation and consumption across Shared, Data/LVM, and Local/OS tiers with 24h delta and headroom forecasting.</p>
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 1.15rem;">
@@ -314,7 +314,7 @@
 
                     <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
                         <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
-                        <span>Runway: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
+                        <span>Headroom: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
                     </div>
                 </div>
                 {% endfor %}
@@ -343,7 +343,7 @@
                     <th>Utilisation %</th>
                     <th>24h Delta</th>
                     <th>24h Delta %</th>
-                    <th>Runway (Days to Full)</th>
+                    <th>Headroom</th>
                 </tr>
             </thead>
             <tbody>
@@ -532,7 +532,7 @@
     <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
         <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                <strong style="color: var(--primary-navy); font-size: 0.88rem;">Linear Projection Runway</strong>
+                <strong style="color: var(--primary-navy); font-size: 0.88rem;">Linear Projection Headroom</strong>
                 <span style="font-size: 0.72rem; color: #64748b;">Threshold: 80% Capacity</span>
             </div>
             
@@ -560,7 +560,7 @@
 
         {% if forecast_info %}
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">Runway:</span>
+            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">Headroom:</span>
             <span style="font-size: 0.85rem; font-weight: 700;
                         {% if forecast_info.runway_badge == 'critical' %}color: #c5221f;
                         {% elif forecast_info.runway_badge == 'warning' %}color: #d59400;
@@ -591,7 +591,7 @@
                     <th>Tablespace %</th>
                     <th>Monthly Growth</th>
                     <th>Growth %</th>
-                    <th>Runway (Days)</th>
+                    <th>Headroom</th>
                     <th style="text-align: left;">Largest Table</th>
                 </tr>
             </thead>

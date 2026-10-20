@@ -2892,7 +2892,7 @@ def dashboard_node_excel(request):
         row_num += 1
 
         cap_headers = [
-            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Runway (Days to Full)"
+            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"
         ]
         ws.append(cap_headers)
         ws.row_dimensions[row_num].height = 24
@@ -2984,7 +2984,7 @@ def dashboard_node_excel(request):
 
         writer.writerow([])
         writer.writerow(["Node Capacity Records (3 Disk Tiers & Shared Storage)"])
-        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Runway (Days to Full)"])
+        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"])
         for cap in node_capacity_records:
             cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
             cap_ts = ""
