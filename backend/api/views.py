@@ -834,6 +834,17 @@ def dashboard(request):
             
     default_lede_text = f"{lede_prefix} {lede_suffix}"
 
+    can_view_db_dashboard = (
+        request.user.is_admin
+        or request.user.is_superuser
+        or request.user.has_perm('api.view_databasedashboard')
+    )
+    can_view_infra_dashboard = (
+        request.user.is_admin
+        or request.user.is_superuser
+        or request.user.has_perm('api.view_infrastructuredashboard')
+    )
+
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -842,6 +853,8 @@ def dashboard(request):
         'maintenance_count': row[4],
         'capacity_count': row[5],
         'is_admin': request.user.is_admin,
+        'can_view_db_dashboard': can_view_db_dashboard,
+        'can_view_infra_dashboard': can_view_infra_dashboard,
         'dashboard_data': dashboard_data,
         'database_detail': database_detail,
         'selected_db': selected_db,
@@ -874,6 +887,10 @@ def dashboard(request):
 
 @login_required
 def dashboard_print(request):
+    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_databasedashboard')):
+        messages.error(request, 'You do not have permission to view or export the Database Operations report.')
+        return redirect('dashboard')
+
     if request.method == 'POST':
         month_str = request.POST.get('month', '')
         selected_db = request.POST.get('database_select', 'All Databases')
@@ -1068,6 +1085,10 @@ def dashboard_print(request):
 
 @login_required
 def dashboard_excel(request):
+    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_databasedashboard')):
+        messages.error(request, 'You do not have permission to export the Database Operations report.')
+        return redirect('dashboard')
+
     month_str = request.GET.get('month', '')
     if month_str:
         try:
@@ -2336,6 +2357,10 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
 
 @login_required
 def dashboard_node_print(request):
+    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_infrastructuredashboard')):
+        messages.error(request, 'You do not have permission to view or export the Node Infrastructure report.')
+        return redirect('dashboard')
+
     if request.method == 'POST':
         month_str = request.POST.get('month', '')
         selected_node = request.POST.get('node_select', 'All Nodes')
@@ -2373,6 +2398,10 @@ def dashboard_node_print(request):
 
 @login_required
 def dashboard_node_excel(request):
+    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_infrastructuredashboard')):
+        messages.error(request, 'You do not have permission to export the Node Infrastructure report.')
+        return redirect('dashboard')
+
     month_str = request.GET.get('month', '')
     if month_str:
         try:
@@ -4136,7 +4165,10 @@ def password_change_required(request):
 
 from django.contrib.auth import views as auth_views
 from django.contrib.auth import login as auth_login
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 
+@method_decorator(ensure_csrf_cookie, name='dispatch')
 class CustomLoginView(auth_views.LoginView):
     template_name = 'login.html'
 

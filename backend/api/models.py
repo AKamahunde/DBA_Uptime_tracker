@@ -399,6 +399,10 @@ class ServerHealth(models.Model):
         verbose_name = 'Server Health'
         verbose_name_plural = 'Server Health'
         default_permissions = ('add', 'view')
+        permissions = [
+            ('view_databasedashboard', 'Can view Database Operations Dashboard'),
+            ('view_infrastructuredashboard', 'Can view Node Infrastructure Dashboard'),
+        ]
 
     def __str__(self):
         return f"{self.node_name} ({self.server}) - {self.date}"

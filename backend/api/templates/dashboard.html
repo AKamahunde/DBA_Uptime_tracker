@@ -162,6 +162,7 @@
     }
 </style>
 
+{% if can_view_db_dashboard %}
 <!-- Header & Scope Selection -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
@@ -779,7 +780,9 @@
     </div>
 </div>
 {% endif %}
+{% endif %}
 
+{% if can_view_infra_dashboard %}
 <!-- Node Infrastructure Overview Section (KPI Cards, Capacity & Performance Records, Uptime Trend & Alerts) -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
     <div>
@@ -985,7 +988,21 @@
         </div>
     </div>
 </div>
+{% endif %}
 
+{% if not can_view_db_dashboard and not can_view_infra_dashboard %}
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 3rem 2rem; text-align: center; margin: 2rem auto; max-width: 600px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <div style="width: 56px; height: 56px; background-color: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+        <span style="font-size: 1.75rem; color: #64748b;">🔒</span>
+    </div>
+    <h3 style="font-size: 1.25rem; font-weight: 700; color: #00205B; margin-bottom: 0.5rem;">Access Restricted</h3>
+    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-bottom: 0;">
+        You do not currently have permission to view the Database Operations Dashboard or the Node Infrastructure Dashboard. Please contact your system administrator to request access.
+    </p>
+</div>
+{% endif %}
+
+{% if can_view_db_dashboard %}
 <!-- Export Performance Report Preview Modal -->
 <div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
     <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
@@ -1050,7 +1067,9 @@
         </form>
     </div>
 </div>
+{% endif %}
 
+{% if can_view_infra_dashboard %}
 <!-- Export Node Performance Report Preview Modal -->
 <div id="exportNodeReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
     <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
@@ -1115,27 +1134,36 @@
         </form>
     </div>
 </div>
+{% endif %}
 
 <script>
     function openExportModal() {
         const modal = document.getElementById('exportReportModal');
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
     }
     function closeExportModal() {
         const modal = document.getElementById('exportReportModal');
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
     }
     function openNodeExportModal() {
         const modal = document.getElementById('exportNodeReportModal');
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+        if (modal) {
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
     }
     function closeNodeExportModal() {
         const modal = document.getElementById('exportNodeReportModal');
-        modal.style.display = 'none';
-        document.body.style.overflow = '';
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
     }
     // Close modal on escape key
     document.addEventListener('keydown', function(event) {

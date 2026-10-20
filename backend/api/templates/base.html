@@ -438,7 +438,9 @@
             </a>
             <div class="nav-links">
                 {% if user.is_authenticated %}
+                    {% if user.is_admin or perms.api.view_databasedashboard or perms.api.view_infrastructuredashboard %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
+                    {% endif %}
                     {% if user.is_admin or perms.api.view_incidentregister %}
                     <a href="{% url 'incident_list' %}">Incidents</a>
                     {% if pending_staging_count > 0 %}
