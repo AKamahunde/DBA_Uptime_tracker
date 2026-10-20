@@ -3,7 +3,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import json
 import os
 from django.contrib.auth.decorators import login_required
@@ -1316,7 +1316,8 @@ def dashboard_excel(request):
         # Adjust Column Widths
         for col in ws.columns:
             max_len = 0
-            col_letter = get_column_letter(col[0].column)
+            col_val = col[0].column
+            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
             for cell in col:
                 if cell.row == 1 or cell.row > legend_start:
                     continue
@@ -1332,7 +1333,6 @@ def dashboard_excel(request):
         
     except Exception:
         import csv
-        from django.http import HttpResponse
         filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.csv"'
@@ -2586,7 +2586,8 @@ def dashboard_node_excel(request):
 
         for col in ws.columns:
             max_len = 0
-            col_letter = get_column_letter(col[0].column)
+            col_val = col[0].column
+            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
             for cell in col:
                 if cell.row == 1 or cell.row >= row_num:
                     continue
@@ -2617,6 +2618,26 @@ def dashboard_node_excel(request):
                 f"{n['uptime_percent']}%", f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}",
                 f"{n['local_disk_util_pct']}%", f"{n['memory_used_gb']} / {n['memory_total_gb']}",
                 f"{n['memory_percent']}%", n['logical_cpus'], f"{n['cpu_percent']}%", n['status']
+            ])
+
+        writer.writerow([])
+        writer.writerow(["Node Capacity Records (3 Disk Tiers & Shared Storage)"])
+        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "Growth (GB)", "Growth (%)"])
+        for cap in node_capacity_records:
+            cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
+            cap_ts = ""
+            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
+                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
+            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
+                cap_ts = cap['date'].strftime('%d %b %Y')
+            elif hasattr(cap.get('month'), 'strftime'):
+                cap_ts = cap['month'].strftime('%d %b %Y')
+            else:
+                cap_ts = str(cap.get('date') or cap.get('month') or "")
+            writer.writerow([
+                cap_ts, cap_node_lbl, cap['node_name'], cap['storage_tier'],
+                cap['capacity_gb'], cap['used_gb'], cap['free_gb'],
+                f"{cap['used_percent']}%", cap['growth_gb'], f"{cap['growth_percent']}%"
             ])
         return response
 
@@ -3245,7 +3266,8 @@ def capacity_excel(request):
         # Adjust Column Widths
         for col in ws.columns:
             max_len = 0
-            col_letter = get_column_letter(col[0].column)
+            col_val = col[0].column
+            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
             for cell in col:
                 if cell.row == 1 or cell.row > row_num:
                     continue
@@ -3261,7 +3283,6 @@ def capacity_excel(request):
         
     except Exception:
         import csv
-        from django.http import HttpResponse
         response = HttpResponse(content_type='text/csv')
         filename = f"Capacity_Report_{db_display.replace(' ', '_')}_{period_display}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
