@@ -1900,7 +1900,15 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
 
     node_overview_data = []
     for nd in node_definitions:
-        latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
+        # Prefer latest Prometheus or telemetry-rich record over legacy zero-disk script records
+        latest_rec = (
+            ServerHealth.objects.filter(nd['filter_q'])
+            .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
+            .order_by('-date', '-updated_at')
+            .first()
+        )
+        if not latest_rec:
+            latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
         if latest_rec:
             up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
             up_days = float(latest_rec.uptime_days or 0.0)
