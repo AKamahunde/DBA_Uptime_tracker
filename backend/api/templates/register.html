@@ -6,68 +6,145 @@
 
 {% block content %}
 <style>
-    .register-logo-container {
-        text-align: center;
-        margin-top: 3.5rem;
-        margin-bottom: 1.5rem;
+    .register-wrapper {
+        min-height: calc(100vh - 80px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
     }
-    .register-logo-container img {
-        max-width: 170px;
-        height: auto;
+    .register-logo-badge {
+        background: #ffffff;
+        padding: 0.65rem 1.25rem;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        margin-bottom: 1.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .register-logo-badge img {
+        height: 48px;
+        width: auto;
+        object-fit: contain;
+    }
+    .register-card {
+        width: 100%;
+        max-width: 400px;
+        background: #ffffff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+        padding: 2.25rem 2rem;
+        box-sizing: border-box;
     }
     .register-title {
-        text-align: center;
-        font-size: 2.1rem;
+        font-size: 2rem;
         font-weight: 900;
         letter-spacing: 1.5px;
-        color: #002569;
-        margin-top: 0;
-        margin-bottom: 0.35rem;
+        color: #00205B;
+        margin: 0;
+        text-align: center;
     }
     .register-subtitle {
         text-align: center;
+        color: #64748b;
+        font-size: 0.78rem;
+        font-weight: 500;
+        margin: 0.4rem 0 1.75rem 0;
+        line-height: 1.4;
+    }
+    .form-group-custom {
+        margin-bottom: 1.15rem;
+        text-align: left;
+    }
+    .form-group-custom label {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         color: #475569;
-        font-style: italic;
-        font-size: 0.88rem;
-        margin-bottom: 0;
-        font-family: 'Georgia', serif;
-        line-height: 1.35;
+        margin-bottom: 0.35rem;
+    }
+    .form-group-custom input {
+        width: 100%;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.9rem;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-sizing: border-box;
+        color: #0f172a;
+        transition: all 0.2s ease;
+    }
+    .form-group-custom input:focus {
+        outline: none;
+        border-color: #00205B;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(0, 32, 91, 0.12);
+    }
+    .btn-register {
+        width: 100%;
+        padding: 0.7rem;
+        background: #00205B;
+        color: #ffffff;
+        font-size: 0.92rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 6px -1px rgba(0, 32, 91, 0.2);
+        transition: all 0.2s ease;
+        margin-top: 0.5rem;
+    }
+    .btn-register:hover {
+        background: #001742;
+        box-shadow: 0 6px 12px -2px rgba(0, 32, 91, 0.3);
+    }
+    .register-footer-tag {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        text-align: center;
+        margin-top: 1.25rem;
+        letter-spacing: 0.02em;
     }
 </style>
 
-<!-- NMS Logo positioned at the top above the card -->
-<div class="register-logo-container">
-    <img src="/static/logo.jpg" alt="NMS Medical Logistics Logo">
-</div>
-
-<!-- Card with DBTRAC Tool Name and Register Form -->
-<div class="card" style="max-width: 420px; margin: 0 auto 2.5rem auto; text-align: center; padding: 2.25rem 2rem;">
-    <div style="margin-bottom: 1.5rem;">
-        <h1 class="register-title"><span style="color: var(--primary-gold, #F2A900);">DB</span>TRAC</h1>
-        <p class="register-subtitle">Database Tracking for Reliability, Administration and Compliance</p>
+<div class="register-wrapper">
+    <!-- NMS Logo in Soft Badge Container -->
+    <div class="register-logo-badge">
+        <img src="/static/logo.jpg" alt="National Medical Stores Logo">
     </div>
 
-    <div style="border-top: 1px solid #e2e8f0; margin-bottom: 1.5rem;"></div>
+    <!-- Modern Enterprise Card -->
+    <div class="register-card">
+        <h1 class="register-title">DBTRAC</h1>
+        <p class="register-subtitle">Create your account</p>
 
-    <h2 style="font-size: 1.35rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem;">Register</h2>
-    <form method="post">
-        {% csrf_token %}
-        <div class="form-group" style="text-align: left;">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username" required>
-        </div>
-        <div class="form-group" style="text-align: left;">
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <div class="form-group" style="text-align: left;">
-            <label for="password_confirm">Confirm Password:</label>
-            <input type="password" id="password_confirm" name="password_confirm" required>
-        </div>
-        <button type="submit" class="btn btn-success" style="width: 100%;">Register</button>
-    </form>
-    <p style="text-align: center; margin-top: 1.25rem; font-size: 0.9rem; color: #64748b;">
-        Already have an account? <a href="{% url 'login' %}" style="font-weight: 600; color: #002569;">Login</a>
-    </p>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group-custom">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Choose username" autocomplete="username" required>
+            </div>
+            <div class="form-group-custom">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="new-password" required>
+            </div>
+            <div class="form-group-custom">
+                <label for="password_confirm">Confirm Password</label>
+                <input type="password" id="password_confirm" name="password_confirm" placeholder="••••••••" autocomplete="new-password" required>
+            </div>
+            <button type="submit" class="btn-register">Create Account</button>
+        </form>
+        <p style="text-align: center; margin-top: 1.25rem; font-size: 0.82rem; color: #64748b;">
+            Already have an account? <a href="{% url 'login' %}" style="font-weight: 600; color: #00205B; text-decoration: none;">Sign In</a>
+        </p>
+    </div>
+
+    <p class="register-footer-tag">National Medical Stores &bull; Directorate of ICT</p>
 </div>
 {% endblock %}
