@@ -3238,12 +3238,27 @@ def maintenance_edit(request, pk):
 
 @login_required
 def capacity_list(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to view capacity planning records.')
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_view_db_capacity = is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')
+    can_view_infra_capacity = is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity')
+
+    if not can_view_db_capacity and not can_view_infra_capacity:
+        messages.error(request, 'You do not have permission to view Database or Infrastructure Capacity records.')
         return redirect('dashboard')
-    current_tab = request.GET.get('tab', 'database').lower()
-    if current_tab not in ['database', 'infrastructure']:
+
+    requested_tab = request.GET.get('tab', '').lower()
+    if requested_tab == 'infrastructure':
+        if not can_view_infra_capacity:
+            messages.warning(request, 'You do not have permission to view Infrastructure Capacity.')
+            return redirect('capacity_list')
+        current_tab = 'infrastructure'
+    elif requested_tab == 'database':
+        if not can_view_db_capacity:
+            messages.warning(request, 'You do not have permission to view Database Capacity.')
+            return redirect('/capacity/?tab=infrastructure')
         current_tab = 'database'
+    else:
+        current_tab = 'database' if can_view_db_capacity else 'infrastructure'
 
     selected_node = request.GET.get('node_select', 'All Nodes')
     node_ctx = _build_node_dashboard_context(selected_node=selected_node)
@@ -3528,6 +3543,8 @@ def capacity_list(request):
     ctx = {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
+        'can_view_db_capacity': can_view_db_capacity,
+        'can_view_infra_capacity': can_view_infra_capacity,
         'current_tab': current_tab,
         'selected_node': selected_node,
         'total_db_capacity_count': CapacityPlanning.objects.count(),
@@ -3554,8 +3571,9 @@ def capacity_list(request):
 
 @login_required
 def capacity_print(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to print capacity planning records.')
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    if not (is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to print database capacity reports.')
         return redirect('capacity_list')
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
     
@@ -3593,8 +3611,9 @@ def capacity_print(request):
 
 @login_required
 def capacity_excel(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to export capacity planning records.')
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    if not (is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to export database capacity records.')
         return redirect('capacity_list')
     
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')

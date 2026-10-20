@@ -462,8 +462,12 @@
                     {% if user.is_admin or perms.api.view_maintenanceregister %}
                     <a href="{% url 'maintenance_list' %}">Maintenance</a>
                     {% endif %}
-                    {% if user.is_admin or perms.api.view_capacityplanning %}
-                    <a href="{% url 'capacity_list' %}">Capacity</a>
+                    {% if user.is_admin or user.is_superuser or perms.api.view_capacityplanning or perms.api.view_databasecapacity or perms.api.view_infrastructurecapacity %}
+                        {% if not perms.api.view_databasecapacity and not perms.api.view_capacityplanning and not user.is_admin and not user.is_superuser and perms.api.view_infrastructurecapacity %}
+                        <a href="{% url 'capacity_list' %}?tab=infrastructure">Capacity</a>
+                        {% else %}
+                        <a href="{% url 'capacity_list' %}">Capacity</a>
+                        {% endif %}
                     {% endif %}
                     {% if user.is_admin %}
                     <div class="nav-dropdown">

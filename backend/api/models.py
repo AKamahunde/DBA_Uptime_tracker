@@ -660,6 +660,10 @@ class CapacityPlanning(models.Model):
         verbose_name = 'Capacity Planning'
         verbose_name_plural = 'Capacity Planning'
         default_permissions = ('add', 'view')
+        permissions = [
+            ('view_databasecapacity', 'Can view Database Capacity'),
+            ('view_infrastructurecapacity', 'Can view Infrastructure Capacity'),
+        ]
 
     def __str__(self):
         return f"{self.database} - {self.month}"
