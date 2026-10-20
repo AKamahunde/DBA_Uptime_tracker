@@ -1932,17 +1932,26 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
     node_overview_data = []
     for nd in node_definitions:
-        # Prefer latest Prometheus or telemetry-rich record over legacy zero-disk script records
-        latest_rec = (
-            ServerHealth.objects.filter(nd['filter_q'])
+        # Prefer telemetry record within target month (from start of the month), fallback to latest overall
+        month_scoped_qs = (
+            ServerHealth.objects.filter(nd['filter_q'], date__gte=start_of_month, date__lt=next_month)
             .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
             .order_by('-date', '-updated_at')
-            .first()
         )
+        latest_rec = month_scoped_qs.first()
+        if not latest_rec:
+            latest_rec = ServerHealth.objects.filter(nd['filter_q'], date__gte=start_of_month, date__lt=next_month).order_by('-date', '-updated_at').first()
+        if not latest_rec:
+            latest_rec = (
+                ServerHealth.objects.filter(nd['filter_q'])
+                .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
+                .order_by('-date', '-updated_at')
+                .first()
+            )
         if not latest_rec:
             latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
 
-        # Monthly average uptime for this specific node in the target reporting month
+        # Monthly average uptime for this specific node across the period starting from the start of the month
         month_node_qs = ServerHealth.objects.filter(
             nd['filter_q'],
             date__gte=start_of_month,
@@ -2229,59 +2238,210 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'updated_at': n.get('updated_at'),
             })
 
+    # Build capacity records from the start of the month across the reporting period
+    month_cap_filter = Q(date__gte=start_of_month, date__lt=next_month)
+    if selected_node == 'OLKVM':
+        month_cap_filter &= (Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs'))
+    elif selected_node == 'Proxmox':
+        month_cap_filter &= (Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
+    elif selected_node != 'All Nodes':
+        month_cap_filter &= Q(server__iexact=selected_node)
+
+    hist_month_qs = (
+        ServerHealth.objects.filter(month_cap_filter)
+        .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
+        .order_by('-date', '-updated_at')
+    )
+
     node_capacity_records = []
-    for n in filtered_nodes:
-        rec_month = (n['date'] or today_dt)
-        rec_date = n.get('date') or today_dt
-        rec_updated = n.get('updated_at')
-        for d in (n['disk_2'], n['disk_3']):
+
+    # Collect distinct (date, server) latest runs
+    seen_day_node = set()
+    daily_runs = []
+    for hr in hist_month_qs:
+        day_key = (hr.date, (hr.server or '').lower())
+        if day_key not in seen_day_node:
+            seen_day_node.add(day_key)
+            daily_runs.append(hr)
+
+    if daily_runs:
+        seen_shared_days = set()
+        for hr in daily_runs:
+            srv_lower = (hr.server or '').lower()
+            nd_m = next((d for d in node_definitions if (d['node_key'].lower() in srv_lower) or (srv_lower in d['node_key'].lower()) or (d['node_name'] == 'OLKVM' and any(k in srv_lower for k in ['infra', 'ebs']))), None)
+            node_lbl = nd_m['node_name'] if nd_m else (hr.node_name or 'Node')
+            disp_lbl = nd_m['display_name'] if nd_m else hr.server
+            host_lbl = nd_m['hosted_systems'] if nd_m else hr.hosted_systems
+            defs_disks = nd_m['default_disks'] if nd_m else ['Disk 1', 'Disk 2', 'Disk 3']
+
+            filter_node_q = nd_m['filter_q'] if nd_m else Q(server=hr.server)
+            prev_hr = (
+                ServerHealth.objects.filter(filter_node_q, date__lt=hr.date, date__gte=oct_baseline_date)
+                .order_by('-date', '-updated_at')
+                .first()
+            )
+
+            # Disk 2 (LVM)
+            d2_sz = float(hr.disk_2_size_gb or 0.0)
+            d2_us = float(hr.disk_2_used_gb or 0.0)
+            d2_fr = max(0.0, d2_sz - d2_us)
+            d2_pct = float(hr.disk_2_percent or 0.0)
+            prev_d2 = float(prev_hr.disk_2_used_gb or 0.0) if prev_hr else 0.0
+            d2_delta = round(d2_us - prev_d2, 2) if prev_hr else 0.0
+            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (prev_hr and prev_d2 > 0) else 0.0
+            d2_rw = _calculate_runway(d2_fr, d2_delta)
+
+            if d2_sz > 0:
+                node_capacity_records.append({
+                    'month': hr.date,
+                    'date': hr.date,
+                    'updated_at': hr.updated_at,
+                    'node_key': hr.server,
+                    'node_name': node_lbl,
+                    'display_name': disp_lbl,
+                    'hosted_systems': host_lbl,
+                    'storage_tier': _clean_disk_label(hr.disk_2_type, defs_disks[1]),
+                    'capacity_gb': round(d2_sz, 2),
+                    'used_gb': round(d2_us, 2),
+                    'free_gb': round(d2_fr, 2),
+                    'used_percent': round(d2_pct, 2),
+                    'growth_gb': d2_delta,
+                    'growth_percent': d2_delta_p,
+                    'delta_24h_gb': d2_delta,
+                    'delta_24h_percent': d2_delta_p,
+                    'runway_days': d2_rw['days'],
+                    'runway_text': d2_rw['text'],
+                    'runway_badge': d2_rw['badge'],
+                    'has_data': True,
+                    'is_shared': False,
+                })
+
+            # Disk 3 (Local)
+            d3_sz = float(hr.disk_3_size_gb or 0.0)
+            d3_us = float(hr.disk_3_used_gb or 0.0)
+            d3_fr = max(0.0, d3_sz - d3_us)
+            d3_pct = float(hr.disk_3_percent or 0.0)
+            prev_d3 = float(prev_hr.disk_3_used_gb or 0.0) if prev_hr else 0.0
+            d3_delta = round(d3_us - prev_d3, 2) if prev_hr else 0.0
+            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (prev_hr and prev_d3 > 0) else 0.0
+            d3_rw = _calculate_runway(d3_fr, d3_delta)
+
+            if d3_sz > 0:
+                node_capacity_records.append({
+                    'month': hr.date,
+                    'date': hr.date,
+                    'updated_at': hr.updated_at,
+                    'node_key': hr.server,
+                    'node_name': node_lbl,
+                    'display_name': disp_lbl,
+                    'hosted_systems': host_lbl,
+                    'storage_tier': _clean_disk_label(hr.disk_3_type, defs_disks[2]),
+                    'capacity_gb': round(d3_sz, 2),
+                    'used_gb': round(d3_us, 2),
+                    'free_gb': round(d3_fr, 2),
+                    'used_percent': round(d3_pct, 2),
+                    'growth_gb': d3_delta,
+                    'growth_percent': d3_delta_p,
+                    'delta_24h_gb': d3_delta,
+                    'delta_24h_percent': d3_delta_p,
+                    'runway_days': d3_rw['days'],
+                    'runway_text': d3_rw['text'],
+                    'runway_badge': d3_rw['badge'],
+                    'has_data': True,
+                    'is_shared': False,
+                })
+
+            # Disk 1 (Shared) - Dedup by (date, cluster)
+            shared_key = (hr.date, node_lbl)
+            if shared_key not in seen_shared_days and float(hr.disk_1_size_gb or 0.0) > 0:
+                seen_shared_days.add(shared_key)
+                d1_sz = float(hr.disk_1_size_gb)
+                d1_us = float(hr.disk_1_used_gb or 0.0)
+                d1_fr = max(0.0, d1_sz - d1_us)
+                d1_pct = float(hr.disk_1_percent or 0.0)
+                prev_d1 = float(prev_hr.disk_1_used_gb or 0.0) if prev_hr else 0.0
+                d1_delta = round(d1_us - prev_d1, 2) if prev_hr else 0.0
+                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (prev_hr and prev_d1 > 0) else 0.0
+                d1_rw = _calculate_runway(d1_fr, d1_delta)
+
+                storage_id = 'VMSAN' if node_lbl == 'Proxmox' else '/nmsddbkp'
+                node_capacity_records.append({
+                    'month': hr.date,
+                    'date': hr.date,
+                    'updated_at': hr.updated_at,
+                    'node_key': node_lbl,
+                    'node_name': node_lbl,
+                    'display_name': f"{node_lbl} Shared",
+                    'hosted_systems': storage_id,
+                    'storage_tier': _clean_disk_label(hr.disk_1_type, defs_disks[0]),
+                    'capacity_gb': round(d1_sz, 2),
+                    'used_gb': round(d1_us, 2),
+                    'free_gb': round(d1_fr, 2),
+                    'used_percent': round(d1_pct, 2),
+                    'growth_gb': d1_delta,
+                    'growth_percent': d1_delta_p,
+                    'delta_24h_gb': d1_delta,
+                    'delta_24h_percent': d1_delta_p,
+                    'runway_days': d1_rw['days'],
+                    'runway_text': d1_rw['text'],
+                    'runway_badge': d1_rw['badge'],
+                    'has_data': True,
+                    'is_shared': True,
+                })
+        node_capacity_records.sort(key=lambda r: (r['date'] or today_dt, r['is_shared'], r['node_name']), reverse=True)
+    else:
+        for n in filtered_nodes:
+            rec_month = (n['date'] or today_dt)
+            rec_date = n.get('date') or today_dt
+            rec_updated = n.get('updated_at')
+            for d in (n['disk_2'], n['disk_3']):
+                node_capacity_records.append({
+                    'month': rec_month,
+                    'date': rec_date,
+                    'updated_at': rec_updated,
+                    'node_key': n['node_key'],
+                    'node_name': n['node_name'],
+                    'display_name': n['display_name'],
+                    'hosted_systems': n['hosted_systems'],
+                    'storage_tier': d['type'],
+                    'capacity_gb': d['size_gb'],
+                    'used_gb': d['used_gb'],
+                    'free_gb': d['free_gb'],
+                    'used_percent': d['percent'],
+                    'growth_gb': d.get('delta_24h_gb', 0.0),
+                    'growth_percent': d.get('delta_24h_pct', 0.0),
+                    'delta_24h_gb': d.get('delta_24h_gb', 0.0),
+                    'delta_24h_percent': d.get('delta_24h_pct', 0.0),
+                    'runway_days': d.get('runway_days', 9999),
+                    'runway_text': d.get('runway_text', 'Stable'),
+                    'runway_badge': d.get('runway_badge', 'stable'),
+                    'has_data': n['has_data'],
+                    'is_shared': False,
+                })
+        for sr in shared_storage_records:
             node_capacity_records.append({
-                'month': rec_month,
-                'date': rec_date,
-                'updated_at': rec_updated,
-                'node_key': n['node_key'],
-                'node_name': n['node_name'],
-                'display_name': n['display_name'],
-                'hosted_systems': n['hosted_systems'],
-                'storage_tier': d['type'],
-                'capacity_gb': d['size_gb'],
-                'used_gb': d['used_gb'],
-                'free_gb': d['free_gb'],
-                'used_percent': d['percent'],
-                'growth_gb': d.get('delta_24h_gb', 0.0),
-                'growth_percent': d.get('delta_24h_pct', 0.0),
-                'delta_24h_gb': d.get('delta_24h_gb', 0.0),
-                'delta_24h_percent': d.get('delta_24h_pct', 0.0),
-                'runway_days': d.get('runway_days', 9999),
-                'runway_text': d.get('runway_text', 'Stable'),
-                'runway_badge': d.get('runway_badge', 'stable'),
-                'has_data': n['has_data'],
-                'is_shared': False,
+                'month': sr['date'],
+                'date': sr['date'],
+                'updated_at': sr.get('updated_at'),
+                'node_key': sr['cluster'],
+                'node_name': sr['cluster'],
+                'display_name': f"{sr['cluster']} Shared",
+                'hosted_systems': sr['storage_id'],
+                'storage_tier': sr['type_label'],
+                'capacity_gb': sr['total_gb'],
+                'used_gb': sr['used_gb'],
+                'free_gb': sr['free_gb'],
+                'used_percent': sr['percent'],
+                'growth_gb': sr['delta_24h_gb'],
+                'growth_percent': sr['delta_24h_pct'],
+                'delta_24h_gb': sr['delta_24h_gb'],
+                'delta_24h_percent': sr['delta_24h_pct'],
+                'runway_days': sr['runway_days'],
+                'runway_text': sr['runway_text'],
+                'runway_badge': sr['runway_badge'],
+                'has_data': True,
+                'is_shared': True,
             })
-    for sr in shared_storage_records:
-        node_capacity_records.append({
-            'month': sr['date'],
-            'date': sr['date'],
-            'updated_at': sr.get('updated_at'),
-            'node_key': sr['cluster'],
-            'node_name': sr['cluster'],
-            'display_name': f"{sr['cluster']} Shared",
-            'hosted_systems': sr['storage_id'],
-            'storage_tier': sr['type_label'],
-            'capacity_gb': sr['total_gb'],
-            'used_gb': sr['used_gb'],
-            'free_gb': sr['free_gb'],
-            'used_percent': sr['percent'],
-            'growth_gb': sr['delta_24h_gb'],
-            'growth_percent': sr['delta_24h_pct'],
-            'delta_24h_gb': sr['delta_24h_gb'],
-            'delta_24h_percent': sr['delta_24h_pct'],
-            'runway_days': sr['runway_days'],
-            'runway_text': sr['runway_text'],
-            'runway_badge': sr['runway_badge'],
-            'has_data': True,
-            'is_shared': True,
-        })
 
     active_nodes = [n for n in filtered_nodes if n['has_data']]
     if active_nodes:
