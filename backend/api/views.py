@@ -23,7 +23,7 @@ from .forms import (
     SLAConfigForm, UgandaHolidayForm
 )
 from users.models import User
-from django.db.models import Sum, Count, Avg
+from django.db.models import Sum, Count, Avg, Q, F
 from .sla_utils import calculate_operational_downtime
 
 def about(request):
@@ -731,8 +731,11 @@ def dashboard(request):
     
     # 7. Attention Required Alerts
     attention_items = []
-    # Staging review alert
-    staging_reviews_qs = IncidentStaging.objects.filter(status='Awaiting Review')
+    # Staging review alert (Database scope only)
+    staging_reviews_qs = IncidentStaging.objects.filter(
+        status='Awaiting Review',
+        category='Database'
+    ).exclude(database='Infrastructure')
     if selected_db != 'All Databases':
         staging_reviews_qs = staging_reviews_qs.filter(database__iexact=selected_db)
     staging_reviews = staging_reviews_qs.count()
@@ -753,8 +756,11 @@ def dashboard(request):
             'type': 'danger',
             'message': f"Backups: {recent_failed_backups} backup failure(s) detected this month."
         })
-    # Open incidents
-    active_incidents = IncidentRegister.objects.filter(status__in=['Open', 'In Progress']).order_by('-created_at')
+    # Open incidents (Database scope only)
+    active_incidents = IncidentRegister.objects.filter(
+        status__in=['Open', 'In Progress'],
+        category='Database'
+    ).exclude(database='Infrastructure').order_by('-created_at')
     if selected_db != 'All Databases':
         active_incidents = active_incidents.filter(database__iexact=selected_db)
     for inc in active_incidents:
@@ -781,8 +787,10 @@ def dashboard(request):
             'status': r.outcome,
             'status_class': 'success' if r.outcome == 'Success' else 'danger'
         })
-    # Incidents
-    recent_incidents = IncidentRegister.objects.all().order_by('-created_at')
+    # Incidents (Database scope only)
+    recent_incidents = IncidentRegister.objects.filter(
+        category='Database'
+    ).exclude(database='Infrastructure').order_by('-created_at')
     if selected_db != 'All Databases':
         recent_incidents = recent_incidents.filter(database__iexact=selected_db)
     recent_incidents = recent_incidents[:8]
@@ -2655,6 +2663,36 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
     node_sla_y_coord = 22 + (100.0 - target_node_sla) * 96 / y_range
 
     node_attention_items = []
+
+    # 1. Staging review alerts (Infrastructure scope)
+    infra_staging_qs = IncidentStaging.objects.filter(
+        status='Awaiting Review'
+    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+    if selected_node != 'All Nodes':
+        infra_staging_qs = infra_staging_qs.filter(
+            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node)
+        )
+    infra_staging_count = infra_staging_qs.count()
+    if infra_staging_count > 0:
+        node_attention_items.append({
+            'type': 'warning',
+            'message': f"Staging Area: {infra_staging_count} infrastructure alert(s) awaiting SysAdmin review."
+        })
+
+    # 2. Open / In Progress Incidents (Infrastructure scope)
+    infra_active_incidents = IncidentRegister.objects.filter(
+        status__in=['Open', 'In Progress']
+    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure')).order_by('-created_at')
+    if selected_node != 'All Nodes':
+        infra_active_incidents = infra_active_incidents.filter(
+            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node)
+        )
+    for inc in infra_active_incidents:
+        inc_target = inc.node_name or inc.system or 'Infrastructure'
+        node_attention_items.append({
+            'type': 'danger',
+            'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc_target}) &mdash; {inc.severity} priority."
+        })
     for n in filtered_nodes:
         display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else f"Proxmox ({n['display_name']})"
         if not n['has_data']:
@@ -4591,31 +4629,70 @@ def incident_staging_list(request):
         messages.error(request, 'You do not have permission to view incident staging records.')
         return redirect('dashboard')
         
-    current_db = request.GET.get('database', '')
+    current_category = request.GET.get('category', '').strip()
+    current_db = request.GET.get('database', '').strip()
+    current_node = request.GET.get('node', '').strip()
     
     # Auto-resolve/sync any staging records that were manually logged or resolved in registers
     awaiting_records = IncidentStaging.objects.filter(status='Awaiting Review')
     for record in awaiting_records:
-        incident = IncidentRegister.objects.filter(database=record.database, start=record.start).first()
-        if incident:
-            record.status = 'Promoted to Incident'
-            record.incident_record = incident
-            record.processed_at = datetime.now()
-            record.save()
-            continue
+        is_infra = (record.category == 'Infrastructure' or record.database == 'Infrastructure')
+        if is_infra:
+            incident = IncidentRegister.objects.filter(
+                Q(category='Infrastructure') | Q(database='Infrastructure'),
+                start=record.start
+            ).first()
+            if incident:
+                record.status = 'Promoted to Incident'
+                record.incident_record = incident
+                record.processed_at = timezone.now()
+                record.save()
+                continue
+                
+            maintenance = MaintenanceRegister.objects.filter(
+                Q(database='Infrastructure') | Q(system__icontains=record.node_name or record.system),
+                start=record.start
+            ).first()
+            if maintenance:
+                record.status = 'Promoted to Maintenance'
+                record.maintenance_record = maintenance
+                record.processed_at = timezone.now()
+                record.save()
+                continue
+        else:
+            incident = IncidentRegister.objects.filter(database=record.database, start=record.start).first()
+            if incident:
+                record.status = 'Promoted to Incident'
+                record.incident_record = incident
+                record.processed_at = timezone.now()
+                record.save()
+                continue
+                
+            maintenance = MaintenanceRegister.objects.filter(database=record.database, start=record.start).first()
+            if maintenance:
+                record.status = 'Promoted to Maintenance'
+                record.maintenance_record = maintenance
+                record.processed_at = timezone.now()
+                record.save()
+                continue
             
-        maintenance = MaintenanceRegister.objects.filter(database=record.database, start=record.start).first()
-        if maintenance:
-            record.status = 'Promoted to Maintenance'
-            record.maintenance_record = maintenance
-            record.processed_at = datetime.now()
-            record.save()
-            continue
-            
-    queryset = IncidentStaging.objects.filter(status='Awaiting Review').order_by('-start')
+    base_qs = IncidentStaging.objects.filter(status='Awaiting Review')
+    total_awaiting_count = base_qs.count()
+    db_awaiting_count = base_qs.filter(category='Database').exclude(database='Infrastructure').count()
+    infra_awaiting_count = base_qs.filter(Q(category='Infrastructure') | Q(database='Infrastructure')).count()
+
+    queryset = base_qs.order_by('-start')
     
+    if current_category == 'Database':
+        queryset = queryset.filter(category='Database').exclude(database='Infrastructure')
+    elif current_category == 'Infrastructure':
+        queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+
     if current_db:
         queryset = queryset.filter(database=current_db)
+        
+    if current_node:
+        queryset = queryset.filter(Q(node_name__iexact=current_node) | Q(system__icontains=current_node))
         
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get('page')
@@ -4638,7 +4715,12 @@ def incident_staging_list(request):
             
     context = {
         'page_obj': page_obj,
+        'current_category': current_category,
         'current_db': current_db,
+        'current_node': current_node,
+        'total_awaiting_count': total_awaiting_count,
+        'db_awaiting_count': db_awaiting_count,
+        'infra_awaiting_count': infra_awaiting_count,
     }
     return render(request, 'incidents/staging_list.html', context)
 
@@ -4650,12 +4732,24 @@ def staging_promote_incident(request, pk):
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    rc_upper = (staging_item.root_cause or '').upper()
+    is_infra = (
+        staging_item.category == 'Infrastructure' or
+        staging_item.database == 'Infrastructure' or
+        'PROMETHEUS' in rc_upper or
+        bool(staging_item.node_name)
+    )
     
     if request.method == 'POST':
         form = IncidentRegisterForm(request.POST)
         if form.is_valid():
             incident = form.save(commit=False)
             incident.created_by = request.user
+            if is_infra:
+                incident.category = 'Infrastructure'
+                incident.database = 'Infrastructure'
+                if not incident.node_name:
+                    incident.node_name = staging_item.node_name or staging_item.system or 'OLKVM'
             incident.save()
             
             # Link/process the staging record
@@ -4670,7 +4764,6 @@ def staging_promote_incident(request, pk):
     else:
         # Determine appropriate severity default from alert text
         severity = 'Medium'
-        rc_upper = (staging_item.root_cause or '').upper()
         if 'CRITICAL' in rc_upper:
             severity = 'Critical'
         elif 'HIGH' in rc_upper:
@@ -4678,30 +4771,29 @@ def staging_promote_incident(request, pk):
         elif 'LOW' in rc_upper:
             severity = 'Low'
 
-        is_infra = (
-            staging_item.category == 'Infrastructure' or
-            'PROMETHEUS' in rc_upper or
-            bool(staging_item.node_name)
-        )
         if is_infra:
             ticket_id = f"INC-PROM-{staging_item.start.strftime('%y%m%d-%H%M')}"
             default_impact = 'Awaiting SysAdmin business impact assessment.'
             resolved_by = 'Prometheus / System'
+            db_val = 'Infrastructure'
+            target_node = staging_item.node_name or staging_item.system or 'OLKVM'
         else:
             ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
             default_impact = 'Awaiting DBA business impact assessment.'
             resolved_by = 'System'
+            db_val = staging_item.database
+            target_node = ''
 
         initial = {
             'ticket': ticket_id,
-            'category': staging_item.category,
-            'node_name': staging_item.node_name,
+            'category': 'Infrastructure' if is_infra else 'Database',
+            'node_name': target_node,
             'date': staging_item.start.date(),
             'start': staging_item.start,
             'end': staging_item.end,
             'severity': severity,
             'system': staging_item.system,
-            'database': 'Infrastructure' if is_infra else staging_item.database,
+            'database': db_val,
             'root_cause': staging_item.root_cause,
             'resolved_by': resolved_by,
             'status': 'Resolved',
@@ -4712,8 +4804,9 @@ def staging_promote_incident(request, pk):
         
     context = {
         'form': form,
-        'title': 'Promote Staging to Incident',
-        'staging_item': staging_item
+        'title': 'Promote Staging to Incident (SysAdmin)' if is_infra else 'Promote Staging to Incident (DBA)',
+        'staging_item': staging_item,
+        'is_infra': is_infra,
     }
     return render(request, 'incidents/staging_promote_incident.html', context)
 
@@ -4725,12 +4818,21 @@ def staging_promote_maintenance(request, pk):
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    is_infra = (
+        staging_item.category == 'Infrastructure' or
+        staging_item.database == 'Infrastructure' or
+        bool(staging_item.node_name)
+    )
     
     if request.method == 'POST':
         form = MaintenanceRegisterForm(request.POST)
         if form.is_valid():
             maintenance = form.save(commit=False)
             maintenance.created_by = request.user
+            if is_infra:
+                maintenance.database = 'Infrastructure'
+                if not maintenance.system:
+                    maintenance.system = staging_item.node_name or staging_item.system
             maintenance.save()
             
             # Link/process the staging record
@@ -4746,8 +4848,8 @@ def staging_promote_maintenance(request, pk):
         # Pre-populate fields from staging record
         initial = {
             'date': staging_item.start.date(),
-            'database': staging_item.database,
-            'system': staging_item.system,
+            'database': 'Infrastructure' if is_infra else staging_item.database,
+            'system': staging_item.node_name or staging_item.system,
             'start': staging_item.start,
             'end': staging_item.end,
             'duration_hrs': staging_item.duration_hrs,
@@ -4763,7 +4865,8 @@ def staging_promote_maintenance(request, pk):
     context = {
         'form': form,
         'title': 'Promote Staging to Maintenance',
-        'staging_item': staging_item
+        'staging_item': staging_item,
+        'is_infra': is_infra,
     }
     return render(request, 'incidents/staging_promote_maintenance.html', context)
 

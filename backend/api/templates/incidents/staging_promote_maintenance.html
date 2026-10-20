@@ -7,8 +7,18 @@
     <h3 style="color: #10b981; margin-bottom: 0.5rem;">Staged Alert Details</h3>
     <table style="width: 100%; margin-bottom: 0;">
         <tr>
-            <td style="width: 25%; font-weight: 600; color: #475569;">Database:</td>
-            <td>{{ staging_item.database }} ({{ staging_item.system }})</td>
+            <td style="width: 25%; font-weight: 600; color: #475569;">
+                {% if is_infra or staging_item.category == 'Infrastructure' or staging_item.database == 'Infrastructure' %}Target Node:{% else %}Database:{% endif %}
+            </td>
+            <td>
+                {% if is_infra or staging_item.category == 'Infrastructure' or staging_item.database == 'Infrastructure' %}
+                    <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Infrastructure</span>
+                    <strong style="color: #00205B; margin-left: 0.35rem;">{{ staging_item.node_name|default:staging_item.system }}</strong>
+                {% else %}
+                    <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Database</span>
+                    <strong style="color: #00205B; margin-left: 0.35rem;">{{ staging_item.database }}</strong> ({{ staging_item.system }})
+                {% endif %}
+            </td>
         </tr>
         <tr>
             <td style="font-weight: 600; color: #475569;">Outage Period:</td>
@@ -18,9 +28,9 @@
                 </div>
                 <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                     <span style="background: #e0f2fe; color: #0369a1; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;">
-                        <strong>{{ staging_item.duration_hrs }} hrs</strong> SLA Business Impact
+                        <strong>{{ staging_item.duration_hrs }} hrs</strong> {% if is_infra %}24/7 Availability Duration{% else %}SLA Business Impact{% endif %}
                     </span>
-                    {% if staging_item.has_off_hours_difference %}
+                    {% if staging_item.has_off_hours_difference and not is_infra %}
                     <span style="background: #f1f5f9; color: #334155; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.78rem; border: 1px solid #cbd5e1;">
                         Total Elapsed Outage: <strong>{{ staging_item.elapsed_duration_hrs }} hrs</strong> ({{ staging_item.elapsed_duration_mins }} mins)
                     </span>
@@ -61,6 +71,10 @@
             </div>
         {% endif %}
 
+        {% if is_infra %}
+            <input type="hidden" name="database" value="Infrastructure">
+        {% endif %}
+
         <div class="form-group">
             <label for="{{ form.date.id_for_label }}">Date:</label>
             {{ form.date }}
@@ -70,7 +84,7 @@
             {{ form.change_id }}
         </div>
         <div class="form-group">
-            <label for="{{ form.system.id_for_label }}">System:</label>
+            <label for="{{ form.system.id_for_label }}">{% if is_infra %}Target Host Node / System:{% else %}System:{% endif %}</label>
             {{ form.system }}
         </div>
         <div class="form-group">
@@ -109,10 +123,13 @@
             <label for="{{ form.success.id_for_label }}">Success:</label>
             {{ form.success }}
         </div>
+
+        {% if not is_infra %}
         <div class="form-group">
             <label for="{{ form.database.id_for_label }}">Database:</label>
             {{ form.database }}
         </div>
+        {% endif %}
 
         <button type="submit" class="btn btn-success" style="background-color: #10b981; border-color: #10b981;">Log Maintenance</button>
         <a href="{% url 'incident_staging_list' %}" class="btn btn-danger" style="margin-left: 0.5rem; background-color: #64748b; border-color: #64748b;">Cancel Promotion</a>
