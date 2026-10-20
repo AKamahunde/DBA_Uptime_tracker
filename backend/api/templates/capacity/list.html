@@ -365,11 +365,11 @@
                         {% endif %}
                     </td>
                     <td>
-                        <span style="display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
-                            {% if cap.runway_badge == 'critical' %}background: #fee2e2; color: #991b1b;
-                            {% elif cap.runway_badge == 'warning' %}background: #fef3c7; color: #92400e;
-                            {% elif cap.runway_badge == 'healthy' %}background: #dcfce7; color: #166534;
-                            {% else %}background: #e0f2fe; color: #0369a1;{% endif %}">
+                        <span style="font-size: 0.82rem; font-weight: 700;
+                            {% if cap.runway_badge == 'critical' %}color: #dc2626;
+                            {% elif cap.runway_badge == 'warning' %}color: #d97706;
+                            {% elif cap.runway_badge == 'healthy' %}color: #16a34a;
+                            {% else %}color: #0284c7;{% endif %}">
                             {{ cap.runway_text }}
                         </span>
                     </td>
@@ -596,11 +596,11 @@
                     </td>
                     <td style="font-weight: 600;">{{ capacity.growth_percent }}%</td>
                     <td>
-                        <span style="display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
-                            {% if capacity.runway_badge == 'critical' %}background: #fee2e2; color: #991b1b;
-                            {% elif capacity.runway_badge == 'warning' %}background: #fef3c7; color: #92400e;
-                            {% elif capacity.runway_badge == 'healthy' %}background: #dcfce7; color: #166534;
-                            {% else %}background: #e0f2fe; color: #0369a1;{% endif %}">
+                        <span style="font-size: 0.82rem; font-weight: 700;
+                            {% if capacity.runway_badge == 'critical' %}color: #dc2626;
+                            {% elif capacity.runway_badge == 'warning' %}color: #d97706;
+                            {% elif capacity.runway_badge == 'healthy' %}color: #16a34a;
+                            {% else %}color: #0284c7;{% endif %}">
                             {{ capacity.runway_text }}
                         </span>
                     </td>
