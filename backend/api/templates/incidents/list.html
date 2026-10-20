@@ -215,7 +215,13 @@
 
                             <!-- Duration -->
                             <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
-                                {{ incident.duration_hrs }} hrs
+                                <div>{{ incident.duration_hrs }} hrs</div>
+                                <div style="font-size: 0.68rem; color: #64748b; font-weight: 600; text-transform: uppercase;">SLA Impact</div>
+                                {% if incident.has_off_hours_difference %}
+                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;" title="Total Elapsed: {{ incident.elapsed_duration_hrs }} hrs">
+                                    Elapsed: <strong>{{ incident.elapsed_duration_hrs }}h</strong>
+                                </div>
+                                {% endif %}
                             </td>
 
                             <!-- Severity -->

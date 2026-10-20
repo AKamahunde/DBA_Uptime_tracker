@@ -101,6 +101,39 @@ class IncidentRegister(models.Model):
     def __str__(self):
         return f"{self.ticket} - {self.date}"
 
+    @property
+    def elapsed_duration_hrs(self):
+        """Total wall-clock elapsed duration between start and end (24/7)."""
+        if self.start and self.end and self.end > self.start:
+            secs = (self.end - self.start).total_seconds()
+            return round(secs / 3600.0, 2)
+        return float(self.duration_hrs or 0.0)
+
+    @property
+    def elapsed_duration_mins(self):
+        """Total wall-clock elapsed duration in minutes."""
+        if self.start and self.end and self.end > self.start:
+            secs = (self.end - self.start).total_seconds()
+            return round(secs / 60.0, 1)
+        return round(float(self.duration_hrs or 0.0) * 60.0, 1)
+
+    @property
+    def has_off_hours_difference(self):
+        """Returns True if the elapsed wall-clock downtime differs noticeably from SLA business hours downtime."""
+        try:
+            return abs(float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)) >= 0.05
+        except Exception:
+            return False
+
+    @property
+    def off_hours_duration_hrs(self):
+        """Duration of the outage that fell outside the SLA business operating window."""
+        try:
+            diff = float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)
+            return round(max(0.0, diff), 2)
+        except Exception:
+            return 0.0
+
 class IncidentChangeLog(models.Model):
     incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
     changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
@@ -651,4 +684,37 @@ class IncidentStaging(models.Model):
 
     def __str__(self):
         return f"Staged {self.database} ({self.start}) - {self.status}"
+
+    @property
+    def elapsed_duration_hrs(self):
+        """Total wall-clock elapsed duration between start and end (24/7)."""
+        if self.start and self.end and self.end > self.start:
+            secs = (self.end - self.start).total_seconds()
+            return round(secs / 3600.0, 2)
+        return float(self.duration_hrs or 0.0)
+
+    @property
+    def elapsed_duration_mins(self):
+        """Total wall-clock elapsed duration in minutes."""
+        if self.start and self.end and self.end > self.start:
+            secs = (self.end - self.start).total_seconds()
+            return round(secs / 60.0, 1)
+        return round(float(self.duration_hrs or 0.0) * 60.0, 1)
+
+    @property
+    def has_off_hours_difference(self):
+        """Returns True if the elapsed wall-clock downtime differs noticeably from SLA business hours downtime."""
+        try:
+            return abs(float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)) >= 0.05
+        except Exception:
+            return False
+
+    @property
+    def off_hours_duration_hrs(self):
+        """Duration of the outage that fell outside the SLA business operating window."""
+        try:
+            diff = float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)
+            return round(max(0.0, diff), 2)
+        except Exception:
+            return 0.0
 

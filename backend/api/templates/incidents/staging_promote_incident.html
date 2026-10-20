@@ -21,7 +21,24 @@
         </tr>
         <tr>
             <td style="font-weight: 600; color: #475569;">Outage Period:</td>
-            <td>{{ staging_item.start|date:"d/m/Y H:i:s" }} to {{ staging_item.end|date:"d/m/Y H:i:s" }} ({{ staging_item.duration_hrs }} hrs)</td>
+            <td>
+                <div style="font-weight: 600; color: #0f172a; font-size: 0.95rem;">
+                    {{ staging_item.start|date:"d/m/Y H:i:s" }} to {{ staging_item.end|date:"d/m/Y H:i:s" }}
+                </div>
+                <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="background: #fee2e2; color: #b91c1c; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <strong>{{ staging_item.duration_hrs }} hrs</strong> SLA Business Impact
+                    </span>
+                    {% if staging_item.has_off_hours_difference %}
+                    <span style="background: #f1f5f9; color: #334155; font-weight: 600; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.78rem; border: 1px solid #cbd5e1;">
+                        Total Elapsed Outage: <strong>{{ staging_item.elapsed_duration_hrs }} hrs</strong> ({{ staging_item.elapsed_duration_mins }} mins)
+                    </span>
+                    <span style="font-size: 0.75rem; color: #64748b; font-style: italic;">
+                        ({{ staging_item.off_hours_duration_hrs }} hrs occurred off-hours outside the SLA business operating window)
+                    </span>
+                    {% endif %}
+                </div>
+            </td>
         </tr>
         <tr>
             <td style="font-weight: 600; color: #475569;">Staged Alert Log:</td>

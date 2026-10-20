@@ -57,7 +57,15 @@
                             Waiting: <span style="color: #d97706; font-weight: 700;">{{ item.waiting_duration }}</span>
                         </div>
                     </td>
-                    <td>{{ item.duration_hrs }}</td>
+                    <td>
+                        <div style="font-weight: 700; color: #0f172a;">{{ item.duration_hrs }} hrs</div>
+                        <div style="font-size: 0.68rem; color: #64748b; font-weight: 600; text-transform: uppercase;">SLA Impact</div>
+                        {% if item.has_off_hours_difference %}
+                        <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; font-weight: 500;" title="Total Elapsed Wall-Clock Outage">
+                            Elapsed: <strong>{{ item.elapsed_duration_hrs }}h</strong>
+                        </div>
+                        {% endif %}
+                    </td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">
                         {{ item.root_cause|linebreaksbr }}
                     </td>
