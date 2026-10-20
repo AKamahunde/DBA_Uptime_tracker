@@ -331,7 +331,10 @@ class ServerHealth(models.Model):
 
     @property
     def display_node_label(self):
-        # Node name comes first, remove initial nms
+        # For OLKVM, maintain just "OLKVM" as node label (workload/server details are shown below the label)
+        srv_lower = (self.server or '').lower()
+        if (self.node_name or '').upper() == 'OLKVM' or self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'infra', 'ebs']):
+            return 'OLKVM'
         srv = self.display_server
         if self.database == 'MS SQL Server':
             srv = 'Pentana'
@@ -342,7 +345,23 @@ class ServerHealth(models.Model):
     @property
     def clean_hosted_systems(self):
         import re
-        txt = self.hosted_systems or self.database or ''
+        txt = self.hosted_systems or ''
+        srv_lower = (self.server or '').lower()
+        if not txt or txt == self.database:
+            if 'infra' in srv_lower:
+                return 'Oracle DB (infra)'
+            elif 'ebs' in srv_lower:
+                return 'Oracle EBS App (ebs)'
+            elif 'pvenode1' in srv_lower:
+                return 'tomcatvm & Internal Systems'
+            elif 'pvenode2' in srv_lower:
+                return 'jumphostvm & monitoringvm'
+            elif 'pvenode3' in srv_lower:
+                return 'databasevm (MySQL / Pentana)'
+            elif (self.node_name or '').upper() == 'OLKVM':
+                return 'Oracle DB & EBS App'
+            elif self.database:
+                return self.database
         # Strip any IP addresses
         txt = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', txt)
         txt = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', txt)

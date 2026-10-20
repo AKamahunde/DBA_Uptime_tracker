@@ -457,7 +457,9 @@
       {% for node in filtered_nodes %}
       <tr>
         <td>
-          <strong style="color: var(--primary-navy);">{{ node.node_name }} &mdash; {{ node.display_name }}</strong>
+          <strong style="color: var(--primary-navy);">
+            {% if node.node_name == 'OLKVM' %}OLKVM{% else %}{{ node.node_name }} &mdash; {{ node.display_name }}{% endif %}
+          </strong>
         </td>
         <td style="text-align: left; color: #475569; font-size: 8px;">{{ node.hosted_systems }}</td>
         <td style="font-weight: 700; color: {% if node.uptime_percent >= target_node_sla %}var(--green-text){% else %}var(--red-text){% endif %};">

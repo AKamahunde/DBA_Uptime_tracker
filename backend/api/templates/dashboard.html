@@ -876,7 +876,13 @@
                 {% for node in filtered_nodes %}
                 <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
                     <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
-                        {{ node.node_name }} &mdash; {{ node.display_name }}
+                        {% if node.node_name == 'OLKVM' %}
+                            OLKVM
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ node.hosted_systems }}</div>
+                        {% else %}
+                            {{ node.node_name }} &mdash; {{ node.display_name }}
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ node.hosted_systems }}</div>
+                        {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %};">
                         {{ node.uptime_str }}

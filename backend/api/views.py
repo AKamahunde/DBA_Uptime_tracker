@@ -1998,11 +1998,12 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             elif srv_clean.startswith('nmsebs'):
                 srv_clean = srv_clean.replace('nmsebs', 'ebs', 1)
 
+            node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
             node_overview_data.append({
                 'node_key': nd['node_key'],
                 'node_name': nd['node_name'],
                 'display_name': nd['display_name'],
-                'full_node_label': f"{nd['node_name']} — {nd['display_name']}",
+                'full_node_label': node_lbl,
                 'role_title': nd['role_title'],
                 'hosted_systems': clean_hosted,
                 'primary_db': nd['primary_db'],
@@ -2045,11 +2046,12 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                 {'slot': i + 1, 'type': _clean_disk_label(nd['default_disks'][i], nd['default_disks'][i]), 'size_gb': 0.0, 'used_gb': 0.0, 'free_gb': 0.0, 'percent': 0.0, 'status': 'No Data', 'is_shared': i == 0}
                 for i in range(3)
             ]
+            node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
             node_overview_data.append({
                 'node_key': nd['node_key'],
                 'node_name': nd['node_name'],
                 'display_name': nd['display_name'],
-                'full_node_label': f"{nd['node_name']} — {nd['display_name']}",
+                'full_node_label': node_lbl,
                 'role_title': nd['role_title'],
                 'hosted_systems': nd['hosted_systems'],
                 'primary_db': nd['primary_db'],
@@ -2267,51 +2269,53 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
 
     node_attention_items = []
     for n in filtered_nodes:
+        display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else f"Proxmox ({n['display_name']})"
         if not n['has_data']:
             node_attention_items.append({
                 'type': 'warning',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}):</strong> No Prometheus telemetry synced yet."
+                'message': f"<strong>{display_label}:</strong> No Prometheus telemetry synced yet."
             })
             continue
 
         if n['uptime_percent'] < target_node_sla:
             node_attention_items.append({
                 'type': 'danger',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}) Uptime:</strong> Node availability ({n['uptime_percent']}%) is below the {target_node_sla}% SLA target."
+                'message': f"<strong>{display_label} Uptime:</strong> Node availability ({n['uptime_percent']}%) is below the {target_node_sla}% SLA target."
             })
 
         if n['cpu_percent'] > 90:
             node_attention_items.append({
                 'type': 'danger',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}) CPU Critical:</strong> CPU utilisation is at {n['cpu_percent']}% (&gt; 90% threshold)."
+                'message': f"<strong>{display_label} CPU Critical:</strong> CPU utilisation is at {n['cpu_percent']}% (&gt; 90% threshold)."
             })
         elif n['cpu_percent'] > 75:
             node_attention_items.append({
                 'type': 'warning',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}) CPU Warning:</strong> Elevated CPU utilisation at {n['cpu_percent']}%."
+                'message': f"<strong>{display_label} CPU Warning:</strong> Elevated CPU utilisation at {n['cpu_percent']}%."
             })
 
         if n['memory_percent'] > 90:
             node_attention_items.append({
                 'type': 'danger',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}) Memory Critical:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
+                'message': f"<strong>{display_label} Memory Critical:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
             })
         elif n['memory_percent'] > 80:
             node_attention_items.append({
                 'type': 'warning',
-                'message': f"<strong>{n['display_name']} ({n['node_name']}) Memory Warning:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
+                'message': f"<strong>{display_label} Memory Warning:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
             })
 
         for d in n['disks']:
+            disk_lbl = f"{display_label} — {d['type']}"
             if d['percent'] > 90:
                 node_attention_items.append({
                     'type': 'danger',
-                    'message': f"<strong>{n['display_name']} — {d['type']}:</strong> Critical disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
+                    'message': f"<strong>{disk_lbl}:</strong> Critical disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
             elif d['percent'] > 80:
                 node_attention_items.append({
                     'type': 'warning',
-                    'message': f"<strong>{n['display_name']} — {d['type']}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
+                    'message': f"<strong>{disk_lbl}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
 
     all_nodes_healthy = all(n['status'] == 'Healthy' for n in active_nodes) if active_nodes else True
@@ -2472,8 +2476,9 @@ def dashboard_node_excel(request):
         row_num += 1
 
         for n in filtered_nodes:
+            node_lbl = "OLKVM" if n['node_name'] == 'OLKVM' else n['display_name']
             r_data = [
-                n['display_name'],
+                node_lbl,
                 n['node_name'],
                 n['hosted_systems'],
                 f"{n['uptime_percent']}%" if n['has_data'] else "No Data",
@@ -2515,9 +2520,10 @@ def dashboard_node_excel(request):
         row_num += 1
 
         for cap in node_capacity_records:
+            cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
             c_data = [
                 cap['month'].strftime('%B %Y') if hasattr(cap['month'], 'strftime') else str(cap['month']),
-                cap['display_name'],
+                cap_node_lbl,
                 cap['node_name'],
                 cap['storage_tier'],
                 cap['capacity_gb'],
@@ -2569,8 +2575,9 @@ def dashboard_node_excel(request):
         writer.writerow([])
         writer.writerow(["Node", "Hypervisor", "Workloads", "Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
         for n in filtered_nodes:
+            node_lbl = "OLKVM" if n['node_name'] == 'OLKVM' else n['display_name']
             writer.writerow([
-                n['display_name'], n['node_name'], n['hosted_systems'],
+                node_lbl, n['node_name'], n['hosted_systems'],
                 f"{n['uptime_percent']}%", f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}",
                 f"{n['local_disk_util_pct']}%", f"{n['memory_used_gb']} / {n['memory_total_gb']}",
                 f"{n['memory_percent']}%", n['logical_cpus'], f"{n['cpu_percent']}%", n['status']

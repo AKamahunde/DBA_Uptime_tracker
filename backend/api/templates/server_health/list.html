@@ -192,7 +192,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.65rem;">
                 <div>
                     <strong style="color: var(--primary-navy); font-size: 0.95rem;">
-                        {{ node.node_name }} &mdash; {{ node.display_name }}
+                        {% if node.node_name == 'OLKVM' %}OLKVM{% else %}{{ node.node_name }} &mdash; {{ node.display_name }}{% endif %}
                     </strong>
                     <span style="color: #64748b; font-size: 0.78rem; margin-left: 0.5rem;">&bull; {{ node.hosted_systems }}</span>
                 </div>
@@ -261,7 +261,12 @@
                 <tr>
                     <td style="font-weight: 600;">{{ cap.month|date:"F Y" }}</td>
                     <td>
-                        <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
+                        {% if cap.node_name == 'OLKVM' %}
+                            <strong>OLKVM</strong>
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ cap.hosted_systems }}</div>
+                        {% else %}
+                            <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
+                        {% endif %}
                     </td>
                     <td style="color: #475569;">{{ cap.storage_tier }}</td>
                     <td>{{ cap.capacity_gb }} GB</td>
