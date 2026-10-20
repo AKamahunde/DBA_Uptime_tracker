@@ -123,13 +123,8 @@
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
                 <select name="node_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
                     <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
-                    <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM Cluster</option>
-                    <option value="nmsinfra.nms.go.ug" {% if selected_node == 'nmsinfra.nms.go.ug' %}selected{% endif %}>nmsinfra.nms.go.ug</option>
-                    <option value="nmsebs.nms.go.ug" {% if selected_node == 'nmsebs.nms.go.ug' %}selected{% endif %}>nmsebs.nms.go.ug</option>
-                    <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox Cluster</option>
-                    <option value="pvenode1" {% if selected_node == 'pvenode1' %}selected{% endif %}>pvenode1</option>
-                    <option value="pvenode2" {% if selected_node == 'pvenode2' %}selected{% endif %}>pvenode2</option>
-                    <option value="pvenode3" {% if selected_node == 'pvenode3' %}selected{% endif %}>pvenode3</option>
+                    <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM</option>
+                    <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
