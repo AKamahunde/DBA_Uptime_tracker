@@ -209,6 +209,39 @@ def _get_dashboard_data(reporting_month):
         sla_exists = (sla_config_record is not None)
         th = sla_config_record.target_hours if sla_exists else 0
 
+        # Auto-ensure default target hours and SLA target if not manually configured
+        if not sla_exists or not th:
+            import calendar
+            from datetime import date
+            yr = reporting_month.year
+            mo = reporting_month.month
+            holidays = set(UgandaHoliday.objects.filter(
+                holiday_date__year=yr, holiday_date__month=mo
+            ).values_list('holiday_date', flat=True))
+            _, num_days = calendar.monthrange(yr, mo)
+            calc_th = 0
+            for day in range(1, num_days + 1):
+                d = date(yr, mo, day)
+                if d not in holidays:
+                    if db_type == 'Oracle':
+                        calc_th += 18
+                    elif d.weekday() < 5:
+                        calc_th += 9
+            if calc_th > 0:
+                try:
+                    target_pct_default = 99.50 if db_type == 'MySQL' else 99.95
+                    first_of_month = reporting_month.replace(day=1)
+                    sla_config_record, _ = SLAConfig.objects.get_or_create(
+                        database=db_type,
+                        month=first_of_month,
+                        defaults={'target_hours': calc_th, 'sla_percent': target_pct_default}
+                    )
+                    sla_exists = True
+                    th = sla_config_record.target_hours
+                except Exception:
+                    th = calc_th
+                    sla_exists = True
+
         if th and th > 0:
             avail = ((float(th) - float(unplanned)) / float(th)) * 100
             avail_str = f"{round(avail, 2)}%"
@@ -332,6 +365,8 @@ def _get_dashboard_data(reporting_month):
     return dashboard_data, db_types
 
 def _get_database_detail(selected_db, reporting_month, dashboard_data):
+    if selected_db in ['MKInsight', 'Pentana']:
+        selected_db = 'MS SQL Server'
     database_detail = None
     db_types = ['Oracle', 'MySQL', 'MS SQL Server']
     if selected_db in db_types:
@@ -498,6 +533,8 @@ def dashboard(request):
         reporting_month = timezone.now().date().replace(day=1)
 
     selected_db = request.GET.get('database_select', 'All Databases')
+    if selected_db in ['MKInsight', 'Pentana']:
+        selected_db = 'MS SQL Server'
     dashboard_data, db_types = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
 
@@ -902,6 +939,9 @@ def dashboard_print(request):
         summary_narrative = request.GET.get('summary_narrative', '').strip()
         download_mode = request.GET.get('download', 'false')
 
+    if selected_db in ['MKInsight', 'Pentana']:
+        selected_db = 'MS SQL Server'
+
     if month_str:
         try:
             reporting_month = datetime.strptime(month_str, '%Y-%m').date()
@@ -1099,6 +1139,8 @@ def dashboard_excel(request):
         reporting_month = timezone.now().date().replace(day=1)
 
     selected_db = request.GET.get('database_select', 'All Databases')
+    if selected_db in ['MKInsight', 'Pentana']:
+        selected_db = 'MS SQL Server'
     dashboard_data, _ = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     month_display = reporting_month.strftime('%B %Y')
@@ -4095,10 +4137,16 @@ def incident_ingest(request):
     try:
         data = json.loads(request.body)
         
-        db_type = data.get('database', 'MySQL')
+        raw_db = data.get('database', 'MySQL')
+        if raw_db.strip().lower() in ['mkinsight', 'pentana', 'mssql', 'ms sql', 'ms sql server']:
+            db_type = 'MS SQL Server'
+            system = data.get('system') or 'MKInsight (Pentana)'
+        else:
+            db_type = raw_db
+            system = data.get('system', f"{db_type} Instance")
+        
         start_str = data.get('start')
         end_str = data.get('end')
-        system = data.get('system', 'MySQL Instance')
         
         if not start_str or not end_str:
             return JsonResponse({'error': 'start and end timestamps are required'}, status=400)

@@ -178,9 +178,9 @@
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
                 <select name="database_select" onchange="submitDbFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
                     <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
-                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle (ERP Suite)</option>
+                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL (NMS360 / DMT)</option>
+                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' or selected_db == 'MKInsight' %}selected{% endif %}>MS SQL Server (MKInsight / Pentana)</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -363,7 +363,7 @@
                     <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
                         {{ item.database }} 
                         <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
-                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
+                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana — MKInsight{% endif %})
                         </span>
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">

@@ -198,6 +198,14 @@ $ramPercent = [Math]::Round((($totalRam - $freeRam) / $totalRam) * 100, 2)
 $drive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
 $diskPercent = [Math]::Round((($drive.Size - $drive.FreeSpace) / $drive.Size) * 100, 2)
 
+# 4. OS Uptime (Days & Availability)
+$bootTime = $os.LastBootUpTime
+$uptimeDays = 0.00
+if ($bootTime) {
+    $uptimeSpan = (Get-Date) - $bootTime
+    $uptimeDays = [Math]::Round($uptimeSpan.TotalDays, 2)
+}
+
 # Create Server Health Payload
 $healthPayload = @{
     server             = $Hostname
@@ -209,6 +217,8 @@ $healthPayload = @{
     slow_queries       = 0
     threads            = $threadsCount
     database           = "MS SQL Server"
+    uptime_days        = $uptimeDays
+    uptime_percent     = 100.00
 }
 
 Write-Host "Sending Server Health Stats..."
