@@ -2188,14 +2188,17 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             import re
             clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', clean_hosted)
             clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
-            clean_hosted = clean_hosted.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+            if 'infra' in clean_hosted and 'nmsinfra' not in clean_hosted:
+                clean_hosted = clean_hosted.replace('infra', 'nmsinfra')
+            if 'ebs' in clean_hosted and 'nmsebs' not in clean_hosted:
+                clean_hosted = clean_hosted.replace('ebs', 'nmsebs')
             clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()') or nd['hosted_systems']
 
             srv_clean = latest_rec.server or nd['display_name']
-            if srv_clean.startswith('nmsinfra'):
-                srv_clean = srv_clean.replace('nmsinfra', 'infra', 1)
-            elif srv_clean.startswith('nmsebs'):
-                srv_clean = srv_clean.replace('nmsebs', 'ebs', 1)
+            if srv_clean.startswith('infra'):
+                srv_clean = 'nms' + srv_clean
+            elif srv_clean.startswith('ebs'):
+                srv_clean = 'nms' + srv_clean
 
             node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
             node_overview_data.append({

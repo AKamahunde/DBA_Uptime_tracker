@@ -416,10 +416,10 @@ class ServerHealth(models.Model):
     @property
     def display_server(self):
         s = self.server or ''
-        if s.startswith('nmsinfra'):
-            return s.replace('nmsinfra', 'infra', 1)
-        if s.startswith('nmsebs'):
-            return s.replace('nmsebs', 'ebs', 1)
+        if s.startswith('infra'):
+            return 'nms' + s
+        if s.startswith('ebs'):
+            return 'nms' + s
         return s
 
     @property
