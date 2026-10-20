@@ -882,7 +882,7 @@ def dashboard(request):
         'recent_activity': recent_activity,
     }
     selected_node = request.GET.get('node_select', 'All Nodes')
-    context.update(_build_node_dashboard_context(selected_node=selected_node))
+    context.update(_build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month))
     return render(request, 'dashboard.html', context)
 
 @login_required
@@ -1786,12 +1786,30 @@ def server_health_sync_prometheus(request):
     return redirect('server_health_list')
 
 
-def _build_node_dashboard_context(selected_node='All Nodes'):
+def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=None):
     from django.db.models import Avg, Q
     import math
     from etl.services.rest_client import PROMETHEUS_URL, sync_all_nodes_from_prometheus
 
     today_dt = timezone.now().date()
+    if not reporting_month:
+        target_month_dt = today_dt.replace(day=1)
+    elif isinstance(reporting_month, str):
+        try:
+            target_month_dt = datetime.strptime(reporting_month[:7], '%Y-%m').date().replace(day=1)
+        except ValueError:
+            target_month_dt = today_dt.replace(day=1)
+    elif hasattr(reporting_month, 'year'):
+        target_month_dt = reporting_month.replace(day=1)
+    else:
+        target_month_dt = today_dt.replace(day=1)
+
+    start_of_month = target_month_dt
+    if start_of_month.month == 12:
+        next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
+    else:
+        next_month = start_of_month.replace(month=start_of_month.month + 1, day=1)
+
     if not ServerHealth.objects.filter(date=today_dt, entered_by='Prometheus').exists():
         try:
             sync_all_nodes_from_prometheus()
@@ -1909,8 +1927,21 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
         )
         if not latest_rec:
             latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
+
+        # Monthly average uptime for this specific node in the target reporting month
+        month_node_qs = ServerHealth.objects.filter(
+            nd['filter_q'],
+            date__gte=start_of_month,
+            date__lt=next_month,
+        ).exclude(uptime_percent__isnull=True)
+
+        month_up_agg = month_node_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
+
         if latest_rec:
-            up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
+            if month_up_agg is not None:
+                up_pct = round(float(month_up_agg), 2)
+            else:
+                up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
             up_days = float(latest_rec.uptime_days or 0.0)
             logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)))
             cpu_val = float(latest_rec.cpu_percent or 0.0)
@@ -2240,7 +2271,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
         elif selected_node != 'All Nodes':
             month_qs = month_qs.filter(server__iexact=selected_node)
 
-        if t_month == today_date and active_nodes:
+        if t_month == target_month_dt and active_nodes:
             val = avg_node_up
             has_m_data = True
         elif t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
@@ -2380,6 +2411,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
         'node_sla_y_coord': node_sla_y_coord,
         'node_attention_items': node_attention_items,
         'default_node_lede_text': default_node_lede_text,
+        'node_reporting_month_display': target_month_dt.strftime('%B %Y'),
     }
 
 
@@ -2406,7 +2438,7 @@ def dashboard_node_print(request):
     else:
         reporting_month = timezone.now().date().replace(day=1)
 
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
 
     user_display = request.user.get_full_name()
     if not user_display:
@@ -2440,7 +2472,7 @@ def dashboard_node_excel(request):
         reporting_month = timezone.now().date().replace(day=1)
 
     selected_node = request.GET.get('node_select', 'All Nodes')
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
     filtered_nodes = node_ctx['filtered_nodes']
     node_capacity_records = node_ctx['node_capacity_records']
     month_display = reporting_month.strftime('%B %Y')
@@ -2486,7 +2518,7 @@ def dashboard_node_excel(request):
         row_num = 3
 
         headers = [
-            "Node", "Hypervisor", "Workloads", "Uptime (%)", "Local Storage (Used / Total GB)",
+            "Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Local Storage (Used / Total GB)",
             "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"
         ]
         ws.append(headers)
@@ -2610,7 +2642,7 @@ def dashboard_node_excel(request):
         writer = csv.writer(response)
         writer.writerow([f"Node Infrastructure Performance & Capacity Summary ({selected_node}) - {month_display}"])
         writer.writerow([])
-        writer.writerow(["Node", "Hypervisor", "Workloads", "Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
+        writer.writerow(["Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
         for n in filtered_nodes:
             node_lbl = "OLKVM" if n['node_name'] == 'OLKVM' else n['display_name']
             writer.writerow([
