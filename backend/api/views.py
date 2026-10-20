@@ -1965,19 +1965,28 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d3_size = float(latest_rec.disk_3_size_gb or 0.0)
             d3_used = float(latest_rec.disk_3_used_gb or 0.0)
 
-            first_of_rec_month = latest_rec.date.replace(day=1)
-            prev_month_rec = (
-                ServerHealth.objects.filter(nd['filter_q'], date__lt=first_of_rec_month)
-                .order_by('-date', '-updated_at')
-                .first()
-            )
-            if prev_month_rec:
-                prev_local_used = float(prev_month_rec.disk_2_used_gb or 0.0) + float(prev_month_rec.disk_3_used_gb or 0.0)
-                curr_local_used = d2_used + d3_used
-                curr_local_cap = d2_size + d3_size
-                if prev_local_used > 0 and curr_local_cap > 0:
-                    growth_gb = round(curr_local_used - prev_local_used, 2)
-                    growth_pct = round((growth_gb / curr_local_cap) * 100.0, 2)
+            # Baseline confirmed telemetry starts from October 1, 2026
+            oct_baseline_date = datetime(2026, 10, 1).date()
+            if latest_rec.date <= oct_baseline_date:
+                # Initial baseline: no confirmed prior data
+                growth_gb = 0.0
+                growth_pct = 0.0
+            else:
+                # Compare against the prior confirmed record (within or since October 2026)
+                prev_month_rec = (
+                    ServerHealth.objects.filter(nd['filter_q'], date__lt=latest_rec.date, date__gte=oct_baseline_date)
+                    .order_by('-date', '-updated_at')
+                    .first()
+                )
+                if prev_month_rec:
+                    prev_local_used = float(prev_month_rec.disk_2_used_gb or 0.0) + float(prev_month_rec.disk_3_used_gb or 0.0)
+                    curr_local_used = d2_used + d3_used
+                    if prev_local_used > 0:
+                        growth_gb = round(curr_local_used - prev_local_used, 2)
+                        growth_pct = round((growth_gb / prev_local_used) * 100.0, 2)
+                else:
+                    growth_gb = 0.0
+                    growth_pct = 0.0
 
             disks = [
                 {
@@ -2146,8 +2155,23 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         seen_shared.add(n['node_name'])
         d1 = n['disk_1']
         if d1['size_gb'] > 0:
-            shared_growth_pct = 0.01 if n['node_name'] == 'Proxmox' else 0.02
-            shared_growth_gb = round((shared_growth_pct / 100.0) * d1['size_gb'], 2)
+            oct_baseline_date = datetime(2026, 10, 1).date()
+            if not n.get('date') or n['date'] <= oct_baseline_date:
+                shared_growth_gb = 0.0
+                shared_growth_pct = 0.0
+            else:
+                prev_sh_rec = (
+                    ServerHealth.objects.filter(nd['filter_q'], date__lt=n['date'], date__gte=oct_baseline_date)
+                    .order_by('-date', '-updated_at')
+                    .first()
+                )
+                if prev_sh_rec and float(prev_sh_rec.disk_1_used_gb or 0.0) > 0:
+                    prev_sh_used = float(prev_sh_rec.disk_1_used_gb)
+                    shared_growth_gb = round(d1['used_gb'] - prev_sh_used, 2)
+                    shared_growth_pct = round((shared_growth_gb / prev_sh_used) * 100.0, 2)
+                else:
+                    shared_growth_gb = 0.0
+                    shared_growth_pct = 0.0
             shared_storage_records.append({
                 'cluster': n['node_name'],
                 'storage_id': 'VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp',
@@ -2274,7 +2298,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         if t_month == target_month_dt and active_nodes:
             val = avg_node_up
             has_m_data = True
-        elif t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
+        elif t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 10):
+            # Prior to October 2026, no confirmed telemetry was commissioned
             val = 0.0
             has_m_data = False
         elif month_qs.exists():
@@ -2311,15 +2336,15 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             m['y'] = y
             m['text_y'] = y - 7
         else:
-            y = 118
-            pts.append(f"{x},{y}")
-            m['y'] = y
+            m['y'] = 118
             m['text_y'] = 110
 
-    node_trend_polyline_points = " ".join(pts)
+    node_trend_polyline_points = " ".join(pts) if len(pts) > 1 else ""
     node_trend_area_points = ""
-    if pts:
-        node_trend_area_points = f"{node_trend_months[0]['x']},118 {node_trend_polyline_points} {node_trend_months[-1]['x']},118"
+    if len(pts) > 1:
+        first_pt = pts[0].split(',')
+        last_pt = pts[-1].split(',')
+        node_trend_area_points = f"{first_pt[0]},118 {node_trend_polyline_points} {last_pt[0]},118"
     node_sla_y_coord = 22 + (100.0 - target_node_sla) * 96 / y_range
 
     node_attention_items = []
