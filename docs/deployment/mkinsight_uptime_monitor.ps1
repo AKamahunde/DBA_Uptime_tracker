@@ -62,7 +62,7 @@ function Send-IncidentToApi {
     $json = ConvertTo-Json $Payload -Depth 5
 
     if ($DryRun) {
-        Write-Host "[DRY RUN] Would send payload to $endpoint:" -ForegroundColor Yellow
+        Write-Host "[DRY RUN] Target endpoint: $endpoint" -ForegroundColor Yellow
         Write-Host $json
         return $true
     }
@@ -75,10 +75,10 @@ function Send-IncidentToApi {
     try {
         $response = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 15
         if ($response.status -eq 'success') {
-            Write-Host "✓ Logged to DBTRAC Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
+            Write-Host "[OK] Logged to DBTRAC Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
             return $true
         } elseif ($response.status -eq 'ignored') {
-            Write-Host "✓ Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
+            Write-Host "[INFO] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
             return $true
         } else {
             Write-Host "API Response: $($response | ConvertTo-Json -Compress)" -ForegroundColor Yellow
@@ -172,7 +172,6 @@ function Detect-BootAndPowerOutages {
                 # The message contains the exact crash time: "The previous system shutdown at <time> on <date> was unexpected."
                 $crashTime = $null
                 if ($evt.Properties.Count -ge 2) {
-                    # Properties[1] is date, Properties[0] is time
                     $timeStr = "$($evt.Properties[1].Value) $($evt.Properties[0].Value)"
                     if ([DateTime]::TryParse($timeStr, [ref]$crashTime)) {
                         # Parsed correctly
@@ -180,7 +179,6 @@ function Detect-BootAndPowerOutages {
                 }
                 
                 if (-not $crashTime) {
-                    # Fallback: estimate 5 minutes prior to boot if time parsing fails
                     $crashTime = $bootTime.AddMinutes(-5)
                 }
 
@@ -222,7 +220,6 @@ Calculated Downtime: $durationMins minutes
         $cleanEvents = Get-WinEvent -FilterHashtable $filter1074 -ErrorAction SilentlyContinue
 
         if ($cleanEvents) {
-            # Find matching subsequent boot events (Event 6005)
             $filter6005 = @{
                 LogName   = 'System'
                 Id        = 6005
@@ -235,7 +232,6 @@ Calculated Downtime: $durationMins minutes
                 $reason = $evt.Message
                 if ($reason.Length -gt 300) { $reason = $reason.Substring(0, 300) + "..." }
 
-                # Find the earliest boot that occurred AFTER this shutdown
                 $nextBoot = $bootEvents | Where-Object { $_.TimeCreated -gt $shutTime } | Select-Object -First 1
 
                 if ($nextBoot) {
@@ -297,7 +293,6 @@ function Detect-SqlServerServiceOutages {
         $crashEvents = Get-WinEvent -FilterHashtable $filter7034 -ErrorAction SilentlyContinue
 
         if ($crashEvents) {
-            # Find running events (7036) for SQL Server
             $filter7036 = @{
                 LogName      = 'System'
                 ProviderName = 'Service Control Manager'
@@ -307,12 +302,10 @@ function Detect-SqlServerServiceOutages {
             $scmEvents = Get-WinEvent -FilterHashtable $filter7036 -ErrorAction SilentlyContinue | Sort-Object TimeCreated
 
             foreach ($evt in $crashEvents) {
-                # Check if this crash was for MSSQLSERVER or MSSQL$*
                 $svcParam = $evt.Properties[0].Value.ToString()
                 if ($svcParam -like "*SQL Server*" -or $svcParam -like "*MSSQL*") {
                     $crashTime = $evt.TimeCreated
                     
-                    # Find when it restarted
                     $restartEvt = $scmEvents | Where-Object { 
                         $_.TimeCreated -gt $crashTime -and 
                         $_.Properties[0].Value.ToString() -eq $svcParam -and 
@@ -453,18 +446,17 @@ function Check-ActiveProbeHealth {
                 $state = $reader["state_desc"].ToString()
                 if ($state -eq "ONLINE") {
                     $isHealthy = $true
-                    Write-Host "✓ SQL Server is ONLINE. Audit DB '$dbName' is ONLINE." -ForegroundColor Green
+                    Write-Host "[OK] SQL Server is ONLINE. Audit DB '$dbName' is ONLINE." -ForegroundColor Green
                 } else {
                     $probeError = "Audit Database '$dbName' state is $state (Not ONLINE)."
                 }
             } else {
-                # Fallback check server version
                 $cmd2 = $conn.CreateCommand()
                 $cmd2.CommandText = "SELECT @@SERVERNAME, SERVERPROPERTY('ProductVersion');"
                 $reader2 = $cmd2.ExecuteReader()
                 if ($reader2.Read()) {
                     $isHealthy = $true
-                    Write-Host "✓ SQL Server instance is responsive (master DB reachable)." -ForegroundColor Green
+                    Write-Host "[OK] SQL Server instance is responsive (master DB reachable)." -ForegroundColor Green
                 }
                 $reader2.Close()
             }
@@ -481,9 +473,8 @@ function Check-ActiveProbeHealth {
     # Active Outage State Handling
     $now = Get-Date
     if (-not $isHealthy) {
-        Write-Host "✗ PROBE FAILED: $probeError" -ForegroundColor Red
+        Write-Host "[FAIL] PROBE FAILED: $probeError" -ForegroundColor Red
         if (-not (Test-Path $ActiveProbeFile)) {
-            # Start of a new outage
             $activeState = @{
                 start_time = $now.ToString("yyyy-MM-dd HH:mm:ss")
                 error      = $probeError
@@ -492,7 +483,6 @@ function Check-ActiveProbeHealth {
             Write-Host "Recorded active outage starting at: $($now.ToString('yyyy-MM-dd HH:mm:ss'))" -ForegroundColor Yellow
         }
     } else {
-        # Check if we are recovering from an active outage
         if (Test-Path $ActiveProbeFile) {
             try {
                 $rawJson = Get-Content $ActiveProbeFile -Raw | ConvertFrom-Json
@@ -503,7 +493,7 @@ function Check-ActiveProbeHealth {
                 $durationMins = [Math]::Round(($now - $startDt).TotalMinutes, 1)
                 $summary = Get-DowntimeSummary -OutageType "Database Probe Failure"
 
-                Write-Host "✓ Service RECOVERED! Total Downtime: $durationMins minutes. Ingesting incident..." -ForegroundColor Green
+                Write-Host "[RECOVERED] Service restored! Total Downtime: $durationMins minutes. Ingesting incident..." -ForegroundColor Green
 
                 $payload = @{
                     start      = $startDt.ToString("yyyy-MM-dd HH:mm:ss")
@@ -516,7 +506,7 @@ AUTO-LOGGED: MKInsight Database Unresponsive Outage detected.
 $summary
 
 Evidence:
-Probe Target: $SqlServer:$SqlPort
+Probe Target: $($SqlServer):$($SqlPort)
 Probe Failure Detected: $($startDt.ToString("yyyy-MM-dd HH:mm:ss"))
 Recovery Confirmed: $($now.ToString("yyyy-MM-dd HH:mm:ss"))
 Initial Failure Root Cause: $origError
@@ -540,7 +530,6 @@ function Invoke-MonitorRun {
     $now = Get-Date
     $cutoff = $now.AddHours(-$LookbackHours)
 
-    # Check last state file
     if (Test-Path $EventStateFile) {
         $lastSavedStr = Get-Content $EventStateFile -First 1
         $parsedLast = $null
@@ -592,7 +581,6 @@ function Invoke-MonitorRun {
         Write-Host "No new unlogged event log outages detected." -ForegroundColor Gray
     }
 
-    # Update state file to current timestamp
     $now.ToString("yyyy-MM-dd HH:mm:ss") | Out-File $EventStateFile -Force
 }
 
