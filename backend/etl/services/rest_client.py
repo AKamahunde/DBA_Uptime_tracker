@@ -560,4 +560,234 @@ def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_da
             logger.error(f"Error saving Prometheus health record for {data.get('server')}: {exc}")
             errors.append(f"{data.get('server')}: {exc}")
 
+    # Check for node reboots / outage gaps in Prometheus and auto-log direct 24/7 incidents
+    try:
+        new_incidents = scan_and_ingest_prometheus_outages(prometheus_url=effective_url)
+        if new_incidents:
+            logger.info(f"Auto-logged {len(new_incidents)} Prometheus node outage incident(s): {', '.join(i.ticket for i in new_incidents)}")
+    except Exception as exc:
+        logger.warning(f"Error during Prometheus outage scan: {exc}")
+
     return synced, errors
+
+
+def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
+    """
+    Scans OLKVM and Proxmox node metrics in Prometheus for reboot events and telemetry gaps.
+    If an outage occurred outside of a registered maintenance window, it is automatically
+    logged directly into IncidentRegister on a 24/7 SLA basis, awaiting SysAdmin assessment.
+    """
+    import time
+    from datetime import datetime, timezone as dt_timezone
+    from django.utils import timezone
+    from django.db.models import Q
+    from api.models import IncidentRegister, IncidentStaging, MaintenanceRegister, IncidentChangeLog
+
+    effective_url = prometheus_url or DEFAULT_PROMETHEUS_URL
+    now_ts = time.time()
+    created_incidents = []
+
+    # 1. Check OLKVM Nodes
+    for cfg in OLKVM_NODES:
+        inst = cfg['instance']
+        srv = cfg['server']
+        short_name = srv.split('.')[0]
+        try:
+            boot_res = query_prometheus(f'node_boot_time_seconds{{instance="{inst}"}}', prometheus_url=effective_url)
+            boot_ts = _extract_scalar(boot_res, 0.0)
+            if boot_ts > 0 and (now_ts - boot_ts) < (lookback_hours * 3600):
+                range_url = f"{effective_url}/api/v1/query_range"
+                params = {
+                    'query': f'up{{instance="{inst}"}}',
+                    'start': int(boot_ts - 86400),
+                    'end': int(boot_ts),
+                    'step': 15
+                }
+                res = requests.get(range_url, params=params, timeout=10).json()
+                results = res.get('data', {}).get('result', [])
+                if results and results[0].get('values'):
+                    pts = results[0]['values']
+                    last_pt = pts[-1]
+                    last_up_ts = float(last_pt[0])
+                    gap_seconds = boot_ts - last_up_ts
+                    if gap_seconds >= 120:  # Downtime >= 2 minutes
+                        start_dt = datetime.fromtimestamp(last_up_ts, tz=dt_timezone.utc)
+                        end_dt = datetime.fromtimestamp(boot_ts, tz=dt_timezone.utc)
+                        duration_hrs = round(gap_seconds / 3600.0, 2)
+                        
+                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=srv, start=start_dt).exists():
+                            maint = MaintenanceRegister.objects.filter(
+                                Q(start__lte=start_dt, end__gte=end_dt) &
+                                (Q(database='Infrastructure') | Q(system__icontains=short_name) | Q(activity__icontains=short_name))
+                            ).first()
+
+                            mins_down = int((gap_seconds % 3600) // 60)
+                            hrs_down = int(gap_seconds // 3600)
+                            human_dur = f"{hrs_down}h {mins_down}m" if hrs_down > 0 else f"{mins_down}m"
+                            root_cause = (
+                                f"PROMETHEUS AUTO-DETECTED: Power outage / abrupt host shutdown. "
+                                f"Node lost power at {start_dt.astimezone().strftime('%I:%M:%S %p')} and booted back up at {end_dt.astimezone().strftime('%I:%M:%S %p')} ({human_dur} downtime)."
+                            )
+                            
+                            if maint:
+                                IncidentStaging.objects.get_or_create(
+                                    category='Infrastructure',
+                                    node_name=srv,
+                                    start=start_dt,
+                                    defaults={
+                                        'database': 'Infrastructure',
+                                        'system': f"Oracle OLKVM Host ({short_name})",
+                                        'end': end_dt,
+                                        'duration_hrs': duration_hrs,
+                                        'root_cause': f"AUTO-LOGGED: Outage occurred within scheduled Maintenance Window ({maint.change_id}).",
+                                        'status': 'Promoted to Maintenance',
+                                        'maintenance_record': maint,
+                                        'processed_at': timezone.now()
+                                    }
+                                )
+                            else:
+                                ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
+                                inc = IncidentRegister.objects.create(
+                                    ticket=ticket_id,
+                                    date=start_dt.date(),
+                                    start=start_dt,
+                                    end=end_dt,
+                                    duration_hrs=duration_hrs,
+                                    planned=False,
+                                    severity='Critical' if duration_hrs >= 1.0 else 'High',
+                                    system=f"Oracle OLKVM Host ({short_name})",
+                                    root_cause=root_cause,
+                                    business_impact='Awaiting SysAdmin business impact assessment.',
+                                    resolved_by='Prometheus / System',
+                                    status='Resolved',
+                                    category='Infrastructure',
+                                    node_name=srv,
+                                    database='Infrastructure',
+                                )
+                                IncidentChangeLog.objects.create(
+                                    incident=inc,
+                                    action='Auto-Logged from Prometheus Telemetry',
+                                    new_status=inc.status,
+                                    comment='Infrastructure host outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
+                                )
+                                IncidentStaging.objects.update_or_create(
+                                    category='Infrastructure',
+                                    node_name=srv,
+                                    start=start_dt,
+                                    defaults={
+                                        'database': 'Infrastructure',
+                                        'system': f"Oracle OLKVM Host ({short_name})",
+                                        'end': end_dt,
+                                        'duration_hrs': duration_hrs,
+                                        'root_cause': root_cause,
+                                        'status': 'Promoted to Incident',
+                                        'incident_record': inc,
+                                        'processed_at': timezone.now()
+                                    }
+                                )
+                                created_incidents.append(inc)
+        except Exception as e:
+            logger.warning(f"Error checking Prometheus outage for {srv}: {e}")
+
+    # 2. Check Proxmox Nodes
+    for cfg in PROXMOX_NODES:
+        pnode = cfg['pve_node']
+        try:
+            up_res = query_prometheus(f'pve_node_uptime{{id="node/{pnode}"}}', prometheus_url=effective_url)
+            uptime_sec = _extract_scalar(up_res, 0.0)
+            if 0 < uptime_sec < (lookback_hours * 3600):
+                boot_ts = now_ts - uptime_sec
+                range_url = f"{effective_url}/api/v1/query_range"
+                params = {
+                    'query': f'pve_up{{id="node/{pnode}"}}',
+                    'start': int(boot_ts - 86400),
+                    'end': int(boot_ts),
+                    'step': 30
+                }
+                res = requests.get(range_url, params=params, timeout=10).json()
+                results = res.get('data', {}).get('result', [])
+                if results and results[0].get('values'):
+                    pts = results[0]['values']
+                    last_pt = pts[-1]
+                    last_up_ts = float(last_pt[0])
+                    gap_seconds = boot_ts - last_up_ts
+                    if gap_seconds >= 120:
+                        start_dt = datetime.fromtimestamp(last_up_ts, tz=dt_timezone.utc)
+                        end_dt = datetime.fromtimestamp(boot_ts, tz=dt_timezone.utc)
+                        duration_hrs = round(gap_seconds / 3600.0, 2)
+                        
+                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=pnode, start=start_dt).exists():
+                            maint = MaintenanceRegister.objects.filter(
+                                Q(start__lte=start_dt, end__gte=end_dt) &
+                                (Q(database='Infrastructure') | Q(system__icontains=pnode) | Q(activity__icontains=pnode))
+                            ).first()
+
+                            mins_down = int((gap_seconds % 3600) // 60)
+                            hrs_down = int(gap_seconds // 3600)
+                            human_dur = f"{hrs_down}h {mins_down}m" if hrs_down > 0 else f"{mins_down}m"
+                            root_cause = (
+                                f"PROMETHEUS AUTO-DETECTED: Proxmox node reboot / power outage. "
+                                f"Node lost telemetry at {start_dt.astimezone().strftime('%I:%M:%S %p')} and rebooted at {end_dt.astimezone().strftime('%I:%M:%S %p')} ({human_dur} downtime)."
+                            )
+                            
+                            if maint:
+                                IncidentStaging.objects.get_or_create(
+                                    category='Infrastructure',
+                                    node_name=pnode,
+                                    start=start_dt,
+                                    defaults={
+                                        'database': 'Infrastructure',
+                                        'system': f"Proxmox Hypervisor ({pnode})",
+                                        'end': end_dt,
+                                        'duration_hrs': duration_hrs,
+                                        'root_cause': f"AUTO-LOGGED: Outage occurred within scheduled Maintenance Window ({maint.change_id}).",
+                                        'status': 'Promoted to Maintenance',
+                                        'maintenance_record': maint,
+                                        'processed_at': timezone.now()
+                                    }
+                                )
+                            else:
+                                ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
+                                inc = IncidentRegister.objects.create(
+                                    ticket=ticket_id,
+                                    date=start_dt.date(),
+                                    start=start_dt,
+                                    end=end_dt,
+                                    duration_hrs=duration_hrs,
+                                    planned=False,
+                                    severity='Critical' if duration_hrs >= 1.0 else 'High',
+                                    system=f"Proxmox Hypervisor ({pnode})",
+                                    root_cause=root_cause,
+                                    business_impact='Awaiting SysAdmin business impact assessment.',
+                                    resolved_by='Prometheus / System',
+                                    status='Resolved',
+                                    category='Infrastructure',
+                                    node_name=pnode,
+                                    database='Infrastructure',
+                                )
+                                IncidentChangeLog.objects.create(
+                                    incident=inc,
+                                    action='Auto-Logged from Prometheus Telemetry',
+                                    new_status=inc.status,
+                                    comment='Infrastructure host outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
+                                )
+                                IncidentStaging.objects.update_or_create(
+                                    category='Infrastructure',
+                                    node_name=pnode,
+                                    start=start_dt,
+                                    defaults={
+                                        'database': 'Infrastructure',
+                                        'system': f"Proxmox Hypervisor ({pnode})",
+                                        'end': end_dt,
+                                        'duration_hrs': duration_hrs,
+                                        'root_cause': root_cause,
+                                        'status': 'Promoted to Incident',
+                                        'incident_record': inc,
+                                        'processed_at': timezone.now()
+                                    }
+                                )
+                                created_incidents.append(inc)
+        except Exception as e:
+            logger.warning(f"Error checking Prometheus outage for {pnode}: {e}")
+
+    return created_incidents

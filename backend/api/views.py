@@ -4330,15 +4330,31 @@ def incident_ingest(request):
             if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
                 return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
             
-        # Check if this incident occurred within a registered maintenance window for the same database
-        maintenance = MaintenanceRegister.objects.filter(
-            database=db_type,
-            start__lte=start_dt,
-            end__gte=end_dt
-        ).first()
+        # Check if this incident occurred within a registered maintenance window
+        maint_query = Q(start__lte=start_dt, end__gte=end_dt)
+        if category == 'Infrastructure':
+            maintenance = MaintenanceRegister.objects.filter(
+                maint_query & (Q(database='Infrastructure') | Q(system__icontains=node_name) | Q(system__icontains=system) | Q(activity__icontains=node_name))
+            ).first()
+        else:
+            maintenance = MaintenanceRegister.objects.filter(
+                maint_query & Q(database=db_type)
+            ).first()
         
         maint_ticket = None
-        root_cause = data.get('root_cause', 'AUTO-LOGGED: Outage detected. Awaiting DBA review.')
+        is_infra = (category == 'Infrastructure' or bool(node_name) or str(raw_db).lower() in ['infrastructure', 'node', 'infra', 'olkvm', 'proxmox'])
+        default_rc = (
+            'AUTO-LOGGED: Outage detected on infrastructure node. Awaiting SysAdmin review.'
+            if is_infra else
+            'AUTO-LOGGED: Outage detected. Awaiting DBA review.'
+        )
+        default_impact = (
+            'Awaiting SysAdmin business impact assessment.'
+            if is_infra else
+            'Awaiting DBA business impact assessment.'
+        )
+        root_cause = data.get('root_cause', default_rc)
+        business_impact = data.get('business_impact', default_impact)
         status = 'Awaiting Review'
         maint_record = None
         processed_at = None
@@ -4356,6 +4372,55 @@ def incident_ingest(request):
                 "DBA Summary: [UNPLANNED MAINTENANCE - CLEAN RESTART]\n"
                 "WARNING: This graceful restart occurred OUTSIDE of a scheduled maintenance window."
             )
+
+        if is_infra and not maintenance:
+            # Infrastructure runs on a 24/7 SLA: log directly into IncidentRegister unless in a maintenance window
+            ticket_id = f"INC-PROM-{start_dt.strftime('%y%m%d-%H%M')}"
+            incident = IncidentRegister.objects.create(
+                ticket=ticket_id,
+                date=start_dt.date(),
+                start=start_dt,
+                end=end_dt,
+                duration_hrs=duration_hrs,
+                planned=False,
+                severity='Critical' if duration_hrs >= 1.0 else 'High',
+                system=system,
+                root_cause=root_cause,
+                business_impact=business_impact,
+                resolved_by='Prometheus / System',
+                status='Resolved' if end_dt else 'Open',
+                category='Infrastructure',
+                node_name=node_name,
+                database='Infrastructure',
+            )
+            IncidentChangeLog.objects.create(
+                incident=incident,
+                action='Auto-Logged from Prometheus Telemetry',
+                new_status=incident.status,
+                comment='Infrastructure node outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
+            )
+            # Retain linked staging record for audit traceability
+            staging = IncidentStaging.objects.create(
+                category=category,
+                node_name=node_name,
+                database=db_type,
+                system=system,
+                start=start_dt,
+                end=end_dt,
+                duration_hrs=duration_hrs,
+                root_cause=root_cause,
+                status='Promoted to Incident',
+                incident_record=incident,
+                maintenance_record=None,
+                processed_at=timezone.now()
+            )
+            return JsonResponse({
+                'status': 'success',
+                'id': incident.id,
+                'ticket': incident.ticket,
+                'direct_incident': True,
+                'maint_linked': False
+            })
             
         staging = IncidentStaging.objects.create(
             category=category,
@@ -4613,7 +4678,20 @@ def staging_promote_incident(request, pk):
         elif 'LOW' in rc_upper:
             severity = 'Low'
 
-        ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
+        is_infra = (
+            staging_item.category == 'Infrastructure' or
+            'PROMETHEUS' in rc_upper or
+            bool(staging_item.node_name)
+        )
+        if is_infra:
+            ticket_id = f"INC-PROM-{staging_item.start.strftime('%y%m%d-%H%M')}"
+            default_impact = 'Awaiting SysAdmin business impact assessment.'
+            resolved_by = 'Prometheus / System'
+        else:
+            ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
+            default_impact = 'Awaiting DBA business impact assessment.'
+            resolved_by = 'System'
+
         initial = {
             'ticket': ticket_id,
             'category': staging_item.category,
@@ -4623,11 +4701,11 @@ def staging_promote_incident(request, pk):
             'end': staging_item.end,
             'severity': severity,
             'system': staging_item.system,
-            'database': staging_item.database,
+            'database': 'Infrastructure' if is_infra else staging_item.database,
             'root_cause': staging_item.root_cause,
-            'resolved_by': 'System',
+            'resolved_by': resolved_by,
             'status': 'Resolved',
-            'business_impact': 'Awaiting DBA business impact assessment.',
+            'business_impact': default_impact,
             'assigned_to': request.user.username if request.user.is_authenticated else ''
         }
         form = IncidentRegisterForm(initial=initial)
