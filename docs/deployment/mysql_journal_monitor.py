@@ -18,6 +18,20 @@ import urllib.request
 from datetime import datetime, timedelta
 
 
+def run_cmd(cmd, check=False):
+    """
+    Enterprise Linux backwards-compatible wrapper around subprocess.run.
+    Supports Python 3.5, 3.6, 3.7+ on Oracle Linux, RHEL, CentOS.
+    """
+    return subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        check=check
+    )
+
+
 def parse_journal_timestamp(line):
     """
     Parses timestamps from systemd journal output line.
@@ -100,11 +114,7 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
 
     # 1. Primary Method: Query journalctl --list-boots
     try:
-        res = subprocess.run(
-            ["journalctl", "--list-boots", "--no-pager"],
-            capture_output=True,
-            text=True
-        )
+        res = run_cmd(["journalctl", "--list-boots", "--no-pager"])
         if res.returncode == 0 and res.stdout.strip():
             boot_lines = res.stdout.strip().splitlines()
             boots = []
@@ -136,11 +146,7 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
                     # Check if prev_boot had a graceful shutdown sequence
                     clean_shutdown = False
                     try:
-                        chk = subprocess.run(
-                            ["journalctl", "-b", prev_boot['id'], "-n", "40", "--no-pager"],
-                            capture_output=True,
-                            text=True
-                        )
+                        chk = run_cmd(["journalctl", "-b", prev_boot['id'], "-n", "40", "--no-pager"])
                         if chk.returncode == 0:
                             clean_markers = [
                                 "Shutting down.",
@@ -157,11 +163,7 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
                     # Determine when MySQL came up in curr_boot
                     mysql_start_dt = curr_boot['start']
                     try:
-                        m_chk = subprocess.run(
-                            ["journalctl", "-b", curr_boot['id'], "-u", "mysql", "--no-pager"],
-                            capture_output=True,
-                            text=True
-                        )
+                        m_chk = run_cmd(["journalctl", "-b", curr_boot['id'], "-u", "mysql", "--no-pager"])
                         if m_chk.returncode == 0:
                             for m_line in m_chk.stdout.splitlines():
                                 if "Started mysql.service" in m_line or "Starting MySQL" in m_line:
@@ -199,11 +201,7 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
     # 2. Fallback via `last -x -F reboot shutdown` if journal boots returned nothing
     if not detected:
         try:
-            l_res = subprocess.run(
-                ["last", "-x", "-F", "-n", "30", "reboot", "shutdown"],
-                capture_output=True,
-                text=True
-            )
+            l_res = run_cmd(["last", "-x", "-F", "-n", "30", "reboot", "shutdown"])
             if l_res.returncode == 0 and l_res.stdout.strip():
                 wtmp_lines = l_res.stdout.strip().splitlines()
                 date_pattern = r'[A-Za-z]{3}\s+[A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4}'
@@ -214,7 +212,7 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
                             try:
                                 crash_dt = datetime.strptime(dts[1], "%a %b %d %H:%M:%S %Y").astimezone()
                                 if crash_dt >= cutoff:
-                                    btime_res = subprocess.run(["uptime", "-s"], capture_output=True, text=True)
+                                    btime_res = run_cmd(["uptime", "-s"])
                                     if btime_res.returncode == 0 and btime_res.stdout.strip():
                                         boot_dt = datetime.strptime(btime_res.stdout.strip(), "%Y-%m-%d %H:%M:%S").astimezone()
                                         if boot_dt > crash_dt:
@@ -275,10 +273,8 @@ def main():
 
     # 2. Check for In-Session MySQL Service Shutdowns, OOM Kills & Crashes
     try:
-        result = subprocess.run(
+        result = run_cmd(
             ["journalctl", "-u", "mysql", "--since", f"{lookback_hours} hours ago", "--no-pager"],
-            capture_output=True,
-            text=True,
             check=True
         )
         lines = result.stdout.splitlines()
