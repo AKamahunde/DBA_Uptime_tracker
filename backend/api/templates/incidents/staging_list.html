@@ -37,7 +37,7 @@
                     <th>Database</th>
                     <th>System</th>
                     <th>Timestamp</th>
-                    <th>Duration (hrs)</th>
+                    <th style="text-align: center;" title="Operational SLA business-hours downtime, plus total elapsed outage if occurred off-hours">Duration</th>
                     <th>Root Cause (Alert Log)</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -57,12 +57,19 @@
                             Waiting: <span style="color: #d97706; font-weight: 700;">{{ item.waiting_duration }}</span>
                         </div>
                     </td>
-                    <td>
-                        <div style="font-weight: 700; color: #0f172a;">{{ item.duration_hrs }} hrs</div>
-                        <div style="font-size: 0.68rem; color: #64748b; font-weight: 600; text-transform: uppercase;">SLA Impact</div>
+                    <td style="text-align: center; vertical-align: middle;">
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
+                            {{ item.human_duration }}
+                        </div>
+                        <div style="font-size: 0.72rem; color: #64748b; font-weight: 500; margin-top: 0.15rem;">
+                            {{ item.duration_hrs }}h SLA
+                        </div>
                         {% if item.has_off_hours_difference %}
-                        <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; font-weight: 500;" title="Total Elapsed Wall-Clock Outage">
-                            Elapsed: <strong>{{ item.elapsed_duration_hrs }}h</strong>
+                        <div style="margin-top: 0.25rem;">
+                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 600;" 
+                                  title="Total wall-clock downtime was {{ item.human_elapsed_duration }} ({{ item.elapsed_duration_hrs }}h). {{ item.off_hours_duration_hrs }}h occurred outside SLA business hours.">
+                                <span>⚡</span> Total: {{ item.human_elapsed_duration }}
+                            </span>
                         </div>
                         {% endif %}
                     </td>

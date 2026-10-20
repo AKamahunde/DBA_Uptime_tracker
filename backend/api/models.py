@@ -2,6 +2,38 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
+
+def format_human_duration(hrs_val):
+    """Format duration in hours into clean human-readable representation:
+       e.g., 0.01h -> '< 1 min', 0.02h -> '1 min', 0.30h -> '18 mins', 2.30h -> '2h 18m', 1.00h -> '1h'
+    """
+    if hrs_val is None:
+        return "0 mins"
+    try:
+        val = float(hrs_val)
+    except (ValueError, TypeError):
+        return "0 mins"
+
+    if val <= 0:
+        return "0 mins"
+
+    secs = int(round(val * 3600))
+    if secs < 60:
+        return "< 1 min"
+    if secs < 3600:
+        mins = int(round(secs / 60.0))
+        return "1 min" if mins <= 1 else f"{mins} mins"
+
+    h = int(secs // 3600)
+    m = int(round((secs % 3600) / 60.0))
+    if m == 60:
+        h += 1
+        m = 0
+    if m == 0:
+        return f"{h}h"
+    return f"{h}h {m}m"
+
+
 class IncidentRegister(models.Model):
     ticket = models.CharField(max_length=50)
     date = models.DateField()
@@ -133,6 +165,16 @@ class IncidentRegister(models.Model):
             return round(max(0.0, diff), 2)
         except Exception:
             return 0.0
+
+    @property
+    def human_duration(self):
+        """Clean human-readable SLA outage duration (e.g., '18 mins', '2h 18m', '< 1 min')."""
+        return format_human_duration(self.duration_hrs)
+
+    @property
+    def human_elapsed_duration(self):
+        """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
+        return format_human_duration(self.elapsed_duration_hrs)
 
 class IncidentChangeLog(models.Model):
     incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
@@ -717,4 +759,14 @@ class IncidentStaging(models.Model):
             return round(max(0.0, diff), 2)
         except Exception:
             return 0.0
+
+    @property
+    def human_duration(self):
+        """Clean human-readable SLA outage duration (e.g., '18 mins', '2h 18m', '< 1 min')."""
+        return format_human_duration(self.duration_hrs)
+
+    @property
+    def human_elapsed_duration(self):
+        """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
+        return format_human_duration(self.elapsed_duration_hrs)
 

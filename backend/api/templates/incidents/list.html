@@ -156,7 +156,7 @@
                         <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Incident / Target</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Outage Window</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Duration</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Operational business-hours outage duration affecting SLA">Duration</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
                             <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
@@ -177,6 +177,10 @@
                             data-start="{{ incident.start|date:'d M Y, H:i' }}"
                             data-end="{{ incident.end|date:'d M Y, H:i'|default:'Active Outage' }}"
                             data-duration="{{ incident.duration_hrs }}"
+                            data-duration-human="{{ incident.human_duration }}"
+                            data-elapsed-human="{{ incident.human_elapsed_duration }}"
+                            data-elapsed-hrs="{{ incident.elapsed_duration_hrs }}"
+                            data-has-offhours="{% if incident.has_off_hours_difference %}1{% else %}0{% endif %}"
                             data-planned="{% if incident.planned %}Planned Outage{% else %}Unplanned Outage{% endif %}"
                             data-severity="{{ incident.severity }}"
                             data-status="{{ incident.status }}"
@@ -214,12 +218,19 @@
                             </td>
 
                             <!-- Duration -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
-                                <div>{{ incident.duration_hrs }} hrs</div>
-                                <div style="font-size: 0.68rem; color: #64748b; font-weight: 600; text-transform: uppercase;">SLA Impact</div>
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; color: #0f172a;">
+                                <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
+                                    {{ incident.human_duration }}
+                                </div>
+                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 500; margin-top: 0.15rem;">
+                                    {{ incident.duration_hrs }}h SLA
+                                </div>
                                 {% if incident.has_off_hours_difference %}
-                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;" title="Total Elapsed: {{ incident.elapsed_duration_hrs }} hrs">
-                                    Elapsed: <strong>{{ incident.elapsed_duration_hrs }}h</strong>
+                                <div style="margin-top: 0.25rem;">
+                                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 600;" 
+                                          title="Total wall-clock downtime was {{ incident.human_elapsed_duration }} ({{ incident.elapsed_duration_hrs }}h). {{ incident.off_hours_duration_hrs }}h occurred outside SLA business hours.">
+                                        <span>⚡</span> Total: {{ incident.human_elapsed_duration }}
+                                    </span>
                                 </div>
                                 {% endif %}
                             </td>
@@ -457,7 +468,15 @@
         
         const end = row.getAttribute('data-end');
         const duration = row.getAttribute('data-duration');
-        document.getElementById('panel-end').textContent = `${end} (${duration}h)`;
+        const durationHuman = row.getAttribute('data-duration-human');
+        const hasOffhours = row.getAttribute('data-has-offhours') === '1';
+        const elapsedHuman = row.getAttribute('data-elapsed-human');
+
+        let durationDisplay = `${end} · ${durationHuman} (${duration}h SLA)`;
+        if (hasOffhours) {
+            durationDisplay += ` [Total: ${elapsedHuman}]`;
+        }
+        document.getElementById('panel-end').textContent = durationDisplay;
         
         const rootCause = row.getAttribute('data-root-cause') || '—';
         const rootCauseContainer = document.getElementById('panel-root-cause');
