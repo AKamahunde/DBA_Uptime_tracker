@@ -2222,18 +2222,27 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
         month_qs = ServerHealth.objects.filter(date__year=t_month.year, date__month=t_month.month)
         if selected_node == 'OLKVM':
             month_qs = month_qs.filter(
-                Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
+                Q(node_name__iexact='OLKVM')
+                | Q(server__icontains='infra')
+                | Q(server__icontains='ebs')
+                | Q(server__icontains='nmsinfra')
+                | Q(server__icontains='nmsebs')
             )
         elif selected_node == 'Proxmox':
             month_qs = month_qs.filter(Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
         elif selected_node != 'All Nodes':
             month_qs = month_qs.filter(server__iexact=selected_node)
 
-        if t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
+        if t_month == today_date and active_nodes:
+            val = avg_node_up
+            has_m_data = True
+        elif t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 7):
             val = 0.0
             has_m_data = False
         elif month_qs.exists():
-            avg_up = month_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
+            prom_qs = month_qs.filter(entered_by='Prometheus')
+            eff_qs = prom_qs if prom_qs.exists() else month_qs
+            avg_up = eff_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
             val = round(float(avg_up), 2) if avg_up is not None else 100.0
             has_m_data = True
         else:
