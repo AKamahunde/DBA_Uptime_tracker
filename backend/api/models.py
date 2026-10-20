@@ -57,11 +57,17 @@ class IncidentRegister(models.Model):
         ('Resolved', 'Resolved'),
         ('Closed', 'Closed')
     ])
+    category = models.CharField(max_length=20, choices=[
+        ('Database', 'Database'),
+        ('Infrastructure', 'Infrastructure'),
+    ], default='Database')
+    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-    ])
+        ('Infrastructure', 'Infrastructure'),
+    ], default='MySQL', blank=True)
     assigned_to = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -80,14 +86,26 @@ class IncidentRegister(models.Model):
         if self.status in ['Resolved', 'Closed'] and not self.end:
             self.end = timezone.now()
 
-        from api.sla_utils import calculate_operational_downtime
-
-        if self.end and self.start:
-            self.duration_hrs = calculate_operational_downtime(self.start, self.end, self.database)
-        elif self.start and self.status not in ['Resolved', 'Closed']:
-            self.duration_hrs = calculate_operational_downtime(self.start, timezone.now(), self.database)
+        if self.category == 'Infrastructure':
+            # Infrastructure host nodes run 24/7 (24 hours/day, 7 days/week)
+            if self.end and self.start and self.end > self.start:
+                secs = (self.end - self.start).total_seconds()
+                self.duration_hrs = round(secs / 3600.0, 2)
+            elif self.start and self.status not in ['Resolved', 'Closed']:
+                secs = (timezone.now() - self.start).total_seconds()
+                self.duration_hrs = round(max(0.0, secs) / 3600.0, 2)
+            else:
+                self.duration_hrs = 0
+            if not self.database or self.database == 'MySQL':
+                self.database = 'Infrastructure'
         else:
-            self.duration_hrs = 0
+            from api.sla_utils import calculate_operational_downtime
+            if self.end and self.start:
+                self.duration_hrs = calculate_operational_downtime(self.start, self.end, self.database)
+            elif self.start and self.status not in ['Resolved', 'Closed']:
+                self.duration_hrs = calculate_operational_downtime(self.start, timezone.now(), self.database)
+            else:
+                self.duration_hrs = 0
             
         # Capture original ticket BEFORE saving so we can locate the existing
         # maintenance record even when the ticket ID is being renamed.
@@ -723,11 +741,17 @@ def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
 
 
 class IncidentStaging(models.Model):
+    category = models.CharField(max_length=20, choices=[
+        ('Database', 'Database'),
+        ('Infrastructure', 'Infrastructure'),
+    ], default='Database')
+    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-    ])
+        ('Infrastructure', 'Infrastructure'),
+    ], default='MySQL')
     system = models.CharField(max_length=100)
     start = models.DateTimeField()
     end = models.DateTimeField()

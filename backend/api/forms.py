@@ -4,6 +4,17 @@ from .models import (
     MaintenanceRegister, CapacityPlanning, SLAConfig, UgandaHoliday
 )
 
+INFRASTRUCTURE_NODE_CHOICES = [
+    ('', '— Select Infrastructure Node —'),
+    ('infra.nms.go.ug', 'OLKVM — infra.nms.go.ug (Oracle DB)'),
+    ('ebs.nms.go.ug', 'OLKVM — ebs.nms.go.ug (Oracle EBS App)'),
+    ('pvenode1', 'Proxmox — pvenode1 (tomcatvm & Internal Systems)'),
+    ('pvenode2', 'Proxmox — pvenode2 (jumphostvm & monitoringvm)'),
+    ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
+    ('OLKVM Cluster', 'OLKVM Cluster (General)'),
+    ('Proxmox Cluster', 'Proxmox Cluster (General)'),
+]
+
 class IncidentRegisterForm(forms.ModelForm):
     change_comment = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status or assignee changes)'}),
@@ -24,6 +35,11 @@ class IncidentRegisterForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if 'node_name' in self.fields:
+            self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
+            self.fields['node_name'].required = False
+        if 'database' in self.fields:
+            self.fields['database'].required = False
         iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
         if 'start' in self.fields:
             self.fields['start'].input_formats = iso_formats
@@ -33,6 +49,22 @@ class IncidentRegisterForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         
+        cat = cleaned_data.get('category')
+        node = cleaned_data.get('node_name')
+        db = cleaned_data.get('database')
+        
+        if cat == 'Infrastructure':
+            if not node:
+                self.add_error('node_name', forms.ValidationError(
+                    "Please select the target Infrastructure Node for an infrastructure-level incident."
+                ))
+            cleaned_data['database'] = 'Infrastructure'
+        elif cat == 'Database':
+            if not db or db == 'Infrastructure':
+                self.add_error('database', forms.ValidationError(
+                    "Please select the database platform (Oracle, MySQL, or MS SQL Server)."
+                ))
+
         # Only enforce on editing existing records
         if self.instance and self.instance.pk:
             old_status = self.instance.status

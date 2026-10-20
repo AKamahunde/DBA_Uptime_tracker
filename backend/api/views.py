@@ -1474,13 +1474,58 @@ def incident_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
-    queryset = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
+        
+    from django.db.models import Sum, Q
     
-    current_db = request.GET.get('database', '')
+    base_qs = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
+    
+    # Tabs: 'all', 'database', 'infrastructure'
+    current_tab = request.GET.get('tab', 'all').lower()
+    if current_tab not in ['all', 'database', 'infrastructure']:
+        current_tab = 'all'
+
+    # Target filter: single db or single node
+    current_target = request.GET.get('target', '').strip()
+    if not current_target and request.GET.get('database'):
+        current_target = request.GET.get('database').strip()
+        
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-    if current_db:
-        queryset = queryset.filter(database=current_db)
+    
+    # Tab counts for headers
+    total_all_count = IncidentRegister.objects.count()
+    total_db_count = IncidentRegister.objects.filter(
+        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+    ).exclude(category='Infrastructure').count()
+    total_infra_count = IncidentRegister.objects.filter(
+        Q(category='Infrastructure') | Q(database='Infrastructure')
+    ).count()
+
+    queryset = base_qs
+
+    # 1. Filter by category tab
+    if current_tab == 'database':
+        queryset = queryset.filter(
+            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+        ).exclude(category='Infrastructure')
+    elif current_tab == 'infrastructure':
+        queryset = queryset.filter(
+            Q(category='Infrastructure') | Q(database='Infrastructure')
+        )
+
+    # 2. Filter by single target (specific DB or specific Node)
+    if current_target:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+            queryset = queryset.filter(database=current_target)
+        elif current_target == 'Infrastructure':
+            queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+        else:
+            queryset = queryset.filter(
+                Q(node_name__icontains=current_target) | 
+                Q(system__icontains=current_target) |
+                Q(database__icontains=current_target)
+            )
+
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
@@ -1490,31 +1535,38 @@ def incident_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Calculate KPIs based on filtered scope/dates
-    kpi_queryset = IncidentRegister.objects.all()
-    if current_db:
-        kpi_queryset = kpi_queryset.filter(database=current_db)
-    if start_date:
-        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
-    if end_date:
-        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
-
-    kpi_active_outages = kpi_queryset.filter(status__in=['Open', 'In Progress']).count()
-    kpi_resolved_count = kpi_queryset.filter(status__in=['Resolved', 'Closed']).count()
+    # Calculate KPIs based on the filtered queryset
+    kpi_active_outages = queryset.filter(status__in=['Open', 'In Progress']).count()
+    kpi_resolved_count = queryset.filter(status__in=['Resolved', 'Closed']).count()
     
-    from django.db.models import Sum
-    kpi_downtime_hours = kpi_queryset.filter(planned=False).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+    kpi_downtime_hours = queryset.filter(planned=False).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
     kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
-    
+
+    node_choices = [
+        ('infra.nms.go.ug', 'OLKVM — infra.nms.go.ug (Oracle DB)'),
+        ('ebs.nms.go.ug', 'OLKVM — ebs.nms.go.ug (Oracle EBS App)'),
+        ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
+        ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
+        ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
+        ('OLKVM Cluster', 'OLKVM Cluster (General)'),
+        ('Proxmox Cluster', 'Proxmox Cluster (General)'),
+    ]
+
     return render(request, 'incidents/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'current_db': current_db,
+        'current_tab': current_tab,
+        'current_target': current_target,
+        'current_db': current_target,
         'start_date': start_date,
         'end_date': end_date,
+        'total_all_count': total_all_count,
+        'total_db_count': total_db_count,
+        'total_infra_count': total_infra_count,
         'kpi_active_outages': kpi_active_outages,
         'kpi_resolved_count': kpi_resolved_count,
-        'kpi_downtime_hours': kpi_downtime_hours
+        'kpi_downtime_hours': kpi_downtime_hours,
+        'node_choices': node_choices,
     })
 
 @login_required
@@ -4137,12 +4189,22 @@ def incident_ingest(request):
     try:
         data = json.loads(request.body)
         
-        raw_db = data.get('database', 'MySQL')
-        if raw_db.strip().lower() in ['mkinsight', 'pentana', 'mssql', 'ms sql', 'ms sql server']:
+        category = data.get('category', 'Database')
+        node_name = data.get('node_name', '')
+        raw_db = data.get('database', '')
+        
+        if str(category).lower() == 'infrastructure' or raw_db.strip().lower() in ['infrastructure', 'node', 'infra', 'olkvm', 'proxmox'] or node_name:
+            category = 'Infrastructure'
+            db_type = 'Infrastructure'
+            node_name = node_name or data.get('server') or data.get('node') or 'Infrastructure Node'
+            system = data.get('system') or node_name or 'Host Node'
+        elif raw_db.strip().lower() in ['mkinsight', 'pentana', 'mssql', 'ms sql', 'ms sql server']:
+            category = 'Database'
             db_type = 'MS SQL Server'
             system = data.get('system') or 'MKInsight (Pentana)'
         else:
-            db_type = raw_db
+            category = 'Database'
+            db_type = raw_db or 'MySQL'
             system = data.get('system', f"{db_type} Instance")
         
         start_str = data.get('start')
@@ -4156,13 +4218,10 @@ def incident_ingest(request):
                 dt_str_clean = dt_str.replace(' ', 'T')
                 if dt_str_clean.endswith('Z'):
                     dt_str_clean = dt_str_clean[:-1] + '+00:00'
-                # If there are milliseconds, strip them or handle them cleanly
                 if '.' in dt_str_clean:
                     parts = dt_str_clean.split('.')
-                    # Reconstruct without sub-seconds but keep timezone
                     time_part = parts[0]
                     tz_part = ''
-                    # Find timezone offset suffix in the second part if present
                     second_part = parts[1]
                     for suffix in ['+', '-']:
                         if suffix in second_part:
@@ -4177,14 +4236,23 @@ def incident_ingest(request):
         start_dt = parse_dt(start_str)
         end_dt = parse_dt(end_str)
         
-        duration_hrs = calculate_operational_downtime(start_dt, end_dt, db_type)
+        if category == 'Infrastructure':
+            # Infrastructure host nodes operate 24/7 (24 hours/day, 7 days/week)
+            duration_hrs = round(max(0.0, (end_dt - start_dt).total_seconds()) / 3600.0, 2)
+        else:
+            duration_hrs = calculate_operational_downtime(start_dt, end_dt, db_type)
         
         # De-duplication check: avoid double registering the same outage in staging or active register
-        if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
-            return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
-            
-        if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
-            return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
+        if category == 'Infrastructure':
+            if IncidentStaging.objects.filter(category='Infrastructure', node_name=node_name, start=start_dt).exists():
+                return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
+            if IncidentRegister.objects.filter(category='Infrastructure', node_name=node_name, start=start_dt).exists():
+                return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
+        else:
+            if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
+                return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
+            if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
+                return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
             
         # Check if this incident occurred within a registered maintenance window for the same database
         maintenance = MaintenanceRegister.objects.filter(
@@ -4214,6 +4282,8 @@ def incident_ingest(request):
             )
             
         staging = IncidentStaging.objects.create(
+            category=category,
+            node_name=node_name,
             database=db_type,
             system=system,
             start=start_dt,
@@ -4470,6 +4540,8 @@ def staging_promote_incident(request, pk):
         ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
         initial = {
             'ticket': ticket_id,
+            'category': staging_item.category,
+            'node_name': staging_item.node_name,
             'date': staging_item.start.date(),
             'start': staging_item.start,
             'end': staging_item.end,

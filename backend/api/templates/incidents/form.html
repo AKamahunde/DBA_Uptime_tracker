@@ -65,7 +65,16 @@
             {{ form.status }}
         </div>
         <div class="form-group">
-            <label for="{{ form.database.id_for_label }}">Database:</label>
+            <label for="{{ form.category.id_for_label }}">Incident Scope / Category:</label>
+            {{ form.category }}
+        </div>
+        <div class="form-group" id="node-field-wrapper" style="{% if form.category.value != 'Infrastructure' %}display: none;{% endif %}">
+            <label for="{{ form.node_name.id_for_label }}">Infrastructure Host Node:</label>
+            {{ form.node_name }}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">Infrastructure incidents are calculated with 24/7 operating hours.</small>
+        </div>
+        <div class="form-group" id="db-field-wrapper" style="{% if form.category.value == 'Infrastructure' %}display: none;{% endif %}">
+            <label for="{{ form.database.id_for_label }}">Database Platform:</label>
             {{ form.database }}
         </div>
         <div class="form-group">
@@ -111,4 +120,28 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const catSelect = document.getElementById('{{ form.category.id_for_label }}');
+        const nodeWrapper = document.getElementById('node-field-wrapper');
+        const dbWrapper = document.getElementById('db-field-wrapper');
+        
+        function updateScopeFields() {
+            if (!catSelect) return;
+            if (catSelect.value === 'Infrastructure') {
+                if (nodeWrapper) nodeWrapper.style.display = 'block';
+                if (dbWrapper) dbWrapper.style.display = 'none';
+            } else {
+                if (nodeWrapper) nodeWrapper.style.display = 'none';
+                if (dbWrapper) dbWrapper.style.display = 'block';
+            }
+        }
+        
+        if (catSelect) {
+            catSelect.addEventListener('change', updateScopeFields);
+            updateScopeFields();
+        }
+    });
+</script>
 {% endblock %}

@@ -78,21 +78,29 @@
 </style>
 
 <!-- Page Header with General Filters -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1.5rem;">
     <div>
         <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Incident Register</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time outage detection, SLA tracking, and resolution timeline.</p>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time outage detection, SLA tracking, and resolution timeline across databases and host infrastructure.</p>
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
         <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <input type="hidden" name="tab" value="{{ current_tab }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
-                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
-                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
-                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
-                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Target Scope</label>
+                <select name="target" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_target %}selected{% endif %}>All Targets</option>
+                    <optgroup label="Database Platforms">
+                        <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                        <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
+                        <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server (MKInsight)</option>
+                    </optgroup>
+                    <optgroup label="Infrastructure Nodes">
+                        {% for node_val, node_lbl in node_choices %}
+                        <option value="{{ node_val }}" {% if current_target == node_val %}selected{% endif %}>{{ node_lbl }}</option>
+                        {% endfor %}
+                    </optgroup>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -103,9 +111,9 @@
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
                 <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
-            {% if start_date or end_date or current_db %}
+            {% if start_date or end_date or current_target %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+                <a href="?tab={{ current_tab }}" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
             </div>
             {% endif %}
         </form>
@@ -116,6 +124,25 @@
         </div>
         {% endif %}
     </div>
+</div>
+
+<!-- Incident Category Filter Tabs -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    <a href="?tab=all{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        All Incidents ({{ total_all_count }})
+    </a>
+    <a href="?tab=database{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        🗄️ Database Incidents ({{ total_db_count }})
+    </a>
+    <a href="?tab=infrastructure{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        🖥️ Infrastructure Incidents ({{ total_infra_count }})
+    </a>
 </div>
 
 <!-- Combined Overall Summary Card (Three Incident KPIs) -->
@@ -171,6 +198,8 @@
                             onclick="selectIncidentRow('row-{{ incident.pk }}')"
                             data-pk="{{ incident.pk }}"
                             data-ticket="{{ incident.ticket }}"
+                            data-category="{{ incident.category|default:'Database' }}"
+                            data-node-name="{{ incident.node_name|default:'' }}"
                             data-system="{{ incident.system|default:'—' }}"
                             data-database="{{ incident.database }}"
                             data-date="{{ incident.date|date:'d M Y' }}"
@@ -204,8 +233,15 @@
                             <!-- Incident / Target -->
                             <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
                                 <div style="font-weight: 600; color: var(--primary-navy); font-family: monospace;">{{ incident.ticket }}</div>
-                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;">
-                                    {{ incident.system }} | <span style="font-weight: 600;">{{ incident.database }}</span>
+                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                    {% if incident.category == 'Infrastructure' %}
+                                        <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Infrastructure</span>
+                                        <span style="font-weight: 600; color: #0f172a;">{{ incident.node_name|default:incident.system }}</span>
+                                    {% else %}
+                                        <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Database</span>
+                                        <span>{{ incident.system }}</span>
+                                        <span style="font-weight: 600; color: #0f172a;">· {{ incident.database }}</span>
+                                    {% endif %}
                                 </div>
                             </td>
 
@@ -222,15 +258,22 @@
                                 <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
                                     {{ incident.human_duration }}
                                 </div>
-                                <div style="font-size: 0.72rem; color: #64748b; font-weight: 500; margin-top: 0.15rem;">
-                                    {{ incident.duration_hrs }}h SLA
+                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; margin-top: 0.15rem;">
+                                    {% if incident.category == 'Infrastructure' %}
+                                        24/7 SLA ({{ incident.duration_hrs }}h)
+                                    {% else %}
+                                        {{ incident.duration_hrs }}h SLA
+                                    {% endif %}
                                 </div>
-                                {% if incident.has_off_hours_difference %}
+                                {% if incident.has_off_hours_difference and incident.category != 'Infrastructure' %}
                                 <div style="margin-top: 0.25rem;">
                                     <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.1rem 0.4rem; font-weight: 600;" 
                                           title="Total wall-clock downtime was {{ incident.human_elapsed_duration }} ({{ incident.elapsed_duration_hrs }}h). {{ incident.off_hours_duration_hrs }}h occurred outside SLA business hours.">
                                         <span>⚡</span> Total: {{ incident.human_elapsed_duration }}
                                     </span>
+                                </div>
+                                {% endif %}
+                            </td>
                                 </div>
                                 {% endif %}
                             </td>
@@ -327,16 +370,16 @@
                 </div>
                 <div style="display: flex; gap: 0.35rem;">
                     {% if page_obj.has_previous %}
-                        <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
-                        <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
+                        <a href="?page=1&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                        <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
                     {% else %}
                         <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                         <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
                     {% endif %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
-                        <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                        <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
                     {% else %}
                         <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                         <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
@@ -458,10 +501,17 @@
 
         document.getElementById('panel-ticket').textContent = row.getAttribute('data-ticket');
         
+        const cat = row.getAttribute('data-category') || 'Database';
+        const nodeName = row.getAttribute('data-node-name') || '';
         const system = row.getAttribute('data-system');
         const db = row.getAttribute('data-database');
         const planned = row.getAttribute('data-planned');
-        document.getElementById('panel-meta').textContent = `${system} | ${db} | ${planned}`;
+        
+        if (cat === 'Infrastructure') {
+            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || system}</strong> · ${planned}`;
+        } else {
+            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
+        }
         
         document.getElementById('panel-start').textContent = row.getAttribute('data-start');
         
