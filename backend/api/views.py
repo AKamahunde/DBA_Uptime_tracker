@@ -3014,25 +3014,52 @@ def server_health_list(request):
 
     from django.db.models import Avg, Q
 
+    current_tab = request.GET.get('tab', 'nodes').lower()
+    if current_tab not in ['nodes', 'vms']:
+        current_tab = 'nodes'
+
     selected_node = request.GET.get('node_select', 'All Nodes')
-    current_db = request.GET.get('database', '')
+    selected_vm = request.GET.get('vm_select', '').strip()
+    current_db = request.GET.get('database', '').strip()
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
 
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+    # Distinct tab badge counts
+    total_node_health_count = ServerHealth.objects.filter(
+        Q(entered_by='Prometheus') | Q(entered_by='User')
+    ).count()
+    total_vm_health_count = ServerHealth.objects.filter(
+        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+    ).count()
 
-    queryset = ServerHealth.objects.exclude(entered_by='Script').order_by('-date', '-updated_at')
+    # Distinct VM server names for filter dropdown
+    vm_choices = list(ServerHealth.objects.filter(
+        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+    ).values_list('server', flat=True).distinct().order_by('server'))
 
-    if selected_node == 'OLKVM':
-        queryset = queryset.filter(
-            Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs')
-        )
-    elif selected_node == 'Proxmox':
-        queryset = queryset.filter(
-            Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
-        )
-    elif selected_node != 'All Nodes':
-        queryset = queryset.filter(server__iexact=selected_node)
+    if current_tab == 'nodes':
+        queryset = ServerHealth.objects.filter(
+            Q(entered_by='Prometheus') | Q(entered_by='User')
+        ).order_by('-date', '-updated_at')
+
+        if selected_node == 'OLKVM':
+            queryset = queryset.filter(
+                Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs')
+            )
+        elif selected_node == 'Proxmox':
+            queryset = queryset.filter(
+                Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
+            )
+        elif selected_node != 'All Nodes':
+            queryset = queryset.filter(server__iexact=selected_node)
+    else:
+        # Virtual Machines (VM-level)
+        queryset = ServerHealth.objects.filter(
+            Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+        ).order_by('-date', '-updated_at')
+
+        if selected_vm:
+            queryset = queryset.filter(server__iexact=selected_vm)
 
     if current_db:
         queryset = queryset.filter(database=current_db)
@@ -3054,6 +3081,12 @@ def server_health_list(request):
     ctx = {
         'page_obj': page_obj,
         'is_admin': request.user.is_admin,
+        'current_tab': current_tab,
+        'selected_node': selected_node,
+        'selected_vm': selected_vm,
+        'vm_choices': vm_choices,
+        'total_node_health_count': total_node_health_count,
+        'total_vm_health_count': total_vm_health_count,
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
@@ -3061,7 +3094,6 @@ def server_health_list(request):
         'kpi_avg_cpu': kpi_avg_cpu,
         'kpi_avg_mem': kpi_avg_mem,
     }
-    ctx.update(node_ctx)
     return render(request, 'server_health/list.html', ctx)
 
 @login_required
@@ -3209,6 +3241,13 @@ def capacity_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
         messages.error(request, 'You do not have permission to view capacity planning records.')
         return redirect('dashboard')
+    current_tab = request.GET.get('tab', 'database').lower()
+    if current_tab not in ['database', 'infrastructure']:
+        current_tab = 'database'
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
+
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
     
     current_db = request.GET.get('database', '')
@@ -3486,9 +3525,13 @@ def capacity_list(request):
                     'runway_badge': runway_badge,
                 }
     
-    return render(request, 'capacity/list.html', {
+    ctx = {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
+        'current_tab': current_tab,
+        'selected_node': selected_node,
+        'total_db_capacity_count': CapacityPlanning.objects.count(),
+        'total_infra_capacity_count': len(node_ctx.get('node_capacity_records', [])),
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
@@ -3505,7 +3548,9 @@ def capacity_list(request):
         'trend_polyline_points': trend_polyline_points,
         'trend_data_points': trend_data_points,
         'forecast_info': forecast_info
-    })
+    }
+    ctx.update(node_ctx)
+    return render(request, 'capacity/list.html', ctx)
 
 @login_required
 def capacity_print(request):
@@ -4028,14 +4073,7 @@ def server_health_ingest(request):
             else:
                 node_name = 'Proxmox'
 
-        source = data.get('entered_by', 'Prometheus' if 'disk_1_type' in data or 'node_name' in data else 'Script')
-
-        # Disable external script logging; only Prometheus (and manual UI entries) manage health metrics
-        if source == 'Script' or data.get('entered_by') == 'Script':
-            return JsonResponse({
-                'status': 'disabled',
-                'message': 'Direct script logging for server health is disabled. Health metrics are ingested exclusively via Prometheus.'
-            }, status=200)
+        source = data.get('entered_by', 'Prometheus' if ('disk_1_type' in data or 'node_name' in data) else 'Script')
 
         if server_name.startswith('nmsinfra'):
             server_name = server_name.replace('nmsinfra', 'infra', 1)

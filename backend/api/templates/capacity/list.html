@@ -4,19 +4,18 @@
 
 {% block content %}
 <style>
-    /* Premium Capacity Table Styling */
     .modern-table {
         width: 100%;
         border-collapse: collapse;
-        text-align: left;
-        font-size: 0.82rem; /* Reduced compact font size matching other tabs */
-        background-color: #fff;
+        text-align: center;
+        font-size: 0.85rem;
+        background-color: var(--pure-white);
         border: 1px solid #e2e8f0;
         border-radius: 6px;
         overflow: hidden;
     }
     .modern-table th {
-        background-color: #f8fafc;
+        background-color: var(--bg-cool);
         color: #475569;
         font-weight: 700;
         text-transform: uppercase;
@@ -44,32 +43,31 @@
         transition: background-color 0.15s ease;
     }
     .modern-table tbody tr:hover {
-        background-color: #f0f7ff !important; /* Light blue hover */
+        background-color: #f0f7ff !important;
     }
 
-    /* Compact column divider styles */
     .kpi-metric-col {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
-    }
-    .db-util-col {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
     }
     @media (min-width: 768px) {
         .kpi-metric-col:not(:first-child) {
             border-left: 1px solid rgba(90, 123, 156, 0.12);
             padding-left: 1.5rem;
         }
-        .db-util-col:not(:first-child) {
-            border-left: 1px solid rgba(90, 123, 156, 0.12);
-            padding-left: 1.5rem;
-        }
     }
 
-    /* Export Dropdown Styles */
+    .db-util-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1rem;
+    }
+
     .export-dropdown {
         position: relative;
         display: inline-block;
@@ -80,11 +78,10 @@
         right: 0;
         background-color: #ffffff;
         min-width: 140px;
-        box-shadow: 0px 8px 16px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         border: 1px solid #e2e8f0;
         border-radius: 6px;
-        z-index: 100;
-        margin-top: 4px;
+        z-index: 50;
         overflow: hidden;
     }
     .export-dropdown:hover .export-dropdown-content {
@@ -106,14 +103,49 @@
 </style>
 
 <!-- Page Header -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1.5rem;">
     <div>
         <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Capacity Tracking</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Storage growth, tablespace utilization, and capacity projections.</p>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">
+            {% if current_tab == 'infrastructure' %}
+            Infrastructure storage tier allocation, 24h consumption delta, and runway forecasting across host nodes.
+            {% else %}
+            Database tablespace utilization, database growth metrics, and capacity projections.
+            {% endif %}
+        </p>
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        {% if current_tab == 'infrastructure' %}
+        <!-- Infrastructure Filter Form -->
         <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <input type="hidden" name="tab" value="infrastructure">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
+                <select name="node_select" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
+                    <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM (infra & ebs)</option>
+                    <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox (pvenode1, 2, 3)</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+            </div>
+            {% if start_date or end_date or selected_node != 'All Nodes' %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
+                <a href="?tab=infrastructure" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+            </div>
+            {% endif %}
+        </form>
+        {% else %}
+        <!-- Database Filter Form -->
+        <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
+            <input type="hidden" name="tab" value="database">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
                 <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
@@ -133,7 +165,7 @@
             </div>
             {% if start_date or end_date or current_db %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+                <a href="?tab=database" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
             </div>
             {% endif %}
         </form>
@@ -159,10 +191,205 @@
             <a href="{% url 'capacity_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
         </div>
         {% endif %}
+        {% endif %}
     </div>
 </div>
 
-<!-- Combined Overall Summary Card -->
+<!-- Scope Filter Tabs: Database Capacity vs Infrastructure Storage Capacity -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    <a href="?tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        🗄️ Database Capacity ({{ total_db_capacity_count }})
+    </a>
+    <a href="?tab=infrastructure{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        🖥️ Infrastructure Storage Capacity ({{ total_infra_capacity_count }})
+    </a>
+</div>
+
+{% if current_tab == 'infrastructure' %}
+<!-- ========================================== -->
+<!-- INFRASTRUCTURE STORAGE CAPACITY VIEW       -->
+<!-- ========================================== -->
+
+<!-- Infrastructure Overall Summary Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Provisioned Storage</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_total_storage_gb }} GB</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Total monitored disk capacity</span>
+    </div>
+
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Used Storage</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_used_storage_gb }} GB</strong>
+        <span style="font-size: 0.72rem; color: #f59e0b; font-weight: 600; margin-top: 0.1rem;">{{ kpi_storage_used_pct }}% utilised</span>
+    </div>
+
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Available Free Space</span>
+        <strong style="color: #137333; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_free_storage_gb }} GB</strong>
+        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.1rem;">Remaining headroom</span>
+    </div>
+
+    <div class="kpi-metric-col">
+        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Host Compute Pools</span>
+        <strong style="color: #0f172a; font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin-top: 0.15rem;">{{ kpi_total_logical_cpus }} Cores</strong>
+        <span style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ kpi_total_ram_gb }} GB Total RAM</span>
+    </div>
+</div>
+
+<!-- Storage Capacity, Used, Free & Utilisation by Node (3 Disk Tiers) -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
+    <div style="margin-bottom: 1rem;">
+        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
+            Storage Capacity, Used, Free &amp; Utilisation by Node (3 Disk Tiers)
+        </h3>
+        <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">Live storage allocation and consumption across Shared, Data/LVM, and Local/OS tiers with 24h delta and runway forecasting.</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1.15rem;">
+        {% for node in filtered_nodes %}
+        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem 1.25rem; background: #ffffff;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.65rem;">
+                <div>
+                    <strong style="color: var(--primary-navy); font-size: 0.95rem;">
+                        {% if node.node_name == 'OLKVM' %}OLKVM{% else %}{{ node.node_name }} &mdash; {{ node.display_name }}{% endif %}
+                    </strong>
+                    <span style="color: #64748b; font-size: 0.78rem; margin-left: 0.5rem;">&bull; {{ node.hosted_systems }}</span>
+                </div>
+                <div style="font-size: 0.78rem; color: #475569; font-weight: 600;">
+                    Node-Local Storage: <strong>{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }} GB ({{ node.local_disk_util_pct }}%)</strong> &bull; Total w/ Shared: <strong>{{ node.total_disk_used_gb }} / {{ node.total_disk_capacity_gb }} GB</strong>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem;">
+                {% for d in node.disks %}
+                <div style="display: flex; flex-direction: column; gap: 0.35rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="font-size: 0.8rem; color: #0f172a;">{{ d.type }}</strong>
+                        <span style="font-size: 0.72rem; font-weight: 700;
+                                    {% if d.status == 'Healthy' %}color: #137333;
+                                    {% elif d.status == 'Warning' %}color: #b06000;
+                                    {% elif d.status == 'Critical' %}color: #c5221f;
+                                    {% else %}color: #64748b;{% endif %}">
+                            {{ d.percent }}% ({{ d.status }})
+                        </span>
+                    </div>
+
+                    <div style="background: #e2e8f0; border-radius: 9999px; height: 7px; overflow: hidden; margin: 0.25rem 0;">
+                        <div style="height: 100%; border-radius: 9999px; width: {{ d.percent }}%;
+                                    {% if d.percent > 90 %}background-color: #ef4444;
+                                    {% elif d.percent > 80 %}background-color: #f59e0b;
+                                    {% else %}background-color: #10b981;{% endif %}"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: #475569;">
+                        <span>Used: <strong style="color: #0f172a;">{{ d.used_gb }} GB</strong></span>
+                        <span>Free: <strong style="color: #137333;">{{ d.free_gb }} GB</strong></span>
+                        <span>Cap: <strong>{{ d.size_gb }} GB</strong></span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
+                        <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
+                        <span>Runway: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Node Capacity Records Table (Matching Capacity Tab Format) -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Node Infrastructure Capacity Records</h3>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="modern-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Node</th>
+                    <th>Storage Tier</th>
+                    <th>Capacity</th>
+                    <th>Used</th>
+                    <th>Free</th>
+                    <th>Utilisation %</th>
+                    <th>24h Delta</th>
+                    <th>24h Delta %</th>
+                    <th>Runway (Days to Full)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cap in node_capacity_records %}
+                <tr>
+                    <td style="vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ cap.date|date:"d M Y" }}</div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
+                    </td>
+                    <td>
+                        {% if cap.node_name == 'OLKVM' %}
+                            <strong>OLKVM</strong>
+                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ cap.hosted_systems }}</div>
+                        {% else %}
+                            <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
+                        {% endif %}
+                    </td>
+                    <td style="color: #475569;">{{ cap.storage_tier }}</td>
+                    <td>{{ cap.capacity_gb }} GB</td>
+                    <td>{{ cap.used_gb }} GB</td>
+                    <td>{{ cap.free_gb }} GB</td>
+                    <td style="font-weight: bold; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
+                    <td>
+                        {% if cap.delta_24h_gb > 0 %}
+                            <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
+                        {% elif cap.delta_24h_gb < 0 %}
+                            <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
+                        {% else %}
+                            <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 600;">
+                        {% if cap.delta_24h_percent > 0 %}
+                            <span style="color: #ef4444;">+{{ cap.delta_24h_percent }}%</span>
+                        {% elif cap.delta_24h_percent < 0 %}
+                            <span style="color: #10b981;">{{ cap.delta_24h_percent }}%</span>
+                        {% else %}
+                            <span style="color: #64748b;">0.00%</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span style="display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
+                            {% if cap.runway_badge == 'critical' %}background: #fee2e2; color: #991b1b;
+                            {% elif cap.runway_badge == 'warning' %}background: #fef3c7; color: #92400e;
+                            {% elif cap.runway_badge == 'healthy' %}background: #dcfce7; color: #166534;
+                            {% else %}background: #e0f2fe; color: #0369a1;{% endif %}">
+                            {{ cap.runway_text }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<!-- ========================================== -->
+<!-- DATABASE CAPACITY VIEW                     -->
+<!-- ========================================== -->
+
+<!-- Database Overall Summary Card -->
 <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.15rem 1.5rem; box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
     <!-- 1. Current Capacity -->
     <div class="kpi-metric-col">
@@ -240,55 +467,97 @@
     </div>
 </div>
 
-<!-- Capacity Forecast Redesign -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2.5rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-            <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
-            <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.75rem;">Linear projection to warning threshold based on last 3 months</p>
-        </div>
-        
-        <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Scope: <strong style="color: var(--primary-navy);">{{ forecast_info.database }}</strong></span>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(90, 123, 156, 0.15);">
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Current Utilisation</span>
-            <strong style="color: #0f172a; font-size: 1.3rem; font-weight: 700;">{{ forecast_info.current_used_pct }}%</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Warning Threshold</span>
-            <strong style="color: #ea580c; font-size: 1.3rem; font-weight: 700;">80.0%</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Avg. Growth Rate</span>
-            <strong style="color: #0f172a; font-size: 1.3rem; font-weight: 700;">~ {{ forecast_info.avg_growth }} GB/mo</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Remaining Headroom</span>
-            <strong style="color: {% if 'months' in forecast_info.headroom_months %}#ea580c{% else %}#10b981{% endif %}; font-size: 1.3rem; font-weight: 700;">{{ forecast_info.headroom_months }}</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Runway (Days to Full)</span>
-            <strong style="color: {% if forecast_info.runway_badge == 'critical' %}#dc2626{% elif forecast_info.runway_badge == 'warning' %}#ea580c{% else %}#10b981{% endif %}; font-size: 1.3rem; font-weight: 700;">{{ forecast_info.runway_text }}</strong>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Estimated Limit Date</span>
-            <strong style="color: var(--primary-navy); font-size: 1.2rem; font-weight: 700;">{{ forecast_info.est_date }}</strong>
-        </div>
+<!-- Growth Trend & Linear Forecast (2 Columns) -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+        <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.82rem;">Predictive linear growth runway analysis based on historical trend telemetry.</p>
     </div>
 </div>
 
-<!-- Capacity Records Table Section -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <!-- Compact Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Capacity Records</h3>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+    <!-- Column 1: Historical Growth Trend (SVG Line Chart) -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <strong style="color: var(--primary-navy); font-size: 0.88rem;">6-Month Size Growth ({{ trend_db }})</strong>
+            <span style="font-size: 0.72rem; color: #64748b;">Values in GB</span>
+        </div>
+        
+        {% if trend_data_points %}
+        <div style="width: 100%; height: 160px; position: relative;">
+            <svg viewBox="0 0 400 130" style="width: 100%; height: 100%; overflow: visible;">
+                <line x1="30" y1="20" x2="380" y2="20" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="2" />
+                <line x1="30" y1="60" x2="380" y2="60" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="2" />
+                <line x1="30" y1="100" x2="380" y2="100" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="2" />
+                
+                {% if trend_polyline_points %}
+                <polyline fill="none" stroke="var(--primary-navy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="{{ trend_polyline_points }}" />
+                {% endif %}
+                
+                {% for pt in trend_data_points %}
+                <circle cx="{{ pt.x }}" cy="{{ pt.y }}" r="4" fill="#ffffff" stroke="var(--primary-navy)" stroke-width="2" />
+                <text x="{{ pt.x }}" y="{{ pt.text_y }}" font-size="9" font-weight="600" fill="#1e293b" text-anchor="middle">{{ pt.value }}</text>
+                <text x="{{ pt.x }}" y="125" font-size="10" font-weight="500" fill="#64748b" text-anchor="middle">{{ pt.name }}</text>
+                {% endfor %}
+            </svg>
+        </div>
+        {% else %}
+        <div style="height: 140px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.85rem;">
+            Insufficient historical data for {{ trend_db }}
+        </div>
+        {% endif %}
     </div>
 
+    <!-- Column 2: Predictive Forecast Card -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <strong style="color: var(--primary-navy); font-size: 0.88rem;">Linear Projection Runway</strong>
+                <span style="font-size: 0.72rem; color: #64748b;">Threshold: 80% Capacity</span>
+            </div>
+            
+            {% if forecast_info %}
+            <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748b;">Target Database:</span>
+                    <strong style="color: var(--primary-navy);">{{ forecast_info.database }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748b;">Estimated Daily Burn:</span>
+                    <strong style="color: #0f172a;">~{{ forecast_info.avg_growth }} GB/mo</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
+                    <span style="color: #64748b;">Estimated Threshold Date:</span>
+                    <strong style="color: #0f172a;">{{ forecast_info.est_date }}</strong>
+                </div>
+            </div>
+            {% else %}
+            <div style="color: #94a3b8; font-size: 0.85rem; padding: 1rem 0;">
+                No growth projection available.
+            </div>
+            {% endif %}
+        </div>
 
+        {% if forecast_info %}
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">Runway:</span>
+            <span style="font-size: 0.85rem; font-weight: 700;
+                        {% if forecast_info.runway_badge == 'critical' %}color: #c5221f;
+                        {% elif forecast_info.runway_badge == 'warning' %}color: #d59400;
+                        {% else %}color: #137333;{% endif %}">
+                {{ forecast_info.runway_text }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
 
-    <!-- Table structured as Capacity -> Consumption -> Remaining -> Growth -->
+<!-- Database Capacity Records Table -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Monthly Capacity Planning Log</h3>
+    </div>
+
     <div style="overflow-x: auto;">
         <table class="modern-table">
             <thead>
@@ -296,56 +565,28 @@
                     <th>Month</th>
                     <th>Database</th>
                     <th>DB Size</th>
-                    <th>Capacity</th>
-                    <th>Used</th>
-                    <th>Free</th>
-                    <th>Utilisation %</th>
-                    <th>Growth</th>
+                    <th>Available Free</th>
+                    <th>Total Disk</th>
+                    <th>Disk Used %</th>
+                    <th>Tablespace %</th>
+                    <th>Monthly Growth</th>
                     <th>Growth %</th>
-                    <th>Runway (Days to Full)</th>
-                    <th>Largest Table</th>
+                    <th>Runway (Days)</th>
+                    <th style="text-align: left;">Largest Table</th>
                 </tr>
             </thead>
             <tbody>
                 {% for capacity in page_obj %}
                 <tr>
-                    <td style="font-weight: 600;">{{ capacity.month|date:"F Y" }}</td>
+                    <td style="font-weight: 700; color: #0f172a;">{{ capacity.month|date:"M Y" }}</td>
                     <td>
-                        <strong>
-                        {% if capacity.database == 'Oracle' %}
-                            Oracle (nmsinfra)
-                        {% elif capacity.database == 'MS SQL Server' %}
-                            MS SQL (Pentana)
-                        {% else %}
-                            {{ capacity.database }}
-                        {% endif %}
-                        </strong>
+                        <strong style="color: var(--primary-navy);">{{ capacity.database }}</strong>
                     </td>
-                    <td>
-                        {{ capacity.database_size_gb }} GB
-                    </td>
-                    <td>
-                        {% if capacity.database == 'MySQL' and capacity.available_capacity_gb == 0 and capacity.disk_used_percent == 20 %}
-                            372.50 GB
-                        {% else %}
-                            {{ capacity.disk_capacity_gb }} GB
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if capacity.database == 'MySQL' and capacity.available_capacity_gb == 0 and capacity.disk_used_percent == 20 %}
-                            74.50 GB
-                        {% else %}
-                            {{ capacity.disk_used_gb }} GB
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if capacity.database == 'MySQL' and capacity.available_capacity_gb == 0 and capacity.disk_used_percent == 20 %}
-                            298.00 GB
-                        {% else %}
-                            {{ capacity.available_capacity_gb|default:"0.00" }} GB
-                        {% endif %}
-                    </td>
+                    <td>{{ capacity.database_size_gb }} GB</td>
+                    <td>{{ capacity.available_capacity_gb }} GB</td>
+                    <td>{{ capacity.disk_capacity_gb }} GB</td>
                     <td style="font-weight: bold; color: var(--primary-navy);">{{ capacity.disk_used_percent }}%</td>
+                    <td style="font-weight: 600;">{{ capacity.tablespace_used_percent }}%</td>
                     <td>
                         {% if capacity.growth_gb > 0 %}
                             <span style="color: #ef4444; font-weight: 600;">+{{ capacity.growth_gb }} GB</span>
@@ -384,16 +625,16 @@
         </div>
         <div style="display: flex; gap: 0.5rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Previous</a>
+                <a href="?page=1&tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}&tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Previous</a>
             {% else %}
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; font-size: 0.8rem;">&laquo; First</span>
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; font-size: 0.8rem;">Previous</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}&tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}&tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
             {% else %}
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; font-size: 0.8rem;">Next</span>
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; font-size: 0.8rem;">Last &raquo;</span>
@@ -402,4 +643,5 @@
     </div>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}

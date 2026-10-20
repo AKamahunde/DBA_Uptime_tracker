@@ -114,11 +114,20 @@
 <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
         <h2 style="margin: 0; font-weight: 700; color: var(--primary-navy); font-size: 1.45rem;">Server Health</h2>
-        <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.85rem;">Node-level storage capacity across 3 disk tiers, resource utilization, and server health logs.</p>
+        <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.85rem;">
+            {% if current_tab == 'vms' %}
+            Guest virtual machine resource utilization (CPU, RAM, OS disk) ingested from operating system telemetry agents.
+            {% else %}
+            Hypervisor host node compute metrics, uptime reliability, and physical hardware health logs.
+            {% endif %}
+        </p>
     </div>
 
     <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
         <form method="get" style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
+            <input type="hidden" name="tab" value="{{ current_tab }}">
+            
+            {% if current_tab == 'nodes' %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
                 <select name="node_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
@@ -127,6 +136,18 @@
                     <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox</option>
                 </select>
             </div>
+            {% else %}
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Virtual Machine</label>
+                <select name="vm_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not selected_vm %}selected{% endif %}>All Virtual Machines</option>
+                    {% for vm in vm_choices %}
+                    <option value="{{ vm }}" {% if selected_vm == vm %}selected{% endif %}>{{ vm }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
                 <input type="date" name="start_date" value="{{ start_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
@@ -135,25 +156,51 @@
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
                 <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
-            {% if start_date or end_date or selected_node != 'All Nodes' %}
+            {% if start_date or end_date or selected_node != 'All Nodes' or selected_vm %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+                <a href="?tab={{ current_tab }}" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
             </div>
             {% endif %}
         </form>
 
-        {% if is_admin or perms.api.add_serverhealth %}
+        {% if current_tab == 'nodes' and is_admin %}
         <form method="post" action="{% url 'server_health_sync_prometheus' %}" style="margin: 0;">
             {% csrf_token %}
             <button type="submit" class="btn btn-secondary" style="background-color: #f1f5f9; color: var(--primary-navy); border: 1px solid #cbd5e1; padding: 0.45rem 0.9rem; font-weight: 600; font-size: 0.82rem; border-radius: 4px; height: 34px; cursor: pointer;">
                 Sync Prometheus
             </button>
         </form>
+        {% endif %}
+
+        {% if is_admin or perms.api.add_serverhealth %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <a href="{% url 'server_health_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Record</a>
         </div>
         {% endif %}
     </div>
+</div>
+
+<!-- Scope Filter Tabs: Host Nodes vs Virtual Machines -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    <a href="?tab=nodes{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'nodes' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        🖥️ Hypervisor Host Nodes ({{ total_node_health_count }})
+    </a>
+    <a href="?tab=vms{% if selected_vm %}&vm_select={{ selected_vm }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'vms' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        📦 Guest Virtual Machines ({{ total_vm_health_count }})
+    </a>
+</div>
+
+<!-- Storage Capacity Navigation Banner -->
+<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #334155;">
+        <span style="font-size: 1.1rem;">💾</span>
+        <span>Infrastructure storage tier allocation &amp; capacity forecasting have moved to <strong>Capacity Tracker</strong>.</span>
+    </div>
+    <a href="{% url 'capacity_list' %}?tab=infrastructure" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.85rem; background: #fff; border: 1px solid #cbd5e1; color: var(--primary-navy); font-weight: 600; text-decoration: none; border-radius: 4px;">View Infrastructure Storage →</a>
 </div>
 
 <!-- Three Server Health KPIs Summary Card -->
@@ -177,153 +224,16 @@
     </div>
 </div>
 
-<!-- Storage Capacity, Used, Free & Utilisation by Node (3 Disk Tiers) -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <div style="margin-bottom: 1rem;">
-        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
-            Storage Capacity, Used, Free &amp; Utilisation by Node (3 Disk Tiers)
-        </h3>
-        <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">Live storage allocation and consumption across Shared, Data/LVM, and Local/OS tiers.</p>
-    </div>
-
-    <div style="display: flex; flex-direction: column; gap: 1.15rem;">
-        {% for node in filtered_nodes %}
-        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem 1.25rem; background: #ffffff;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.65rem;">
-                <div>
-                    <strong style="color: var(--primary-navy); font-size: 0.95rem;">
-                        {% if node.node_name == 'OLKVM' %}OLKVM{% else %}{{ node.node_name }} &mdash; {{ node.display_name }}{% endif %}
-                    </strong>
-                    <span style="color: #64748b; font-size: 0.78rem; margin-left: 0.5rem;">&bull; {{ node.hosted_systems }}</span>
-                </div>
-                <div style="font-size: 0.78rem; color: #475569; font-weight: 600;">
-                    Node-Local Storage: <strong>{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }} GB ({{ node.local_disk_util_pct }}%)</strong> &bull; Total w/ Shared: <strong>{{ node.total_disk_used_gb }} / {{ node.total_disk_capacity_gb }} GB</strong>
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem;">
-                {% for d in node.disks %}
-                <div style="display: flex; flex-direction: column; gap: 0.35rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="font-size: 0.8rem; color: #0f172a;">{{ d.type }}</strong>
-                        <span style="font-size: 0.72rem; font-weight: 700;
-                                    {% if d.status == 'Healthy' %}color: #137333;
-                                    {% elif d.status == 'Warning' %}color: #b06000;
-                                    {% elif d.status == 'Critical' %}color: #c5221f;
-                                    {% else %}color: #64748b;{% endif %}">
-                            {{ d.percent }}% ({{ d.status }})
-                        </span>
-                    </div>
-
-                    <div style="background: #e2e8f0; border-radius: 9999px; height: 7px; overflow: hidden; margin: 0.25rem 0;">
-                        <div style="height: 100%; border-radius: 9999px; width: {{ d.percent }}%;
-                                    {% if d.percent > 90 %}background-color: #ef4444;
-                                    {% elif d.percent > 80 %}background-color: #f59e0b;
-                                    {% else %}background-color: #10b981;{% endif %}"></div>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: #475569;">
-                        <span>Used: <strong style="color: #0f172a;">{{ d.used_gb }} GB</strong></span>
-                        <span>Free: <strong style="color: #137333;">{{ d.free_gb }} GB</strong></span>
-                        <span>Cap: <strong>{{ d.size_gb }} GB</strong></span>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
-                        <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
-                        <span>Runway: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-
-<!-- Node Capacity Records Table (Matching Capacity Tab Format) -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Node Capacity Records</h3>
-    </div>
-
-    <div style="overflow-x: auto;">
-        <table class="modern-table">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Node</th>
-                    <th>Storage Tier</th>
-                    <th>Capacity</th>
-                    <th>Used</th>
-                    <th>Free</th>
-                    <th>Utilisation %</th>
-                    <th>24h Delta</th>
-                    <th>24h Delta %</th>
-                    <th>Runway (Days to Full)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cap in node_capacity_records %}
-                <tr>
-                    <td style="vertical-align: middle;">
-                        <div style="font-weight: 600; color: #0f172a;">{{ cap.date|date:"d M Y" }}</div>
-                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
-                    </td>
-                    <td>
-                        {% if cap.node_name == 'OLKVM' %}
-                            <strong>OLKVM</strong>
-                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ cap.hosted_systems }}</div>
-                        {% else %}
-                            <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
-                        {% endif %}
-                    </td>
-                    <td style="color: #475569;">{{ cap.storage_tier }}</td>
-                    <td>{{ cap.capacity_gb }} GB</td>
-                    <td>{{ cap.used_gb }} GB</td>
-                    <td>{{ cap.free_gb }} GB</td>
-                    <td style="font-weight: bold; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
-                    <td>
-                        {% if cap.delta_24h_gb > 0 %}
-                            <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
-                        {% elif cap.delta_24h_gb < 0 %}
-                            <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
-                        {% else %}
-                            <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
-                        {% endif %}
-                    </td>
-                    <td style="font-weight: 600;">
-                        {% if cap.delta_24h_percent > 0 %}
-                            <span style="color: #ef4444;">+{{ cap.delta_24h_percent }}%</span>
-                        {% elif cap.delta_24h_percent < 0 %}
-                            <span style="color: #10b981;">{{ cap.delta_24h_percent }}%</span>
-                        {% else %}
-                            <span style="color: #64748b;">0.00%</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span style="display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;
-                            {% if cap.runway_badge == 'critical' %}background: #fee2e2; color: #991b1b;
-                            {% elif cap.runway_badge == 'warning' %}background: #fef3c7; color: #92400e;
-                            {% elif cap.runway_badge == 'healthy' %}background: #dcfce7; color: #166534;
-                            {% else %}background: #e0f2fe; color: #0369a1;{% endif %}">
-                            {{ cap.runway_text }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="10" style="text-align: center; padding: 2rem; color: #64748b;">No node capacity tracking records found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
 <!-- Server Health Registry Table Panel -->
 <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">Server &amp; Node Health Log</h3>
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--primary-navy);">
+            {% if current_tab == 'vms' %}
+            Guest Virtual Machine Health Logs
+            {% else %}
+            Hypervisor Host Node Health Logs
+            {% endif %}
+        </h3>
     </div>
 
     <div style="overflow-x: auto;">
@@ -331,7 +241,17 @@
             <thead>
                 <tr>
                     <th>Timestamp</th>
-                    <th style="text-align: left;">Node / Server</th>
+                    {% if current_tab == 'vms' %}
+                    <th style="text-align: left;">Virtual Machine (Server)</th>
+                    <th>Database Scope</th>
+                    <th>Uptime</th>
+                    <th>CPU</th>
+                    <th>Memory</th>
+                    <th>OS Disk</th>
+                    <th>Status</th>
+                    <th>Agent / Source</th>
+                    {% else %}
+                    <th style="text-align: left;">Host Node / Server</th>
                     <th>Uptime</th>
                     <th>CPU</th>
                     <th>Memory</th>
@@ -340,6 +260,7 @@
                     <th>Local / OS</th>
                     <th>Status</th>
                     <th>Logged By</th>
+                    {% endif %}
                     {% if is_admin %}
                     <th style="width: 50px;"></th>
                     {% endif %}
@@ -353,6 +274,58 @@
                         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.updated_at|time:"H:i" }}</div>
                     </td>
 
+                    {% if current_tab == 'vms' %}
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left;">
+                        <div style="font-weight: 600; color: #0f172a;">
+                            {{ health.server }}
+                        </div>
+                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">
+                            {{ health.node_name }} &bull; {{ health.clean_hosted_systems|default:"Guest VM" }}
+                        </div>
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <span style="font-weight: 600; color: var(--primary-navy);">{{ health.database|default:"—" }}</span>
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #137333;">
+                        {{ health.uptime_percent|default:"100.00" }}%
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
+                        {{ health.cpu_percent }}%
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.memory_percent }}%</div>
+                        {% if health.memory_total_gb > 0 %}
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
+                        {% endif %}
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ health.disk_percent }}%</div>
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        <span style="font-size: 0.75rem; font-weight: 600;
+                                    {% if health.status == 'Healthy' %}color: #137333;
+                                    {% elif health.status == 'Critical' %}color: #c5221f;
+                                    {% else %}color: #b06000;{% endif %}">
+                            {{ health.status }}
+                        </span>
+                    </td>
+
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-weight: 500; color: #475569;">
+                        {% if health.created_by %}
+                            {{ health.created_by.username }}
+                        {% elif health.entered_by %}
+                            {{ health.entered_by }}
+                        {% else %}
+                            System
+                        {% endif %}
+                    </td>
+                    {% else %}
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left;">
                         <div style="font-weight: 600; color: #0f172a;">
                             {{ health.display_node_label }}
@@ -414,6 +387,7 @@
                             System
                         {% endif %}
                     </td>
+                    {% endif %}
 
                     {% if is_admin %}
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
@@ -434,7 +408,9 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{% if is_admin %}11{% else %}10{% endif %}" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No server health records found.</td>
+                    <td colspan="{% if is_admin %}{% if current_tab == 'vms' %}11{% else %}12{% endif %}{% else %}{% if current_tab == 'vms' %}10{% else %}11{% endif %}{% endif %}" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">
+                        No {% if current_tab == 'vms' %}virtual machine{% else %}server host node{% endif %} health records found.
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -448,16 +424,16 @@
         </div>
         <div style="display: flex; gap: 0.35rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
+                <a href="?page=1&tab={{ current_tab }}{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if selected_vm %}&vm_select={{ selected_vm }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if selected_vm %}&vm_select={{ selected_vm }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
             {% else %}
                 <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                 <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}&node_select={{ selected_node }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if selected_vm %}&vm_select={{ selected_vm }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}&tab={{ current_tab }}{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if selected_vm %}&vm_select={{ selected_vm }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
             {% else %}
                 <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                 <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
