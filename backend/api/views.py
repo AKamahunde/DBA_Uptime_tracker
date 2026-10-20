@@ -3362,20 +3362,37 @@ def capacity_list(request):
             })
             
     # Build growth trend chart data (SVG coordinates)
-    trend_db = current_db if current_db else 'Oracle'
-    trend_recs = CapacityPlanning.objects.filter(database=trend_db).order_by('month')
-    trend_months_list = list(trend_recs)[-6:]
+    if current_db:
+        trend_db = current_db
+        trend_recs = CapacityPlanning.objects.filter(database=trend_db).order_by('month')
+        trend_months_list = [
+            {'month': r.month, 'size_gb': float(r.database_size_gb)}
+            for r in list(trend_recs)[-6:]
+        ]
+    else:
+        trend_db = "All Databases"
+        # Group by month and sum database_size_gb across all databases
+        unique_months = (
+            CapacityPlanning.objects.order_by('month')
+            .values_list('month', flat=True)
+            .distinct()
+        )
+        unique_months = list(unique_months)[-6:]
+        trend_months_list = []
+        for m in unique_months:
+            m_size = CapacityPlanning.objects.filter(month=m).aggregate(Sum('database_size_gb'))['database_size_gb__sum'] or 0.0
+            trend_months_list.append({'month': m, 'size_gb': float(m_size)})
     
     trend_polyline_points = ""
     trend_data_points = []
     if trend_months_list:
-        max_gb = float(max(r.database_size_gb for r in trend_months_list))
-        min_gb = float(min(r.database_size_gb for r in trend_months_list))
+        max_gb = float(max(r['size_gb'] for r in trend_months_list))
+        min_gb = float(min(r['size_gb'] for r in trend_months_list))
         gb_range = max(1.0, max_gb - min_gb)
         
         svg_points = []
         for idx, r in enumerate(trend_months_list):
-            m_val = float(r.database_size_gb)
+            m_val = float(r['size_gb'])
             x = 40 + idx * 64
             y = 20 + (max_gb - m_val) * 80 / gb_range
             svg_points.append(f"{x},{y}")
@@ -3384,7 +3401,7 @@ def capacity_list(request):
                 'x': x,
                 'y': y,
                 'text_y': y - 8,
-                'name': r.month.strftime('%b'),
+                'name': r['month'].strftime('%b'),
                 'value': round(m_val, 1)
             })
         trend_polyline_points = " ".join(svg_points)
