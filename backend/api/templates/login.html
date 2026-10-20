@@ -34,22 +34,32 @@
         to { transform: rotate(360deg); }
     }
     
+    .login-logo-container {
+        text-align: center;
+        margin-top: 3.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .login-logo-container img {
+        max-width: 170px;
+        height: auto;
+    }
     .login-title {
         text-align: center;
-        font-size: 2.5rem;
+        font-size: 2.1rem;
         font-weight: 900;
-        letter-spacing: 2px;
+        letter-spacing: 1.5px;
         color: #002569;
-        margin-top: 3.5rem;
+        margin-top: 0;
         margin-bottom: 0.35rem;
     }
     .login-subtitle {
         text-align: center;
         color: #475569;
         font-style: italic;
-        font-size: 1.05rem;
-        margin-bottom: 2.5rem;
+        font-size: 0.88rem;
+        margin-bottom: 0;
         font-family: 'Georgia', serif;
+        line-height: 1.35;
     }
 </style>
 
@@ -58,27 +68,33 @@
     <div class="login-spinner-text">Logging in, please wait…</div>
 </div>
 
-<h1 class="login-title">DBTRAC</h1>
-<p class="login-subtitle">Database Tracking for Reliability, Administration and Compliance</p>
+<!-- NMS Logo positioned at the top above the login card -->
+<div class="login-logo-container">
+    <img src="/static/logo.jpg" alt="NMS Medical Logistics Logo">
+</div>
 
-<div class="card" style="max-width: 400px; margin: 0 auto 2rem auto; text-align: center;">
+<!-- Login Card with DBTRAC Tool Name where the logo formerly was -->
+<div class="card" style="max-width: 420px; margin: 0 auto 2.5rem auto; text-align: center; padding: 2.25rem 2rem;">
     <div style="margin-bottom: 1.5rem;">
-        <img src="/static/logo.jpg" alt="DBTRAC Logo" style="max-width: 150px; height: auto;">
+        <h1 class="login-title"><span style="color: var(--primary-gold, #F2A900);">DB</span>TRAC</h1>
+        <p class="login-subtitle">Database Tracking for Reliability, Administration and Compliance</p>
     </div>
-    <h2 style="margin-bottom: 1.5rem;">Login</h2>
+
+    <div style="border-top: 1px solid #e2e8f0; margin-bottom: 1.5rem;"></div>
+
+    <h2 style="font-size: 1.35rem; font-weight: 700; color: #1e293b; margin-bottom: 1.5rem;">Login</h2>
     <form method="post" id="loginForm">
         {% csrf_token %}
-        <div class="form-group">
+        <div class="form-group" style="text-align: left;">
             <label for="username">Username:</label>
             <input type="text" id="username" name="username" required>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="text-align: left;">
             <label for="password">Password:</label>
             <input type="password" id="password" name="password" required>
         </div>
         <button type="submit" class="btn btn-primary" id="loginBtn" style="width: 100%;">Login</button>
     </form>
-
 </div>
 
 <script>
