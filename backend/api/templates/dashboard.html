@@ -172,11 +172,11 @@
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-        <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
+        <form method="GET" action="." style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
             <input type="hidden" name="node_select" value="{{ selected_node }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
-                <select name="database_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                <select name="database_select" onchange="submitDbFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
                     <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
                     <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
                     <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
@@ -185,7 +185,7 @@
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
-                <input type="month" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
+                <input type="month" name="month" value="{{ reporting_month }}" onchange="submitDbFilter(this)" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem; cursor: pointer;">
             </div>
         </form>
         
@@ -784,7 +784,7 @@
 
 {% if can_view_infra_dashboard %}
 <!-- Node Infrastructure Overview Section (KPI Cards, Capacity & Performance Records, Uptime Trend & Alerts) -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+<div id="node-infrastructure" style="display: flex; justify-content: space-between; align-items: center; margin-top: 2.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; scroll-margin-top: 1.5rem;">
     <div>
         <h2 style="margin: 0; font-weight: 700; color: #00205B; font-size: 1.45rem;">
             Node Infrastructure Overview
@@ -792,12 +792,12 @@
     </div>
 
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-        <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
+        <form method="GET" action="#node-infrastructure" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
             <input type="hidden" name="database_select" value="{{ selected_db }}">
             <input type="hidden" name="month" value="{{ reporting_month }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
-                <select name="node_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                <select name="node_select" onchange="submitNodeScopeFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
                     <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
                     <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM</option>
                     <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox</option>
@@ -1178,5 +1178,79 @@
             closeNodeExportModal();
         }
     });
+
+    // Node Scope and Database Filter Navigation
+    function submitNodeScopeFilter(selectEl) {
+        try {
+            sessionStorage.setItem('restore_node_infra_scroll', 'true');
+        } catch (e) {}
+
+        const form = selectEl.form;
+        const url = new URL(window.location.href);
+        url.searchParams.set('node_select', selectEl.value);
+
+        const dbInput = form.querySelector('input[name="database_select"]');
+        if (dbInput && dbInput.value) {
+            url.searchParams.set('database_select', dbInput.value);
+        }
+        const monthInput = form.querySelector('input[name="month"]');
+        if (monthInput && monthInput.value) {
+            url.searchParams.set('month', monthInput.value);
+        }
+        url.hash = 'node-infrastructure';
+        window.location.href = url.pathname + '?' + url.searchParams.toString() + '#node-infrastructure';
+    }
+
+    function submitDbFilter(inputEl) {
+        try {
+            sessionStorage.removeItem('restore_node_infra_scroll');
+        } catch (e) {}
+
+        const form = inputEl.form;
+        const url = new URL(window.location.href);
+        if (inputEl.name === 'database_select') {
+            url.searchParams.set('database_select', inputEl.value);
+        } else if (inputEl.name === 'month') {
+            url.searchParams.set('month', inputEl.value);
+        }
+        const nodeInput = form.querySelector('input[name="node_select"]');
+        if (nodeInput && nodeInput.value) {
+            url.searchParams.set('node_select', nodeInput.value);
+        }
+        url.hash = '';
+        window.location.href = url.pathname + '?' + url.searchParams.toString();
+    }
+
+    // Scroll restoration for Node Infrastructure section
+    (function() {
+        function checkAndScroll() {
+            let shouldScroll = false;
+            try {
+                if (sessionStorage.getItem('restore_node_infra_scroll') === 'true') {
+                    shouldScroll = true;
+                    sessionStorage.removeItem('restore_node_infra_scroll');
+                }
+            } catch (e) {}
+
+            if (window.location.hash === '#node-infrastructure') {
+                shouldScroll = true;
+            }
+
+            if (shouldScroll) {
+                const el = document.getElementById('node-infrastructure');
+                if (el) {
+                    requestAnimationFrame(function() {
+                        el.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    });
+                }
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkAndScroll);
+        } else {
+            checkAndScroll();
+        }
+    })();
 </script>
 {% endblock %}
