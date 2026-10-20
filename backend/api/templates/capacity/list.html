@@ -491,7 +491,7 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
     <div>
         <h3 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary-navy);">Capacity Forecast</h3>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.82rem;">Predictive linear growth runway analysis based on historical trend telemetry.</p>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.82rem;">Predictive linear growth headroom analysis based on historical trend telemetry.</p>
     </div>
 </div>
 
@@ -539,15 +539,15 @@
             {% if forecast_info %}
             <div style="display: flex; flex-direction: column; gap: 0.65rem; margin-top: 0.5rem;">
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
-                    <span style="color: #64748b;">Target Database:</span>
+                    <span style="color: #64748b;">Target Scope:</span>
                     <strong style="color: var(--primary-navy);">{{ forecast_info.database }}</strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
-                    <span style="color: #64748b;">Estimated Daily Burn:</span>
-                    <strong style="color: #0f172a;">~{{ forecast_info.avg_growth }} GB/mo</strong>
+                    <span style="color: #64748b;">Monthly Growth:</span>
+                    <strong style="color: #0f172a;">{% if forecast_info.monthly_burn > 0 %}+{% endif %}{{ forecast_info.monthly_burn }} GB/mo <span style="font-size: 0.75rem; font-weight: 400; color: #64748b;">(~{{ forecast_info.daily_burn }} GB/d)</span></strong>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 0.82rem;">
-                    <span style="color: #64748b;">Estimated Threshold Date:</span>
+                    <span style="color: #64748b;">Est. 80% Warning Date:</span>
                     <strong style="color: #0f172a;">{{ forecast_info.est_date }}</strong>
                 </div>
             </div>
@@ -560,7 +560,7 @@
 
         {% if forecast_info %}
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;">Headroom:</span>
+            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;" title="Headroom remaining before disk is 100% full at current monthly consumption rate">Headroom:</span>
             <span style="font-size: 0.85rem; font-weight: 700;
                         {% if forecast_info.runway_badge == 'critical' %}color: #c5221f;
                         {% elif forecast_info.runway_badge == 'warning' %}color: #d59400;
@@ -591,7 +591,7 @@
                     <th>Tablespace %</th>
                     <th>Monthly Growth</th>
                     <th>Growth %</th>
-                    <th>Headroom</th>
+                    <th title="Estimated capacity headroom remaining before 100% disk exhaustion at current monthly burn rate">Headroom</th>
                     <th style="text-align: left;">Largest Table</th>
                 </tr>
             </thead>

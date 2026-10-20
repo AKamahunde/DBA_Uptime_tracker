@@ -3406,14 +3406,16 @@ def capacity_list(request):
             })
         trend_polyline_points = " ".join(svg_points)
         
-    # Build Forecast Block (Linear projection based on last 3 months)
+    # Build Forecast Block (Linear projection aligned with capacity log metrics)
     forecast_info = {}
     if current_db:
         # Specific database scope
         db_recs = CapacityPlanning.objects.filter(database=current_db).order_by('-month', '-updated_at')[:3]
         if db_recs.exists():
             latest = db_recs[0]
-            avg_growth = sum(float(r.growth_gb) for r in db_recs) / len(db_recs)
+            # Use the latest verified runway and consumption metrics for consistent alignment with the log table
+            runway_data = latest.runway_info
+            growth_val = float(latest.growth_gb or 0.0)
             
             cap = float(latest.disk_capacity_gb)
             used_pct = float(latest.disk_used_percent)
@@ -3428,16 +3430,15 @@ def capacity_list(request):
             current_used_gb = cap * used_pct / 100.0
             space_left_gb = warning_used_gb - current_used_gb
             
-            if avg_growth > 0:
-                headroom_months = space_left_gb / avg_growth
-                daily_burn = avg_growth / 30.4
-                runway_days = int(free / daily_burn) if daily_burn > 0 else 9999
+            if growth_val > 0.01:
+                headroom_months = space_left_gb / growth_val
+                daily_burn = round(growth_val / 30.4, 2)
                 if headroom_months < 0:
                     headroom_str = "Exceeded threshold"
-                    est_date_str = "Exceeded"
+                    est_date_str = "Exceeded (>=80%)"
                 elif headroom_months > 60:
                     headroom_str = "> 5 years"
-                    est_date_str = "Safe"
+                    est_date_str = "Safe (> 5 yrs)"
                 else:
                     headroom_str = f"{round(headroom_months, 1)} months"
                     est_days = headroom_months * 30.44
@@ -3446,31 +3447,19 @@ def capacity_list(request):
             else:
                 headroom_str = "Infinite"
                 est_date_str = "Safe"
-                runway_days = 9999
+                daily_burn = 0.0
 
-            if runway_days <= 30:
-                runway_text = f"{runway_days} days"
-                runway_badge = 'critical'
-            elif runway_days <= 90:
-                runway_text = f"{runway_days} days"
-                runway_badge = 'warning'
-            elif runway_days <= 365:
-                mos = round(runway_days / 30.4, 1)
-                runway_text = f"{mos} mos ({runway_days}d)"
-                runway_badge = 'healthy'
-            else:
-                runway_text = "> 1 Year"
-                runway_badge = 'stable'
-                
             forecast_info = {
                 'database': current_db,
                 'current_used_pct': round(used_pct, 1),
-                'avg_growth': round(avg_growth, 2),
+                'monthly_burn': round(growth_val, 2),
+                'daily_burn': daily_burn,
+                'avg_growth': round(growth_val, 2),
                 'headroom_months': headroom_str,
                 'est_date': est_date_str,
-                'runway_days': runway_days,
-                'runway_text': runway_text,
-                'runway_badge': runway_badge,
+                'runway_days': runway_data['days'],
+                'runway_text': runway_data['text'],
+                'runway_badge': runway_data['badge'],
             }
     else:
         # Fleet-wide scope (All Databases combined)
@@ -3482,6 +3471,7 @@ def capacity_list(request):
                 total_cap = 0.0
                 total_used = 0.0
                 total_growth = 0.0
+                total_free = 0.0
                 
                 for r in month_recs:
                     cap = float(r.disk_capacity_gb)
@@ -3491,40 +3481,42 @@ def capacity_list(request):
                     
                     if cap == 0.0 and free == 0.0 and used_pct > 0:
                         cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
+                        free = cap - size
                         
                     total_cap += cap
                     total_used += (cap * used_pct / 100.0)
                     total_growth += float(r.growth_gb)
+                    total_free += free
                     
                 fleet_months.append({
                     'month': month,
                     'capacity_gb': total_cap,
                     'used_gb': total_used,
-                    'growth_gb': total_growth
+                    'growth_gb': total_growth,
+                    'free_gb': total_free
                 })
                 
             if fleet_months:
                 latest = fleet_months[0]
-                avg_growth = sum(m['growth_gb'] for m in fleet_months) / len(fleet_months)
-                
+                growth_val = latest['growth_gb']
                 cap = latest['capacity_gb']
                 used_pct = (latest['used_gb'] / cap * 100.0) if cap > 0 else 0.0
+                fleet_free = latest['free_gb'] if latest['free_gb'] > 0 else max(0.0, cap - latest['used_gb'])
                 
                 warning_used_gb = cap * 0.8
                 current_used_gb = latest['used_gb']
                 space_left_gb = warning_used_gb - current_used_gb
                 
-                if avg_growth > 0:
-                    headroom_months = space_left_gb / avg_growth
-                    fleet_free = cap - latest['used_gb']
-                    daily_burn = avg_growth / 30.4
-                    runway_days = int(fleet_free / daily_burn) if daily_burn > 0 else 9999
+                if growth_val > 0.01 and fleet_free > 0:
+                    daily_burn = round(growth_val / 30.4, 2)
+                    runway_days = int(fleet_free / (growth_val / 30.4)) if (growth_val / 30.4) > 0 else 9999
+                    headroom_months = space_left_gb / growth_val
                     if headroom_months < 0:
                         headroom_str = "Exceeded threshold"
-                        est_date_str = "Exceeded"
+                        est_date_str = "Exceeded (>=80%)"
                     elif headroom_months > 60:
                         headroom_str = "> 5 years"
-                        est_date_str = "Safe"
+                        est_date_str = "Safe (> 5 yrs)"
                     else:
                         headroom_str = f"{round(headroom_months, 1)} months"
                         est_days = headroom_months * 30.44
@@ -3533,6 +3525,7 @@ def capacity_list(request):
                 else:
                     headroom_str = "Infinite"
                     est_date_str = "Safe"
+                    daily_burn = 0.0
                     runway_days = 9999
 
                 if runway_days <= 30:
@@ -3550,9 +3543,11 @@ def capacity_list(request):
                     runway_badge = 'stable'
                     
                 forecast_info = {
-                    'database': 'All Databases',
+                    'database': 'All Databases (Fleet)',
                     'current_used_pct': round(used_pct, 1),
-                    'avg_growth': round(avg_growth, 2),
+                    'monthly_burn': round(growth_val, 2),
+                    'daily_burn': daily_burn,
+                    'avg_growth': round(growth_val, 2),
                     'headroom_months': headroom_str,
                     'est_date': est_date_str,
                     'runway_days': runway_days,
