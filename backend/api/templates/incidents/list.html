@@ -267,28 +267,27 @@
                             <!-- SLA Status -->
                             <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; white-space: nowrap;">
                                 {% if incident.status == 'Open' or incident.status == 'In Progress' %}
-                                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">
-                                        <span class="badge-running-dot" style="background-color: #0284c7;"></span>
+                                    <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #e0f2fe; color: #0369a1;">
                                         Running
                                     </span>
                                 {% else %}
                                     {% if incident.severity == 'Critical' or incident.severity == 'High' %}
                                         {% if incident.duration_hrs <= 9 %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #e6f4ea; color: #137333;">Met</span>
                                         {% else %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #fce8e6; color: #c5221f;">Breached</span>
                                         {% endif %}
                                     {% elif incident.severity == 'Medium' %}
                                         {% if incident.duration_hrs <= 18 %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #e6f4ea; color: #137333;">Met</span>
                                         {% else %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #fce8e6; color: #c5221f;">Breached</span>
                                         {% endif %}
                                     {% else %}
                                         {% if incident.duration_hrs <= 180 %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #e6f4ea; color: #137333;">Met</span>
                                         {% else %}
-                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
+                                            <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 75px; text-align: center; background: #fce8e6; color: #c5221f;">Breached</span>
                                         {% endif %}
                                     {% endif %}
                                 {% endif %}
