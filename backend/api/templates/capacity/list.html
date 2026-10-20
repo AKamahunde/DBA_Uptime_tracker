@@ -177,10 +177,10 @@
                 </button>
                 <div class="export-dropdown-content">
                     <a href="{% url 'capacity_print' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
-                        📄 Export PDF
+                        Export PDF
                     </a>
                     <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
-                        📊 Export Excel
+                        Export Excel
                     </a>
                 </div>
             </div>
@@ -200,12 +200,12 @@
     <a href="?tab=database{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-        🗄️ Database Capacity ({{ total_db_capacity_count }})
+        Database Capacity ({{ total_db_capacity_count }})
     </a>
     <a href="?tab=infrastructure{% if selected_node != 'All Nodes' %}&node_select={{ selected_node }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-        🖥️ Infrastructure Storage Capacity ({{ total_infra_capacity_count }})
+        Infrastructure Storage Capacity ({{ total_infra_capacity_count }})
     </a>
 </div>
 

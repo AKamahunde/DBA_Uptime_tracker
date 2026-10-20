@@ -276,7 +276,7 @@
                             {% elif row.database == 'PostgreSQL' %}
                                 <img src="/static/postgres_logo.png" alt="PostgreSQL Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                             {% else %}
-                                <span style="font-size: 2rem;">🗄️</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00205B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
                             {% endif %}
                         </div>
 
@@ -999,7 +999,7 @@
 {% if not can_view_db_dashboard and not can_view_infra_dashboard %}
 <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 3rem 2rem; text-align: center; margin: 2rem auto; max-width: 600px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="width: 56px; height: 56px; background-color: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
-        <span style="font-size: 1.75rem; color: #64748b;">🔒</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
     </div>
     <h3 style="font-size: 1.25rem; font-weight: 700; color: #00205B; margin-bottom: 0.5rem;">Access Restricted</h3>
     <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-bottom: 0;">
