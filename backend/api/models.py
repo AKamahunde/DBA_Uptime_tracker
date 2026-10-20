@@ -321,6 +321,37 @@ class ServerHealth(models.Model):
         return round(max(0.0, float(self.disk_3_size_gb or 0) - float(self.disk_3_used_gb or 0)), 2)
 
     @property
+    def display_server(self):
+        s = self.server or ''
+        if s.startswith('nmsinfra'):
+            return s.replace('nmsinfra', 'infra', 1)
+        if s.startswith('nmsebs'):
+            return s.replace('nmsebs', 'ebs', 1)
+        return s
+
+    @property
+    def display_node_label(self):
+        # Node name comes first, remove initial nms
+        srv = self.display_server
+        if self.database == 'MS SQL Server':
+            srv = 'Pentana'
+        if self.node_name:
+            return f"{self.node_name} — {srv}"
+        return srv
+
+    @property
+    def clean_hosted_systems(self):
+        import re
+        txt = self.hosted_systems or self.database or ''
+        # Strip any IP addresses
+        txt = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', txt)
+        txt = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', txt)
+        # Strip initial nms
+        txt = txt.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+        txt = re.sub(r'\(\s*\)', '', txt).strip(' -()')
+        return txt or self.database
+
+    @property
     def total_disk_capacity_gb(self):
         return round(float(self.disk_1_size_gb or 0) + float(self.disk_2_size_gb or 0) + float(self.disk_3_size_gb or 0), 2)
 
@@ -334,25 +365,25 @@ class ServerHealth(models.Model):
 
     def save(self, *args, **kwargs):
         srv_lower = (self.server or '').lower()
-        if not self.node_name or (self.node_name == 'Proxmox' and (self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']))):
-            if self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']):
+        if not self.node_name or (self.node_name == 'Proxmox' and (self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs', 'infra', 'ebs']))):
+            if self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs', 'infra', 'ebs']):
                 self.node_name = 'OLKVM'
             else:
                 self.node_name = 'Proxmox'
 
         if not self.hosted_systems:
-            if 'nmsinfra' in srv_lower:
-                self.hosted_systems = 'Oracle DB (nmsinfra - 192.168.30.26)'
-            elif 'nmsebs' in srv_lower:
-                self.hosted_systems = 'Oracle EBS App (nmsebs - 192.168.30.25)'
+            if 'nmsinfra' in srv_lower or 'infra' in srv_lower:
+                self.hosted_systems = 'Oracle DB (infra)'
+            elif 'nmsebs' in srv_lower or 'ebs' in srv_lower:
+                self.hosted_systems = 'Oracle EBS App (ebs)'
             elif 'pvenode1' in srv_lower:
-                self.hosted_systems = 'tomcatvm (qemu/102) & Internal Systems'
+                self.hosted_systems = 'tomcatvm & Internal Systems'
             elif 'pvenode2' in srv_lower:
-                self.hosted_systems = 'jumphostvm (qemu/100) & monitoringvm (qemu/101)'
+                self.hosted_systems = 'jumphostvm & monitoringvm'
             elif 'pvenode3' in srv_lower:
-                self.hosted_systems = 'databasevm (qemu/103 - MySQL / Pentana)'
+                self.hosted_systems = 'databasevm (MySQL / Pentana)'
             elif self.node_name == 'OLKVM':
-                self.hosted_systems = 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
+                self.hosted_systems = 'Oracle DB (infra) & Oracle EBS App (ebs)'
             else:
                 self.hosted_systems = 'MySQL (nickledbnew), MS SQL (Pentana) & Internal Systems'
 

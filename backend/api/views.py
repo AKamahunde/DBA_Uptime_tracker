@@ -1779,31 +1779,31 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
 
     node_definitions = [
         {
-            'node_key': 'nmsinfra.nms.go.ug',
+            'node_key': 'infra.nms.go.ug',
             'node_name': 'OLKVM',
-            'display_name': 'nmsinfra.nms.go.ug',
+            'display_name': 'infra.nms.go.ug',
             'role_title': 'OLKVM — Oracle Database Node',
-            'hosted_systems': 'Oracle DB (nmsinfra)',
+            'hosted_systems': 'Oracle DB (infra)',
             'primary_db': 'Oracle',
-            'filter_q': Q(server__iexact='nmsinfra.nms.go.ug') | Q(server__icontains='nmsinfra'),
+            'filter_q': Q(server__icontains='infra'),
             'default_disks': [
-                'NFS Backup (/fra/nmsddbkp)',
-                'LVM XFS (/fra)',
-                'Local XFS (/data, /u01, /)',
+                '/nmsddbkp (Shared NFS)',
+                '/u01 (Oracle Data)',
+                '/ (OS Root)',
             ],
         },
         {
-            'node_key': 'nmsebs.nms.go.ug',
+            'node_key': 'ebs.nms.go.ug',
             'node_name': 'OLKVM',
-            'display_name': 'nmsebs.nms.go.ug',
+            'display_name': 'ebs.nms.go.ug',
             'role_title': 'OLKVM — Oracle EBS App Node',
-            'hosted_systems': 'Oracle EBS App (nmsebs)',
+            'hosted_systems': 'Oracle EBS App (ebs)',
             'primary_db': 'Oracle',
-            'filter_q': Q(server__iexact='nmsebs.nms.go.ug') | Q(server__icontains='nmsebs'),
+            'filter_q': Q(server__icontains='ebs'),
             'default_disks': [
-                'NFS Backup (/nmsddbkp)',
-                'LVM XFS (/stagearea)',
-                'Local XFS (/fmw, /)',
+                '/nmsddbkp (Shared NFS)',
+                '/stagearea (LVM XFS)',
+                '/ (OS Root)',
             ],
         },
         {
@@ -1815,9 +1815,9 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             'primary_db': 'MySQL / Internal',
             'filter_q': Q(server__iexact='pvenode1'),
             'default_disks': [
-                'VMSAN (NFS Shared)',
+                'VMSAN (Shared)',
                 'local-lvm (LVM-Thin)',
-                'local (Local Dir)',
+                'local (Root / ISO)',
             ],
         },
         {
@@ -1829,9 +1829,9 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             'primary_db': 'Monitoring / Ops',
             'filter_q': Q(server__iexact='pvenode2'),
             'default_disks': [
-                'VMSAN (NFS Shared)',
+                'VMSAN (Shared)',
                 'local-lvm (LVM-Thin)',
-                'local (Local Dir)',
+                'local (Root / ISO)',
             ],
         },
         {
@@ -1843,9 +1843,9 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             'primary_db': 'MySQL / MS SQL Server',
             'filter_q': Q(server__iexact='pvenode3'),
             'default_disks': [
-                'VMSAN (NFS Shared)',
+                'VMSAN (Shared)',
                 'local-lvm (LVM-Thin)',
-                'local (Local Dir)',
+                'local (Root / ISO)',
             ],
         },
     ]
@@ -1964,14 +1964,28 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
             if growth_gb == 0.0 and growth_pct != 0.0 and local_cap > 0:
                 growth_gb = round((growth_pct / 100.0) * local_cap, 2)
 
+            clean_hosted = latest_rec.hosted_systems or nd['hosted_systems']
+            import re
+            clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', clean_hosted)
+            clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
+            clean_hosted = clean_hosted.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+            clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()') or nd['hosted_systems']
+
+            srv_clean = latest_rec.server or nd['display_name']
+            if srv_clean.startswith('nmsinfra'):
+                srv_clean = srv_clean.replace('nmsinfra', 'infra', 1)
+            elif srv_clean.startswith('nmsebs'):
+                srv_clean = srv_clean.replace('nmsebs', 'ebs', 1)
+
             node_overview_data.append({
                 'node_key': nd['node_key'],
                 'node_name': nd['node_name'],
                 'display_name': nd['display_name'],
+                'full_node_label': f"{nd['node_name']} — {nd['display_name']}",
                 'role_title': nd['role_title'],
-                'hosted_systems': latest_rec.hosted_systems or nd['hosted_systems'],
+                'hosted_systems': clean_hosted,
                 'primary_db': nd['primary_db'],
-                'server': latest_rec.server,
+                'server': srv_clean,
                 'has_data': True,
                 'uptime_percent': round(up_pct, 2),
                 'uptime_str': f"{round(up_pct, 2)}%",
@@ -2014,6 +2028,7 @@ def _build_node_dashboard_context(selected_node='All Nodes'):
                 'node_key': nd['node_key'],
                 'node_name': nd['node_name'],
                 'display_name': nd['display_name'],
+                'full_node_label': f"{nd['node_name']} — {nd['display_name']}",
                 'role_title': nd['role_title'],
                 'hosted_systems': nd['hosted_systems'],
                 'primary_db': nd['primary_db'],
@@ -2550,11 +2565,11 @@ def server_health_list(request):
 
     node_ctx = _build_node_dashboard_context(selected_node=selected_node)
 
-    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
+    queryset = ServerHealth.objects.exclude(entered_by='Script').order_by('-date', '-updated_at')
 
     if selected_node == 'OLKVM':
         queryset = queryset.filter(
-            Q(node_name__iexact='OLKVM') | Q(server__icontains='nmsinfra') | Q(server__icontains='nmsebs')
+            Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs')
         )
     elif selected_node == 'Proxmox':
         queryset = queryset.filter(
@@ -3518,6 +3533,25 @@ def server_health_ingest(request):
 
         source = data.get('entered_by', 'Prometheus' if 'disk_1_type' in data or 'node_name' in data else 'Script')
 
+        # Disable external script logging; only Prometheus (and manual UI entries) manage health metrics
+        if source == 'Script' or data.get('entered_by') == 'Script':
+            return JsonResponse({
+                'status': 'disabled',
+                'message': 'Direct script logging for server health is disabled. Health metrics are ingested exclusively via Prometheus.'
+            }, status=200)
+
+        if server_name.startswith('nmsinfra'):
+            server_name = server_name.replace('nmsinfra', 'infra', 1)
+        elif server_name.startswith('nmsebs'):
+            server_name = server_name.replace('nmsebs', 'ebs', 1)
+
+        raw_hosted = data.get('hosted_systems', '')
+        import re
+        clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', raw_hosted)
+        clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
+        clean_hosted = clean_hosted.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+        clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()')
+
         # Find existing entry for this server/node/date combination
         health = ServerHealth.objects.filter(
             date=health_date,
@@ -3527,7 +3561,7 @@ def server_health_ingest(request):
 
         fields_map = {
             'node_name': node_name,
-            'hosted_systems': data.get('hosted_systems', ''),
+            'hosted_systems': clean_hosted,
             'entered_by': source,
             'uptime_percent': uptime_pct,
             'uptime_days': float(data.get('uptime_days', 0)),

@@ -13,18 +13,18 @@ PROMETHEUS_URL = DEFAULT_PROMETHEUS_URL
 OLKVM_NODES = [
     {
         'node_name': 'OLKVM',
-        'server': 'nmsinfra.nms.go.ug',
+        'server': 'infra.nms.go.ug',
         'instance': os.getenv('PROMETHEUS_NMSINFRA_INSTANCE', '192.168.30.26:9100'),
         'nodename': 'nmsinfra.nms.go.ug',
-        'hosted_systems': 'Oracle DB (nmsinfra)',
+        'hosted_systems': 'Oracle DB (infra)',
         'database': 'Oracle',
     },
     {
         'node_name': 'OLKVM',
-        'server': 'nmsebs.nms.go.ug',
+        'server': 'ebs.nms.go.ug',
         'instance': os.getenv('PROMETHEUS_NMSEBS_INSTANCE', '192.168.30.25:9100'),
         'nodename': 'nmsebs.nms.go.ug',
-        'hosted_systems': 'Oracle EBS App (nmsebs)',
+        'hosted_systems': 'Oracle EBS App (ebs)',
         'database': 'Oracle',
     },
 ]
