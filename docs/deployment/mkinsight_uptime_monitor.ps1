@@ -173,8 +173,13 @@ function Detect-BootAndPowerOutages {
                 $crashTime = $null
                 if ($evt.Properties.Count -ge 2) {
                     $timeStr = "$($evt.Properties[1].Value) $($evt.Properties[0].Value)"
-                    if ([DateTime]::TryParse($timeStr, [ref]$crashTime)) {
-                        # Parsed correctly
+                    try {
+                        $crashTime = Get-Date $timeStr -ErrorAction Stop
+                    } catch {
+                        [DateTime]$dtParsed = [DateTime]::MinValue
+                        if ([DateTime]::TryParse($timeStr, [ref]$dtParsed)) {
+                            $crashTime = $dtParsed
+                        }
                     }
                 }
                 
@@ -532,10 +537,17 @@ function Invoke-MonitorRun {
 
     if (Test-Path $EventStateFile) {
         $lastSavedStr = Get-Content $EventStateFile -First 1
-        $parsedLast = $null
-        if ([DateTime]::TryParse($lastSavedStr, [ref]$parsedLast)) {
+        try {
+            $parsedLast = Get-Date $lastSavedStr -ErrorAction Stop
             if ($parsedLast -gt $cutoff) {
                 $cutoff = $parsedLast
+            }
+        } catch {
+            [DateTime]$parsedLast = [DateTime]::MinValue
+            if ([DateTime]::TryParse($lastSavedStr, [ref]$parsedLast)) {
+                if ($parsedLast -gt $cutoff) {
+                    $cutoff = $parsedLast
+                }
             }
         }
     }

@@ -1543,8 +1543,8 @@ def incident_list(request):
     kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
 
     node_choices = [
-        ('infra.nms.go.ug', 'OLKVM — infra.nms.go.ug (Oracle DB)'),
-        ('ebs.nms.go.ug', 'OLKVM — ebs.nms.go.ug (Oracle EBS App)'),
+        ('nmsinfra.nms.go.ug', 'OLKVM — nmsinfra.nms.go.ug (Oracle DB)'),
+        ('nmsebs.nms.go.ug', 'OLKVM — nmsebs.nms.go.ug (Oracle EBS App)'),
         ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
         ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
         ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
@@ -1912,11 +1912,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
     node_definitions = [
         {
-            'node_key': 'infra.nms.go.ug',
+            'node_key': 'nmsinfra.nms.go.ug',
             'node_name': 'OLKVM',
-            'display_name': 'infra.nms.go.ug',
+            'display_name': 'nmsinfra.nms.go.ug',
             'role_title': 'OLKVM — Oracle Database Node',
-            'hosted_systems': 'Oracle DB (infra)',
+            'hosted_systems': 'Oracle DB (nmsinfra)',
             'primary_db': 'Oracle',
             'filter_q': Q(server__icontains='infra'),
             'default_disks': [
@@ -1926,11 +1926,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             ],
         },
         {
-            'node_key': 'ebs.nms.go.ug',
+            'node_key': 'nmsebs.nms.go.ug',
             'node_name': 'OLKVM',
-            'display_name': 'ebs.nms.go.ug',
+            'display_name': 'nmsebs.nms.go.ug',
             'role_title': 'OLKVM — Oracle EBS App Node',
-            'hosted_systems': 'Oracle EBS App (ebs)',
+            'hosted_systems': 'Oracle EBS App (nmsebs)',
             'primary_db': 'Oracle',
             'filter_q': Q(server__icontains='ebs'),
             'default_disks': [
@@ -4075,16 +4075,20 @@ def server_health_ingest(request):
 
         source = data.get('entered_by', 'Prometheus' if ('disk_1_type' in data or 'node_name' in data) else 'Script')
 
-        if server_name.startswith('nmsinfra'):
-            server_name = server_name.replace('nmsinfra', 'infra', 1)
-        elif server_name.startswith('nmsebs'):
-            server_name = server_name.replace('nmsebs', 'ebs', 1)
+        if server_name.startswith('infra'):
+            server_name = 'nms' + server_name
+        elif server_name.startswith('ebs'):
+            server_name = 'nms' + server_name
 
         raw_hosted = data.get('hosted_systems', '')
         import re
         clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', raw_hosted)
         clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
-        clean_hosted = clean_hosted.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+        clean_hosted = clean_hosted.replace('Oracle DB (infra)', 'Oracle DB (nmsinfra)').replace('Oracle EBS App (ebs)', 'Oracle EBS App (nmsebs)')
+        if 'infra' in clean_hosted and 'nmsinfra' not in clean_hosted:
+            clean_hosted = clean_hosted.replace('infra', 'nmsinfra')
+        if 'ebs' in clean_hosted and 'nmsebs' not in clean_hosted:
+            clean_hosted = clean_hosted.replace('ebs', 'nmsebs')
         clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()')
 
         # Find existing entry for this server/node/date combination

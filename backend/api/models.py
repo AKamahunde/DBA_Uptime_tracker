@@ -442,9 +442,9 @@ class ServerHealth(models.Model):
         srv_lower = (self.server or '').lower()
         if not txt or txt == self.database:
             if 'infra' in srv_lower:
-                return 'Oracle DB (infra)'
+                return 'Oracle DB (nmsinfra)'
             elif 'ebs' in srv_lower:
-                return 'Oracle EBS App (ebs)'
+                return 'Oracle EBS App (nmsebs)'
             elif 'pvenode1' in srv_lower:
                 return 'tomcatvm & Internal Systems'
             elif 'pvenode2' in srv_lower:
@@ -452,14 +452,17 @@ class ServerHealth(models.Model):
             elif 'pvenode3' in srv_lower:
                 return 'databasevm (MySQL / Pentana)'
             elif (self.node_name or '').upper() == 'OLKVM':
-                return 'Oracle DB & EBS App'
+                return 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
             elif self.database:
                 return self.database
         # Strip any IP addresses
         txt = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', txt)
         txt = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', txt)
-        # Strip initial nms
-        txt = txt.replace('nmsinfra', 'infra').replace('nmsebs', 'ebs')
+        # Normalize to nmsinfra and nmsebs
+        if 'infra' in txt and 'nmsinfra' not in txt:
+            txt = txt.replace('infra', 'nmsinfra')
+        if 'ebs' in txt and 'nmsebs' not in txt:
+            txt = txt.replace('ebs', 'nmsebs')
         txt = re.sub(r'\(\s*\)', '', txt).strip(' -()')
         return txt or self.database
 
@@ -485,9 +488,9 @@ class ServerHealth(models.Model):
 
         if not self.hosted_systems:
             if 'nmsinfra' in srv_lower or 'infra' in srv_lower:
-                self.hosted_systems = 'Oracle DB (infra)'
+                self.hosted_systems = 'Oracle DB (nmsinfra)'
             elif 'nmsebs' in srv_lower or 'ebs' in srv_lower:
-                self.hosted_systems = 'Oracle EBS App (ebs)'
+                self.hosted_systems = 'Oracle EBS App (nmsebs)'
             elif 'pvenode1' in srv_lower:
                 self.hosted_systems = 'tomcatvm & Internal Systems'
             elif 'pvenode2' in srv_lower:
@@ -495,7 +498,7 @@ class ServerHealth(models.Model):
             elif 'pvenode3' in srv_lower:
                 self.hosted_systems = 'databasevm (MySQL / Pentana)'
             elif self.node_name == 'OLKVM':
-                self.hosted_systems = 'Oracle DB (infra) & Oracle EBS App (ebs)'
+                self.hosted_systems = 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
             else:
                 self.hosted_systems = 'MySQL (nickledbnew), MS SQL (Pentana) & Internal Systems'
 

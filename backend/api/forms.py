@@ -6,8 +6,8 @@ from .models import (
 
 INFRASTRUCTURE_NODE_CHOICES = [
     ('', '— Select Infrastructure Node —'),
-    ('infra.nms.go.ug', 'OLKVM — infra.nms.go.ug (Oracle DB)'),
-    ('ebs.nms.go.ug', 'OLKVM — ebs.nms.go.ug (Oracle EBS App)'),
+    ('nmsinfra.nms.go.ug', 'OLKVM — nmsinfra.nms.go.ug (Oracle DB)'),
+    ('nmsebs.nms.go.ug', 'OLKVM — nmsebs.nms.go.ug (Oracle EBS App)'),
     ('pvenode1', 'Proxmox — pvenode1 (tomcatvm & Internal Systems)'),
     ('pvenode2', 'Proxmox — pvenode2 (jumphostvm & monitoringvm)'),
     ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
