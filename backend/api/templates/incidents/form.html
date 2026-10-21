@@ -17,8 +17,21 @@
     <form method="post">
         {% csrf_token %}
         <div class="form-group">
-            <label for="{{ form.ticket.id_for_label }}">Ticket:</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <label for="{{ form.ticket.id_for_label }}" style="margin-bottom: 0;">Ticket:</label>
+                {% if not incident %}
+                <button type="button" id="btn-refresh-ticket" style="background: none; border: none; color: #2563eb; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; padding: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    Auto-generate New Ticket ID
+                </button>
+                {% endif %}
+            </div>
             {{ form.ticket }}
+            {% if not incident %}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
+                Auto-generated notation: <code>INC-YYMMDD-HHMM</code> (can be customized or left blank to auto-create).
+            </small>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.date.id_for_label }}">Date:</label>
@@ -126,6 +139,45 @@
         const catSelect = document.getElementById('{{ form.category.id_for_label }}');
         const nodeWrapper = document.getElementById('node-field-wrapper');
         const dbWrapper = document.getElementById('db-field-wrapper');
+        const ticketInput = document.getElementById('{{ form.ticket.id_for_label }}');
+        const refreshBtn = document.getElementById('btn-refresh-ticket');
+        const isCreatePage = {% if incident %}false{% else %}true{% endif %};
+        
+        function formatTicketNow() {
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            const isInfra = catSelect && catSelect.value === 'Infrastructure';
+            const prefix = isInfra ? 'INC-INFRA' : 'INC';
+            return `${prefix}-${yy}${mm}${dd}-${hh}${min}`;
+        }
+
+        if (isCreatePage && ticketInput) {
+            if (!ticketInput.value.trim()) {
+                ticketInput.value = formatTicketNow();
+            }
+
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function() {
+                    ticketInput.value = formatTicketNow();
+                    ticketInput.focus();
+                });
+            }
+
+            if (catSelect) {
+                catSelect.addEventListener('change', function() {
+                    const currentVal = ticketInput.value.trim();
+                    if (/^INC(-INFRA)?-\d{6}-\d{4}(-\d+)?$/.test(currentVal)) {
+                        const isInfra = catSelect.value === 'Infrastructure';
+                        const timePart = currentVal.replace(/^INC(-INFRA)?-/, '');
+                        ticketInput.value = (isInfra ? 'INC-INFRA-' : 'INC-') + timePart;
+                    }
+                });
+            }
+        }
         
         function updateScopeFields() {
             if (!catSelect) return;

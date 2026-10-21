@@ -34,8 +34,29 @@ def format_human_duration(hrs_val):
     return f"{h}h {m}m"
 
 
+def generate_incident_ticket(category=None, dt=None):
+    """
+    Auto-generates a standardized incident ticket identifier.
+    Format: INC-YYMMDD-HHMM (or INC-INFRA-YYMMDD-HHMM for infrastructure)
+    e.g., INC-261021-0904, INC-INFRA-261021-0904
+    Guarantees uniqueness across existing incident records.
+    """
+    ref_dt = dt or timezone.now()
+    if hasattr(ref_dt, 'date') and not hasattr(ref_dt, 'hour'):
+        ref_dt = timezone.datetime.combine(ref_dt, timezone.now().time())
+    
+    prefix = "INC-INFRA" if category == 'Infrastructure' else "INC"
+    base_ticket = f"{prefix}-{ref_dt.strftime('%y%m%d-%H%M')}"
+    candidate = base_ticket
+    counter = 1
+    while IncidentRegister.objects.filter(ticket=candidate).exists():
+        candidate = f"{base_ticket}-{counter:02d}"
+        counter += 1
+    return candidate
+
+
 class IncidentRegister(models.Model):
-    ticket = models.CharField(max_length=50)
+    ticket = models.CharField(max_length=50, blank=True)
     date = models.DateField()
     start = models.DateTimeField(null=True, blank=True)
     end = models.DateTimeField(null=True, blank=True)
@@ -80,6 +101,9 @@ class IncidentRegister(models.Model):
         default_permissions = ('add', 'view')
 
     def save(self, *args, **kwargs):
+        if not self.ticket or not str(self.ticket).strip():
+            self.ticket = generate_incident_ticket(self.category, self.start or getattr(self, 'date', None))
+
         if not self.start:
             self.start = timezone.now()
 

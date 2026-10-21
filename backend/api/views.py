@@ -1794,7 +1794,7 @@ def incident_create(request):
                 assigned_to=incident.assigned_to,
                 comment=form.cleaned_data.get('change_comment', '')
             )
-            messages.success(request, 'Incident created successfully.')
+            messages.success(request, f'Incident {incident.ticket} created successfully.')
             return redirect('incident_list')
     else:
         form = IncidentRegisterForm()

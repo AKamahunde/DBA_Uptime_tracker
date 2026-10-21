@@ -14,6 +14,16 @@ INFRASTRUCTURE_NODE_CHOICES = [
 ]
 
 class IncidentRegisterForm(forms.ModelForm):
+    ticket = forms.CharField(
+        max_length=50,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Auto-generated (e.g., INC-261021-0904)',
+            'autocomplete': 'off',
+        }),
+        label="Ticket",
+        help_text="Leave blank to auto-generate standard notation."
+    )
     change_comment = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status or assignee changes)'}),
         required=False,
@@ -33,6 +43,22 @@ class IncidentRegisterForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            from .models import generate_incident_ticket
+            from django.utils import timezone
+            cat = self.initial.get('category') or (self.data.get('category') if self.data else 'Database')
+            if not self.initial.get('ticket') and (not self.data or not self.data.get('ticket')):
+                self.initial['ticket'] = generate_incident_ticket(category=cat)
+            now = timezone.now()
+            if not self.initial.get('date'):
+                self.initial['date'] = now.date().strftime('%Y-%m-%d')
+            if not self.initial.get('start'):
+                self.initial['start'] = now.strftime('%Y-%m-%dT%H:%M')
+            if not self.initial.get('status'):
+                self.initial['status'] = 'Open'
+            if not self.initial.get('severity'):
+                self.initial['severity'] = 'Medium'
+
         if 'node_name' in self.fields:
             self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
             self.fields['node_name'].required = False
@@ -43,6 +69,15 @@ class IncidentRegisterForm(forms.ModelForm):
             self.fields['start'].input_formats = iso_formats
         if 'end' in self.fields:
             self.fields['end'].input_formats = iso_formats
+
+    def clean_ticket(self):
+        ticket = self.cleaned_data.get('ticket', '').strip()
+        if not ticket:
+            from .models import generate_incident_ticket
+            cat = self.cleaned_data.get('category')
+            start = self.cleaned_data.get('start')
+            ticket = generate_incident_ticket(category=cat, dt=start)
+        return ticket
 
     def clean(self):
         cleaned_data = super().clean()
