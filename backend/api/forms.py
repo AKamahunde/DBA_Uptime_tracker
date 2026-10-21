@@ -6,13 +6,11 @@ from .models import (
 
 INFRASTRUCTURE_NODE_CHOICES = [
     ('', '— Select Infrastructure Node —'),
-    ('nmsinfra.nms.go.ug', 'OLKVM — nmsinfra.nms.go.ug (Oracle DB)'),
-    ('nmsebs.nms.go.ug', 'OLKVM — nmsebs.nms.go.ug (Oracle EBS App)'),
+    ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
     ('pvenode1', 'Proxmox — pvenode1 (tomcatvm & Internal Systems)'),
     ('pvenode2', 'Proxmox — pvenode2 (jumphostvm & monitoringvm)'),
     ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
-    ('OLKVM Cluster', 'OLKVM Cluster (General)'),
-    ('Proxmox Cluster', 'Proxmox Cluster (General)'),
+    ('Proxmox', 'Proxmox Cluster (General)'),
 ]
 
 class IncidentRegisterForm(forms.ModelForm):
@@ -58,6 +56,12 @@ class IncidentRegisterForm(forms.ModelForm):
                 self.add_error('node_name', forms.ValidationError(
                     "Please select the target Infrastructure Node for an infrastructure-level incident."
                 ))
+            else:
+                if node in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster'] or any(k in str(node).lower() for k in ['infra', 'ebs', 'olkvm']):
+                    cleaned_data['node_name'] = 'OLKVM'
+                    node = 'OLKVM'
+                if not cleaned_data.get('system') or cleaned_data.get('system') in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM', 'Host Node']:
+                    cleaned_data['system'] = 'OLKVM Host Node (Oracle DB & EBS)' if node == 'OLKVM' else f"Proxmox Hypervisor ({node})"
             cleaned_data['database'] = 'Infrastructure'
         elif cat == 'Database':
             if not db or db == 'Infrastructure':

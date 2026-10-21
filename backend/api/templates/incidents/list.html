@@ -561,7 +561,8 @@
         const planned = row.getAttribute('data-planned');
         
         if (cat === 'Infrastructure') {
-            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || system}</strong> · ${planned}`;
+            const sysLabel = (system && system !== nodeName) ? ` · ${system}` : '';
+            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || 'OLKVM'}</strong>${sysLabel} · ${planned}`;
         } else {
             document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
         }

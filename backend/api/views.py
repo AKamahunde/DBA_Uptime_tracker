@@ -26,6 +26,11 @@ from users.models import User
 from django.db.models import Sum, Count, Avg, Q, F
 from .sla_utils import calculate_operational_downtime
 
+try:
+    from etl.services.rest_client import consolidate_olkvm_incidents
+except ImportError:
+    consolidate_olkvm_incidents = None
+
 def about(request):
     return render(request, 'about.html')
 
@@ -1500,6 +1505,13 @@ def incident_list(request):
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
     
+    # Auto-consolidate any legacy VM records to host node level
+    if consolidate_olkvm_incidents:
+        try:
+            consolidate_olkvm_incidents()
+        except Exception:
+            pass
+
     # Tab counts for headers
     total_all_count = IncidentRegister.objects.count()
     total_db_count = IncidentRegister.objects.filter(
@@ -1527,6 +1539,14 @@ def incident_list(request):
             queryset = queryset.filter(database=current_target)
         elif current_target == 'Infrastructure':
             queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+        elif current_target == 'OLKVM' or current_target in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']:
+            queryset = queryset.filter(
+                Q(node_name__iexact='OLKVM') |
+                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
+                Q(system__icontains='olkvm') |
+                Q(system__icontains='nmsinfra') |
+                Q(system__icontains='nmsebs')
+            )
         else:
             queryset = queryset.filter(
                 Q(node_name__icontains=current_target) | 
@@ -1551,13 +1571,11 @@ def incident_list(request):
     kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
 
     node_choices = [
-        ('nmsinfra.nms.go.ug', 'OLKVM — nmsinfra.nms.go.ug (Oracle DB)'),
-        ('nmsebs.nms.go.ug', 'OLKVM — nmsebs.nms.go.ug (Oracle EBS App)'),
+        ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
         ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
         ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
         ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
-        ('OLKVM Cluster', 'OLKVM Cluster (General)'),
-        ('Proxmox Cluster', 'Proxmox Cluster (General)'),
+        ('Proxmox', 'Proxmox Cluster (General)'),
     ]
 
     return render(request, 'incidents/list.html', {
@@ -4390,8 +4408,14 @@ def incident_ingest(request):
         if str(category).lower() == 'infrastructure' or raw_db.strip().lower() in ['infrastructure', 'node', 'infra', 'olkvm', 'proxmox'] or node_name:
             category = 'Infrastructure'
             db_type = 'Infrastructure'
-            node_name = node_name or data.get('server') or data.get('node') or 'Infrastructure Node'
-            system = data.get('system') or node_name or 'Host Node'
+            raw_node = node_name or data.get('server') or data.get('node') or ''
+            raw_sys = data.get('system') or ''
+            if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']) or any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']):
+                node_name = 'OLKVM'
+                system = 'OLKVM Host Node (Oracle DB & EBS)'
+            else:
+                node_name = raw_node or 'Infrastructure Node'
+                system = raw_sys or node_name or 'Host Node'
         elif raw_db.strip().lower() in ['mkinsight', 'pentana', 'mssql', 'ms sql', 'ms sql server']:
             category = 'Database'
             db_type = 'MS SQL Server'
@@ -4438,10 +4462,13 @@ def incident_ingest(request):
         
         # De-duplication check: avoid double registering the same outage in staging or active register
         if category == 'Infrastructure':
-            if IncidentStaging.objects.filter(category='Infrastructure', node_name=node_name, start=start_dt).exists():
-                return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
-            if IncidentRegister.objects.filter(category='Infrastructure', node_name=node_name, start=start_dt).exists():
-                return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
+            window_start = start_dt - timedelta(minutes=15)
+            window_end = start_dt + timedelta(minutes=15)
+            target_nodes = ['OLKVM', 'nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug'] if node_name == 'OLKVM' else [node_name]
+            if IncidentStaging.objects.filter(category='Infrastructure', node_name__in=target_nodes, start__range=(window_start, window_end)).exists():
+                return JsonResponse({'status': 'ignored', 'message': f'Outage already staged for node {node_name}'}, status=200)
+            if IncidentRegister.objects.filter(category='Infrastructure', node_name__in=target_nodes, start__range=(window_start, window_end)).exists():
+                return JsonResponse({'status': 'ignored', 'message': f'Outage already registered as an active incident for node {node_name}'}, status=200)
         else:
             if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
                 return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
@@ -4452,7 +4479,14 @@ def incident_ingest(request):
         maint_query = Q(start__lte=start_dt, end__gte=end_dt)
         if category == 'Infrastructure':
             maintenance = MaintenanceRegister.objects.filter(
-                maint_query & (Q(database='Infrastructure') | Q(system__icontains=node_name) | Q(system__icontains=system) | Q(activity__icontains=node_name))
+                maint_query & (
+                    Q(database='Infrastructure') |
+                    Q(system__icontains=node_name) |
+                    Q(system__icontains=system) |
+                    Q(activity__icontains=node_name) |
+                    Q(system__icontains='OLKVM') |
+                    Q(activity__icontains='OLKVM')
+                )
             ).first()
         else:
             maintenance = MaintenanceRegister.objects.filter(
@@ -4713,6 +4747,13 @@ def incident_staging_list(request):
     current_db = request.GET.get('database', '').strip()
     current_node = request.GET.get('node', '').strip()
     
+    # Consolidate any legacy VM records into single OLKVM host node records
+    if consolidate_olkvm_incidents:
+        try:
+            consolidate_olkvm_incidents()
+        except Exception:
+            pass
+
     # Auto-resolve/sync any staging records that were manually logged or resolved in registers
     awaiting_records = IncidentStaging.objects.filter(status='Awaiting Review')
     for record in awaiting_records:
@@ -4772,7 +4813,16 @@ def incident_staging_list(request):
         queryset = queryset.filter(database=current_db)
         
     if current_node:
-        queryset = queryset.filter(Q(node_name__iexact=current_node) | Q(system__icontains=current_node))
+        if current_node.upper() == 'OLKVM' or current_node in ['nmsinfra', 'nmsebs']:
+            queryset = queryset.filter(
+                Q(node_name__iexact='OLKVM') |
+                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
+                Q(system__icontains='olkvm') |
+                Q(system__icontains='nmsinfra') |
+                Q(system__icontains='nmsebs')
+            )
+        else:
+            queryset = queryset.filter(Q(node_name__iexact=current_node) | Q(system__icontains=current_node))
         
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get('page')
@@ -4828,8 +4878,13 @@ def staging_promote_incident(request, pk):
             if is_infra:
                 incident.category = 'Infrastructure'
                 incident.database = 'Infrastructure'
-                if not incident.node_name:
-                    incident.node_name = staging_item.node_name or staging_item.system or 'OLKVM'
+                raw_node = incident.node_name or staging_item.node_name or 'OLKVM'
+                if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']):
+                    incident.node_name = 'OLKVM'
+                    if not incident.system or any(k in incident.system.lower() for k in ['nmsinfra', 'nmsebs', 'olkvm', 'host node']):
+                        incident.system = 'OLKVM Host Node (Oracle DB & EBS)'
+                else:
+                    incident.node_name = raw_node
             incident.save()
             
             # Link/process the staging record
@@ -4856,13 +4911,20 @@ def staging_promote_incident(request, pk):
             default_impact = 'Awaiting SysAdmin business impact assessment.'
             resolved_by = 'Prometheus / System'
             db_val = 'Infrastructure'
-            target_node = staging_item.node_name or staging_item.system or 'OLKVM'
+            raw_node = staging_item.node_name or staging_item.system or 'OLKVM'
+            if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']):
+                target_node = 'OLKVM'
+                target_system = 'OLKVM Host Node (Oracle DB & EBS)'
+            else:
+                target_node = raw_node
+                target_system = staging_item.system
         else:
             ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
             default_impact = 'Awaiting DBA business impact assessment.'
             resolved_by = 'System'
             db_val = staging_item.database
             target_node = ''
+            target_system = staging_item.system
 
         initial = {
             'ticket': ticket_id,
@@ -4872,7 +4934,7 @@ def staging_promote_incident(request, pk):
             'start': staging_item.start,
             'end': staging_item.end,
             'severity': severity,
-            'system': staging_item.system,
+            'system': target_system,
             'database': db_val,
             'root_cause': staging_item.root_cause,
             'resolved_by': resolved_by,
@@ -4912,7 +4974,8 @@ def staging_promote_maintenance(request, pk):
             if is_infra:
                 maintenance.database = 'Infrastructure'
                 if not maintenance.system:
-                    maintenance.system = staging_item.node_name or staging_item.system
+                    raw_sys = staging_item.node_name or staging_item.system or 'OLKVM'
+                    maintenance.system = 'OLKVM Host Node (Oracle DB & EBS)' if any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']) else raw_sys
             maintenance.save()
             
             # Link/process the staging record
@@ -4926,10 +4989,16 @@ def staging_promote_maintenance(request, pk):
             return redirect('incident_staging_list')
     else:
         # Pre-populate fields from staging record
+        if is_infra:
+            raw_sys = staging_item.node_name or staging_item.system or 'OLKVM'
+            target_sys = 'OLKVM Host Node (Oracle DB & EBS)' if any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']) else raw_sys
+        else:
+            target_sys = staging_item.system
+
         initial = {
             'date': staging_item.start.date(),
             'database': 'Infrastructure' if is_infra else staging_item.database,
-            'system': staging_item.node_name or staging_item.system,
+            'system': target_sys,
             'start': staging_item.start,
             'end': staging_item.end,
             'duration_hrs': staging_item.duration_hrs,

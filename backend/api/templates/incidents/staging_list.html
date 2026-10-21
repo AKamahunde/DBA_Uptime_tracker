@@ -53,10 +53,11 @@
             <label for="node" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Infrastructure Node</label>
             <select id="node" name="node" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 180px;">
                 <option value="">All Nodes</option>
-                <option value="nmsinfra" {% if current_node == 'nmsinfra' %}selected{% endif %}>nmsinfra (Oracle DB)</option>
-                <option value="nmsebs" {% if current_node == 'nmsebs' %}selected{% endif %}>nmsebs (Oracle EBS)</option>
-                <option value="OLKVM" {% if current_node == 'OLKVM' %}selected{% endif %}>OLKVM Cluster</option>
-                <option value="Proxmox" {% if current_node == 'Proxmox' %}selected{% endif %}>Proxmox Cluster</option>
+                <option value="OLKVM" {% if current_node == 'OLKVM' or current_node == 'nmsinfra' or current_node == 'nmsebs' %}selected{% endif %}>OLKVM (Oracle DB & EBS)</option>
+                <option value="pvenode1" {% if current_node == 'pvenode1' %}selected{% endif %}>Proxmox — pvenode1 (tomcatvm)</option>
+                <option value="pvenode2" {% if current_node == 'pvenode2' %}selected{% endif %}>Proxmox — pvenode2 (jumphost & monitoring)</option>
+                <option value="pvenode3" {% if current_node == 'pvenode3' %}selected{% endif %}>Proxmox — pvenode3 (databasevm / Pentana)</option>
+                <option value="Proxmox" {% if current_node == 'Proxmox' %}selected{% endif %}>Proxmox Cluster (All)</option>
             </select>
         </div>
         {% endif %}

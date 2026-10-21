@@ -571,14 +571,109 @@ def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_da
     return synced, errors
 
 
+def consolidate_olkvm_incidents():
+    """
+    Consolidates any duplicate or VM-level infrastructure incident/staging records
+    (e.g., nmsinfra and nmsebs having identical or overlapping outage times on OLKVM)
+    into a single host node-level incident ('OLKVM').
+    """
+    from datetime import timedelta
+    from django.db.models import Q
+    from api.models import IncidentRegister, IncidentStaging, IncidentChangeLog
+
+    vm_indicators = ['nmsinfra', 'nmsebs', 'olkvm']
+
+    def is_olkvm_target(node_str, sys_str):
+        n = (node_str or '').lower()
+        s = (sys_str or '').lower()
+        return any(k in n or k in s for k in vm_indicators)
+
+    # 1. Consolidate IncidentRegister
+    infra_regs = list(IncidentRegister.objects.filter(
+        Q(category='Infrastructure') | Q(database='Infrastructure') | 
+        Q(node_name__icontains='olkvm') | Q(node_name__icontains='nmsinfra') | Q(node_name__icontains='nmsebs') |
+        Q(system__icontains='olkvm') | Q(system__icontains='nmsinfra') | Q(system__icontains='nmsebs')
+    ).order_by('start'))
+
+    processed_regs = set()
+    for i, reg in enumerate(infra_regs):
+        if reg.id in processed_regs:
+            continue
+        
+        if not is_olkvm_target(reg.node_name, reg.system):
+            continue
+
+        # Look for duplicate host outages within 15 minutes tolerance
+        duplicates = [
+            r for r in infra_regs[i+1:]
+            if r.id not in processed_regs and 
+            is_olkvm_target(r.node_name, r.system) and
+            abs((r.start - reg.start).total_seconds()) <= 900
+        ]
+
+        # Normalize the primary record to the host node level
+        reg.node_name = 'OLKVM'
+        reg.system = 'OLKVM Host Node (Oracle DB & EBS)'
+        reg.category = 'Infrastructure'
+        reg.database = 'Infrastructure'
+        reg.save()
+        processed_regs.add(reg.id)
+
+        # Merge duplicate incidents
+        for dup in duplicates:
+            IncidentStaging.objects.filter(incident_record=dup).update(incident_record=reg)
+            IncidentChangeLog.objects.filter(incident=dup).update(incident=reg)
+            dup.delete()
+            processed_regs.add(dup.id)
+
+    # 2. Consolidate IncidentStaging
+    staging_records = list(IncidentStaging.objects.filter(
+        Q(category='Infrastructure') | Q(database='Infrastructure') | 
+        Q(node_name__icontains='olkvm') | Q(node_name__icontains='nmsinfra') | Q(node_name__icontains='nmsebs') |
+        Q(system__icontains='olkvm') | Q(system__icontains='nmsinfra') | Q(system__icontains='nmsebs')
+    ).order_by('start'))
+
+    processed_stg = set()
+    for i, stg in enumerate(staging_records):
+        if stg.id in processed_stg:
+            continue
+
+        if not is_olkvm_target(stg.node_name, stg.system):
+            continue
+
+        duplicates = [
+            s for s in staging_records[i+1:]
+            if s.id not in processed_stg and 
+            is_olkvm_target(s.node_name, s.system) and
+            abs((s.start - stg.start).total_seconds()) <= 900
+        ]
+
+        stg.node_name = 'OLKVM'
+        stg.system = 'OLKVM Host Node (Oracle DB & EBS)'
+        stg.category = 'Infrastructure'
+        stg.database = 'Infrastructure'
+        stg.save()
+        processed_stg.add(stg.id)
+
+        for dup in duplicates:
+            if dup.incident_record and not stg.incident_record:
+                stg.incident_record = dup.incident_record
+                stg.status = dup.status
+                stg.save()
+            dup.delete()
+            processed_stg.add(dup.id)
+
+
 def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
     """
     Scans OLKVM and Proxmox node metrics in Prometheus for reboot events and telemetry gaps.
     If an outage occurred outside of a registered maintenance window, it is automatically
     logged directly into IncidentRegister on a 24/7 SLA basis, awaiting SysAdmin assessment.
+    Consolidates VM-level telemetry to the host node level (e.g., OLKVM) to avoid duplicate
+    alerts when a host goes down.
     """
     import time
-    from datetime import datetime, timezone as dt_timezone
+    from datetime import datetime, timedelta, timezone as dt_timezone
     from django.utils import timezone
     from django.db.models import Q
     from api.models import IncidentRegister, IncidentStaging, MaintenanceRegister, IncidentChangeLog
@@ -587,7 +682,14 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
     now_ts = time.time()
     created_incidents = []
 
-    # 1. Check OLKVM Nodes
+    # Run auto-consolidation of any existing legacy VM records
+    try:
+        consolidate_olkvm_incidents()
+    except Exception as exc:
+        logger.warning(f"Error during OLKVM incident consolidation: {exc}")
+
+    # 1. Check OLKVM Nodes (consolidated to single host node: OLKVM)
+    seen_olkvm_outages = []
     for cfg in OLKVM_NODES:
         inst = cfg['instance']
         srv = cfg['server']
@@ -615,77 +717,103 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                         end_dt = datetime.fromtimestamp(boot_ts, tz=dt_timezone.utc)
                         duration_hrs = round(gap_seconds / 3600.0, 2)
                         
-                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=srv, start=start_dt).exists():
-                            maint = MaintenanceRegister.objects.filter(
-                                Q(start__lte=start_dt, end__gte=end_dt) &
-                                (Q(database='Infrastructure') | Q(system__icontains=short_name) | Q(activity__icontains=short_name))
-                            ).first()
+                        # Deduplicate: check if this host outage was already processed during this run or in the database
+                        is_duplicate = any(abs((start_dt - seen_s).total_seconds()) <= 900 for seen_s in seen_olkvm_outages)
+                        if not is_duplicate:
+                            window_start = start_dt - timedelta(minutes=15)
+                            window_end = start_dt + timedelta(minutes=15)
+                            if IncidentRegister.objects.filter(
+                                category='Infrastructure',
+                                node_name__in=['OLKVM', 'nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug'],
+                                start__range=(window_start, window_end)
+                            ).exists() or IncidentStaging.objects.filter(
+                                category='Infrastructure',
+                                node_name__in=['OLKVM', 'nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug'],
+                                start__range=(window_start, window_end)
+                            ).exists():
+                                is_duplicate = True
 
-                            mins_down = int((gap_seconds % 3600) // 60)
-                            hrs_down = int(gap_seconds // 3600)
-                            human_dur = f"{hrs_down}h {mins_down}m" if hrs_down > 0 else f"{mins_down}m"
-                            root_cause = (
-                                f"PROMETHEUS AUTO-DETECTED: Power outage / abrupt host shutdown. "
-                                f"Node lost power at {start_dt.astimezone().strftime('%I:%M:%S %p')} and booted back up at {end_dt.astimezone().strftime('%I:%M:%S %p')} ({human_dur} downtime)."
+                        if is_duplicate:
+                            logger.info(f"Prometheus telemetry outage detected on {srv} matches existing OLKVM host outage around {start_dt}; deduplicated.")
+                            continue
+
+                        seen_olkvm_outages.append(start_dt)
+
+                        target_node = 'OLKVM'
+                        target_system = 'OLKVM Host Node (Oracle DB & EBS)'
+
+                        maint = MaintenanceRegister.objects.filter(
+                            Q(start__lte=start_dt, end__gte=end_dt) &
+                            (Q(database='Infrastructure') | Q(system__icontains='OLKVM') | Q(activity__icontains='OLKVM') |
+                             Q(system__icontains=short_name) | Q(activity__icontains=short_name))
+                        ).first()
+
+                        mins_down = int((gap_seconds % 3600) // 60)
+                        hrs_down = int(gap_seconds // 3600)
+                        human_dur = f"{hrs_down}h {mins_down}m" if hrs_down > 0 else f"{mins_down}m"
+                        root_cause = (
+                            f"PROMETHEUS AUTO-DETECTED: Host power outage / abrupt reboot on OLKVM host node. "
+                            f"Host node lost telemetry at {start_dt.astimezone().strftime('%I:%M:%S %p')} and booted back up at {end_dt.astimezone().strftime('%I:%M:%S %p')} ({human_dur} downtime). "
+                            f"Telemetry verified via {srv}."
+                        )
+                        
+                        if maint:
+                            IncidentStaging.objects.get_or_create(
+                                category='Infrastructure',
+                                node_name=target_node,
+                                start=start_dt,
+                                defaults={
+                                    'database': 'Infrastructure',
+                                    'system': target_system,
+                                    'end': end_dt,
+                                    'duration_hrs': duration_hrs,
+                                    'root_cause': f"AUTO-LOGGED: Outage occurred within scheduled Maintenance Window ({maint.change_id}).",
+                                    'status': 'Promoted to Maintenance',
+                                    'maintenance_record': maint,
+                                    'processed_at': timezone.now()
+                                }
                             )
-                            
-                            if maint:
-                                IncidentStaging.objects.get_or_create(
-                                    category='Infrastructure',
-                                    node_name=srv,
-                                    start=start_dt,
-                                    defaults={
-                                        'database': 'Infrastructure',
-                                        'system': f"Oracle OLKVM Host ({short_name})",
-                                        'end': end_dt,
-                                        'duration_hrs': duration_hrs,
-                                        'root_cause': f"AUTO-LOGGED: Outage occurred within scheduled Maintenance Window ({maint.change_id}).",
-                                        'status': 'Promoted to Maintenance',
-                                        'maintenance_record': maint,
-                                        'processed_at': timezone.now()
-                                    }
-                                )
-                            else:
-                                ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
-                                inc = IncidentRegister.objects.create(
-                                    ticket=ticket_id,
-                                    date=start_dt.date(),
-                                    start=start_dt,
-                                    end=end_dt,
-                                    duration_hrs=duration_hrs,
-                                    planned=False,
-                                    severity='Critical' if duration_hrs >= 1.0 else 'High',
-                                    system=f"Oracle OLKVM Host ({short_name})",
-                                    root_cause=root_cause,
-                                    business_impact='Awaiting SysAdmin business impact assessment.',
-                                    resolved_by='Prometheus / System',
-                                    status='Resolved',
-                                    category='Infrastructure',
-                                    node_name=srv,
-                                    database='Infrastructure',
-                                )
-                                IncidentChangeLog.objects.create(
-                                    incident=inc,
-                                    action='Auto-Logged from Prometheus Telemetry',
-                                    new_status=inc.status,
-                                    comment='Infrastructure host outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
-                                )
-                                IncidentStaging.objects.update_or_create(
-                                    category='Infrastructure',
-                                    node_name=srv,
-                                    start=start_dt,
-                                    defaults={
-                                        'database': 'Infrastructure',
-                                        'system': f"Oracle OLKVM Host ({short_name})",
-                                        'end': end_dt,
-                                        'duration_hrs': duration_hrs,
-                                        'root_cause': root_cause,
-                                        'status': 'Promoted to Incident',
-                                        'incident_record': inc,
-                                        'processed_at': timezone.now()
-                                    }
-                                )
-                                created_incidents.append(inc)
+                        else:
+                            ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
+                            inc = IncidentRegister.objects.create(
+                                ticket=ticket_id,
+                                date=start_dt.date(),
+                                start=start_dt,
+                                end=end_dt,
+                                duration_hrs=duration_hrs,
+                                planned=False,
+                                severity='Critical' if duration_hrs >= 1.0 else 'High',
+                                system=target_system,
+                                root_cause=root_cause,
+                                business_impact='Awaiting SysAdmin business impact assessment.',
+                                resolved_by='Prometheus / System',
+                                status='Resolved',
+                                category='Infrastructure',
+                                node_name=target_node,
+                                database='Infrastructure',
+                            )
+                            IncidentChangeLog.objects.create(
+                                incident=inc,
+                                action='Auto-Logged from Prometheus Telemetry',
+                                new_status=inc.status,
+                                comment='OLKVM host node outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
+                            )
+                            IncidentStaging.objects.update_or_create(
+                                category='Infrastructure',
+                                node_name=target_node,
+                                start=start_dt,
+                                defaults={
+                                    'database': 'Infrastructure',
+                                    'system': target_system,
+                                    'end': end_dt,
+                                    'duration_hrs': duration_hrs,
+                                    'root_cause': root_cause,
+                                    'status': 'Promoted to Incident',
+                                    'incident_record': inc,
+                                    'processed_at': timezone.now()
+                                }
+                            )
+                            created_incidents.append(inc)
         except Exception as e:
             logger.warning(f"Error checking Prometheus outage for {srv}: {e}")
 
@@ -716,7 +844,9 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                         end_dt = datetime.fromtimestamp(boot_ts, tz=dt_timezone.utc)
                         duration_hrs = round(gap_seconds / 3600.0, 2)
                         
-                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=pnode, start=start_dt).exists():
+                        window_start = start_dt - timedelta(minutes=15)
+                        window_end = start_dt + timedelta(minutes=15)
+                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=pnode, start__range=(window_start, window_end)).exists():
                             maint = MaintenanceRegister.objects.filter(
                                 Q(start__lte=start_dt, end__gte=end_dt) &
                                 (Q(database='Infrastructure') | Q(system__icontains=pnode) | Q(activity__icontains=pnode))
