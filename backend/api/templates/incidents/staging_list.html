@@ -7,12 +7,21 @@
     <div style="margin-bottom: 1.5rem;">
         <h2>Incident Staging Area</h2>
         <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
+            {% if is_sysadmin %}
+            Review incoming automated infrastructure and host node alerts from Prometheus. Establish whether each alert was an unplanned <strong>Incident</strong>, a planned <strong>Maintenance activity</strong>, or transient <strong>network intermittence</strong>.
+            {% else %}
             Review incoming automated server restart, database outage, and host node alerts. Establish whether each alert was an unplanned <strong>Incident</strong> or a planned <strong>Maintenance activity</strong> to route them to their respective operational registers.
+            {% endif %}
         </p>
     </div>
 
     <!-- Category Tabs -->
     <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem; flex-wrap: wrap;">
+        {% if is_sysadmin %}
+        <span style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background: var(--primary-navy); color: #fff;">
+            Infrastructure Alerts (Prometheus) ({{ infra_awaiting_count }})
+        </span>
+        {% else %}
         <a href="?category=" 
            style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
                   {% if not current_category %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
@@ -28,6 +37,7 @@
                   {% if current_category == 'Infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
             Infrastructure Alerts ({{ infra_awaiting_count }})
         </a>
+        {% endif %}
     </div>
 
     <!-- Filter Bar -->
@@ -36,7 +46,7 @@
         <input type="hidden" name="category" value="{{ current_category }}">
         {% endif %}
 
-        {% if current_category != 'Infrastructure' %}
+        {% if not is_sysadmin and current_category != 'Infrastructure' %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
             <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
             <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
@@ -118,6 +128,13 @@
                         <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
                             {{ item.human_duration }}
                         </div>
+                        {% if item.duration_hrs < 0.25 %}
+                            <div style="margin-top: 0.35rem;">
+                                <span style="display: inline-block; padding: 0.15rem 0.4rem; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 4px; font-size: 0.68rem; font-weight: 700; white-space: nowrap;" title="Duration under 15 minutes. May indicate transient network intermittence or scrape timeout.">
+                                    ⚠️ Intermittence (&lt; 15m)
+                                </span>
+                            </div>
+                        {% endif %}
                     </td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">
                         {{ item.root_cause|linebreaksbr }}
@@ -144,7 +161,7 @@
                                 <a href="{% url 'staging_promote_maintenance' item.pk %}" class="btn btn-success" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; text-decoration: none; background-color: #10b981; border-color: #10b981;">
                                     Log Maintenance
                                 </a>
-                                {% if request.user.is_admin or perms.api.delete_incidentregister or perms.api.delete_incidentstaging %}
+                                {% if request.user.is_admin or perms.api.delete_incidentregister or perms.api.delete_incidentstaging or is_sysadmin %}
                                 <form method="post" action="{% url 'staging_delete' item.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to dismiss/delete this staged alert?');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; background-color: #64748b; color: white; border: none; font-family: inherit; font-weight: 600; cursor: pointer; transition: background-color 0.2s;">

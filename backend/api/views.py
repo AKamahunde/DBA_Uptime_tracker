@@ -25,6 +25,7 @@ from .forms import (
 from users.models import User
 from django.db.models import Sum, Count, Avg, Q, F
 from .sla_utils import calculate_operational_downtime
+from .context_processors import is_sysadmin_user
 
 try:
     from etl.services.rest_client import consolidate_olkvm_incidents
@@ -169,7 +170,7 @@ def _get_dashboard_data(reporting_month):
         if db_type == 'Infrastructure':
             # Infrastructure Planned Downtime
             planned = MaintenanceRegister.objects.filter(
-                Q(database__iexact='Infrastructure') | Q(category__iexact='Infrastructure'),
+                Q(database__iexact='Infrastructure') | Q(system__icontains='Infrastructure') | Q(system__icontains='OLKVM') | Q(system__icontains='Proxmox'),
                 success=True, date__year=reporting_month.year, date__month=reporting_month.month
             ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
 
@@ -4786,51 +4787,34 @@ def incident_ingest(request):
             )
 
         if is_infra and not maintenance:
-            # Infrastructure runs on a 24/7 SLA: log directly into IncidentRegister unless in a maintenance window
-            ticket_id = f"INC-PROM-{start_dt.strftime('%y%m%d-%H%M')}"
-            incident = IncidentRegister.objects.create(
-                ticket=ticket_id,
-                date=start_dt.date(),
-                start=start_dt,
-                end=end_dt,
-                duration_hrs=duration_hrs,
-                planned=False,
-                severity='Critical' if duration_hrs >= 1.0 else 'High',
-                system=system,
-                root_cause=root_cause,
-                business_impact=business_impact,
-                resolved_by='Prometheus / System',
-                status='Resolved' if end_dt else 'Open',
-                category='Infrastructure',
-                node_name=node_name,
-                database='Infrastructure',
-            )
-            IncidentChangeLog.objects.create(
-                incident=incident,
-                action='Auto-Logged from Prometheus Telemetry',
-                new_status=incident.status,
-                comment='Infrastructure node outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
-            )
-            # Retain linked staging record for audit traceability
+            # Infrastructure events outside maintenance windows route to IncidentStaging for SysAdmin review.
+            # Events under 15 minutes (< 0.25h) are flagged as potential network intermittence.
+            is_intermittent = (duration_hrs < 0.25)
+            rc_final = root_cause
+            if is_intermittent and not root_cause.startswith("[POTENTIAL NETWORK INTERMITTENCE"):
+                rc_final = f"[POTENTIAL NETWORK INTERMITTENCE (< 15m)] {root_cause}"
+                if not data.get('business_impact'):
+                    business_impact = f"Duration {round(duration_hrs * 60, 1)}m under 15-minute threshold; potential network/scrape intermittence under SysAdmin review."
+
             staging = IncidentStaging.objects.create(
-                category=category,
-                node_name=node_name,
-                database=db_type,
+                category='Infrastructure',
+                node_name=node_name or ('OLKVM' if any(k in str(system).lower() for k in ['infra', 'ebs', 'olkvm']) else None),
+                database='Infrastructure',
                 system=system,
                 start=start_dt,
                 end=end_dt,
                 duration_hrs=duration_hrs,
-                root_cause=root_cause,
-                status='Promoted to Incident',
-                incident_record=incident,
+                root_cause=rc_final,
+                status='Awaiting Review',
+                incident_record=None,
                 maintenance_record=None,
-                processed_at=timezone.now()
+                processed_at=None
             )
             return JsonResponse({
                 'status': 'success',
-                'id': incident.id,
-                'ticket': incident.ticket,
-                'direct_incident': True,
+                'id': staging.id,
+                'staged': True,
+                'intermittence_risk': is_intermittent,
                 'maint_linked': False
             })
             
@@ -4999,13 +4983,27 @@ def holiday_delete(request, pk):
 
 @login_required
 def incident_staging_list(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
+    is_sysadmin = is_sysadmin_user(request.user)
+    can_view = (
+        request.user.is_superuser or
+        request.user.is_staff or
+        getattr(request.user, 'is_admin', False) or
+        request.user.has_perm('api.view_incidentregister') or
+        request.user.has_perm('api.view_incidentstaging') or
+        is_sysadmin
+    )
+    if not can_view:
         messages.error(request, 'You do not have permission to view incident staging records.')
         return redirect('dashboard')
         
     current_category = request.GET.get('category', '').strip()
     current_db = request.GET.get('database', '').strip()
     current_node = request.GET.get('node', '').strip()
+
+    if is_sysadmin:
+        # SysAdmins can ONLY view Prometheus / Infrastructure alerts
+        current_category = 'Infrastructure'
+        current_db = ''
     
     # Consolidate any legacy VM records into single OLKVM host node records
     if consolidate_olkvm_incidents:
@@ -5016,6 +5014,11 @@ def incident_staging_list(request):
 
     # Auto-resolve/sync any staging records that were manually logged or resolved in registers
     awaiting_records = IncidentStaging.objects.filter(status='Awaiting Review')
+    if is_sysadmin:
+        awaiting_records = awaiting_records.filter(
+            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus')
+        )
+
     for record in awaiting_records:
         is_infra = (record.category == 'Infrastructure' or record.database == 'Infrastructure')
         if is_infra:
@@ -5058,18 +5061,22 @@ def incident_staging_list(request):
                 continue
             
     base_qs = IncidentStaging.objects.filter(status='Awaiting Review')
+    if is_sysadmin:
+        base_qs = base_qs.filter(
+            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus')
+        )
     total_awaiting_count = base_qs.count()
-    db_awaiting_count = base_qs.filter(category='Database').exclude(database='Infrastructure').count()
-    infra_awaiting_count = base_qs.filter(Q(category='Infrastructure') | Q(database='Infrastructure')).count()
+    db_awaiting_count = 0 if is_sysadmin else base_qs.filter(category='Database').exclude(database='Infrastructure').count()
+    infra_awaiting_count = total_awaiting_count if is_sysadmin else base_qs.filter(Q(category='Infrastructure') | Q(database='Infrastructure')).count()
 
     queryset = base_qs.order_by('-start')
     
-    if current_category == 'Database':
+    if current_category == 'Database' and not is_sysadmin:
         queryset = queryset.filter(category='Database').exclude(database='Infrastructure')
-    elif current_category == 'Infrastructure':
-        queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+    elif current_category == 'Infrastructure' or is_sysadmin:
+        queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus'))
 
-    if current_db:
+    if current_db and not is_sysadmin:
         queryset = queryset.filter(database=current_db)
         
     if current_node:
@@ -5111,13 +5118,22 @@ def incident_staging_list(request):
         'total_awaiting_count': total_awaiting_count,
         'db_awaiting_count': db_awaiting_count,
         'infra_awaiting_count': infra_awaiting_count,
+        'is_sysadmin': is_sysadmin,
     }
     return render(request, 'incidents/staging_list.html', context)
 
 
 @login_required
 def staging_promote_incident(request, pk):
-    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
+    is_sysadmin = is_sysadmin_user(request.user)
+    can_promote = (
+        request.user.is_superuser or
+        request.user.is_staff or
+        getattr(request.user, 'is_admin', False) or
+        request.user.has_perm('api.add_incidentregister') or
+        is_sysadmin
+    )
+    if not can_promote:
         messages.error(request, 'You do not have permission to create incidents.')
         return redirect('incident_staging_list')
         
@@ -5129,6 +5145,10 @@ def staging_promote_incident(request, pk):
         'PROMETHEUS' in rc_upper or
         bool(staging_item.node_name)
     )
+
+    if is_sysadmin and not is_infra:
+        messages.error(request, 'SysAdmins are only permitted to review and promote Prometheus/Infrastructure alerts.')
+        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         form = IncidentRegisterForm(request.POST)
@@ -5215,16 +5235,30 @@ def staging_promote_incident(request, pk):
 
 @login_required
 def staging_promote_maintenance(request, pk):
-    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
+    is_sysadmin = is_sysadmin_user(request.user)
+    can_maint = (
+        request.user.is_superuser or
+        request.user.is_staff or
+        getattr(request.user, 'is_admin', False) or
+        request.user.has_perm('api.add_maintenanceregister') or
+        is_sysadmin
+    )
+    if not can_maint:
         messages.error(request, 'You do not have permission to log maintenance activities.')
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    rc_upper = (staging_item.root_cause or '').upper()
     is_infra = (
         staging_item.category == 'Infrastructure' or
         staging_item.database == 'Infrastructure' or
+        'PROMETHEUS' in rc_upper or
         bool(staging_item.node_name)
     )
+
+    if is_sysadmin and not is_infra:
+        messages.error(request, 'SysAdmins are only permitted to review and promote Prometheus/Infrastructure alerts.')
+        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         form = MaintenanceRegisterForm(request.POST)
@@ -5282,12 +5316,31 @@ def staging_promote_maintenance(request, pk):
 
 @login_required
 def staging_delete(request, pk):
-    # Check permissions (admins or users with delete rights)
-    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.delete_incidentstaging')):
+    is_sysadmin = is_sysadmin_user(request.user)
+    can_delete = (
+        request.user.is_superuser or
+        request.user.is_staff or
+        getattr(request.user, 'is_admin', False) or
+        request.user.has_perm('api.delete_incidentregister') or
+        request.user.has_perm('api.delete_incidentstaging') or
+        is_sysadmin
+    )
+    if not can_delete:
         messages.error(request, 'You do not have permission to delete staging records.')
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
+    rc_upper = (staging_item.root_cause or '').upper()
+    is_infra = (
+        staging_item.category == 'Infrastructure' or
+        staging_item.database == 'Infrastructure' or
+        'PROMETHEUS' in rc_upper or
+        bool(staging_item.node_name)
+    )
+
+    if is_sysadmin and not is_infra:
+        messages.error(request, 'SysAdmins are only permitted to dismiss Prometheus/Infrastructure alerts.')
+        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         staging_item.delete()

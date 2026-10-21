@@ -774,31 +774,11 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                                 }
                             )
                         else:
-                            ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
-                            inc = IncidentRegister.objects.create(
-                                ticket=ticket_id,
-                                date=start_dt.date(),
-                                start=start_dt,
-                                end=end_dt,
-                                duration_hrs=duration_hrs,
-                                planned=False,
-                                severity='Critical' if duration_hrs >= 1.0 else 'High',
-                                system=target_system,
-                                root_cause=root_cause,
-                                business_impact='Awaiting SysAdmin business impact assessment.',
-                                resolved_by='Prometheus / System',
-                                status='Resolved',
-                                category='Infrastructure',
-                                node_name=target_node,
-                                database='Infrastructure',
-                            )
-                            IncidentChangeLog.objects.create(
-                                incident=inc,
-                                action='Auto-Logged from Prometheus Telemetry',
-                                new_status=inc.status,
-                                comment='OLKVM host node outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
-                            )
-                            IncidentStaging.objects.update_or_create(
+                            is_intermittent = (duration_hrs < 0.25)
+                            rc_text = root_cause
+                            if is_intermittent and not rc_text.startswith("[POTENTIAL NETWORK INTERMITTENCE"):
+                                rc_text = f"[POTENTIAL NETWORK INTERMITTENCE (< 15m)] {root_cause}"
+                            staging_obj, created = IncidentStaging.objects.update_or_create(
                                 category='Infrastructure',
                                 node_name=target_node,
                                 start=start_dt,
@@ -807,13 +787,15 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                                     'system': target_system,
                                     'end': end_dt,
                                     'duration_hrs': duration_hrs,
-                                    'root_cause': root_cause,
-                                    'status': 'Promoted to Incident',
-                                    'incident_record': inc,
-                                    'processed_at': timezone.now()
+                                    'root_cause': rc_text,
+                                    'status': 'Awaiting Review',
+                                    'incident_record': None,
+                                    'maintenance_record': None,
+                                    'processed_at': None
                                 }
                             )
-                            created_incidents.append(inc)
+                            if created:
+                                created_incidents.append(staging_obj)
         except Exception as e:
             logger.warning(f"Error checking Prometheus outage for {srv}: {e}")
 
@@ -846,7 +828,7 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                         
                         window_start = start_dt - timedelta(minutes=15)
                         window_end = start_dt + timedelta(minutes=15)
-                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=pnode, start__range=(window_start, window_end)).exists():
+                        if not IncidentRegister.objects.filter(category='Infrastructure', node_name=pnode, start__range=(window_start, window_end)).exists() and not IncidentStaging.objects.filter(category='Infrastructure', node_name=pnode, start__range=(window_start, window_end)).exists():
                             maint = MaintenanceRegister.objects.filter(
                                 Q(start__lte=start_dt, end__gte=end_dt) &
                                 (Q(database='Infrastructure') | Q(system__icontains=pnode) | Q(activity__icontains=pnode))
@@ -877,31 +859,11 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                                     }
                                 )
                             else:
-                                ticket_id = f"INC-PROM-{start_dt.astimezone().strftime('%y%m%d-%H%M')}"
-                                inc = IncidentRegister.objects.create(
-                                    ticket=ticket_id,
-                                    date=start_dt.date(),
-                                    start=start_dt,
-                                    end=end_dt,
-                                    duration_hrs=duration_hrs,
-                                    planned=False,
-                                    severity='Critical' if duration_hrs >= 1.0 else 'High',
-                                    system=f"Proxmox Hypervisor ({pnode})",
-                                    root_cause=root_cause,
-                                    business_impact='Awaiting SysAdmin business impact assessment.',
-                                    resolved_by='Prometheus / System',
-                                    status='Resolved',
-                                    category='Infrastructure',
-                                    node_name=pnode,
-                                    database='Infrastructure',
-                                )
-                                IncidentChangeLog.objects.create(
-                                    incident=inc,
-                                    action='Auto-Logged from Prometheus Telemetry',
-                                    new_status=inc.status,
-                                    comment='Infrastructure host outage detected by Prometheus 24/7 telemetry. Awaiting SysAdmin assessment.'
-                                )
-                                IncidentStaging.objects.update_or_create(
+                                is_intermittent = (duration_hrs < 0.25)
+                                rc_text = root_cause
+                                if is_intermittent and not rc_text.startswith("[POTENTIAL NETWORK INTERMITTENCE"):
+                                    rc_text = f"[POTENTIAL NETWORK INTERMITTENCE (< 15m)] {root_cause}"
+                                staging_obj, created = IncidentStaging.objects.update_or_create(
                                     category='Infrastructure',
                                     node_name=pnode,
                                     start=start_dt,
@@ -910,13 +872,15 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
                                         'system': f"Proxmox Hypervisor ({pnode})",
                                         'end': end_dt,
                                         'duration_hrs': duration_hrs,
-                                        'root_cause': root_cause,
-                                        'status': 'Promoted to Incident',
-                                        'incident_record': inc,
-                                        'processed_at': timezone.now()
+                                        'root_cause': rc_text,
+                                        'status': 'Awaiting Review',
+                                        'incident_record': None,
+                                        'maintenance_record': None,
+                                        'processed_at': None
                                     }
                                 )
-                                created_incidents.append(inc)
+                                if created:
+                                    created_incidents.append(staging_obj)
         except Exception as e:
             logger.warning(f"Error checking Prometheus outage for {pnode}: {e}")
 
