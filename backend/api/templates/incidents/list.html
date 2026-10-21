@@ -231,7 +231,7 @@
                             
                             <!-- Ticket ID -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
-                                <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.82rem; font-weight: 700; color: #00205B; background: #f8fafc; padding: 0.25rem 0.55rem; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
+                                <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.85rem; font-weight: 700; color: #00205B;">
                                     {{ incident.ticket }}
                                 </span>
                                 <!-- Safe Isolated Change Logs JSON -->
@@ -253,13 +253,13 @@
                             <!-- Target / Scope -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle;">
                                 {% if incident.category == 'Infrastructure' %}
-                                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap;">
-                                        <span style="display: inline-block; padding: 0.15rem 0.45rem; background: #ede9fe; color: #5b21b6; border-radius: 4px; font-weight: 700; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;">Infrastructure</span>
+                                    <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: nowrap;">
+                                        <span style="color: #6d28d9; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Infrastructure</span>
                                         <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.node_name|default:incident.system }}</strong>
                                     </div>
                                 {% else %}
-                                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap;">
-                                        <span style="display: inline-block; padding: 0.15rem 0.45rem; background: #e2e8f0; color: #334155; border-radius: 4px; font-weight: 700; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;">Database</span>
+                                    <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: nowrap;">
+                                        <span style="color: #475569; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Database</span>
                                         <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.database }}</strong>
                                         {% if incident.system and incident.system != incident.database %}
                                             <span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">({{ incident.system }})</span>
@@ -578,9 +578,9 @@
         
         if (cat === 'Infrastructure') {
             const sysLabel = (system && system !== nodeName) ? ` · ${system}` : '';
-            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || 'OLKVM'}</strong>${sysLabel} · ${planned}`;
+            document.getElementById('panel-meta').innerHTML = `<span style="color: #6d28d9; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || 'OLKVM'}</strong>${sysLabel} · ${planned}`;
         } else {
-            document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
+            document.getElementById('panel-meta').innerHTML = `<span style="color: #475569; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
         }
         
         document.getElementById('panel-start').textContent = row.getAttribute('data-start') || '—';
