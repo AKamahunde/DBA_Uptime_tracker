@@ -559,9 +559,9 @@
         </div>
 
         {% if forecast_info %}
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.75rem 1rem; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.8rem; font-weight: 600; color: #475569;" title="Headroom remaining before disk is 100% full at current monthly consumption rate">Headroom:</span>
-            <span style="font-size: 0.85rem; font-weight: 700;
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #f1f5f9;">
+            <span style="font-size: 0.82rem; font-weight: 600; color: #475569;" title="Headroom remaining before disk is 100% full at current monthly consumption rate">Headroom:</span>
+            <span style="font-size: 0.88rem; font-weight: 700;
                         {% if forecast_info.runway_badge == 'critical' %}color: #c5221f;
                         {% elif forecast_info.runway_badge == 'warning' %}color: #d59400;
                         {% else %}color: #137333;{% endif %}">
