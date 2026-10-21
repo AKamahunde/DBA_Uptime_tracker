@@ -133,12 +133,12 @@
               {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         All Incidents ({{ total_all_count }})
     </a>
-    <a href="?tab=database{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+    <a href="?tab=database{% if current_target and current_target in 'Oracle MySQL MS SQL Server' %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Database Incidents ({{ total_db_count }})
     </a>
-    <a href="?tab=infrastructure{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+    <a href="?tab=infrastructure{% if current_target and current_target not in 'Oracle MySQL MS SQL Server' %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Infrastructure Incidents ({{ total_infra_count }})
@@ -198,45 +198,48 @@
                             style="cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid rgba(90, 123, 156, 0.1);"
                             onclick="selectIncidentRow('row-{{ incident.pk }}')"
                             data-pk="{{ incident.pk }}"
-                            data-ticket="{{ incident.ticket }}"
-                            data-category="{{ incident.category|default:'Database' }}"
-                            data-node-name="{{ incident.node_name|default:'' }}"
-                            data-system="{{ incident.system|default:'—' }}"
-                            data-database="{{ incident.database }}"
+                            data-ticket="{{ incident.ticket|escape }}"
+                            data-category="{{ incident.category|default:'Database'|escape }}"
+                            data-node-name="{{ incident.node_name|default:''|escape }}"
+                            data-system="{{ incident.system|default:'—'|escape }}"
+                            data-database="{{ incident.database|escape }}"
                             data-date="{{ incident.date|date:'d M Y' }}"
                             data-start="{{ incident.start|date:'d M Y, H:i' }}"
                             data-end="{{ incident.end|date:'d M Y, H:i'|default:'Active Outage' }}"
-                            data-duration="{{ incident.duration_hrs }}"
+                            data-duration="{{ incident.duration_hrs|default:'0' }}"
                             data-duration-human="{{ incident.human_duration }}"
                             data-elapsed-human="{{ incident.human_elapsed_duration }}"
                             data-elapsed-hrs="{{ incident.elapsed_duration_hrs }}"
                             data-has-offhours="{% if incident.has_off_hours_difference %}1{% else %}0{% endif %}"
                             data-is-planned="{% if incident.planned %}1{% else %}0{% endif %}"
                             data-planned="{% if incident.planned %}Planned Outage{% else %}Unplanned Outage{% endif %}"
-                            data-severity="{{ incident.severity }}"
-                            data-status="{{ incident.status }}"
-                            data-root-cause="{{ incident.root_cause }}"
-                            data-impact="{{ incident.business_impact }}"
-                            data-resolved-by="{{ incident.resolved_by|default:'—' }}"
-                            data-assigned-to="{{ incident.assigned_to|default:'—' }}"
-                            data-logged-by="{% if incident.created_by %}{{ incident.created_by.username }}{% else %}System{% endif %}"
-                            data-change-logs='[
-                                {% for log in incident.change_logs.all %}
-                                    {
-                                        "changed_at": "{{ log.changed_at|date:"d M Y, H:i" }}",
-                                        "action": "{{ log.action|escapejs }}",
-                                        "changed_by": "{{ log.changed_by.username|default:"System"|escapejs }}",
-                                        "assigned_to": "{{ log.assigned_to|default:""|escapejs }}",
-                                        "comment": "{{ log.comment|default:""|escapejs }}"
-                                    }{% if not forloop.last %},{% endif %}
-                                {% endfor %}
-                            ]'>
+                            data-severity="{{ incident.severity|escape }}"
+                            data-status="{{ incident.status|escape }}"
+                            data-root-cause="{{ incident.root_cause|escape }}"
+                            data-impact="{{ incident.business_impact|escape }}"
+                            data-resolved-by="{{ incident.resolved_by|default:'—'|escape }}"
+                            data-assigned-to="{{ incident.assigned_to|default:'—'|escape }}"
+                            data-logged-by="{% if incident.created_by %}{{ incident.created_by.username|escape }}{% else %}System{% endif %}">
                             
                             <!-- Ticket ID -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
                                 <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.82rem; font-weight: 700; color: #00205B; background: #f8fafc; padding: 0.25rem 0.55rem; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
                                     {{ incident.ticket }}
                                 </span>
+                                <!-- Safe Isolated Change Logs JSON -->
+                                <script type="application/json" id="logs-data-{{ incident.pk }}">
+                                [
+                                    {% for log in incident.change_logs.all %}
+                                        {
+                                            "changed_at": "{{ log.changed_at|date:'d M Y, H:i' }}",
+                                            "action": "{{ log.action|escapejs }}",
+                                            "changed_by": "{{ log.changed_by.username|default:'System'|escapejs }}",
+                                            "assigned_to": "{{ log.assigned_to|default:''|escapejs }}",
+                                            "comment": "{{ log.comment|default:''|escapejs }}"
+                                        }{% if not forloop.last %},{% endif %}
+                                    {% endfor %}
+                                ]
+                                </script>
                             </td>
 
                             <!-- Target / Scope -->
@@ -303,25 +306,29 @@
 
                             <!-- SLA Status -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
-                                {% if incident.status == 'Open' or incident.status == 'In Progress' %}
+                                {% if incident.planned %}
+                                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #059669;">
+                                        Excluded
+                                    </span>
+                                {% elif incident.status == 'Open' or incident.status == 'In Progress' %}
                                     <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7;">
                                         Running
                                     </span>
                                 {% else %}
                                     {% if incident.severity == 'Critical' or incident.severity == 'High' %}
-                                        {% if incident.duration_hrs <= 9 %}
+                                        {% if incident.duration_hrs and incident.duration_hrs <= 9 %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
                                         {% else %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
                                         {% endif %}
                                     {% elif incident.severity == 'Medium' %}
-                                        {% if incident.duration_hrs <= 18 %}
+                                        {% if incident.duration_hrs and incident.duration_hrs <= 18 %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
                                         {% else %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
                                         {% endif %}
                                     {% else %}
-                                        {% if incident.duration_hrs <= 180 %}
+                                        {% if incident.duration_hrs and incident.duration_hrs <= 180 %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
                                         {% else %}
                                             <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
@@ -335,7 +342,7 @@
                                 <div class="actions-dropdown">
                                     <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ incident.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
                                     <div id="actions-{{ incident.pk }}" class="actions-dropdown-content">
-                                        <a href="#" onclick="showDetailsFromTrigger('row-{{ incident.pk }}')">Details</a>
+                                        <a href="javascript:void(0)" onclick="showDetailsFromTrigger('row-{{ incident.pk }}')">Details</a>
                                         <a href="{% url 'incident_edit' incident.pk %}">Edit</a>
                                         {% if not incident.planned %}
                                         <form method="post" action="{% url 'incident_reclassify_maintenance' incident.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Reclassify {{ incident.ticket }} as scheduled Maintenance? This will move it to the Maintenance Register and exclude it from unplanned downtime.');">
@@ -427,14 +434,22 @@
                 </div>
 
                 <!-- Time Metrics -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
                     <div>
                         <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage Start</div>
-                        <div id="panel-start" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
+                        <div id="panel-start" style="font-size: 0.82rem; font-weight: 600; color: #0f172a; margin-top: 0.2rem;">—</div>
                     </div>
                     <div>
                         <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage End</div>
-                        <div id="panel-end" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
+                        <div id="panel-end" style="font-size: 0.82rem; font-weight: 600; color: #0f172a; margin-top: 0.2rem;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Duration</div>
+                        <div id="panel-duration" style="font-size: 0.85rem; font-weight: 700; color: #00205B; margin-top: 0.2rem;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Wall-clock Total</div>
+                        <div id="panel-elapsed" style="font-size: 0.82rem; font-weight: 600; color: #475569; margin-top: 0.2rem;">—</div>
                     </div>
                 </div>
 
@@ -560,19 +575,20 @@
             document.getElementById('panel-meta').innerHTML = `<span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
         }
         
-        document.getElementById('panel-start').textContent = row.getAttribute('data-start');
+        document.getElementById('panel-start').textContent = row.getAttribute('data-start') || '—';
         
-        const end = row.getAttribute('data-end');
-        const duration = row.getAttribute('data-duration');
-        const durationHuman = row.getAttribute('data-duration-human');
+        const end = row.getAttribute('data-end') || '—';
+        const duration = row.getAttribute('data-duration') || '0';
+        const durationHuman = row.getAttribute('data-duration-human') || '0 mins';
         const hasOffhours = row.getAttribute('data-has-offhours') === '1';
-        const elapsedHuman = row.getAttribute('data-elapsed-human');
+        const elapsedHuman = row.getAttribute('data-elapsed-human') || durationHuman;
 
-        let durationDisplay = `${end} · ${durationHuman} (${duration}h SLA)`;
-        if (hasOffhours) {
-            durationDisplay += ` [Total: ${elapsedHuman}]`;
+        document.getElementById('panel-end').textContent = end;
+        document.getElementById('panel-duration').textContent = `${durationHuman} (${duration}h)`;
+        const elapsedEl = document.getElementById('panel-elapsed');
+        if (elapsedEl) {
+            elapsedEl.textContent = hasOffhours ? elapsedHuman : '— (Identical)';
         }
-        document.getElementById('panel-end').textContent = durationDisplay;
         
         const rootCause = row.getAttribute('data-root-cause') || '—';
         const rootCauseContainer = document.getElementById('panel-root-cause');
@@ -588,13 +604,13 @@
         }
         
         document.getElementById('panel-impact').textContent = row.getAttribute('data-impact') || '—';
-        document.getElementById('panel-assigned-to').textContent = row.getAttribute('data-assigned-to');
-        document.getElementById('panel-resolved-by').textContent = row.getAttribute('data-resolved-by');
-        document.getElementById('panel-logged-by').textContent = row.getAttribute('data-logged-by');
+        document.getElementById('panel-assigned-to').textContent = row.getAttribute('data-assigned-to') || '—';
+        document.getElementById('panel-resolved-by').textContent = row.getAttribute('data-resolved-by') || '—';
+        document.getElementById('panel-logged-by').textContent = row.getAttribute('data-logged-by') || '—';
 
         const severity = row.getAttribute('data-severity');
         const sevBadge = document.getElementById('panel-severity-badge');
-        sevBadge.textContent = severity;
+        sevBadge.textContent = severity || '—';
         sevBadge.style.display = "inline-block";
         if (severity === 'Critical' || severity === 'High') {
             sevBadge.style.background = '#fce8e6';
@@ -609,7 +625,7 @@
 
         const status = row.getAttribute('data-status');
         const statusBadge = document.getElementById('panel-status-badge');
-        statusBadge.textContent = status;
+        statusBadge.textContent = status || '—';
         statusBadge.style.display = "inline-block";
         if (status === 'Open') {
             statusBadge.style.background = '#fce8e6';
@@ -622,7 +638,16 @@
             statusBadge.style.color = '#137333';
         }
 
-        const logsData = JSON.parse(row.getAttribute('data-change-logs') || '[]');
+        let logsData = [];
+        const logsScript = document.getElementById('logs-data-' + incidentPk);
+        if (logsScript) {
+            try {
+                logsData = JSON.parse(logsScript.textContent || '[]');
+            } catch (e) {
+                console.error("Error parsing change logs JSON:", e);
+                logsData = [];
+            }
+        }
         const logsContainer = document.getElementById('panel-logs-timeline');
         const logsSection = document.getElementById('panel-logs-section');
         

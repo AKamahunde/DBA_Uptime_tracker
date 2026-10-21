@@ -53,6 +53,13 @@ def calculate_operational_downtime(start_dt, end_dt, database='MySQL', holiday_d
             holiday_dates = set()
     
     db_name = (database or '').strip().lower()
+    is_infra = any(kw in db_name for kw in ['infra', 'infrastructure', 'host', 'node', 'server', 'olkvm', 'proxmox', '24/7', '24x7'])
+    if is_infra:
+        # Infrastructure host nodes operate 24/7 (24 hours/day, 7 days/week) with no holiday exclusions
+        total_seconds = Decimal(str((end_local - start_local).total_seconds()))
+        hours = total_seconds / Decimal('3600.0')
+        return round(hours, 2)
+
     is_oracle = any(kw in db_name for kw in ['oracle', 'nmsinfra', 'nmsebs'])
     
     total_seconds = Decimal('0.0')

@@ -914,7 +914,7 @@
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {% if node.has_data %}{{ node.cpu_percent }}%{% else %}No Data{% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.status == 'Healthy' %}#137333{% elif node.status == 'Warning' %}#d97706{% elif node.status in ['Below SLA', 'Outage'] %}#c5221f{% else %}#64748b{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.status == 'Healthy' %}#137333{% elif node.status == 'Warning' %}#d97706{% elif node.status == 'Below SLA' or node.status == 'Outage' %}#c5221f{% else %}#64748b{% endif %};">
                         {{ node.status }}
                     </td>
                 </tr>

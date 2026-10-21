@@ -1698,12 +1698,16 @@ def incident_list(request):
 
     queryset = base_qs
 
-    # 1. Filter by category tab
+    # 1. Filter by category tab and normalize cross-tab target filters
     if current_tab == 'database':
+        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server']:
+            current_target = ''
         queryset = queryset.filter(
             Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
         ).exclude(category='Infrastructure')
     elif current_tab == 'infrastructure':
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+            current_target = ''
         queryset = queryset.filter(
             Q(category='Infrastructure') | Q(database='Infrastructure')
         )
@@ -1804,7 +1808,12 @@ def incident_create(request):
 def incident_edit(request, pk):
     incident = get_object_or_404(IncidentRegister, pk=pk)
     
-    can_edit_always = request.user.is_admin
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_incidentregister')
+    )
     is_creator_within_time = (incident.created_by == request.user) and ((timezone.now() - incident.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -2016,7 +2025,12 @@ def replication_create(request):
 def replication_edit(request, pk):
     replication = get_object_or_404(ReplicationMonitor, pk=pk)
     
-    can_edit_always = request.user.is_admin
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_replicationmonitor')
+    )
     is_creator_within_time = (replication.created_by == request.user) and ((timezone.now() - replication.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -2108,7 +2122,12 @@ def backup_create(request):
 def backup_edit(request, pk):
     backup = get_object_or_404(BackupRecovery, pk=pk)
     
-    can_edit_always = request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.change_backuprecovery')
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_backuprecovery')
+    )
     is_creator_within_time = (backup.created_by == request.user) and ((timezone.now() - backup.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -2340,11 +2359,14 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         _, num_days = calendar.monthrange(target_month_dt.year, target_month_dt.month)
         total_month_hours = num_days * 24.0
 
-        # Query unplanned incidents for this node in the reporting month
+        # Query unplanned incidents for this node in the reporting month (matching by date or start)
+        month_inc_filter = (
+            Q(date__year=target_month_dt.year, date__month=target_month_dt.month) |
+            Q(start__year=target_month_dt.year, start__month=target_month_dt.month)
+        )
         if nd['node_name'] == 'OLKVM':
             node_inc_qs = IncidentRegister.objects.filter(
-                date__year=target_month_dt.year,
-                date__month=target_month_dt.month,
+                month_inc_filter,
                 planned=False
             ).filter(
                 Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
@@ -2358,15 +2380,16 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             )
         else:
             node_inc_qs = IncidentRegister.objects.filter(
-                date__year=target_month_dt.year,
-                date__month=target_month_dt.month,
+                month_inc_filter,
                 planned=False
             ).filter(
                 Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
             ).filter(
                 Q(node_name__iexact=nd['node_key']) |
                 Q(node_name__iexact=nd['display_name']) |
-                Q(system__icontains=nd['node_key'])
+                Q(node_name__iexact='Proxmox') |
+                Q(system__icontains=nd['node_key']) |
+                Q(system__icontains='proxmox')
             )
 
         node_unplanned_hrs = 0.0
@@ -2598,6 +2621,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 for i in range(3)
             ]
             node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
+            has_node_inc = (node_inc_count > 0 or node_unplanned_hrs > 0)
+            fallback_up_pct = round(max(0.0, (total_month_hours - node_unplanned_hrs) / total_month_hours * 100.0), 2) if total_month_hours > 0 else 100.0
+            fallback_status = 'Outage' if node_inc_qs.filter(status__in=['Open', 'In Progress']).exists() else ('Below SLA' if fallback_up_pct < target_node_sla else 'Healthy')
+
             node_overview_data.append({
                 'node_key': nd['node_key'],
                 'node_name': nd['node_name'],
@@ -2607,13 +2634,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'hosted_systems': nd['hosted_systems'],
                 'primary_db': nd['primary_db'],
                 'server': nd['display_name'],
-                'has_data': False,
-                'uptime_percent': 0.0,
-                'uptime_str': 'No Data',
+                'has_data': has_node_inc,
+                'uptime_percent': fallback_up_pct if has_node_inc else 0.0,
+                'uptime_str': f"{fallback_up_pct}%" if has_node_inc else 'No Data',
                 'uptime_days': 0.0,
-                'uptime_status': 'N/A',
-                'unplanned_down_hrs': 0.0,
-                'incident_count': 0,
+                'uptime_status': ('Meets SLA' if fallback_up_pct >= 99.90 else ('Warning' if fallback_up_pct >= 99.0 else 'Below SLA')) if has_node_inc else 'N/A',
+                'unplanned_down_hrs': node_unplanned_hrs,
+                'incident_count': node_inc_count,
                 'logical_cpus': 48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16),
                 'cpu_percent': 0.0,
                 'memory_percent': 0.0,
@@ -2637,7 +2664,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'connections': 0,
                 'threads': 0,
                 'slow_queries': 0,
-                'status': 'No Data',
+                'status': fallback_status if has_node_inc else 'No Data',
                 'entered_by': 'Prometheus',
                 'updated_at': None,
                 'date': None,
@@ -3523,7 +3550,12 @@ def server_health_edit(request, pk):
         messages.error(request, 'Server health records generated by automated scripts or Prometheus cannot be edited.')
         return redirect('server_health_list')
         
-    can_edit_always = request.user.is_admin
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_incidentregister')
+    )
     is_creator_within_time = (health.created_by == request.user) and ((timezone.now() - health.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -3614,7 +3646,12 @@ def maintenance_create(request):
 def maintenance_edit(request, pk):
     maintenance = get_object_or_404(MaintenanceRegister, pk=pk)
     
-    can_edit_always = request.user.is_admin
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_maintenanceregister')
+    )
     is_creator_within_time = (maintenance.created_by == request.user) and ((timezone.now() - maintenance.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -4234,7 +4271,12 @@ def capacity_create(request):
 def capacity_edit(request, pk):
     capacity = get_object_or_404(CapacityPlanning, pk=pk)
     
-    can_edit_always = request.user.is_admin
+    can_edit_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_capacityplanning')
+    )
     is_creator_within_time = (capacity.created_by == request.user) and ((timezone.now() - capacity.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -4265,7 +4307,12 @@ def incident_delete(request, pk):
         return redirect('incident_list')
     obj = get_object_or_404(IncidentRegister, pk=pk)
     
-    can_delete_always = request.user.is_admin
+    can_delete_always = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.delete_incidentregister')
+    )
     is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
     
     if not (can_delete_always or is_creator_within_time):

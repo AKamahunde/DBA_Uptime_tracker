@@ -45,10 +45,15 @@
             <label for="{{ form.end.id_for_label }}">End:</label>
             {{ form.end }}
         </div>
+        {% if incident and incident.duration_hrs %}
         <div class="form-group">
-            <label for="{{ form.duration_hrs.id_for_label }}">Duration (hrs):</label>
-            {{ form.duration_hrs }}
+            <label style="font-weight: 600; color: #475569;">Recorded Downtime Duration:</label>
+            <div style="padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; font-weight: 600; color: #0f172a;">
+                {{ incident.human_duration }} ({{ incident.duration_hrs }} hrs)
+                <span style="font-size: 0.75rem; color: #64748b; font-weight: normal; margin-left: 0.5rem;">— Calculated automatically from start and end times</span>
+            </div>
         </div>
+        {% endif %}
         <div class="form-group" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; margin-bottom: 1.5rem;">
             {{ form.planned }}
             <label for="{{ form.planned.id_for_label }}" style="margin-bottom: 0; display: inline-block; cursor: pointer; font-weight: 500;">Planned Incident (occurs during maintenance/approved windows)</label>
