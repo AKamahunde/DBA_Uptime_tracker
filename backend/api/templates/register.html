@@ -13,32 +13,46 @@
         align-items: center;
         justify-content: center;
         padding: 2rem 1rem;
+        position: relative;
+        overflow: hidden;
     }
-    .register-logo-badge {
-        background: #ffffff;
-        padding: 0.65rem 1.25rem;
-        border-radius: 12px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(226, 232, 240, 0.9);
-        margin-bottom: 1.5rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .register-logo-badge img {
-        height: 48px;
-        width: auto;
-        object-fit: contain;
+    .register-wrapper::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 600px;
+        height: 600px;
+        background: url('/static/logo.jpg') no-repeat center center;
+        background-size: contain;
+        opacity: 0.04;
+        mix-blend-mode: multiply;
+        pointer-events: none;
+        z-index: 0;
     }
     .register-card {
+        position: relative;
+        z-index: 1;
         width: 100%;
-        max-width: 400px;
+        max-width: 420px;
         background: #ffffff;
         border-radius: 14px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
         padding: 2.25rem 2rem;
         box-sizing: border-box;
+    }
+    .register-card-logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 1.25rem;
+    }
+    .register-card-logo img {
+        height: 52px;
+        width: auto;
+        object-fit: contain;
     }
     .register-title {
         font-size: 2rem;
@@ -114,13 +128,11 @@
 </style>
 
 <div class="register-wrapper">
-    <!-- NMS Logo in Soft Badge Container -->
-    <div class="register-logo-badge">
-        <img src="/static/logo.jpg" alt="National Medical Stores Logo">
-    </div>
-
-    <!-- Modern Enterprise Card -->
+    <!-- Modern Enterprise Card with Integrated NMS Logo -->
     <div class="register-card">
+        <div class="register-card-logo">
+            <img src="/static/logo.jpg" alt="National Medical Stores Logo">
+        </div>
         <h1 class="register-title">DBTRAC</h1>
         <p class="register-subtitle">Create your account</p>
 
@@ -144,7 +156,5 @@
             Already have an account? <a href="{% url 'login' %}" style="font-weight: 600; color: #00205B; text-decoration: none;">Sign In</a>
         </p>
     </div>
-
-    <p class="register-footer-tag">National Medical Stores &bull; Directorate of ICT</p>
 </div>
 {% endblock %}
