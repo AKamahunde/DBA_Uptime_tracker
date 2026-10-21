@@ -88,19 +88,27 @@
         <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
             <input type="hidden" name="tab" value="{{ current_tab }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Target Scope</label>
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
+                    {% if current_tab == 'database' %}Database Platform{% elif current_tab == 'infrastructure' %}Infrastructure Host Node{% else %}Scope Filter{% endif %}
+                </label>
                 <select name="target" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
-                    <option value="" {% if not current_target %}selected{% endif %}>All Targets</option>
-                    <optgroup label="Database Platforms">
+                    <option value="" {% if not current_target %}selected{% endif %}>
+                        {% if current_tab == 'database' %}All Databases{% elif current_tab == 'infrastructure' %}All Host Nodes{% else %}All Scopes{% endif %}
+                    </option>
+                    {% if current_tab != 'infrastructure' %}
+                        {% if current_tab == 'all' %}<optgroup label="Database Platforms">{% endif %}
                         <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
                         <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
                         <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server (MKInsight)</option>
-                    </optgroup>
-                    <optgroup label="Infrastructure Nodes">
+                        {% if current_tab == 'all' %}</optgroup>{% endif %}
+                    {% endif %}
+                    {% if current_tab != 'database' %}
+                        {% if current_tab == 'all' %}<optgroup label="Infrastructure Nodes">{% endif %}
                         {% for node_val, node_lbl in node_choices %}
                         <option value="{{ node_val }}" {% if current_target == node_val %}selected{% endif %}>{{ node_lbl }}</option>
                         {% endfor %}
-                    </optgroup>
+                        {% if current_tab == 'all' %}</optgroup>{% endif %}
+                    {% endif %}
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -128,17 +136,17 @@
 
 <!-- Incident Category Filter Tabs -->
 <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
-    <a href="?tab=all{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+    <a href="?tab=all{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         All Incidents ({{ total_all_count }})
     </a>
-    <a href="?tab=database{% if current_target and current_target in 'Oracle MySQL MS SQL Server' %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+    <a href="?tab=database{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Database Incidents ({{ total_db_count }})
     </a>
-    <a href="?tab=infrastructure{% if current_target and current_target not in 'Oracle MySQL MS SQL Server' %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+    <a href="?tab=infrastructure{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Infrastructure Incidents ({{ total_infra_count }})
