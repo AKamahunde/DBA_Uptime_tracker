@@ -181,14 +181,15 @@
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
                     <thead>
                         <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Incident / Target</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Outage Window</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Operational business-hours outage duration affecting SLA">Duration</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
-                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Ticket ID</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Target / Scope</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Outage Window</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;" title="Operational business-hours outage duration affecting SLA">Duration</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;">Severity</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;">Status</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -231,25 +232,33 @@
                                 {% endfor %}
                             ]'>
                             
-                            <!-- Incident / Target -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
-                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                                    <div style="font-weight: 600; color: var(--primary-navy); font-family: monospace;">{{ incident.ticket }}</div>
-                                </div>
-                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                                    {% if incident.category == 'Infrastructure' %}
-                                        <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #ede9fe; color: #5b21b6; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Infrastructure</span>
-                                        <span style="font-weight: 600; color: #0f172a;">{{ incident.node_name|default:incident.system }}</span>
-                                    {% else %}
-                                        <span style="display: inline-block; padding: 0.1rem 0.4rem; background: #e2e8f0; color: #334155; border-radius: 3px; font-weight: 700; font-size: 0.65rem; text-transform: uppercase;">Database</span>
-                                        <span>{{ incident.system }}</span>
-                                        <span style="font-weight: 600; color: #0f172a;">· {{ incident.database }}</span>
-                                    {% endif %}
-                                </div>
+                            <!-- Ticket ID -->
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
+                                <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.82rem; font-weight: 700; color: #00205B; background: #f8fafc; padding: 0.25rem 0.55rem; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
+                                    {{ incident.ticket }}
+                                </span>
+                            </td>
+
+                            <!-- Target / Scope -->
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle;">
+                                {% if incident.category == 'Infrastructure' %}
+                                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap;">
+                                        <span style="display: inline-block; padding: 0.15rem 0.45rem; background: #ede9fe; color: #5b21b6; border-radius: 4px; font-weight: 700; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;">Infrastructure</span>
+                                        <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.node_name|default:incident.system }}</strong>
+                                    </div>
+                                {% else %}
+                                    <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: nowrap;">
+                                        <span style="display: inline-block; padding: 0.15rem 0.45rem; background: #e2e8f0; color: #334155; border-radius: 4px; font-weight: 700; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em;">Database</span>
+                                        <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.database }}</strong>
+                                        {% if incident.system and incident.system != incident.database %}
+                                            <span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">({{ incident.system }})</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                             </td>
 
                             <!-- Outage Window -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
                                 <div style="font-weight: 600; color: #0f172a;">{{ incident.start|date:"d M Y" }}</div>
                                 <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
                                     {{ incident.start|date:"H:i" }} - {% if incident.end %}{{ incident.end|date:"H:i" }}{% else %}Active{% endif %}
@@ -257,14 +266,14 @@
                             </td>
 
                             <!-- Duration -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; color: #0f172a;">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; color: #0f172a; white-space: nowrap;">
                                 <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
                                     {{ incident.human_duration }}
                                 </div>
                             </td>
 
                             <!-- Severity -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
                                 <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
                                             {% if incident.severity == 'Critical' or incident.severity == 'High' %}color: #dc2626;
                                             {% elif incident.severity == 'Medium' %}color: #d97706;
@@ -274,7 +283,7 @@
                             </td>
 
                             <!-- Status -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
                                 <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
                                             {% if incident.status == 'Open' %}color: #dc2626;
                                             {% elif incident.status == 'In Progress' %}color: #d97706;
@@ -284,7 +293,7 @@
                             </td>
 
                             <!-- Root Cause -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-weight: 500;" title="{{ incident.root_cause }}">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-weight: 500;" title="{{ incident.root_cause }}">
                                 {% if incident.root_cause|slice:":12" == "AUTO-LOGGED:" %}
                                     <span style="font-family: monospace; font-size: 0.75rem; color: var(--primary-navy);">Auto-detected logs</span>
                                 {% else %}
@@ -293,7 +302,7 @@
                             </td>
 
                             <!-- SLA Status -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; white-space: nowrap;">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
                                 {% if incident.status == 'Open' or incident.status == 'In Progress' %}
                                     <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7;">
                                         Running
@@ -322,7 +331,7 @@
                             </td>
 
                             <!-- Action Menu -->
-                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
+                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
                                 <div class="actions-dropdown">
                                     <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ incident.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
                                     <div id="actions-{{ incident.pk }}" class="actions-dropdown-content">
@@ -351,7 +360,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No incidents found.</td>
+                            <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No incidents found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

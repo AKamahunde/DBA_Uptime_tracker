@@ -2180,6 +2180,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         target_month_dt = today_dt.replace(day=1)
 
     start_of_month = target_month_dt
+    target_node_sla = 99.90
     if start_of_month.month == 12:
         next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
     else:
