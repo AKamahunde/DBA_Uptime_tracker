@@ -177,10 +177,11 @@
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
                 <select name="database_select" onchange="submitDbFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
-                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
+                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Systems &amp; Fleet Overview</option>
                     <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle (ERP Suite)</option>
                     <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL (NMS360 / DMT)</option>
                     <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' or selected_db == 'MKInsight' %}selected{% endif %}>MS SQL Server (MKInsight / Pentana)</option>
+                    <option value="Infrastructure" {% if selected_db == 'Infrastructure' %}selected{% endif %}>Infrastructure (Host Nodes: OLKVM &amp; Proxmox)</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -363,7 +364,7 @@
                     <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
                         {{ item.database }} 
                         <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
-                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana — MKInsight{% endif %})
+                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% elif item.database == 'Infrastructure' %}OLKVM &amp; Proxmox Host Nodes (24/7 SLA){% else %}Pentana — MKInsight{% endif %})
                         </span>
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
@@ -390,7 +391,7 @@
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {{ item.restore_success }}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' or item.replication_status == 'N/A' %}#64748b{% else %}#c5221f{% endif %};">
                         {{ item.replication_status }}
                     </td>
                 </tr>
@@ -828,7 +829,7 @@
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; padding: 0.25rem 0;">
     <div>
         <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;" title="Aggregated monthly average uptime across all active nodes">Node Uptime (Monthly Avg)</span>
-        <strong style="color: #16a34a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_node_uptime }}</strong>
+        <strong style="color: {% if kpi_node_uptime_val and kpi_node_uptime_val < target_node_sla %}#c5221f{% else %}#16a34a{% endif %}; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_node_uptime }}</strong>
         <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_nodes_healthy }} &bull; Target: &ge; {{ target_node_sla }}%</span>
     </div>
 
@@ -862,7 +863,9 @@
             <thead>
                 <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Node</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Monthly average uptime across all telemetry records">Uptime (Monthly Avg)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Monthly average uptime across all telemetry records and logged outages">Uptime (Monthly Avg)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Local Storage (GB)</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Storage Util %</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory (GB)</th>
@@ -887,6 +890,12 @@
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %};">
                         {{ node.uptime_str }}
                     </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.unplanned_down_hrs > 0 %}#c5221f{% else %}#475569{% endif %};">
+                        {% if node.unplanned_down_hrs > 0 %}{{ node.unplanned_down_hrs }} hrs{% else %}0.00 hrs{% endif %}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.incident_count > 0 %}#c5221f{% else %}#334155{% endif %};">
+                        {{ node.incident_count }}
+                    </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
                         {% if node.has_data and node.local_disk_capacity_gb > 0 %}{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }}{% else %}No Data{% endif %}
                     </td>
@@ -905,7 +914,7 @@
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {% if node.has_data %}{{ node.cpu_percent }}%{% else %}No Data{% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.status == 'Healthy' %}#137333{% elif node.status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.status == 'Healthy' %}#137333{% elif node.status == 'Warning' %}#d97706{% elif node.status in ['Below SLA', 'Outage'] %}#c5221f{% else %}#64748b{% endif %};">
                         {{ node.status }}
                     </td>
                 </tr>

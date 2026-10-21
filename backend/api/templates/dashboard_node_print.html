@@ -444,6 +444,8 @@
         <th>Node</th>
         <th>Workloads</th>
         <th>Uptime (Monthly Avg)</th>
+        <th>Unplanned Down</th>
+        <th>Incidents</th>
         <th>Local Storage (GB)</th>
         <th>Storage Util %</th>
         <th>Memory (GB)</th>
@@ -465,13 +467,19 @@
         <td style="font-weight: 700; color: {% if node.uptime_percent >= target_node_sla %}var(--green-text){% else %}var(--red-text){% endif %};">
           {{ node.uptime_str }}
         </td>
+        <td style="font-weight: 600; color: {% if node.unplanned_down_hrs > 0 %}var(--red-text){% else %}inherit{% endif %};">
+          {% if node.unplanned_down_hrs > 0 %}{{ node.unplanned_down_hrs }} hrs{% else %}0.00 hrs{% endif %}
+        </td>
+        <td style="font-weight: 600; color: {% if node.incident_count > 0 %}var(--red-text){% else %}inherit{% endif %};">
+          {{ node.incident_count }}
+        </td>
         <td>{% if node.has_data and node.local_disk_capacity_gb > 0 %}{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }}{% else %}No Data{% endif %}</td>
         <td style="font-weight: 600;">{% if node.has_data %}{{ node.local_disk_util_pct }}%{% else %}No Data{% endif %}</td>
         <td>{% if node.has_data and node.memory_total_gb > 0 %}{{ node.memory_used_gb }} / {{ node.memory_total_gb }}{% else %}No Data{% endif %}</td>
         <td style="font-weight: 600;">{% if node.has_data %}{{ node.memory_percent }}%{% else %}No Data{% endif %}</td>
         <td style="font-weight: 600;">{{ node.logical_cpus }}</td>
         <td style="font-weight: 600;">{% if node.has_data %}{{ node.cpu_percent }}%{% else %}No Data{% endif %}</td>
-        <td style="font-weight: 700; color: {% if node.status == 'Healthy' %}var(--green-text){% else %}var(--red-text){% endif %};">{{ node.status }}</td>
+        <td style="font-weight: 700; color: {% if node.status == 'Healthy' %}var(--green-text){% elif node.status == 'Warning' %}#d97706{% else %}var(--red-text){% endif %};">{{ node.status }}</td>
       </tr>
       {% endfor %}
     </tbody>

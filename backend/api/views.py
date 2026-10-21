@@ -161,11 +161,144 @@ def get_status(current, target_val, operator, warning_val=None):
     return 'N/A'
 
 def _get_dashboard_data(reporting_month):
-    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'Infrastructure']
 
     dashboard_data = []
 
     for db_type in db_types:
+        if db_type == 'Infrastructure':
+            # Infrastructure Planned Downtime
+            planned = MaintenanceRegister.objects.filter(
+                Q(database__iexact='Infrastructure') | Q(category__iexact='Infrastructure'),
+                success=True, date__year=reporting_month.year, date__month=reporting_month.month
+            ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
+
+            # Infrastructure Incidents (ALL for the month)
+            incidents = IncidentRegister.objects.filter(
+                date__year=reporting_month.year, date__month=reporting_month.month
+            ).filter(
+                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
+            )
+            unplanned_incidents = incidents.filter(planned=False)
+
+            # Deduplicate overlapping outage intervals across VMs on the same host node
+            outage_intervals = []
+            no_interval_hrs = 0.0
+            sla_breach_count = 0
+            now = timezone.now()
+
+            for inc in unplanned_incidents:
+                st = inc.start
+                en = inc.end or (now if inc.status not in ['Resolved', 'Closed'] else None)
+                if st and en:
+                    outage_intervals.append((st, en))
+                elif inc.duration_hrs:
+                    no_interval_hrs += float(inc.duration_hrs)
+
+                # IT Service Desk Policy §20.4.5.2 — 9 hours for Critical/High
+                target_hrs = 9 if inc.severity in ['Critical', 'High'] else (18 if inc.severity == 'Medium' else 180)
+                if inc.duration_hrs and float(inc.duration_hrs) > target_hrs:
+                    sla_breach_count += 1
+
+            if outage_intervals:
+                # Merge overlapping intervals so co-located VMs sharing an outage don't double count
+                sorted_intervals = sorted(outage_intervals, key=lambda x: x[0])
+                merged = [sorted_intervals[0]]
+                for current in sorted_intervals[1:]:
+                    prev_start, prev_end = merged[-1]
+                    if current[0] <= prev_end:
+                        merged[-1] = (prev_start, max(prev_end, current[1]))
+                    else:
+                        merged.append(current)
+
+                total_interval_seconds = sum((m[1] - m[0]).total_seconds() for m in merged)
+                unplanned = round(total_interval_seconds / 3600.0, 2) + no_interval_hrs
+                total_unplanned = len(merged) + (1 if no_interval_hrs > 0 else 0)
+                total_incidents = incidents.count()
+            else:
+                unplanned = 0.0
+                for inc in unplanned_incidents:
+                    if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
+                        active_downtime = calculate_operational_downtime(inc.start, now, 'Infrastructure')
+                        unplanned += float(active_downtime)
+                    elif inc.duration_hrs:
+                        unplanned += float(inc.duration_hrs)
+                total_unplanned = unplanned_incidents.count()
+                total_incidents = incidents.count()
+
+            mttr_hrs = (unplanned / total_unplanned) if total_unplanned > 0 else 0
+            mttr_mins = round(mttr_hrs * 60, 2)
+
+            # Target Hours for 24/7 Infrastructure SLA
+            import calendar
+            _, num_days = calendar.monthrange(reporting_month.year, reporting_month.month)
+            th = num_days * 24.0  # 744.0 hrs in a 31-day month
+            target_pct = 99.90
+            sla_exists = True
+
+            first_of_month = reporting_month.replace(day=1)
+            try:
+                sla_config_record, _ = SLAConfig.objects.get_or_create(
+                    database='Infrastructure',
+                    month=first_of_month,
+                    defaults={'target_hours': th, 'sla_percent': target_pct}
+                )
+            except Exception:
+                pass
+
+            avail = max(0.0, ((float(th) - float(unplanned)) / float(th)) * 100)
+            avail_str = f"{round(avail, 2)}%"
+
+            backup_success_pct = 'N/A'
+            restore_success_pct = 'N/A'
+            rep_status = 'N/A'
+            failed_backups = 'N/A'
+            last_backup_str = 'N/A'
+
+            active_incidents = IncidentRegister.objects.filter(
+                Q(category='Infrastructure') | Q(database='Infrastructure'),
+                status__in=['Open', 'In Progress']
+            ).count()
+
+            if active_incidents > 0:
+                health_status = 'OUTAGE'
+            elif unplanned > 0 or avail < target_pct:
+                health_status = 'WARNING'
+            else:
+                health_status = 'HEALTHY'
+
+            dashboard_data.append({
+                'database': 'Infrastructure',
+                'availability': avail_str,
+                'target_sla_val': target_pct,
+                'availability_status': get_status(avail_str, target_pct, '>='),
+                'planned_downtime': round(planned, 2),
+                'planned_downtime_status': 'Meets SLA',
+                'unplanned_downtime': round(unplanned, 2),
+                'unplanned_downtime_status': get_status(unplanned, 2.0, '<='),
+                'total_incidents': total_incidents,
+                'total_incidents_status': get_status(total_unplanned, 2, '<='),
+                'sla_breach_count': sla_breach_count,
+                'mttr_mins': mttr_mins,
+                'mttr_mins_status': get_status(mttr_mins, 240, '<='),
+                'backup_success': backup_success_pct,
+                'backup_success_status': 'N/A',
+                'restore_success': restore_success_pct,
+                'restore_success_status': 'N/A',
+                'replication_status': rep_status,
+                'replication_status_status': 'N/A',
+                'failed_backups': failed_backups,
+                'health_status': health_status,
+                'active_incidents': active_incidents,
+                'last_backup_detail': last_backup_str,
+                'database_size_gb': 'No Data',
+                'available_capacity_gb': 'No Data',
+                'disk_used_percent': 'No Data',
+                'tablespace_used_percent': 'No Data',
+                'growth_gb': 'No Data',
+            })
+            continue
+
         # Planned Downtime
         planned = MaintenanceRegister.objects.filter(
             database__iexact=db_type, success=True, date__year=reporting_month.year, date__month=reporting_month.month
@@ -373,10 +506,51 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
     database_detail = None
-    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'Infrastructure']
     if selected_db in db_types:
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
+            if selected_db == 'Infrastructure':
+                target_pct = float(row_data.get('target_sla_val', 99.90))
+                avail_status = row_data['availability_status']
+                unplanned_val = float(row_data['unplanned_downtime']) if isinstance(row_data['unplanned_downtime'], (int, float)) else 0.0
+                inc_val = int(row_data['total_incidents']) if isinstance(row_data['total_incidents'], int) else 0
+                return {
+                    'database': 'Infrastructure',
+                    'current': {
+                        'availability': row_data['availability'],
+                        'planned_downtime': f"{row_data['planned_downtime']} hrs",
+                        'unplanned_downtime': f"{row_data['unplanned_downtime']} hrs",
+                        'total_incidents': row_data['total_incidents'],
+                        'sla_breach_count': row_data.get('sla_breach_count', 0),
+                        'mttr_mins': f"{row_data['mttr_mins']} mins",
+                        'backup_success': 'N/A',
+                        'restore_success': 'N/A',
+                        'replication_status': 'N/A',
+                        'last_full': 'N/A',
+                        'last_inc': 'N/A',
+                        'last_dr': 'N/A',
+                        'failed_backups': 'N/A',
+                        'failed_restores': 0,
+                        'replication_lag': 'N/A'
+                    },
+                    'status': {
+                        'availability': avail_status,
+                        'planned_downtime': 'Meets SLA',
+                        'unplanned_downtime': 'Meets SLA' if unplanned_val <= 2.0 else 'Below SLA',
+                        'total_incidents': 'Meets SLA' if inc_val <= 2 else 'Warning',
+                        'mttr_mins': 'Meets SLA',
+                        'backup_success': 'N/A',
+                        'restore_success': 'N/A',
+                        'replication_status': 'N/A',
+                        'last_full': 'N/A',
+                        'last_inc': 'N/A',
+                        'last_dr': 'N/A',
+                        'failed_backups': 'Meets SLA',
+                        'failed_restores': 'Meets SLA',
+                        'replication_lag': 'N/A'
+                    }
+                }
             # Query if SLA Config exists for the selected database
             selected_sla_exists = SLAConfig.objects.filter(
                 database__iexact=selected_db, month__year=reporting_month.year, month__month=reporting_month.month
@@ -1041,12 +1215,12 @@ def dashboard_print(request):
         target_val = item.get('target_sla_val', 99.95)
         target_scaled = round((target_val - 99.0) * 100.0, 2) if target_val >= 99.0 else 0.0
 
-        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else 'MKInsight Audit Framework')
-        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else 'Windows Server Host (Standalone)')
+        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else ('OLKVM & Proxmox Virtualization Fleet' if db_type == 'Infrastructure' else 'MKInsight Audit Framework'))
+        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else ('OLKVM, pvenode1, pvenode2, pvenode3' if db_type == 'Infrastructure' else 'Windows Server Host (Standalone)'))
 
         formatted_data.append({
             'database': db_type,
-            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
+            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else ('OLKVM & Proxmox' if db_type == 'Infrastructure' else 'Pentana')),
             'role_desc': role_desc,
             'host_desc': host_desc,
             'availability': avail_str,
@@ -2160,11 +2334,71 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
         month_up_agg = month_node_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
 
+        import calendar
+        _, num_days = calendar.monthrange(target_month_dt.year, target_month_dt.month)
+        total_month_hours = num_days * 24.0
+
+        # Query unplanned incidents for this node in the reporting month
+        if nd['node_name'] == 'OLKVM':
+            node_inc_qs = IncidentRegister.objects.filter(
+                date__year=target_month_dt.year,
+                date__month=target_month_dt.month,
+                planned=False
+            ).filter(
+                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
+            ).filter(
+                Q(node_name__iexact='OLKVM') |
+                Q(node_name__iexact=nd['node_key']) |
+                Q(node_name__iexact=nd['display_name']) |
+                Q(system__icontains=nd['node_key']) |
+                Q(system__icontains='olkvm') |
+                (Q(node_name__icontains='infra') if 'infra' in nd['node_key'] else Q(node_name__icontains='ebs'))
+            )
+        else:
+            node_inc_qs = IncidentRegister.objects.filter(
+                date__year=target_month_dt.year,
+                date__month=target_month_dt.month,
+                planned=False
+            ).filter(
+                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
+            ).filter(
+                Q(node_name__iexact=nd['node_key']) |
+                Q(node_name__iexact=nd['display_name']) |
+                Q(system__icontains=nd['node_key'])
+            )
+
+        node_unplanned_hrs = 0.0
+        now_dt = timezone.now()
+        for inc in node_inc_qs:
+            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
+                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
+                node_unplanned_hrs += float(active_dt)
+            elif inc.duration_hrs:
+                node_unplanned_hrs += float(inc.duration_hrs)
+
+        node_unplanned_hrs = round(node_unplanned_hrs, 2)
+        node_inc_count = node_inc_qs.count()
+
         if latest_rec:
             if month_up_agg is not None:
                 up_pct = round(float(month_up_agg), 2)
             else:
                 up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
+
+            # Deduct unplanned outage downtime from SLA uptime percentage
+            if node_unplanned_hrs > 0:
+                sla_node_up_pct = round(max(0.0, (total_month_hours - node_unplanned_hrs) / total_month_hours * 100.0), 2)
+                up_pct = min(up_pct, sla_node_up_pct)
+
+            active_node_inc = node_inc_qs.filter(status__in=['Open', 'In Progress']).count()
+            if active_node_inc > 0:
+                node_status_str = 'Outage'
+            elif up_pct < target_node_sla:
+                node_status_str = 'Below SLA'
+            elif node_unplanned_hrs > 0:
+                node_status_str = 'Warning'
+            else:
+                node_status_str = latest_rec.status if (latest_rec and latest_rec.status) else 'Healthy'
             up_days = float(latest_rec.uptime_days or 0.0)
             logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)))
             cpu_val = float(latest_rec.cpu_percent or 0.0)
@@ -2321,6 +2555,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'uptime_str': f"{round(up_pct, 2)}%",
                 'uptime_days': round(up_days, 1),
                 'uptime_status': 'Meets SLA' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Below SLA'),
+                'unplanned_down_hrs': node_unplanned_hrs,
+                'incident_count': node_inc_count,
                 'logical_cpus': logical_cpus,
                 'cpu_percent': round(cpu_val, 2),
                 'memory_percent': round(mem_val, 2),
@@ -2349,7 +2585,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'connections': latest_rec.connections,
                 'threads': latest_rec.threads,
                 'slow_queries': latest_rec.slow_queries,
-                'status': latest_rec.status,
+                'status': node_status_str,
                 'entered_by': latest_rec.entered_by,
                 'updated_at': latest_rec.updated_at,
                 'date': latest_rec.date,
@@ -2374,6 +2610,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'uptime_str': 'No Data',
                 'uptime_days': 0.0,
                 'uptime_status': 'N/A',
+                'unplanned_down_hrs': 0.0,
+                'incident_count': 0,
                 'logical_cpus': 48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16),
                 'cpu_percent': 0.0,
                 'memory_percent': 0.0,
@@ -2791,6 +3029,25 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'type': 'danger',
             'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc_target}) &mdash; {inc.severity} priority."
         })
+
+    # 3. Resolved Outages this month (Infrastructure scope)
+    infra_resolved_incidents = IncidentRegister.objects.filter(
+        date__year=target_month_dt.year,
+        date__month=target_month_dt.month,
+        status__in=['Resolved', 'Closed'],
+        planned=False
+    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure')).order_by('-date', '-created_at')
+    if selected_node != 'All Nodes':
+        infra_resolved_incidents = infra_resolved_incidents.filter(
+            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node) |
+            (Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM']) if selected_node == 'OLKVM' else Q())
+        )
+    for inc in infra_resolved_incidents:
+        inc_target = inc.node_name or inc.system or 'Infrastructure'
+        node_attention_items.append({
+            'type': 'warning',
+            'message': f"Resolved Outage: <strong>{inc.ticket or 'INC-'+str(inc.id)} ({inc_target})</strong> &mdash; {inc.duration_hrs or 0} hrs downtime on {inc.date.strftime('%d %b %Y')}."
+        })
     for n in filtered_nodes:
         display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else f"Proxmox ({n['display_name']})"
         if not n['has_data']:
@@ -2863,6 +3120,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         'shared_storage_records': shared_storage_records,
         'node_capacity_records': node_capacity_records,
         'kpi_node_uptime': kpi_node_uptime,
+        'kpi_node_uptime_val': avg_node_up,
         'kpi_nodes_healthy': kpi_nodes_healthy,
         'kpi_total_logical_cpus': kpi_total_logical_cpus,
         'kpi_total_ram_gb': kpi_total_ram_gb,
@@ -2986,7 +3244,7 @@ def dashboard_node_excel(request):
         row_num = 3
 
         headers = [
-            "Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Local Storage (Used / Total GB)",
+            "Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Unplanned Down (Hrs)", "Incidents", "Local Storage (Used / Total GB)",
             "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"
         ]
         ws.append(headers)
@@ -3006,6 +3264,8 @@ def dashboard_node_excel(request):
                 n['node_name'],
                 n['hosted_systems'],
                 f"{n['uptime_percent']}%" if n['has_data'] else "No Data",
+                f"{n.get('unplanned_down_hrs', 0.0)} hrs",
+                n.get('incident_count', 0),
                 f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}" if n['has_data'] else "No Data",
                 f"{n['local_disk_util_pct']}%" if n['has_data'] else "No Data",
                 f"{n['memory_used_gb']} / {n['memory_total_gb']}" if n['has_data'] else "No Data",
