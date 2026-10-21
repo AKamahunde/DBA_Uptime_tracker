@@ -1665,6 +1665,86 @@ def incident_edit(request, pk):
         'change_logs': incident.change_logs.all()
     })
 
+
+@login_required
+@require_POST
+def incident_reclassify_maintenance(request, pk):
+    incident = get_object_or_404(IncidentRegister, pk=pk)
+    
+    can_reclassify = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_incidentregister') or 
+        request.user.has_perm('api.add_maintenanceregister') or
+        (incident.created_by == request.user)
+    )
+    if not can_reclassify:
+        messages.error(request, 'You do not have permission to reclassify this incident.')
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+    if incident.planned:
+        messages.info(request, f"Incident {incident.ticket} is already classified as planned Maintenance.")
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+    incident.planned = True
+    if incident.category == 'Infrastructure':
+        incident.business_impact = 'Approved scheduled infrastructure maintenance activity.'
+        log_comment = 'Reclassified as scheduled infrastructure maintenance by SysAdmin.'
+    else:
+        incident.business_impact = 'Approved scheduled database maintenance activity.'
+        log_comment = 'Reclassified as scheduled database maintenance by DBA.'
+
+    incident.save()  # Automatically creates/syncs MaintenanceRegister entry via IncidentRegister.save()
+
+    IncidentChangeLog.objects.create(
+        incident=incident,
+        changed_by=request.user,
+        action='Reclassified as Scheduled Maintenance',
+        new_status=incident.status,
+        comment=log_comment
+    )
+
+    messages.success(request, f"Incident {incident.ticket} successfully reclassified as scheduled Maintenance. It will no longer penalize SLA availability.")
+    return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+
+@login_required
+@require_POST
+def incident_reclassify_unplanned(request, pk):
+    incident = get_object_or_404(IncidentRegister, pk=pk)
+    
+    can_reclassify = (
+        request.user.is_admin or 
+        request.user.is_superuser or 
+        request.user.is_staff or 
+        request.user.has_perm('api.change_incidentregister') or 
+        request.user.has_perm('api.add_maintenanceregister') or
+        (incident.created_by == request.user)
+    )
+    if not can_reclassify:
+        messages.error(request, 'You do not have permission to reclassify this incident.')
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+    if not incident.planned:
+        messages.info(request, f"Incident {incident.ticket} is already an unplanned incident.")
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+    incident.planned = False
+    incident.save()  # Automatically removes linked MaintenanceRegister entry via IncidentRegister.save()
+
+    IncidentChangeLog.objects.create(
+        incident=incident,
+        changed_by=request.user,
+        action='Reclassified as Unplanned Incident',
+        new_status=incident.status,
+        comment='Reclassified back to an unplanned incident.'
+    )
+
+    messages.warning(request, f"Incident {incident.ticket} reverted to Unplanned Incident. It will now count towards SLA availability metrics.")
+    return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+
+
 @login_required
 def replication_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_replicationmonitor')):
