@@ -118,19 +118,6 @@
                         <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
                             {{ item.human_duration }}
                         </div>
-                        <div style="font-size: 0.72rem; color: #64748b; font-weight: 500; margin-top: 0.15rem;">
-                            {% if item.category == 'Infrastructure' or item.database == 'Infrastructure' %}
-                                24/7 SLA ({{ item.duration_hrs }}h)
-                            {% else %}
-                                {{ item.duration_hrs }}h SLA
-                            {% endif %}
-                        </div>
-                        {% if item.has_off_hours_difference and item.category != 'Infrastructure' and item.database != 'Infrastructure' %}
-                        <div style="font-size: 0.7rem; color: #b45309; font-weight: 600; margin-top: 0.15rem;" 
-                              title="Total wall-clock downtime was {{ item.human_elapsed_duration }} ({{ item.elapsed_duration_hrs }}h). {{ item.off_hours_duration_hrs }}h occurred outside SLA business hours.">
-                            Total: {{ item.human_elapsed_duration }}
-                        </div>
-                        {% endif %}
                     </td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">
                         {{ item.root_cause|linebreaksbr }}

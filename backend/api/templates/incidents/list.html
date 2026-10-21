@@ -261,19 +261,6 @@
                                 <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
                                     {{ incident.human_duration }}
                                 </div>
-                                <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; margin-top: 0.15rem;">
-                                    {% if incident.category == 'Infrastructure' %}
-                                        24/7 SLA ({{ incident.duration_hrs }}h)
-                                    {% else %}
-                                        {{ incident.duration_hrs }}h SLA
-                                    {% endif %}
-                                </div>
-                                {% if incident.has_off_hours_difference and incident.category != 'Infrastructure' %}
-                                <div style="font-size: 0.7rem; color: #b45309; font-weight: 600; margin-top: 0.15rem;" 
-                                     title="Total wall-clock downtime was {{ incident.human_elapsed_duration }} ({{ incident.elapsed_duration_hrs }}h). {{ incident.off_hours_duration_hrs }}h occurred outside SLA business hours.">
-                                    Total: {{ incident.human_elapsed_duration }}
-                                </div>
-                                {% endif %}
                             </td>
 
                             <!-- Severity -->
