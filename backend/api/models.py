@@ -156,6 +156,12 @@ class IncidentRegister(models.Model):
             maint_start = self.start if self.start else timezone.now()
             maint_end = self.end if self.end else maint_start
 
+            # Remove any legacy duplicates for this change_id to avoid MultipleObjectsReturned
+            dup_qs = MaintenanceRegister.objects.filter(change_id=original_ticket)
+            if dup_qs.count() > 1:
+                first_pk = dup_qs.first().pk
+                MaintenanceRegister.objects.filter(change_id=original_ticket).exclude(pk=first_pk).delete()
+
             MaintenanceRegister.objects.update_or_create(
                 change_id=original_ticket,   # look up by ORIGINAL ticket
                 defaults={

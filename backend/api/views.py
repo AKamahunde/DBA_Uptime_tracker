@@ -3410,15 +3410,23 @@ def maintenance_list(request):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
     # Ensure Maintenance Register strictly contains DB-level activities
-    MaintenanceRegister.objects.filter(
+    invalid_maint = MaintenanceRegister.objects.filter(
         Q(database='Infrastructure') | 
         Q(database__icontains='Infrastructure') |
         Q(system__icontains='Host Node') | 
         Q(system__icontains='OLKVM') |
         Q(system__icontains='Proxmox')
-    ).delete()
+    )
+    if invalid_maint.exists():
+        invalid_maint.delete()
 
-    queryset = MaintenanceRegister.objects.exclude(database='Infrastructure').order_by('-date', '-created_at')
+    queryset = MaintenanceRegister.objects.exclude(
+        Q(database='Infrastructure') | 
+        Q(database__icontains='Infrastructure') |
+        Q(system__icontains='Host Node') | 
+        Q(system__icontains='OLKVM') |
+        Q(system__icontains='Proxmox')
+    ).order_by('-date', '-created_at')
     
     # Auto-update maintenance statuses (Scheduled -> In Progress -> Completed)
     auto_update_maintenance_statuses()
