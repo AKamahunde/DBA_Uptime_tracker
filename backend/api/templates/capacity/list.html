@@ -402,6 +402,32 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Infrastructure Capacity Pagination Controls -->
+    {% if node_cap_page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+        <div style="color: #64748b; font-size: 0.875rem;">
+            Showing page <strong>{{ node_cap_page_obj.number }}</strong> of <strong>{{ node_cap_page_obj.paginator.num_pages }}</strong> ({{ total_infra_capacity_count }} records)
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            {% if node_cap_page_obj.has_previous %}
+                <a href="?tab=infrastructure&page=1{% if selected_node %}&node_select={{ selected_node }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">&laquo; First</a>
+                <a href="?tab=infrastructure&page={{ node_cap_page_obj.previous_page_number }}{% if selected_node %}&node_select={{ selected_node }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">Previous</a>
+            {% else %}
+                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; font-size: 0.8rem;">&laquo; First</span>
+                <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; font-size: 0.8rem;">Previous</span>
+            {% endif %}
+
+            {% if node_cap_page_obj.has_next %}
+                <a href="?tab=infrastructure&page={{ node_cap_page_obj.next_page_number }}{% if selected_node %}&node_select={{ selected_node }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                <a href="?tab=infrastructure&page={{ node_cap_page_obj.paginator.num_pages }}{% if selected_node %}&node_select={{ selected_node }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+            {% else %}
+                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; font-size: 0.8rem;">Next</span>
+                <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; font-size: 0.8rem;">Last &raquo;</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 {% else %}

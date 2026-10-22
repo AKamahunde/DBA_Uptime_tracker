@@ -3409,7 +3409,16 @@ def maintenance_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-    queryset = MaintenanceRegister.objects.all().order_by('-date', '-created_at')
+    # Ensure Maintenance Register strictly contains DB-level activities
+    MaintenanceRegister.objects.filter(
+        Q(database='Infrastructure') | 
+        Q(database__icontains='Infrastructure') |
+        Q(system__icontains='Host Node') | 
+        Q(system__icontains='OLKVM') |
+        Q(system__icontains='Proxmox')
+    ).delete()
+
+    queryset = MaintenanceRegister.objects.exclude(database='Infrastructure').order_by('-date', '-created_at')
     
     # Auto-update maintenance statuses (Scheduled -> In Progress -> Completed)
     auto_update_maintenance_statuses()
@@ -3816,6 +3825,12 @@ def capacity_list(request):
                     'runway_badge': runway_badge,
                 }
     
+    raw_node_capacity = node_ctx.get('node_capacity_records', [])
+    total_infra_capacity = len(raw_node_capacity)
+    infra_page = request.GET.get('page') if current_tab == 'infrastructure' else request.GET.get('infra_page')
+    infra_paginator = Paginator(raw_node_capacity, 10)
+    node_cap_page_obj = infra_paginator.get_page(infra_page)
+
     ctx = {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
@@ -3824,7 +3839,8 @@ def capacity_list(request):
         'current_tab': current_tab,
         'selected_node': selected_node,
         'total_db_capacity_count': CapacityPlanning.objects.count(),
-        'total_infra_capacity_count': len(node_ctx.get('node_capacity_records', [])),
+        'total_infra_capacity_count': total_infra_capacity,
+        'node_cap_page_obj': node_cap_page_obj,
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
@@ -3843,6 +3859,9 @@ def capacity_list(request):
         'forecast_info': forecast_info
     }
     ctx.update(node_ctx)
+    ctx['node_capacity_records'] = node_cap_page_obj
+    ctx['node_cap_page_obj'] = node_cap_page_obj
+    ctx['total_infra_capacity_count'] = total_infra_capacity
     return render(request, 'capacity/list.html', ctx)
 
 @login_required
@@ -5130,8 +5149,8 @@ def staging_promote_maintenance(request, pk):
         bool(staging_item.node_name)
     )
 
-    if is_sysadmin and not is_infra:
-        messages.error(request, 'SysAdmins are only permitted to review and promote Prometheus/Infrastructure alerts.')
+    if is_infra:
+        messages.error(request, 'Infrastructure alerts are at the host node level and cannot be logged as Database Maintenance. Please promote to an Incident instead.')
         return redirect('incident_staging_list')
     
     if request.method == 'POST':
@@ -5139,11 +5158,6 @@ def staging_promote_maintenance(request, pk):
         if form.is_valid():
             maintenance = form.save(commit=False)
             maintenance.created_by = request.user
-            if is_infra:
-                maintenance.database = 'Infrastructure'
-                if not maintenance.system:
-                    raw_sys = staging_item.node_name or staging_item.system or 'OLKVM'
-                    maintenance.system = 'OLKVM Host Node (Oracle DB & EBS)' if any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']) else raw_sys
             maintenance.save()
             
             # Link/process the staging record

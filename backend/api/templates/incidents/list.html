@@ -253,16 +253,17 @@
                             <!-- Target / Scope -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle;">
                                 {% if incident.category == 'Infrastructure' %}
-                                    <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: nowrap;">
-                                        <span style="color: #6d28d9; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Infrastructure</span>
-                                        <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.node_name|default:incident.system }}</strong>
+                                    <div>
+                                        <strong style="color: #0f172a; font-size: 0.88rem; white-space: nowrap;">{{ incident.node_name|default:incident.system }}</strong>
+                                        {% if incident.system and incident.node_name and incident.system != incident.node_name %}
+                                            <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.1rem;">{{ incident.system }}</div>
+                                        {% endif %}
                                     </div>
                                 {% else %}
-                                    <div style="display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: nowrap;">
-                                        <span style="color: #475569; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Database</span>
-                                        <strong style="color: #0f172a; font-size: 0.85rem; white-space: nowrap;">{{ incident.database }}</strong>
+                                    <div>
+                                        <strong style="color: #0f172a; font-size: 0.88rem; white-space: nowrap;">{{ incident.database }}</strong>
                                         {% if incident.system and incident.system != incident.database %}
-                                            <span style="color: #64748b; font-size: 0.78rem; white-space: nowrap;">({{ incident.system }})</span>
+                                            <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.1rem;">{{ incident.system }}</div>
                                         {% endif %}
                                     </div>
                                 {% endif %}

@@ -142,10 +142,16 @@ class IncidentRegister(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Sync to Maintenance Register
+        # Sync to Maintenance Register ONLY for Database category
         from api.models import MaintenanceRegister
 
-        if self.planned:
+        is_db_planned = (
+            bool(self.planned)
+            and getattr(self, 'category', 'Database') == 'Database'
+            and self.database in ['MySQL', 'Oracle', 'MS SQL Server']
+        )
+
+        if is_db_planned:
             maint_date = self.start.date() if self.start else self.date
             maint_start = self.start if self.start else timezone.now()
             maint_end = self.end if self.end else maint_start
@@ -157,7 +163,7 @@ class IncidentRegister(models.Model):
                     'database': self.database,
                     'system': self.system,        # Sync system name (e.g. nmsinfra (DB))
                     'date': maint_date,
-                    'activity': f"Planned Incident Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
+                    'activity': f"Planned Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
                     'start': maint_start,
                     'end': maint_end,
                     'risk': 'Medium',
@@ -168,7 +174,7 @@ class IncidentRegister(models.Model):
                 }
             )
         else:
-            # Incident marked unplanned — remove any linked maintenance record
+            # Unplanned or Infrastructure outage — remove any linked maintenance record
             # (check both current and original ticket name in case it was renamed)
             MaintenanceRegister.objects.filter(change_id__in=[self.ticket, original_ticket]).delete()
 
@@ -578,7 +584,7 @@ class MaintenanceRegister(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        if self.start:
+        if not self.change_id and self.start:
             # Auto-generate change ID based on start date: CHG + DD + MM (e.g. CHG2108 for 21 Aug)
             self.change_id = f"CHG{self.start.strftime('%d%m')}"
 
