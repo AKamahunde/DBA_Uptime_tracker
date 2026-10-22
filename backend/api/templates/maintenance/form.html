@@ -5,6 +5,20 @@
 {% block content %}
 <div class="card">
     <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+
+    {% if form.errors %}
+    <div style="background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; color: #991b1b;">
+        <strong style="font-size: 0.95rem; display: block; margin-bottom: 0.35rem;">⚠️ Please correct the errors below:</strong>
+        <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem;">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <li><strong>{% if field == '__all__' %}General{% else %}{{ field|title }}{% endif %}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <form method="post">
         {% csrf_token %}
         <div class="form-group">
@@ -24,12 +38,24 @@
             {{ form.activity }}
         </div>
         <div class="form-group">
-            <label for="{{ form.start.id_for_label }}">Start:</label>
+            <label for="{{ form.start.id_for_label }}">Start (24-hour clock):</label>
             {{ form.start }}
+            {% if form.start.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.start.errors.0 }}</div>
+            {% endif %}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
+                Use 24-hour notation (e.g. <code>22:00</code> for 10 PM, <code>08:00</code> for 8 AM).
+            </small>
         </div>
         <div class="form-group">
-            <label for="{{ form.end.id_for_label }}">End:</label>
+            <label for="{{ form.end.id_for_label }}">End (24-hour clock):</label>
             {{ form.end }}
+            {% if form.end.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.end.errors.0 }}</div>
+            {% endif %}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
+                If maintenance crossed midnight into the next morning, ensure End Date is set to the following day.
+            </small>
         </div>
         <div class="form-group">
             <label for="{{ form.duration_hrs.id_for_label }}">Duration (hrs):</label>

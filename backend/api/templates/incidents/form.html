@@ -58,18 +58,24 @@
             {% endif %}
         </div>
         <div class="form-group">
-            <label for="{{ form.start.id_for_label }}">Start:</label>
+            <label for="{{ form.start.id_for_label }}">Start (24-hour clock):</label>
             {{ form.start }}
             {% if form.start.errors %}
                 <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.start.errors.0 }}</div>
             {% endif %}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
+                Use 24-hour time notation (e.g., <code>22:00</code> for 10:00 PM, <code>08:00</code> for 8:00 AM).
+            </small>
         </div>
         <div class="form-group">
-            <label for="{{ form.end.id_for_label }}">End:</label>
+            <label for="{{ form.end.id_for_label }}">End (24-hour clock):</label>
             {{ form.end }}
             {% if form.end.errors %}
                 <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.end.errors.0 }}</div>
             {% endif %}
+            <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
+                If the outage crosses midnight into the next morning, ensure the End Date is set to the following day.
+            </small>
         </div>
         {% if incident and incident.duration_hrs %}
         <div class="form-group">

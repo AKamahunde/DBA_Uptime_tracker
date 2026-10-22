@@ -114,6 +114,21 @@ class IncidentRegisterForm(forms.ModelForm):
             if not cleaned_data.get('system'):
                 cleaned_data['system'] = db or 'Database'
 
+        # Chronological validation with 24-hour cross-midnight intelligence
+        start = cleaned_data.get('start')
+        end = cleaned_data.get('end')
+        if start and end:
+            if end < start:
+                if start.date() == end.date() and end.time() < start.time():
+                    self.add_error('end', forms.ValidationError(
+                        f"End time ({end.strftime('%H:%M')}) is earlier than start time ({start.strftime('%H:%M')}) on the same date. "
+                        f"If this event crossed midnight into the next morning, please set the End Date to the following day."
+                    ))
+                else:
+                    self.add_error('end', forms.ValidationError(
+                        f"End datetime ({end.strftime('%d/%m/%Y %H:%M')}) cannot be earlier than start datetime ({start.strftime('%d/%m/%Y %H:%M')})."
+                    ))
+
         # Only enforce on editing existing records
         if self.instance and self.instance.pk:
             old_status = self.instance.status
@@ -234,6 +249,23 @@ class MaintenanceRegisterForm(forms.ModelForm):
             self.fields['start'].input_formats = iso_formats
         if 'end' in self.fields:
             self.fields['end'].input_formats = iso_formats
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get('start')
+        end = cleaned_data.get('end')
+        if start and end:
+            if end < start:
+                if start.date() == end.date() and end.time() < start.time():
+                    self.add_error('end', forms.ValidationError(
+                        f"End time ({end.strftime('%H:%M')}) is earlier than start time ({start.strftime('%H:%M')}) on the same date. "
+                        f"If this maintenance crossed midnight into the next morning, please set the End Date to the following day."
+                    ))
+                else:
+                    self.add_error('end', forms.ValidationError(
+                        f"End datetime ({end.strftime('%d/%m/%Y %H:%M')}) cannot be earlier than start datetime ({start.strftime('%d/%m/%Y %H:%M')})."
+                    ))
+        return cleaned_data
 
 class CapacityPlanningForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))

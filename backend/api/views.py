@@ -3417,17 +3417,7 @@ def maintenance_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-    # Ensure Maintenance Register strictly contains DB-level activities
-    invalid_maint = MaintenanceRegister.objects.filter(
-        Q(database='Infrastructure') | 
-        Q(database__icontains='Infrastructure') |
-        Q(system__icontains='Host Node') | 
-        Q(system__icontains='OLKVM') |
-        Q(system__icontains='Proxmox')
-    )
-    if invalid_maint.exists():
-        invalid_maint.delete()
-
+    # Filter Maintenance Register strictly for DB-level activities
     queryset = MaintenanceRegister.objects.exclude(
         Q(database='Infrastructure') | 
         Q(database__icontains='Infrastructure') |
