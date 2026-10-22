@@ -79,8 +79,11 @@ def auto_update_maintenance_statuses():
 def autopopulate_fixed_holidays():
     from datetime import date
     current_year = date.today().year
+    # Fast exit if current year is already seeded
+    if UgandaHoliday.objects.filter(holiday_date__year=current_year).exists():
+        return
+
     years_to_check = [current_year, current_year + 1]
-    
     fixed_holidays = [
         ((1, 1), 'New Year'),
         ((1, 26), 'NRM Liberation'),
@@ -102,37 +105,8 @@ def autopopulate_fixed_holidays():
                     holiday_date=h_date,
                     defaults={'name': name}
                 )
-            except Exception as e:
+            except Exception:
                 pass
-
-@login_required
-def dashboard(request):
-    autopopulate_fixed_holidays()
-    auto_close_incidents()
-    
-    # Run all counts in a single DB round-trip by using lazy evaluation
-    from django.db import connection
-    with connection.cursor() as cursor:
-        cursor.execute("""
-            SELECT
-                (SELECT COUNT(*) FROM incident_register),
-                (SELECT COUNT(*) FROM replication_monitor),
-                (SELECT COUNT(*) FROM backup_recovery),
-                (SELECT COUNT(*) FROM server_health),
-                (SELECT COUNT(*) FROM maintenance_register),
-                (SELECT COUNT(*) FROM capacity_planning)
-        """)
-        row = cursor.fetchone()
-
-    # Get reporting month
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
 
 def get_status(current, target_val, operator, warning_val=None):
     if current == 'No Data' or current is None or current == 'N/A':
@@ -510,10 +484,6 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 
 @login_required
 def dashboard(request):
-    autopopulate_fixed_holidays()
-    auto_close_incidents()
-    auto_update_maintenance_statuses()
-    
     # Run all counts in a single DB round-trip by using lazy evaluation
     from django.db import connection
     with connection.cursor() as cursor:
@@ -1483,8 +1453,6 @@ def dashboard_excel(request):
 
 @login_required
 def incident_list(request):
-    auto_close_incidents()
-    
     if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
@@ -2026,12 +1994,6 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
     else:
         next_month = start_of_month.replace(month=start_of_month.month + 1, day=1)
-
-    if not ServerHealth.objects.filter(date=today_dt, entered_by='Prometheus').exists():
-        try:
-            sync_all_nodes_from_prometheus()
-        except Exception:
-            pass
 
     node_definitions = [
         {
@@ -3426,9 +3388,6 @@ def maintenance_list(request):
         Q(system__icontains='Proxmox')
     ).order_by('-date', '-created_at')
     
-    # Auto-update maintenance statuses (Scheduled -> In Progress -> Completed)
-    auto_update_maintenance_statuses()
-            
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
@@ -5285,6 +5244,5 @@ class CustomLoginView(auth_views.LoginView):
         if getattr(user, 'must_change_password', False):
             return redirect('password_change_required')
         return redirect(self.get_success_url())
-
 
 
