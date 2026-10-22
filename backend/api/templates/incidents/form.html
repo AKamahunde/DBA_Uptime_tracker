@@ -14,6 +14,20 @@
 </style>
 <div class="card">
     <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+
+    {% if form.errors %}
+    <div style="background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; color: #991b1b;">
+        <strong style="font-size: 0.95rem; display: block; margin-bottom: 0.35rem;">⚠️ Please correct the errors below:</strong>
+        <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem;">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <li><strong>{% if field == '__all__' %}General{% else %}{{ field|title }}{% endif %}:</strong> {{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <form method="post">
         {% csrf_token %}
         <div class="form-group">
@@ -27,6 +41,9 @@
                 {% endif %}
             </div>
             {{ form.ticket }}
+            {% if form.ticket.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.ticket.errors.0 }}</div>
+            {% endif %}
             {% if not incident %}
             <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">
                 Auto-generated notation: <code>INC-YYMMDD-HHMM</code> (can be customized or left blank to auto-create).
@@ -36,14 +53,23 @@
         <div class="form-group">
             <label for="{{ form.date.id_for_label }}">Date:</label>
             {{ form.date }}
+            {% if form.date.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.date.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.start.id_for_label }}">Start:</label>
             {{ form.start }}
+            {% if form.start.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.start.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.end.id_for_label }}">End:</label>
             {{ form.end }}
+            {% if form.end.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.end.errors.0 }}</div>
+            {% endif %}
         </div>
         {% if incident and incident.duration_hrs %}
         <div class="form-group">
@@ -61,48 +87,81 @@
         <div class="form-group">
             <label for="{{ form.severity.id_for_label }}">Severity:</label>
             {{ form.severity }}
+            {% if form.severity.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.severity.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.system.id_for_label }}">System:</label>
             {{ form.system }}
+            {% if form.system.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.system.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.root_cause.id_for_label }}">Root Cause:</label>
             {{ form.root_cause }}
+            {% if form.root_cause.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.root_cause.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.business_impact.id_for_label }}">Business Impact:</label>
             {{ form.business_impact }}
+            {% if form.business_impact.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.business_impact.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.resolved_by.id_for_label }}">Resolved By:</label>
             {{ form.resolved_by }}
+            {% if form.resolved_by.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.resolved_by.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.status.id_for_label }}">Status:</label>
             {{ form.status }}
+            {% if form.status.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.status.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.category.id_for_label }}">Incident Scope / Category:</label>
             {{ form.category }}
+            {% if form.category.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.category.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group" id="node-field-wrapper" style="{% if form.category.value != 'Infrastructure' %}display: none;{% endif %}">
             <label for="{{ form.node_name.id_for_label }}">Infrastructure Host Node:</label>
             {{ form.node_name }}
+            {% if form.node_name.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.node_name.errors.0 }}</div>
+            {% endif %}
             <small style="color: #64748b; font-size: 0.78rem; display: block; margin-top: 0.25rem;">Infrastructure incidents are calculated with 24/7 operating hours.</small>
         </div>
         <div class="form-group" id="db-field-wrapper" style="{% if form.category.value == 'Infrastructure' %}display: none;{% endif %}">
             <label for="{{ form.database.id_for_label }}">Database Platform:</label>
             {{ form.database }}
+            {% if form.database.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.database.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.assigned_to.id_for_label }}">Assigned To:</label>
             {{ form.assigned_to }}
+            {% if form.assigned_to.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.assigned_to.errors.0 }}</div>
+            {% endif %}
         </div>
         {% if incident %}
         <div class="form-group" style="margin-top: 2rem; border-top: 1px solid #ddd; padding-top: 1rem;">
             <label for="{{ form.change_comment.id_for_label }}">{{ form.change_comment.label }}</label>
             {{ form.change_comment }}
+            {% if form.change_comment.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.change_comment.errors.0 }}</div>
+            {% endif %}
         </div>
         {% endif %}
         {% if can_edit == False %}

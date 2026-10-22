@@ -107,6 +107,9 @@ class IncidentRegister(models.Model):
         if not self.start:
             self.start = timezone.now()
 
+        if not getattr(self, 'date', None):
+            self.date = self.start.date()
+
         if self.status in ['Resolved', 'Closed'] and not self.end:
             self.end = timezone.now()
 

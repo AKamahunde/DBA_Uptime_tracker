@@ -59,6 +59,8 @@ class IncidentRegisterForm(forms.ModelForm):
             if not self.initial.get('severity'):
                 self.initial['severity'] = 'Medium'
 
+        if 'system' in self.fields:
+            self.fields['system'].required = False
         if 'node_name' in self.fields:
             self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
             self.fields['node_name'].required = False
@@ -74,7 +76,7 @@ class IncidentRegisterForm(forms.ModelForm):
         ticket = self.cleaned_data.get('ticket', '').strip()
         if not ticket:
             from .models import generate_incident_ticket
-            cat = self.cleaned_data.get('category')
+            cat = self.cleaned_data.get('category') or 'Database'
             start = self.cleaned_data.get('start')
             ticket = generate_incident_ticket(category=cat, dt=start)
         return ticket
@@ -82,9 +84,15 @@ class IncidentRegisterForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         
-        cat = cleaned_data.get('category')
+        cat = cleaned_data.get('category') or 'Database'
+        cleaned_data['category'] = cat
         node = cleaned_data.get('node_name')
         db = cleaned_data.get('database')
+        
+        if not cleaned_data.get('date'):
+            start_val = cleaned_data.get('start')
+            from django.utils import timezone
+            cleaned_data['date'] = start_val.date() if start_val else timezone.now().date()
         
         if cat == 'Infrastructure':
             if not node:
@@ -95,14 +103,16 @@ class IncidentRegisterForm(forms.ModelForm):
                 if node in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster'] or any(k in str(node).lower() for k in ['infra', 'ebs', 'olkvm']):
                     cleaned_data['node_name'] = 'OLKVM'
                     node = 'OLKVM'
-                if not cleaned_data.get('system') or cleaned_data.get('system') in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM', 'Host Node']:
-                    cleaned_data['system'] = 'OLKVM Host Node (Oracle DB & EBS)' if node == 'OLKVM' else f"Proxmox Hypervisor ({node})"
+                if not cleaned_data.get('system'):
+                    cleaned_data['system'] = 'OLKVM' if node == 'OLKVM' else str(node)
             cleaned_data['database'] = 'Infrastructure'
         elif cat == 'Database':
             if not db or db == 'Infrastructure':
                 self.add_error('database', forms.ValidationError(
                     "Please select the database platform (Oracle, MySQL, or MS SQL Server)."
                 ))
+            if not cleaned_data.get('system'):
+                cleaned_data['system'] = db or 'Database'
 
         # Only enforce on editing existing records
         if self.instance and self.instance.pk:

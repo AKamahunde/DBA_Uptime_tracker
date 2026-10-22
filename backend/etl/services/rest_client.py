@@ -588,9 +588,11 @@ def consolidate_olkvm_incidents():
         s = (sys_str or '').lower()
         return any(k in n or k in s for k in vm_indicators)
 
-    # 1. Consolidate IncidentRegister
+    # 1. Consolidate IncidentRegister strictly for auto-logged infrastructure alerts
     infra_regs = list(IncidentRegister.objects.filter(
-        Q(category='Infrastructure') | Q(database='Infrastructure') | 
+        category='Infrastructure',
+        created_by__isnull=True
+    ).filter(
         Q(node_name__icontains='olkvm') | Q(node_name__icontains='nmsinfra') | Q(node_name__icontains='nmsebs') |
         Q(system__icontains='olkvm') | Q(system__icontains='nmsinfra') | Q(system__icontains='nmsebs')
     ).order_by('start'))
@@ -603,10 +605,11 @@ def consolidate_olkvm_incidents():
         if not is_olkvm_target(reg.node_name, reg.system):
             continue
 
-        # Look for duplicate host outages within 15 minutes tolerance
+        # Look for duplicate host outages within 15 minutes tolerance (auto-logged only)
         duplicates = [
             r for r in infra_regs[i+1:]
             if r.id not in processed_regs and 
+            r.created_by is None and
             is_olkvm_target(r.node_name, r.system) and
             abs((r.start - reg.start).total_seconds()) <= 900
         ]

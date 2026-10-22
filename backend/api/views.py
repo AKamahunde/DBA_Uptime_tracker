@@ -1505,13 +1505,6 @@ def incident_list(request):
         
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-    
-    # Auto-consolidate any legacy VM records to host node level
-    if consolidate_olkvm_incidents:
-        try:
-            consolidate_olkvm_incidents()
-        except Exception:
-            pass
 
     # Tab counts for headers
     total_all_count = IncidentRegister.objects.count()
@@ -1625,7 +1618,10 @@ def incident_create(request):
                 comment=form.cleaned_data.get('change_comment', '')
             )
             messages.success(request, f'Incident {incident.ticket} created successfully.')
-            return redirect('incident_list')
+            redirect_tab = 'infrastructure' if incident.category == 'Infrastructure' else 'database'
+            return redirect(f'/incidents/?tab={redirect_tab}')
+        else:
+            messages.error(request, 'Failed to save incident. Please review the highlighted errors below.')
     else:
         form = IncidentRegisterForm()
     return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident'})
