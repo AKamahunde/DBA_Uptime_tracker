@@ -2137,11 +2137,17 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             return '/ (OS Root)'
         return lbl
 
-    def _calculate_runway(free_gb, daily_burn_gb):
-        if daily_burn_gb and daily_burn_gb > 0.01 and free_gb > 0:
+    def _calculate_runway(free_gb, daily_burn_gb, used_pct=0.0):
+        if free_gb <= 0:
+            return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
+        if used_pct >= 95.0:
+            return {'days': 0, 'text': '< 10 days', 'badge': 'critical'}
+        if daily_burn_gb and daily_burn_gb > 0.05 and free_gb > 0:
             days = int(free_gb / daily_burn_gb)
-            if days <= 30:
+            if days <= 7:
                 return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
+            elif days <= 30:
+                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
             elif days <= 90:
                 return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
             elif days <= 365:
@@ -2149,7 +2155,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
             else:
                 return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
-        return {'days': 9999, 'text': "Stable", 'badge': 'stable'}
+        return {'days': 9999, 'text': "> 1 Year", 'badge': 'stable'}
 
     node_overview_data = []
     for nd in node_definitions:
@@ -2312,9 +2318,9 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 local_delta_gb = 0.0
                 local_delta_pct = 0.0
 
-            d1_runway = _calculate_runway(max(0.0, d1_size - d1_used), d1_delta_gb)
-            d2_runway = _calculate_runway(max(0.0, d2_size - d2_used), d2_delta_gb)
-            d3_runway = _calculate_runway(max(0.0, d3_size - d3_used), d3_delta_gb)
+            d1_runway = _calculate_runway(max(0.0, d1_size - d1_used), d1_delta_gb, d1_pct)
+            d2_runway = _calculate_runway(max(0.0, d2_size - d2_used), d2_delta_gb, d2_pct)
+            d3_runway = _calculate_runway(max(0.0, d3_size - d3_used), d3_delta_gb, d3_pct)
 
             disks = [
                 {
@@ -2373,7 +2379,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             local_util_pct = round((local_used / local_cap) * 100.0, 2) if local_cap > 0 else 0.0
             peak_disk = round(max([float(latest_rec.disk_percent or 0.0)] + [d['percent'] for d in disks]), 2)
 
-            node_runway = _calculate_runway(local_free, local_delta_gb)
+            node_runway = _calculate_runway(local_free, local_delta_gb, local_util_pct)
 
             clean_hosted = latest_rec.hosted_systems or nd['hosted_systems']
             import re
@@ -2582,10 +2588,12 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d2_us = float(hr.disk_2_used_gb or 0.0)
             d2_fr = max(0.0, d2_sz - d2_us)
             d2_pct = float(hr.disk_2_percent or 0.0)
-            prev_d2 = float(prev_hr.disk_2_used_gb or 0.0) if prev_hr else 0.0
-            d2_delta = round(d2_us - prev_d2, 2) if prev_hr else 0.0
-            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (prev_hr and prev_d2 > 0) else 0.0
-            d2_rw = _calculate_runway(d2_fr, d2_delta)
+            prev_d2 = float(prev_hr.disk_2_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_2_size_gb or 0.0) > 0) else 0.0
+            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0) else 0.0
+            if abs(d2_delta) > (d2_sz * 0.4):
+                d2_delta = 0.0
+            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (prev_hr and prev_d2 > 0 and d2_delta != 0.0) else 0.0
+            d2_rw = _calculate_runway(d2_fr, d2_delta, d2_pct)
 
             if d2_sz > 0:
                 node_capacity_records.append({
@@ -2617,10 +2625,12 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d3_us = float(hr.disk_3_used_gb or 0.0)
             d3_fr = max(0.0, d3_sz - d3_us)
             d3_pct = float(hr.disk_3_percent or 0.0)
-            prev_d3 = float(prev_hr.disk_3_used_gb or 0.0) if prev_hr else 0.0
-            d3_delta = round(d3_us - prev_d3, 2) if prev_hr else 0.0
-            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (prev_hr and prev_d3 > 0) else 0.0
-            d3_rw = _calculate_runway(d3_fr, d3_delta)
+            prev_d3 = float(prev_hr.disk_3_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_3_size_gb or 0.0) > 0) else 0.0
+            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0) else 0.0
+            if abs(d3_delta) > (d3_sz * 0.4):
+                d3_delta = 0.0
+            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (prev_hr and prev_d3 > 0 and d3_delta != 0.0) else 0.0
+            d3_rw = _calculate_runway(d3_fr, d3_delta, d3_pct)
 
             if d3_sz > 0:
                 node_capacity_records.append({
@@ -2655,10 +2665,12 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 d1_us = float(hr.disk_1_used_gb or 0.0)
                 d1_fr = max(0.0, d1_sz - d1_us)
                 d1_pct = float(hr.disk_1_percent or 0.0)
-                prev_d1 = float(prev_hr.disk_1_used_gb or 0.0) if prev_hr else 0.0
-                d1_delta = round(d1_us - prev_d1, 2) if prev_hr else 0.0
-                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (prev_hr and prev_d1 > 0) else 0.0
-                d1_rw = _calculate_runway(d1_fr, d1_delta)
+                prev_d1 = float(prev_hr.disk_1_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_1_size_gb or 0.0) > 0) else 0.0
+                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0) else 0.0
+                if abs(d1_delta) > (d1_sz * 0.4):
+                    d1_delta = 0.0
+                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (prev_hr and prev_d1 > 0 and d1_delta != 0.0) else 0.0
+                d1_rw = _calculate_runway(d1_fr, d1_delta, d1_pct)
 
                 storage_id = 'VMSAN' if node_lbl == 'Proxmox' else '/nmsddbkp'
                 node_capacity_records.append({
