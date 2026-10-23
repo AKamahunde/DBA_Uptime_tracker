@@ -1,0 +1,563 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Infrastructure Storage Capacity Planning Report — {{ reporting_period_str }}</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+<style>
+  :root {
+    --primary-navy: #002569;
+    --primary-gold: #f1ab00;
+    --primary-green: #76b900;
+    --border-mist: #e2e8f0;
+    --text-dark: #0f172a;
+    --text-soft: #64748b;
+    --bg-cool: #f8fafc;
+    --green-text: #16a34a;
+    --red-text: #dc2626;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    color: var(--text-dark);
+    background: #e2e8f0;
+    font-size: 8.5px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .screen-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-mist);
+    padding: 10px 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+  }
+  .toolbar-content {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .toolbar-title {
+    font-size: 13px;
+    color: var(--primary-navy);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toolbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-print {
+    background: var(--primary-navy);
+    color: #ffffff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-print:hover { background: #001a4d; }
+  .btn-close {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid var(--border-mist);
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-close:hover { background: #e2e8f0; }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 12px auto;
+    background: #ffffff;
+    padding: 10mm 12mm 8mm 12mm;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  .masthead-center {
+    text-align: center;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--primary-navy);
+  }
+  .masthead-logo-wrap {
+    margin-bottom: 4px;
+  }
+  .masthead-logo {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+  }
+  .report-title {
+    margin: 0 0 2px 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--primary-navy);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .report-org-subtitle {
+    margin: 0 0 6px 0;
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-soft);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .report-meta-strip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid var(--border-mist);
+    border-radius: 3px;
+    padding: 3px 12px;
+    font-size: 8px;
+    margin-top: 2px;
+  }
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .meta-label {
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+  .meta-value {
+    color: var(--primary-navy);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-divider {
+    color: #cbd5e1;
+    font-weight: bold;
+  }
+
+  .summary-box {
+    margin: 0 0 10px 0;
+    padding: 6px 10px;
+    background: var(--bg-cool);
+    border-left: 3px solid var(--primary-navy);
+    border-radius: 2px;
+  }
+  .summary-box-label {
+    font-size: 7.5px;
+    font-weight: 700;
+    color: var(--primary-navy);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .summary-box-text {
+    margin: 0;
+    font-size: 8.5px;
+    color: #334155;
+    line-height: 1.4;
+  }
+
+  .kpi-deck {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .kpi-card {
+    background: #ffffff;
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+  .kpi-label {
+    font-size: 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-soft);
+    margin: 0 0 2px 0;
+  }
+  .kpi-value {
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0 0 1px 0;
+    color: var(--primary-navy);
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-value.green {
+    color: var(--primary-green);
+  }
+  .kpi-subtext {
+    font-size: 7px;
+    color: #94a3b8;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .section-heading {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary-navy);
+    margin: 10px 0 5px 0;
+    padding-bottom: 2px;
+    border-bottom: 1.5px solid var(--border-mist);
+  }
+
+  table.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 8px;
+  }
+  table.report-table th {
+    background: #f1f5f9;
+    color: var(--primary-navy);
+    font-weight: 700;
+    font-size: 7px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 5px 6px;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1.5px solid var(--primary-navy);
+    text-align: center;
+  }
+  table.report-table th.text-left {
+    text-align: left;
+  }
+  table.report-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--border-mist);
+    text-align: center;
+    vertical-align: middle;
+  }
+  table.report-table td.text-left {
+    text-align: left;
+  }
+  table.report-table tr:nth-child(even) {
+    background: #fbfcfe;
+  }
+
+  .signoff-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .signoff-box {
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 7px 9px;
+    background: #ffffff;
+  }
+  .signoff-header {
+    font-size: 7.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary-navy);
+    border-bottom: 1.5px solid var(--primary-navy);
+    padding-bottom: 3px;
+    margin-bottom: 6px;
+  }
+  .signoff-sig-field {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 6px;
+    height: 24px;
+  }
+  .signoff-sig-label {
+    font-size: 7.5px;
+    color: #475569;
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .signoff-sig-line {
+    border-bottom: 1px solid #94a3b8;
+    flex-grow: 1;
+    height: 0;
+    margin-bottom: 2px;
+  }
+  .signoff-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 7.5px;
+    color: #475569;
+    margin-bottom: 4px;
+  }
+  .signoff-row:last-child {
+    margin-bottom: 0;
+  }
+  .signoff-label {
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .signoff-line {
+    border-bottom: 1px dotted #cbd5e1;
+    flex-grow: 1;
+    margin-left: 2px;
+    height: 0;
+    margin-bottom: 2px;
+  }
+  .signoff-val {
+    font-size: 7.5px;
+    color: var(--primary-navy);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-left: 2px;
+  }
+
+  @media print {
+    .no-print { display: none !important; }
+    @page {
+      size: A4 portrait;
+      margin: 10mm 10mm 8mm 10mm;
+    }
+    body {
+      background: #ffffff !important;
+      font-size: 8.5px !important;
+    }
+    .page {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .signoff-grid {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="screen-toolbar no-print">
+  <div class="toolbar-content">
+    <div class="toolbar-title">
+      <strong>Report Ready:</strong> {{ reporting_period_str }} Infrastructure Storage Capacity Report
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" onclick="window.print()" class="btn-print">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        Print / Save as PDF
+      </button>
+      <button type="button" onclick="window.close()" class="btn-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="masthead-center">
+    <div class="masthead-logo-wrap">
+      <img src="{% static 'logo.jpg' %}" alt="National Medical Stores Logo" class="masthead-logo">
+    </div>
+
+    <h1 class="report-title">
+      {% if selected_node == 'All Nodes' %}
+        INFRASTRUCTURE STORAGE CAPACITY PLANNING &amp; RUNWAY REPORT
+      {% else %}
+        {{ selected_node|upper }} STORAGE CAPACITY &amp; RUNWAY REPORT
+      {% endif %}
+    </h1>
+    <div class="report-org-subtitle">National Medical Stores • Database Tracking for Reliability, Administration and Compliance (DBTRAC)</div>
+
+    <div class="report-meta-strip">
+      <div class="meta-item">
+        <span class="meta-label">Period:</span>
+        <span class="meta-value">{{ reporting_period_str }}</span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Scope:</span>
+        <span class="meta-value">{{ selected_node }}</span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Extracted:</span>
+        <span class="meta-value">{{ extracted_at }} EAT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary-box">
+    <div class="summary-box-label">Storage Capacity Executive Summary</div>
+    <p class="summary-box-text">
+      Total provisioned infrastructure storage across {{ selected_node }} stands at <strong>{{ kpi_total_storage_gb }} GB</strong> with <strong>{{ kpi_used_storage_gb }} GB</strong> utilized (<strong>{{ kpi_storage_used_pct }}%</strong>) and <strong>{{ kpi_free_storage_gb }} GB</strong> available headroom. Shared SAN/NFS storage pools and guest volume allocations operate well within operational thresholds with sustainable runway projections.
+    </p>
+  </div>
+
+  <div class="kpi-deck">
+    <div class="kpi-card">
+      <div class="kpi-label">Provisioned Storage</div>
+      <div class="kpi-value">{{ kpi_total_storage_gb }} GB</div>
+      <div class="kpi-subtext">Across monitored node pools</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Used Storage</div>
+      <div class="kpi-value green">{{ kpi_used_storage_gb }} GB</div>
+      <div class="kpi-subtext">{{ kpi_storage_used_pct }}% aggregate utilisation</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Free Headroom</div>
+      <div class="kpi-value">{{ kpi_free_storage_gb }} GB</div>
+      <div class="kpi-subtext">Unallocated &amp; usable volume</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Monitored Storage Tiers</div>
+      <div class="kpi-value">{{ node_capacity_records|length }} Tiers</div>
+      <div class="kpi-subtext">Shared pools &amp; host disks</div>
+    </div>
+  </div>
+
+  <div class="section-heading">Infrastructure Storage Capacity &amp; Operational Runway Breakdown</div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th style="width: 12%;">Timestamp</th>
+        <th class="text-left" style="width: 14%;">Cluster / Node</th>
+        <th class="text-left" style="width: 22%;">Storage Tier</th>
+        <th style="width: 10%;">Capacity</th>
+        <th style="width: 9%;">Used</th>
+        <th style="width: 9%;">Free</th>
+        <th style="width: 8%;">Util %</th>
+        <th style="width: 8%;">24h Delta</th>
+        <th style="width: 8%;">Headroom</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cap in node_capacity_records %}
+      <tr>
+        <td>
+          <div style="font-weight: 600;">{{ cap.date|date:"d M Y" }}</div>
+          <div style="font-size: 6.8pt; color: #64748b;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
+        </td>
+        <td class="text-left">
+          <strong>{{ cap.node_name }}</strong>
+          {% if cap.hosted_systems %}
+          <div style="font-size: 6.8pt; color: #64748b;">{{ cap.hosted_systems }}</div>
+          {% endif %}
+        </td>
+        <td class="text-left" style="color: #334155; font-weight: 500;">
+          {{ cap.storage_tier }}
+          {% if cap.is_shared %}
+          <span style="font-size: 6.5pt; background: #e0f2fe; color: #0284c7; padding: 1px 4px; border-radius: 2px; font-weight: 700; margin-left: 2px;">Shared</span>
+          {% endif %}
+        </td>
+        <td style="font-variant-numeric: tabular-nums;">{{ cap.capacity_gb }} GB</td>
+        <td style="font-variant-numeric: tabular-nums;">{{ cap.used_gb }} GB</td>
+        <td style="font-variant-numeric: tabular-nums;">{{ cap.free_gb }} GB</td>
+        <td style="font-weight: 700; color: {% if cap.used_percent >= 90 %}var(--red-text){% elif cap.used_percent >= 80 %}#d97706{% else %}var(--primary-navy){% endif %}; font-variant-numeric: tabular-nums;">
+          {{ cap.used_percent }}%
+        </td>
+        <td style="font-variant-numeric: tabular-nums;">
+          {% if cap.delta_24h_gb is not None %}
+            {% if cap.delta_24h_gb > 0 %}
+              <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
+            {% elif cap.delta_24h_gb < 0 %}
+              <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
+            {% else %}
+              <span style="color: #64748b;">0.00 GB</span>
+            {% endif %}
+          {% else %}
+            <span style="color: #64748b;">&mdash;</span>
+          {% endif %}
+        </td>
+        <td style="font-weight: 700; color: {% if cap.runway_badge == 'critical' %}#b91c1c{% elif cap.runway_badge == 'warning' %}#b45309{% else %}#15803d{% endif %};">
+          {{ cap.runway_text }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 12px; color: var(--text-soft); font-style: italic;">No infrastructure capacity records found for the selected scope.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="section-heading">Formal Review &amp; Sign-Off</div>
+  <div class="signoff-grid">
+    <div class="signoff-box">
+      <div class="signoff-header">Prepared / Extracted By</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <span class="signoff-val">{{ extracted_by }}</span>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <span class="signoff-val">{{ extracted_at }}</span>
+      </div>
+    </div>
+
+    <div class="signoff-box">
+      <div class="signoff-header">Reviewed By (SSA)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
+      </div>
+    </div>
+
+    <div class="signoff-box">
+      <div class="signoff-header">Approved By (CICTO)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      window.print();
+    }, 400);
+  });
+</script>
+</body>
+</html>

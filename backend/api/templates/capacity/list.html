@@ -170,10 +170,10 @@
                     Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
                 </button>
                 <div class="export-dropdown-content">
-                    <a href="{% url 'dashboard_node_print' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
+                    <a href="{% url 'capacity_infra_print' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
                         Export PDF
                     </a>
-                    <a href="{% url 'dashboard_node_excel' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
+                    <a href="{% url 'capacity_infra_excel' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
                         Export Excel
                     </a>
                 </div>

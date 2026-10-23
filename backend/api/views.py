@@ -2053,9 +2053,20 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     """
     Summarizes Guest Virtual Machine health across the hypervisor fleet
     (OLKVM and Proxmox) into a consolidated single-pane-of-glass status matrix.
+    Inherits parent host hypervisor unplanned outages and factors in direct VM incidents.
     """
     from django.db.models import Q
     today_dt = timezone.now().date()
+    target_date = target_month_dt if target_month_dt else today_dt
+    start_of_month = target_date.replace(day=1)
+    if target_date.month == 12:
+        next_month = target_date.replace(year=target_date.year + 1, month=1, day=1)
+    else:
+        next_month = target_date.replace(month=target_date.month + 1, day=1)
+    total_month_hours = (next_month - start_of_month).total_seconds() / 3600.0
+
+    month_inc_filter = Q(start__gte=start_of_month, start__lt=next_month) | Q(start__lt=start_of_month, end__gte=start_of_month) | Q(start__lt=start_of_month, end__isnull=True)
+    now_dt = timezone.now()
 
     canonical_vms = [
         {
@@ -2163,6 +2174,36 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
             is_fallback = True
 
+        # Determine any unplanned outages affecting this VM directly or via its host hypervisor
+        parent_k = defn.get('parent_node_key', '')
+        short_k = defn.get('short_name', '')
+
+        if parent_k == 'OLKVM':
+            vm_inc_q = (
+                Q(node_name__iexact='OLKVM') |
+                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']) |
+                Q(system__icontains='olkvm') |
+                Q(system__icontains='nmsinfra') |
+                Q(system__icontains='nmsebs') |
+                (Q(database__iexact='Oracle') & (Q(category__iexact='Infrastructure') | Q(category__iexact='Database')))
+            )
+        else:
+            vm_inc_q = (
+                Q(node_name__iexact=parent_k) |
+                Q(node_name__icontains=short_k) |
+                Q(system__icontains=short_k)
+            )
+
+        vm_inc_qs = IncidentRegister.objects.filter(month_inc_filter, planned=False).filter(vm_inc_q)
+        vm_unplanned_hrs = 0.0
+        for inc in vm_inc_qs:
+            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
+                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
+                vm_unplanned_hrs += float(active_dt)
+            elif inc.duration_hrs:
+                vm_unplanned_hrs += float(inc.duration_hrs)
+        vm_unplanned_hrs = round(vm_unplanned_hrs, 2)
+
         if rec:
             if not is_fallback:
                 seen_canonical_servers.add((rec.server or '').lower())
@@ -2180,7 +2221,6 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
                 disk_us = round(disk_sz * disk_pct / 100.0, 2)
 
-            status = rec.status or ('Healthy' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Critical'))
             last_date = rec.date
             last_updated = rec.updated_at
             source = rec.entered_by or ('Prometheus' if is_fallback else 'System')
@@ -2194,11 +2234,27 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             disk_pct = 0.0
             disk_sz = 0.0
             disk_us = 0.0
-            status = 'Healthy'
             last_date = today_dt
             last_updated = None
             source = 'Baseline'
             has_data = False
+
+        # Factor in host node unplanned downtime into guest VM Uptime SLA
+        if vm_unplanned_hrs > 0 and total_month_hours > 0:
+            sla_vm_up_pct = round(max(0.0, (total_month_hours - vm_unplanned_hrs) / total_month_hours * 100.0), 2)
+            up_pct = min(up_pct, sla_vm_up_pct)
+
+        active_vm_inc = vm_inc_qs.filter(status__in=['Open', 'In Progress']).count()
+        if active_vm_inc > 0:
+            status = 'Outage'
+        elif up_pct < 99.0:
+            status = 'Below SLA'
+        elif vm_unplanned_hrs > 0 or up_pct < 99.90:
+            status = 'Warning'
+        elif rec:
+            status = rec.status or 'Healthy'
+        else:
+            status = 'Healthy'
 
         fleet_vms.append({
             'pk': rec.pk if rec else None,
@@ -2215,6 +2271,8 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'logical_cpus': int(rec.logical_cpus or defn['default_cores']) if rec else defn['default_cores'],
             'uptime_percent': round(up_pct, 2),
             'uptime_str': f"{round(up_pct, 2)}%",
+            'unplanned_down_hrs': vm_unplanned_hrs,
+            'incident_count': vm_inc_qs.count(),
             'cpu_percent': round(cpu_pct, 2),
             'memory_percent': round(mem_pct, 2),
             'memory_total_gb': round(mem_tot, 2),
@@ -3114,241 +3172,274 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'updated_at': n.get('updated_at'),
             })
 
-    # Build capacity records from the start of the month across the reporting period
-    month_cap_filter = Q(date__gte=start_of_month, date__lt=next_month)
-    if selected_node == 'OLKVM':
-        month_cap_filter &= (Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs'))
-    elif selected_node == 'Proxmox':
-        month_cap_filter &= (Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
-    elif selected_node != 'All Nodes':
-        month_cap_filter &= Q(server__iexact=selected_node)
-
-    hist_month_qs = (
-        ServerHealth.objects.filter(month_cap_filter)
-        .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
-        .order_by('-date', '-updated_at')
-    )
-
+    # Build clean grouped capacity records (Option B: 7-Row Consolidated Storage Architecture)
     node_capacity_records = []
 
-    # Collect distinct (date, server) latest runs
-    seen_day_node = set()
-    daily_runs = []
-    for hr in hist_month_qs:
-        day_key = (hr.date, (hr.server or '').lower())
-        if day_key not in seen_day_node:
-            seen_day_node.add(day_key)
-            daily_runs.append(hr)
+    # Reference dates for the report
+    latest_date = today_dt
+    latest_updated = None
+    for n in filtered_nodes:
+        if n.get('date') and (latest_date is None or n['date'] > latest_date):
+            latest_date = n['date']
+        if n.get('updated_at') and (latest_updated is None or n['updated_at'] > latest_updated):
+            latest_updated = n['updated_at']
 
-    if daily_runs:
-        seen_shared_days = set()
-        for hr in daily_runs:
-            srv_lower = (hr.server or '').lower()
-            nd_m = next((d for d in node_definitions if (d['node_key'].lower() in srv_lower) or (srv_lower in d['node_key'].lower()) or (d['node_name'] == 'OLKVM' and any(k in srv_lower for k in ['infra', 'ebs']))), None)
-            node_lbl = nd_m['node_name'] if nd_m else (hr.node_name or 'Node')
-            disp_lbl = nd_m['display_name'] if nd_m else hr.server
-            host_lbl = nd_m['hosted_systems'] if nd_m else hr.hosted_systems
-            defs_disks = nd_m['default_disks'] if nd_m else ['Disk 1', 'Disk 2', 'Disk 3']
+    # 1. Proxmox Shared SAN pool (VMSAN)
+    pve_shared_src = next((p for p in proxmox_nodes if p.get('has_data') and p['disk_1']['size_gb'] > 0), proxmox_nodes[0] if proxmox_nodes else None)
+    vmsan_rec = None
+    if pve_shared_src:
+        d1 = pve_shared_src['disk_1']
+        vmsan_rec = {
+            'month': pve_shared_src.get('date') or latest_date,
+            'date': pve_shared_src.get('date') or latest_date,
+            'updated_at': pve_shared_src.get('updated_at') or latest_updated,
+            'node_key': 'Proxmox',
+            'node_name': 'Proxmox',
+            'display_name': 'Proxmox Shared SAN',
+            'hosted_systems': 'VMSAN',
+            'storage_tier': 'VMSAN (Shared SAN)',
+            'capacity_gb': d1['size_gb'],
+            'used_gb': d1['used_gb'],
+            'free_gb': d1['free_gb'],
+            'used_percent': d1['percent'],
+            'growth_gb': d1.get('delta_24h_gb'),
+            'growth_percent': d1.get('delta_24h_pct'),
+            'delta_24h_gb': d1.get('delta_24h_gb'),
+            'delta_24h_percent': d1.get('delta_24h_pct'),
+            'runway_days': d1.get('runway_days', 9999),
+            'runway_text': d1.get('runway_text', 'Stable'),
+            'runway_badge': d1.get('runway_badge', 'stable'),
+            'has_data': pve_shared_src.get('has_data', False),
+            'is_shared': True,
+        }
 
-            filter_node_q = nd_m['filter_q'] if nd_m else Q(server=hr.server)
-            prev_hr = (
-                ServerHealth.objects.filter(filter_node_q, date__lt=hr.date, date__gte=oct_baseline_date)
-                .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
-                .order_by('-date', '-updated_at')
-                .first()
-            )
+    # 2. OLKVM Shared NFS pool (/nmsddbkp)
+    olkvm_shared_src = infra_w if infra_w else (ebs_w if ebs_w else None)
+    nmsddbkp_rec = None
+    if olkvm_shared_src:
+        d1 = olkvm_shared_src['disk_1']
+        nmsddbkp_rec = {
+            'month': olkvm_shared_src.get('date') or latest_date,
+            'date': olkvm_shared_src.get('date') or latest_date,
+            'updated_at': olkvm_shared_src.get('updated_at') or latest_updated,
+            'node_key': 'OLKVM',
+            'node_name': 'OLKVM',
+            'display_name': 'OLKVM Shared NFS',
+            'hosted_systems': '/nmsddbkp',
+            'storage_tier': '/nmsddbkp (Shared NFS)',
+            'capacity_gb': d1['size_gb'],
+            'used_gb': d1['used_gb'],
+            'free_gb': d1['free_gb'],
+            'used_percent': d1['percent'],
+            'growth_gb': d1.get('delta_24h_gb'),
+            'growth_percent': d1.get('delta_24h_pct'),
+            'delta_24h_gb': d1.get('delta_24h_gb'),
+            'delta_24h_percent': d1.get('delta_24h_pct'),
+            'runway_days': d1.get('runway_days', 9999),
+            'runway_text': d1.get('runway_text', 'Stable'),
+            'runway_badge': d1.get('runway_badge', 'stable'),
+            'has_data': olkvm_shared_src.get('has_data', False),
+            'is_shared': True,
+        }
 
-            # Disk 2 (LVM)
-            d2_sz = float(hr.disk_2_size_gb or 0.0)
-            d2_pct = float(hr.disk_2_percent or 0.0)
-            d2_us = float(hr.disk_2_used_gb or (d2_sz * d2_pct / 100.0 if d2_sz > 0 else 0.0))
-            if d2_us == 0.0 and d2_sz > 0 and d2_pct > 0:
-                d2_us = round(d2_sz * d2_pct / 100.0, 2)
-            d2_fr = max(0.0, d2_sz - d2_us)
+    # 3. Oracle Data volume (/u01) - nmsinfra
+    u01_rec = None
+    if infra_w:
+        d2 = infra_w['disk_2']
+        u01_rec = {
+            'month': infra_w.get('date') or latest_date,
+            'date': infra_w.get('date') or latest_date,
+            'updated_at': infra_w.get('updated_at') or latest_updated,
+            'node_key': 'nmsinfra',
+            'node_name': 'OLKVM',
+            'display_name': 'Oracle DB (nmsinfra)',
+            'hosted_systems': 'nmsinfra',
+            'storage_tier': d2['type'] or '/u01 (Oracle Data)',
+            'capacity_gb': d2['size_gb'],
+            'used_gb': d2['used_gb'],
+            'free_gb': d2['free_gb'],
+            'used_percent': d2['percent'],
+            'growth_gb': d2.get('delta_24h_gb'),
+            'growth_percent': d2.get('delta_24h_pct'),
+            'delta_24h_gb': d2.get('delta_24h_gb'),
+            'delta_24h_percent': d2.get('delta_24h_pct'),
+            'runway_days': d2.get('runway_days', 9999),
+            'runway_text': d2.get('runway_text', 'Stable'),
+            'runway_badge': d2.get('runway_badge', 'stable'),
+            'has_data': infra_w.get('has_data', False),
+            'is_shared': False,
+        }
 
-            prev_d2_sz = float(prev_hr.disk_2_size_gb or 0.0) if prev_hr else 0.0
-            prev_d2_pct = float(prev_hr.disk_2_percent or 0.0) if prev_hr else 0.0
-            prev_d2 = float(prev_hr.disk_2_used_gb or (prev_d2_sz * prev_d2_pct / 100.0 if prev_d2_sz > 0 else 0.0)) if prev_hr else 0.0
-            if prev_d2 == 0.0 and prev_d2_sz > 0 and prev_d2_pct > 0:
-                prev_d2 = round(prev_d2_sz * prev_d2_pct / 100.0, 2)
+    # 4. Oracle Fast Recovery Area (/fra) - nmsinfra
+    fra_rec = None
+    if infra_w:
+        d3 = infra_w['disk_3']
+        fra_rec = {
+            'month': infra_w.get('date') or latest_date,
+            'date': infra_w.get('date') or latest_date,
+            'updated_at': infra_w.get('updated_at') or latest_updated,
+            'node_key': 'nmsinfra',
+            'node_name': 'OLKVM',
+            'display_name': 'Oracle DB (nmsinfra)',
+            'hosted_systems': 'nmsinfra',
+            'storage_tier': d3['type'] or '/fra (Recovery Area)',
+            'capacity_gb': d3['size_gb'],
+            'used_gb': d3['used_gb'],
+            'free_gb': d3['free_gb'],
+            'used_percent': d3['percent'],
+            'growth_gb': d3.get('delta_24h_gb'),
+            'growth_percent': d3.get('delta_24h_pct'),
+            'delta_24h_gb': d3.get('delta_24h_gb'),
+            'delta_24h_percent': d3.get('delta_24h_pct'),
+            'runway_days': d3.get('runway_days', 9999),
+            'runway_text': d3.get('runway_text', 'Stable'),
+            'runway_badge': d3.get('runway_badge', 'stable'),
+            'has_data': infra_w.get('has_data', False),
+            'is_shared': False,
+        }
 
-            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0 and d2_us > 0) else None
-            if d2_delta is not None and d2_sz > 0 and abs(d2_delta) > (d2_sz * 0.25):
-                d2_delta = None
-            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (d2_delta is not None and prev_d2 > 0) else None
-            d2_rw = _calculate_runway(d2_fr, d2_delta, d2_pct)
+    # 5. Oracle Staging volume (/stagearea) - nmsebs
+    stage_rec = None
+    if ebs_w:
+        d2 = ebs_w['disk_2']
+        stage_rec = {
+            'month': ebs_w.get('date') or latest_date,
+            'date': ebs_w.get('date') or latest_date,
+            'updated_at': ebs_w.get('updated_at') or latest_updated,
+            'node_key': 'nmsebs',
+            'node_name': 'OLKVM',
+            'display_name': 'Oracle EBS App (nmsebs)',
+            'hosted_systems': 'nmsebs',
+            'storage_tier': d2['type'] or '/stagearea (Staging)',
+            'capacity_gb': d2['size_gb'],
+            'used_gb': d2['used_gb'],
+            'free_gb': d2['free_gb'],
+            'used_percent': d2['percent'],
+            'growth_gb': d2.get('delta_24h_gb'),
+            'growth_percent': d2.get('delta_24h_pct'),
+            'delta_24h_gb': d2.get('delta_24h_gb'),
+            'delta_24h_percent': d2.get('delta_24h_pct'),
+            'runway_days': d2.get('runway_days', 9999),
+            'runway_text': d2.get('runway_text', 'Stable'),
+            'runway_badge': d2.get('runway_badge', 'stable'),
+            'has_data': ebs_w.get('has_data', False),
+            'is_shared': False,
+        }
 
-            if d2_sz > 0:
-                node_capacity_records.append({
-                    'month': hr.date,
-                    'date': hr.date,
-                    'updated_at': hr.updated_at,
-                    'node_key': hr.server,
-                    'node_name': node_lbl,
-                    'display_name': disp_lbl,
-                    'hosted_systems': host_lbl,
-                    'storage_tier': _clean_disk_label(hr.disk_2_type, defs_disks[1]),
-                    'capacity_gb': round(d2_sz, 2),
-                    'used_gb': round(d2_us, 2),
-                    'free_gb': round(d2_fr, 2),
-                    'used_percent': round(d2_pct, 2),
-                    'growth_gb': d2_delta,
-                    'growth_percent': d2_delta_p,
-                    'delta_24h_gb': d2_delta,
-                    'delta_24h_percent': d2_delta_p,
-                    'runway_days': d2_rw['days'],
-                    'runway_text': d2_rw['text'],
-                    'runway_badge': d2_rw['badge'],
-                    'has_data': True,
-                    'is_shared': False,
-                })
+    # 6. Oracle EBS Middleware & OS volume (/fmw, /) - nmsebs
+    fmw_rec = None
+    if ebs_w:
+        d3 = ebs_w['disk_3']
+        fmw_rec = {
+            'month': ebs_w.get('date') or latest_date,
+            'date': ebs_w.get('date') or latest_date,
+            'updated_at': ebs_w.get('updated_at') or latest_updated,
+            'node_key': 'nmsebs',
+            'node_name': 'OLKVM',
+            'display_name': 'Oracle EBS App (nmsebs)',
+            'hosted_systems': 'nmsebs',
+            'storage_tier': d3['type'] or '/fmw, / (Middleware & OS)',
+            'capacity_gb': d3['size_gb'],
+            'used_gb': d3['used_gb'],
+            'free_gb': d3['free_gb'],
+            'used_percent': d3['percent'],
+            'growth_gb': d3.get('delta_24h_gb'),
+            'growth_percent': d3.get('delta_24h_pct'),
+            'delta_24h_gb': d3.get('delta_24h_gb'),
+            'delta_24h_percent': d3.get('delta_24h_pct'),
+            'runway_days': d3.get('runway_days', 9999),
+            'runway_text': d3.get('runway_text', 'Stable'),
+            'runway_badge': d3.get('runway_badge', 'stable'),
+            'has_data': ebs_w.get('has_data', False),
+            'is_shared': False,
+        }
 
-            # Disk 3 (Local)
-            d3_sz = float(hr.disk_3_size_gb or 0.0)
-            d3_pct = float(hr.disk_3_percent or 0.0)
-            d3_us = float(hr.disk_3_used_gb or (d3_sz * d3_pct / 100.0 if d3_sz > 0 else 0.0))
-            if d3_us == 0.0 and d3_sz > 0 and d3_pct > 0:
-                d3_us = round(d3_sz * d3_pct / 100.0, 2)
-            d3_fr = max(0.0, d3_sz - d3_us)
+    # 7. Proxmox Host Local Pools summary (pvenode1, pvenode2, pvenode3 local-lvm & root)
+    pve_local_summary_rec = None
+    if proxmox_nodes:
+        tot_pve_local_cap = round(sum(p['disk_2']['size_gb'] + p['disk_3']['size_gb'] for p in proxmox_nodes), 2)
+        tot_pve_local_used = round(sum(p['disk_2']['used_gb'] + p['disk_3']['used_gb'] for p in proxmox_nodes), 2)
+        tot_pve_local_free = round(max(0.0, tot_pve_local_cap - tot_pve_local_used), 2)
+        tot_pve_local_pct = round((tot_pve_local_used / tot_pve_local_cap * 100.0), 2) if tot_pve_local_cap > 0 else 0.0
+        pve_deltas = [p.get('delta_24h_gb') for p in proxmox_nodes if p.get('delta_24h_gb') is not None]
+        tot_pve_delta = round(sum(pve_deltas), 2) if pve_deltas else None
+        tot_pve_delta_pct = round((tot_pve_delta / tot_pve_local_used) * 100.0, 2) if (tot_pve_delta is not None and tot_pve_local_used > 0) else None
+        pve_rw = _calculate_runway(tot_pve_local_free, tot_pve_delta, tot_pve_local_pct)
+        pve_local_summary_rec = {
+            'month': proxmox_nodes[0].get('date') or latest_date,
+            'date': proxmox_nodes[0].get('date') or latest_date,
+            'updated_at': proxmox_nodes[0].get('updated_at') or latest_updated,
+            'node_key': 'Proxmox',
+            'node_name': 'Proxmox',
+            'display_name': 'Proxmox Nodes 1–3 (Local)',
+            'hosted_systems': 'pvenode1, pvenode2, pvenode3',
+            'storage_tier': 'Local Disks (root & lvm)',
+            'capacity_gb': tot_pve_local_cap,
+            'used_gb': tot_pve_local_used,
+            'free_gb': tot_pve_local_free,
+            'used_percent': tot_pve_local_pct,
+            'growth_gb': tot_pve_delta,
+            'growth_percent': tot_pve_delta_pct,
+            'delta_24h_gb': tot_pve_delta,
+            'delta_24h_percent': tot_pve_delta_pct,
+            'runway_days': pve_rw['days'],
+            'runway_text': pve_rw['text'],
+            'runway_badge': pve_rw['badge'],
+            'has_data': any(p.get('has_data') for p in proxmox_nodes),
+            'is_shared': False,
+        }
 
-            prev_d3_sz = float(prev_hr.disk_3_size_gb or 0.0) if prev_hr else 0.0
-            prev_d3_pct = float(prev_hr.disk_3_percent or 0.0) if prev_hr else 0.0
-            prev_d3 = float(prev_hr.disk_3_used_gb or (prev_d3_sz * prev_d3_pct / 100.0 if prev_d3_sz > 0 else 0.0)) if prev_hr else 0.0
-            if prev_d3 == 0.0 and prev_d3_sz > 0 and prev_d3_pct > 0:
-                prev_d3 = round(prev_d3_sz * prev_d3_pct / 100.0, 2)
-
-            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0 and d3_us > 0) else None
-            if d3_delta is not None and d3_sz > 0 and abs(d3_delta) > (d3_sz * 0.25):
-                d3_delta = None
-            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (d3_delta is not None and prev_d3 > 0) else None
-            d3_rw = _calculate_runway(d3_fr, d3_delta, d3_pct)
-
-            if d3_sz > 0:
-                node_capacity_records.append({
-                    'month': hr.date,
-                    'date': hr.date,
-                    'updated_at': hr.updated_at,
-                    'node_key': hr.server,
-                    'node_name': node_lbl,
-                    'display_name': disp_lbl,
-                    'hosted_systems': host_lbl,
-                    'storage_tier': _clean_disk_label(hr.disk_3_type, defs_disks[2]),
-                    'capacity_gb': round(d3_sz, 2),
-                    'used_gb': round(d3_us, 2),
-                    'free_gb': round(d3_fr, 2),
-                    'used_percent': round(d3_pct, 2),
-                    'growth_gb': d3_delta,
-                    'growth_percent': d3_delta_p,
-                    'delta_24h_gb': d3_delta,
-                    'delta_24h_percent': d3_delta_p,
-                    'runway_days': d3_rw['days'],
-                    'runway_text': d3_rw['text'],
-                    'runway_badge': d3_rw['badge'],
-                    'has_data': True,
-                    'is_shared': False,
-                })
-
-            # Disk 1 (Shared) - Dedup by (date, cluster)
-            shared_key = (hr.date, node_lbl)
-            if shared_key not in seen_shared_days and float(hr.disk_1_size_gb or 0.0) > 0:
-                seen_shared_days.add(shared_key)
-                d1_sz = float(hr.disk_1_size_gb)
-                d1_pct = float(hr.disk_1_percent or 0.0)
-                d1_us = float(hr.disk_1_used_gb or (d1_sz * d1_pct / 100.0 if d1_sz > 0 else 0.0))
-                if d1_us == 0.0 and d1_sz > 0 and d1_pct > 0:
-                    d1_us = round(d1_sz * d1_pct / 100.0, 2)
-                d1_fr = max(0.0, d1_sz - d1_us)
-
-                prev_d1_sz = float(prev_hr.disk_1_size_gb or 0.0) if prev_hr else 0.0
-                prev_d1_pct = float(prev_hr.disk_1_percent or 0.0) if prev_hr else 0.0
-                prev_d1 = float(prev_hr.disk_1_used_gb or (prev_d1_sz * prev_d1_pct / 100.0 if prev_d1_sz > 0 else 0.0)) if prev_hr else 0.0
-                if prev_d1 == 0.0 and prev_d1_sz > 0 and prev_d1_pct > 0:
-                    prev_d1 = round(prev_d1_sz * prev_d1_pct / 100.0, 2)
-
-                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0 and d1_us > 0) else None
-                if d1_delta is not None and d1_sz > 0 and abs(d1_delta) > (d1_sz * 0.25):
-                    d1_delta = None
-                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (d1_delta is not None and prev_d1 > 0) else None
-                d1_rw = _calculate_runway(d1_fr, d1_delta, d1_pct)
-
-                storage_id = 'VMSAN' if node_lbl == 'Proxmox' else '/nmsddbkp'
-                node_capacity_records.append({
-                    'month': hr.date,
-                    'date': hr.date,
-                    'updated_at': hr.updated_at,
-                    'node_key': node_lbl,
-                    'node_name': node_lbl,
-                    'display_name': f"{node_lbl} Shared",
-                    'hosted_systems': storage_id,
-                    'storage_tier': _clean_disk_label(hr.disk_1_type, defs_disks[0]),
-                    'capacity_gb': round(d1_sz, 2),
-                    'used_gb': round(d1_us, 2),
-                    'free_gb': round(d1_fr, 2),
-                    'used_percent': round(d1_pct, 2),
-                    'growth_gb': d1_delta,
-                    'growth_percent': d1_delta_p,
-                    'delta_24h_gb': d1_delta,
-                    'delta_24h_percent': d1_delta_p,
-                    'runway_days': d1_rw['days'],
-                    'runway_text': d1_rw['text'],
-                    'runway_badge': d1_rw['badge'],
-                    'has_data': True,
-                    'is_shared': True,
-                })
-        node_capacity_records.sort(key=lambda r: (r['date'] or today_dt, r['is_shared'], r['node_name']), reverse=True)
+    # Scope dispatch
+    if selected_node == 'All Nodes':
+        for r in [vmsan_rec, nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec, pve_local_summary_rec]:
+            if r:
+                node_capacity_records.append(r)
+    elif selected_node == 'OLKVM':
+        for r in [nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec]:
+            if r:
+                node_capacity_records.append(r)
+    elif selected_node == 'Proxmox':
+        for r in [vmsan_rec, pve_local_summary_rec]:
+            if r:
+                node_capacity_records.append(r)
+    elif 'infra' in selected_node.lower():
+        for r in [nmsddbkp_rec, u01_rec, fra_rec]:
+            if r:
+                node_capacity_records.append(r)
+    elif 'ebs' in selected_node.lower():
+        for r in [nmsddbkp_rec, stage_rec, fmw_rec]:
+            if r:
+                node_capacity_records.append(r)
     else:
-        for n in filtered_nodes:
-            rec_month = (n['date'] or today_dt)
-            rec_date = n.get('date') or today_dt
-            rec_updated = n.get('updated_at')
-            for d in (n['disk_2'], n['disk_3']):
+        # Specific individual node (e.g. pvenode1, pvenode2, pvenode3)
+        matched_pve = next((p for p in proxmox_nodes if p['node_key'].lower() == selected_node.lower() or selected_node.lower() in p['node_key'].lower()), None)
+        if matched_pve:
+            if vmsan_rec:
+                node_capacity_records.append(vmsan_rec)
+            for d in (matched_pve['disk_2'], matched_pve['disk_3']):
                 node_capacity_records.append({
-                    'month': rec_month,
-                    'date': rec_date,
-                    'updated_at': rec_updated,
-                    'node_key': n['node_key'],
-                    'node_name': n['node_name'],
-                    'display_name': n['display_name'],
-                    'hosted_systems': n['hosted_systems'],
+                    'month': matched_pve.get('date') or latest_date,
+                    'date': matched_pve.get('date') or latest_date,
+                    'updated_at': matched_pve.get('updated_at') or latest_updated,
+                    'node_key': matched_pve['node_key'],
+                    'node_name': matched_pve['node_name'],
+                    'display_name': matched_pve['display_name'],
+                    'hosted_systems': matched_pve['hosted_systems'],
                     'storage_tier': d['type'],
                     'capacity_gb': d['size_gb'],
                     'used_gb': d['used_gb'],
                     'free_gb': d['free_gb'],
                     'used_percent': d['percent'],
-                    'growth_gb': d.get('delta_24h_gb', 0.0),
-                    'growth_percent': d.get('delta_24h_pct', 0.0),
-                    'delta_24h_gb': d.get('delta_24h_gb', 0.0),
-                    'delta_24h_percent': d.get('delta_24h_pct', 0.0),
+                    'growth_gb': d.get('delta_24h_gb'),
+                    'growth_percent': d.get('delta_24h_pct'),
+                    'delta_24h_gb': d.get('delta_24h_gb'),
+                    'delta_24h_percent': d.get('delta_24h_pct'),
                     'runway_days': d.get('runway_days', 9999),
                     'runway_text': d.get('runway_text', 'Stable'),
                     'runway_badge': d.get('runway_badge', 'stable'),
-                    'has_data': n['has_data'],
+                    'has_data': matched_pve.get('has_data', False),
                     'is_shared': False,
                 })
-        for sr in shared_storage_records:
-            node_capacity_records.append({
-                'month': sr['date'],
-                'date': sr['date'],
-                'updated_at': sr.get('updated_at'),
-                'node_key': sr['cluster'],
-                'node_name': sr['cluster'],
-                'display_name': f"{sr['cluster']} Shared",
-                'hosted_systems': sr['storage_id'],
-                'storage_tier': sr['type_label'],
-                'capacity_gb': sr['total_gb'],
-                'used_gb': sr['used_gb'],
-                'free_gb': sr['free_gb'],
-                'used_percent': sr['percent'],
-                'growth_gb': sr['delta_24h_gb'],
-                'growth_percent': sr['delta_24h_pct'],
-                'delta_24h_gb': sr['delta_24h_gb'],
-                'delta_24h_percent': sr['delta_24h_pct'],
-                'runway_days': sr['runway_days'],
-                'runway_text': sr['runway_text'],
-                'runway_badge': sr['runway_badge'],
-                'has_data': True,
-                'is_shared': True,
-            })
 
     active_nodes = [n for n in filtered_nodes if n['has_data']]
     if active_nodes:
@@ -5006,6 +5097,310 @@ def capacity_excel(request):
         writer.writerow([])
         writer.writerow([f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}"])
         return response
+
+
+@login_required
+def capacity_infra_print(request):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    if not (is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity') or request.user.has_perm('api.view_infrastructuredashboard')):
+        messages.error(request, 'You do not have permission to print Infrastructure Capacity reports.')
+        return redirect('capacity_list')
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    month_str = request.GET.get('month', '')
+
+    reporting_month = None
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = None
+    if not reporting_month and start_date:
+        try:
+            reporting_month = datetime.strptime(start_date, '%Y-%m-%d').date().replace(day=1)
+        except ValueError:
+            reporting_month = None
+    if not reporting_month:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
+
+    user = request.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        username = user.username
+        if '.' in username:
+            parts = username.split('.')
+            full_name = " ".join([p.capitalize() for p in parts])
+        else:
+            full_name = username.capitalize()
+
+    reporting_period_str = f"{start_date} to {end_date}" if (start_date and end_date) else reporting_month.strftime('%B %Y')
+
+    context = {
+        'selected_node': selected_node,
+        'start_date': start_date,
+        'end_date': end_date,
+        'reporting_period_str': reporting_period_str,
+        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'extracted_by': full_name,
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
+        'node_capacity_records': node_ctx['node_capacity_records'],
+        'filtered_nodes': node_ctx['filtered_nodes'],
+        'kpi_total_storage_gb': node_ctx['kpi_total_storage_gb'],
+        'kpi_used_storage_gb': node_ctx['kpi_used_storage_gb'],
+        'kpi_free_storage_gb': node_ctx['kpi_free_storage_gb'],
+        'kpi_storage_used_pct': node_ctx['kpi_storage_used_pct'],
+    }
+    return render(request, 'capacity/infra_print.html', context)
+
+
+@login_required
+def capacity_infra_excel(request):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    if not (is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity') or request.user.has_perm('api.view_infrastructuredashboard')):
+        messages.error(request, 'You do not have permission to export Infrastructure Capacity records.')
+        return redirect('capacity_list')
+
+    selected_node = request.GET.get('node_select', 'All Nodes')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    month_str = request.GET.get('month', '')
+
+    reporting_month = None
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = None
+    if not reporting_month and start_date:
+        try:
+            reporting_month = datetime.strptime(start_date, '%Y-%m-%d').date().replace(day=1)
+        except ValueError:
+            reporting_month = None
+    if not reporting_month:
+        reporting_month = timezone.now().date().replace(day=1)
+
+    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
+    node_capacity_records = node_ctx['node_capacity_records']
+
+    user = request.user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        username = user.username
+        if '.' in username:
+            parts = username.split('.')
+            full_name = " ".join([p.capitalize() for p in parts])
+        else:
+            full_name = username.capitalize()
+
+    reporting_period_str = f"{start_date} to {end_date}" if (start_date and end_date) else reporting_month.strftime('%B %Y')
+    node_scope_display = selected_node if selected_node else "All Nodes"
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Infra Storage Capacity"
+
+        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
+        font_header = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+        font_body = Font(name='Segoe UI', size=10)
+        font_kpi_label = Font(name='Segoe UI', size=9, bold=True, color='64748B')
+        font_kpi_val = Font(name='Segoe UI', size=12, bold=True, color='002569')
+
+        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
+        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
+        fill_kpi = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+
+        align_center = Alignment(horizontal='center', vertical='center')
+        align_left = Alignment(horizontal='left', vertical='center')
+        align_right = Alignment(horizontal='right', vertical='center')
+
+        border_thin = Border(
+            left=Side(style='thin', color='D1D7E0'),
+            right=Side(style='thin', color='D1D7E0'),
+            top=Side(style='thin', color='D1D7E0'),
+            bottom=Side(style='thin', color='D1D7E0')
+        )
+
+        # Title Block
+        ws.merge_cells('A1:J1')
+        ws['A1'] = f"Infrastructure Storage Capacity & Runway Report — {node_scope_display} ({reporting_period_str})"
+        ws['A1'].font = font_title
+        ws['A1'].alignment = align_left
+        ws.row_dimensions[1].height = 30
+
+        # KPI Summary Cards Block
+        ws.merge_cells('A3:B3')
+        ws['A3'] = "TOTAL PROVISIONED STORAGE"
+        ws['A3'].font = font_kpi_label
+        ws['A3'].alignment = align_center
+
+        ws.merge_cells('A4:B4')
+        ws['A4'] = f"{node_ctx['kpi_total_storage_gb']} GB"
+        ws['A4'].font = font_kpi_val
+        ws['A4'].alignment = align_center
+
+        ws.merge_cells('C3:D3')
+        ws['C3'] = "USED STORAGE"
+        ws['C3'].font = font_kpi_label
+        ws['C3'].alignment = align_center
+
+        ws.merge_cells('C4:D4')
+        ws['C4'] = f"{node_ctx['kpi_used_storage_gb']} GB ({node_ctx['kpi_storage_used_pct']}%)"
+        ws['C4'].font = font_kpi_val
+        ws['C4'].alignment = align_center
+
+        ws.merge_cells('E3:F3')
+        ws['E3'] = "FREE HEADROOM"
+        ws['E3'].font = font_kpi_label
+        ws['E3'].alignment = align_center
+
+        ws.merge_cells('E4:F4')
+        ws['E4'] = f"{node_ctx['kpi_free_storage_gb']} GB"
+        ws['E4'].font = font_kpi_val
+        ws['E4'].alignment = align_center
+
+        ws.merge_cells('G3:H3')
+        ws['G3'] = "MONITORED STORAGE POOLS"
+        ws['G3'].font = font_kpi_label
+        ws['G3'].alignment = align_center
+
+        ws.merge_cells('G4:H4')
+        ws['G4'] = f"{len(node_capacity_records)} Storage Tiers"
+        ws['G4'].font = font_kpi_val
+        ws['G4'].alignment = align_center
+
+        for r_k in (3, 4):
+            for col_k in range(1, 9):
+                c_k = ws.cell(row=r_k, column=col_k)
+                c_k.fill = fill_kpi
+                c_k.border = border_thin
+
+        ws.append([]) # Row 5 empty
+
+        # Headers
+        headers = [
+            "Timestamp", "Cluster / Node", "Host / Workload", "Storage Tier",
+            "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Operational Runway"
+        ]
+        ws.append(headers)
+        row_num = 6
+        ws.row_dimensions[row_num].height = 25
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_thin
+
+        row_num = 7
+        for cap in node_capacity_records:
+            cap_ts = ""
+            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
+                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
+            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
+                cap_ts = cap['date'].strftime('%d %b %Y')
+            elif hasattr(cap.get('month'), 'strftime'):
+                cap_ts = cap['month'].strftime('%d %b %Y')
+            else:
+                cap_ts = str(cap.get('date') or cap.get('month') or "")
+
+            delta_gb_val = f"+{cap['delta_24h_gb']} GB" if (cap.get('delta_24h_gb') is not None and cap['delta_24h_gb'] > 0) else (f"{cap['delta_24h_gb']} GB" if cap.get('delta_24h_gb') is not None else "—")
+            delta_pct_val = f"+{cap['delta_24h_percent']}%" if (cap.get('delta_24h_percent') is not None and cap['delta_24h_percent'] > 0) else (f"{cap['delta_24h_percent']}%" if cap.get('delta_24h_percent') is not None else "—")
+
+            row_data = [
+                cap_ts,
+                cap['node_name'],
+                cap.get('hosted_systems', ''),
+                cap['storage_tier'],
+                float(cap['capacity_gb']),
+                float(cap['used_gb']),
+                float(cap['free_gb']),
+                f"{cap['used_percent']}%",
+                delta_gb_val,
+                delta_pct_val,
+                cap.get('runway_text', 'Stable'),
+            ]
+            ws.append(row_data)
+            ws.row_dimensions[row_num].height = 20
+
+            for col_num in range(1, len(headers) + 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.font = font_body
+                cell.border = border_thin
+                if row_num % 2 == 0:
+                    cell.fill = fill_even
+                if col_num in [1, 2, 3, 4]:
+                    cell.alignment = align_left
+                elif col_num in [5, 6, 7]:
+                    cell.alignment = align_right
+                else:
+                    cell.alignment = align_center
+            row_num += 1
+
+        # Metadata footer
+        ws.append([])
+        row_num += 1
+        ws.cell(row=row_num, column=1, value=f"Extracted by {full_name} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')} EAT").font = Font(name='Segoe UI', size=9, italic=True)
+
+        for col in ws.columns:
+            max_len = 0
+            col_val = col[0].column
+            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            for cell in col:
+                if cell.row in (1, 3, 4) or cell.row > row_num:
+                    continue
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
+
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        clean_scope = node_scope_display.replace(' ', '_')
+        filename = f"Infra_Capacity_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
+
+    except Exception:
+        import csv
+        response = HttpResponse(content_type='text/csv')
+        clean_scope = node_scope_display.replace(' ', '_')
+        filename = f"Infra_Capacity_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow([f"Infrastructure Storage Capacity Report - {node_scope_display} ({reporting_period_str})"])
+        writer.writerow([])
+        writer.writerow([
+            "Timestamp", "Cluster / Node", "Host / Workload", "Storage Tier",
+            "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Operational Runway"
+        ])
+        for cap in node_capacity_records:
+            writer.writerow([
+                str(cap.get('date') or cap.get('month') or ''),
+                cap['node_name'],
+                cap.get('hosted_systems', ''),
+                cap['storage_tier'],
+                cap['capacity_gb'],
+                cap['used_gb'],
+                cap['free_gb'],
+                f"{cap['used_percent']}%",
+                cap.get('delta_24h_gb', ''),
+                cap.get('delta_24h_percent', ''),
+                cap.get('runway_text', 'Stable'),
+            ])
+        writer.writerow([])
+        writer.writerow([f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}"])
+        return response
+
 
 @login_required
 def capacity_create(request):

@@ -522,6 +522,9 @@
         <td style="text-align: center; font-weight: 600; font-size: 8pt;">{{ vm.database }}</td>
         <td style="text-align: center; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}var(--green-text){% elif vm.uptime_percent >= 99.0 %}#d97706{% else %}var(--red-text){% endif %};">
           {{ vm.uptime_str }}
+          {% if vm.unplanned_down_hrs > 0 %}
+          <div style="font-size: 6.8pt; color: #dc2626; font-weight: normal;">{{ vm.unplanned_down_hrs }}h outage</div>
+          {% endif %}
         </td>
         <td style="text-align: center; font-weight: 600;">{{ vm.cpu_percent }}%</td>
         <td style="text-align: center;">
@@ -578,8 +581,8 @@
         <td>{{ cap.used_gb }} GB</td>
         <td>{{ cap.free_gb }} GB</td>
         <td style="font-weight: 700; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
-        <td>{% if cap.delta_24h_gb > 0 %}+{{ cap.delta_24h_gb }} GB{% else %}{{ cap.delta_24h_gb }} GB{% endif %}</td>
-        <td style="font-weight: 600;">{% if cap.delta_24h_percent > 0 %}+{{ cap.delta_24h_percent }}%{% else %}{{ cap.delta_24h_percent }}%{% endif %}</td>
+        <td>{% if cap.delta_24h_gb is not None %}{% if cap.delta_24h_gb > 0 %}+{{ cap.delta_24h_gb }} GB{% else %}{{ cap.delta_24h_gb }} GB{% endif %}{% else %}&mdash;{% endif %}</td>
+        <td style="font-weight: 600;">{% if cap.delta_24h_percent is not None %}{% if cap.delta_24h_percent > 0 %}+{{ cap.delta_24h_percent }}%{% else %}{{ cap.delta_24h_percent }}%{% endif %}{% else %}&mdash;{% endif %}</td>
         <td style="font-weight: 700; color: {% if cap.runway_badge == 'critical' %}#b91c1c{% elif cap.runway_badge == 'warning' %}#b45309{% else %}#15803d{% endif %};">{{ cap.runway_text }}</td>
       </tr>
       {% endfor %}
