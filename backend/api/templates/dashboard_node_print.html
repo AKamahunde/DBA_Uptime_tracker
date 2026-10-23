@@ -545,50 +545,6 @@
     </tbody>
   </table>
 
-  <div class="section-heading">Storage Allocation &amp; Operational Runway Summary</div>
-  <table class="report-table">
-    <thead>
-      <tr>
-        <th>Timestamp</th>
-        <th>Node</th>
-        <th>Storage Tier</th>
-        <th>Capacity</th>
-        <th>Used</th>
-        <th>Free</th>
-        <th>Utilisation %</th>
-        <th>24h Delta</th>
-        <th>24h Delta %</th>
-        <th>Headroom</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for cap in node_capacity_records %}
-      <tr>
-        <td>
-          <div style="font-weight: 600;">{{ cap.date|date:"d M Y" }}</div>
-          <div style="font-size: 7.5pt; color: #64748b;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
-        </td>
-        <td>
-          {% if cap.node_name == 'OLKVM' %}
-            <strong>OLKVM</strong>
-            <div style="font-size: 7.5pt; color: #64748b;">{{ cap.hosted_systems }}</div>
-          {% else %}
-            <strong>{{ cap.node_name }} &mdash; {{ cap.display_name }}</strong>
-          {% endif %}
-        </td>
-        <td style="text-align: left; color: #475569;">{{ cap.storage_tier }}</td>
-        <td>{{ cap.capacity_gb }} GB</td>
-        <td>{{ cap.used_gb }} GB</td>
-        <td>{{ cap.free_gb }} GB</td>
-        <td style="font-weight: 700; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
-        <td>{% if cap.delta_24h_gb is not None %}{% if cap.delta_24h_gb > 0 %}+{{ cap.delta_24h_gb }} GB{% else %}{{ cap.delta_24h_gb }} GB{% endif %}{% else %}&mdash;{% endif %}</td>
-        <td style="font-weight: 600;">{% if cap.delta_24h_percent is not None %}{% if cap.delta_24h_percent > 0 %}+{{ cap.delta_24h_percent }}%{% else %}{{ cap.delta_24h_percent }}%{% endif %}{% else %}&mdash;{% endif %}</td>
-        <td style="font-weight: 700; color: {% if cap.runway_badge == 'critical' %}#b91c1c{% elif cap.runway_badge == 'warning' %}#b45309{% else %}#15803d{% endif %};">{{ cap.runway_text }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
   <div class="section-heading">Formal Review &amp; Sign-Off</div>
   <div class="signoff-grid">
     <div class="signoff-box">

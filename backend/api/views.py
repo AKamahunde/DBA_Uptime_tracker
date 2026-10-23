@@ -3849,17 +3849,19 @@ def dashboard_node_excel(request):
                 c.alignment = align_left if col_num in (1, 2, 3) else align_center
             row_num += 1
 
+        guest_vms_summary = node_ctx.get('guest_vms_summary', [])
+
         ws.append([])
         row_num += 1
-        ws.cell(row=row_num, column=1, value="Storage Allocation & Operational Runway Summary").font = font_section
+        ws.cell(row=row_num, column=1, value="Guest Virtual Machine Fleet Status").font = font_section
         row_num += 1
 
-        cap_headers = [
-            "Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"
+        vm_headers = [
+            "Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"
         ]
-        ws.append(cap_headers)
+        ws.append(vm_headers)
         ws.row_dimensions[row_num].height = 24
-        for col_num in range(1, len(cap_headers) + 1):
+        for col_num in range(1, len(vm_headers) + 1):
             c = ws.cell(row=row_num, column=col_num)
             c.font = font_header
             c.fill = fill_header
@@ -3867,36 +3869,23 @@ def dashboard_node_excel(request):
             c.border = border_thin
         row_num += 1
 
-        for cap in node_capacity_records:
-            cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
-            
-            # Format timestamp as '20 Oct 2026 09:15'
-            cap_ts = ""
-            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
-                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
-            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
-                cap_ts = cap['date'].strftime('%d %b %Y')
-            elif hasattr(cap.get('month'), 'strftime'):
-                cap_ts = cap['month'].strftime('%d %b %Y')
-            else:
-                cap_ts = str(cap.get('date') or cap.get('month') or "")
-
-            c_data = [
-                cap_ts,
-                cap_node_lbl,
-                cap['node_name'],
-                cap['storage_tier'],
-                cap['capacity_gb'],
-                cap['used_gb'],
-                cap['free_gb'],
-                f"{cap['used_percent']}%",
-                cap['delta_24h_gb'],
-                f"{cap['delta_24h_percent']}%",
-                cap['runway_text'],
+        for vm in guest_vms_summary:
+            vm_data = [
+                vm['display_name'],
+                vm['host_node'],
+                vm['cluster'],
+                vm['role'],
+                vm['database'],
+                f"{vm['uptime_percent']}%",
+                f"{vm.get('unplanned_down_hrs', 0.0)} hrs" if vm.get('unplanned_down_hrs', 0.0) > 0 else "0.00 hrs",
+                f"{vm['cpu_percent']}%",
+                f"{vm['memory_used_gb']} / {vm['memory_total_gb']} GB" if vm.get('memory_total_gb', 0) > 0 else "—",
+                f"{vm['memory_percent']}%",
+                vm['status'],
             ]
-            ws.append(c_data)
+            ws.append(vm_data)
             ws.row_dimensions[row_num].height = 20
-            for col_num in range(1, len(cap_headers) + 1):
+            for col_num in range(1, len(vm_headers) + 1):
                 c = ws.cell(row=row_num, column=col_num)
                 c.font = font_body
                 c.border = border_thin
@@ -3946,7 +3935,15 @@ def dashboard_node_excel(request):
             ])
 
         writer.writerow([])
-        writer.writerow(["Storage Allocation & Operational Runway Summary"])
+        writer.writerow(["Guest Virtual Machine Fleet Status"])
+        writer.writerow(["Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"])
+        for vm in node_ctx.get('guest_vms_summary', []):
+            writer.writerow([
+                vm['display_name'], vm['host_node'], vm['cluster'], vm['role'],
+                vm['database'], f"{vm['uptime_percent']}%", f"{vm.get('unplanned_down_hrs', 0.0)} hrs",
+                f"{vm['cpu_percent']}%", f"{vm['memory_used_gb']} / {vm['memory_total_gb']} GB",
+                f"{vm['memory_percent']}%", vm['status']
+            ])
         writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"])
         for cap in node_capacity_records:
             cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
