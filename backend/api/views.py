@@ -2460,6 +2460,181 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'date': None,
             })
 
+    # Consolidate OLKVM workloads (nmsinfra and nmsebs) into a single Node-level record
+    olkvm_workloads = [n for n in node_overview_data if n['node_name'] == 'OLKVM']
+    proxmox_nodes = [n for n in node_overview_data if n['node_name'] == 'Proxmox']
+
+    # Map hosted VMs / Workloads for Proxmox physical nodes
+    for p_node in proxmox_nodes:
+        pkey = (p_node.get('node_key') or '').lower()
+        if 'pvenode1' in pkey:
+            p_node['hosted_vms'] = [{'name': 'tomcatvm', 'label': 'tomcatvm (qemu/102)', 'role': 'Internal Web'}]
+        elif 'pvenode2' in pkey:
+            p_node['hosted_vms'] = [
+                {'name': 'jumphostvm', 'label': 'jumphostvm (qemu/100)', 'role': 'Secure Access'},
+                {'name': 'monitoringvm', 'label': 'monitoringvm (qemu/101)', 'role': 'Prometheus & Ops'}
+            ]
+        elif 'pvenode3' in pkey:
+            p_node['hosted_vms'] = [{'name': 'databasevm', 'label': 'databasevm (qemu/103)', 'role': 'MySQL / Pentana'}]
+        else:
+            p_node['hosted_vms'] = [{'name': p_node.get('display_name', 'VM'), 'label': p_node.get('hosted_systems', ''), 'role': ''}]
+
+    consolidated_node_overview = []
+    if olkvm_workloads:
+        infra_w = next((w for w in olkvm_workloads if 'infra' in w['node_key'].lower()), olkvm_workloads[0])
+        ebs_w = next((w for w in olkvm_workloads if 'ebs' in w['node_key'].lower()), None)
+        olkvm_has_data = any(w['has_data'] for w in olkvm_workloads)
+
+        # Query single deduplicated incident count and downtime for OLKVM host
+        olkvm_inc_qs = IncidentRegister.objects.filter(
+            month_inc_filter,
+            planned=False
+        ).filter(
+            Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
+        ).filter(
+            Q(node_name__iexact='OLKVM') |
+            Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']) |
+            Q(system__icontains='olkvm') |
+            Q(system__icontains='nmsinfra') |
+            Q(system__icontains='nmsebs')
+        )
+        olkvm_unplanned_hrs = 0.0
+        for inc in olkvm_inc_qs:
+            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
+                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
+                olkvm_unplanned_hrs += float(active_dt)
+            elif inc.duration_hrs:
+                olkvm_unplanned_hrs += float(inc.duration_hrs)
+        olkvm_unplanned_hrs = round(olkvm_unplanned_hrs, 2)
+        olkvm_inc_count = olkvm_inc_qs.count()
+
+        olkvm_telemetry_ups = [w['uptime_percent'] for w in olkvm_workloads if w['has_data'] and w['uptime_percent'] > 0]
+        base_olkvm_up = (sum(olkvm_telemetry_ups) / len(olkvm_telemetry_ups)) if olkvm_telemetry_ups else 100.0
+        if olkvm_unplanned_hrs > 0 and total_month_hours > 0:
+            sla_olkvm_up = round(max(0.0, (total_month_hours - olkvm_unplanned_hrs) / total_month_hours * 100.0), 2)
+            olkvm_up_pct = min(base_olkvm_up, sla_olkvm_up)
+        else:
+            olkvm_up_pct = base_olkvm_up
+        olkvm_up_pct = round(olkvm_up_pct, 2)
+
+        olkvm_cpus = sum(w['logical_cpus'] for w in olkvm_workloads)
+        olkvm_mem_tot = round(sum(w['memory_total_gb'] for w in olkvm_workloads), 2)
+        olkvm_mem_used = round(sum(w['memory_used_gb'] for w in olkvm_workloads), 2)
+        olkvm_mem_pct = round((olkvm_mem_used / olkvm_mem_tot * 100.0), 2) if olkvm_mem_tot > 0 else 0.0
+
+        tot_cpu_weight = sum(w['cpu_percent'] * w['logical_cpus'] for w in olkvm_workloads)
+        olkvm_cpu_pct = round(tot_cpu_weight / olkvm_cpus, 2) if olkvm_cpus > 0 else 0.0
+
+        olkvm_local_cap = round(sum(w['local_disk_capacity_gb'] for w in olkvm_workloads), 2)
+        olkvm_local_used = round(sum(w['local_disk_used_gb'] for w in olkvm_workloads), 2)
+        olkvm_local_free = round(max(0.0, olkvm_local_cap - olkvm_local_used), 2)
+        olkvm_local_pct = round((olkvm_local_used / olkvm_local_cap * 100.0), 2) if olkvm_local_cap > 0 else 0.0
+
+        olkvm_storage_growth = round(sum(w['storage_growth_gb'] for w in olkvm_workloads), 2)
+        olkvm_delta_24h = round(sum(w['delta_24h_gb'] for w in olkvm_workloads), 2)
+        olkvm_runway = _calculate_runway(olkvm_local_free, olkvm_delta_24h, olkvm_local_pct)
+
+        active_olkvm_inc = olkvm_inc_qs.filter(status__in=['Open', 'In Progress']).count()
+        if active_olkvm_inc > 0:
+            olkvm_status = 'Outage'
+        elif olkvm_up_pct < target_node_sla:
+            olkvm_status = 'Below SLA'
+        elif olkvm_unplanned_hrs > 0:
+            olkvm_status = 'Warning'
+        else:
+            olkvm_status = 'Healthy'
+
+        hosted_vms = [
+            {
+                'name': 'nmsinfra',
+                'label': 'Oracle DB (nmsinfra)',
+                'role': 'Oracle Database',
+                'storage_used': infra_w['local_disk_used_gb'],
+                'storage_cap': infra_w['local_disk_capacity_gb'],
+                'storage_pct': infra_w['local_disk_util_pct'],
+                'cpus': infra_w['logical_cpus'],
+                'ram_gb': infra_w['memory_total_gb'],
+            }
+        ]
+        storage_breakdown = f"nmsinfra: {round(infra_w['local_disk_used_gb']/1024.0, 2)}TB"
+        if ebs_w:
+            hosted_vms.append({
+                'name': 'nmsebs',
+                'label': 'Oracle EBS App (nmsebs)',
+                'role': 'Oracle EBS App',
+                'storage_used': ebs_w['local_disk_used_gb'],
+                'storage_cap': ebs_w['local_disk_capacity_gb'],
+                'storage_pct': ebs_w['local_disk_util_pct'],
+                'cpus': ebs_w['logical_cpus'],
+                'ram_gb': ebs_w['memory_total_gb'],
+            })
+            storage_breakdown += f" · nmsebs: {round(ebs_w['local_disk_used_gb']/1024.0, 2)}TB"
+
+        olkvm_disks = [
+            infra_w['disk_1'],
+            infra_w['disk_2'],
+        ]
+        if ebs_w:
+            olkvm_disks.append(ebs_w['disk_2'])
+        else:
+            olkvm_disks.append(infra_w['disk_3'])
+
+        consolidated_olkvm = {
+            'node_key': 'OLKVM',
+            'node_name': 'OLKVM',
+            'display_name': 'OLKVM',
+            'full_node_label': 'OLKVM',
+            'role_title': 'Oracle Linux KVM (OLKVM) Host Cluster',
+            'hosted_systems': 'Oracle DB (nmsinfra), Oracle EBS App (nmsebs)',
+            'hosted_vms': hosted_vms,
+            'storage_breakdown': storage_breakdown,
+            'primary_db': 'Oracle',
+            'server': 'OLKVM',
+            'has_data': olkvm_has_data,
+            'uptime_percent': olkvm_up_pct,
+            'uptime_str': f"{olkvm_up_pct}%" if olkvm_has_data else 'No Data',
+            'uptime_days': max(w['uptime_days'] for w in olkvm_workloads),
+            'uptime_status': 'Meets SLA' if olkvm_up_pct >= 99.90 else ('Warning' if olkvm_up_pct >= 99.0 else 'Below SLA'),
+            'unplanned_down_hrs': olkvm_unplanned_hrs,
+            'incident_count': olkvm_inc_count,
+            'logical_cpus': olkvm_cpus,
+            'cpu_percent': olkvm_cpu_pct,
+            'memory_percent': olkvm_mem_pct,
+            'memory_total_gb': olkvm_mem_tot,
+            'memory_used_gb': olkvm_mem_used,
+            'disk_percent': max(w['disk_percent'] for w in olkvm_workloads),
+            'storage_growth_gb': olkvm_storage_growth,
+            'storage_growth_pct': round((olkvm_storage_growth / olkvm_local_used * 100.0), 2) if olkvm_local_used > 0 else 0.0,
+            'delta_24h_gb': olkvm_delta_24h,
+            'delta_24h_pct': round((olkvm_delta_24h / olkvm_local_used * 100.0), 2) if olkvm_local_used > 0 else 0.0,
+            'runway_days': olkvm_runway['days'],
+            'runway_text': olkvm_runway['text'],
+            'runway_badge': olkvm_runway['badge'],
+            'disks': olkvm_disks,
+            'disk_1': olkvm_disks[0],
+            'disk_2': olkvm_disks[1],
+            'disk_3': olkvm_disks[2] if len(olkvm_disks) > 2 else olkvm_disks[1],
+            'total_disk_capacity_gb': round(infra_w['disk_1']['size_gb'] + olkvm_local_cap, 2),
+            'total_disk_used_gb': round(infra_w['disk_1']['used_gb'] + olkvm_local_used, 2),
+            'total_disk_free_gb': round(infra_w['disk_1']['free_gb'] + olkvm_local_free, 2),
+            'local_disk_capacity_gb': olkvm_local_cap,
+            'local_disk_used_gb': olkvm_local_used,
+            'local_disk_free_gb': olkvm_local_free,
+            'local_disk_util_pct': olkvm_local_pct,
+            'total_disk_used_pct': round(((infra_w['disk_1']['used_gb'] + olkvm_local_used) / (infra_w['disk_1']['size_gb'] + olkvm_local_cap) * 100.0), 1) if (infra_w['disk_1']['size_gb'] + olkvm_local_cap) > 0 else olkvm_local_pct,
+            'connections': sum(w['connections'] for w in olkvm_workloads),
+            'threads': sum(w['threads'] for w in olkvm_workloads),
+            'slow_queries': sum(w['slow_queries'] for w in olkvm_workloads),
+            'status': olkvm_status,
+            'entered_by': 'Prometheus',
+            'updated_at': infra_w['updated_at'],
+            'date': infra_w['date'],
+        }
+        consolidated_node_overview.append(consolidated_olkvm)
+
+    consolidated_node_overview.extend(proxmox_nodes)
+    node_overview_data = consolidated_node_overview
+
     if selected_node == 'All Nodes':
         filtered_nodes = node_overview_data
     elif selected_node in ('OLKVM', 'Proxmox'):

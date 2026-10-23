@@ -862,6 +862,7 @@
             <thead>
                 <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Node</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Hosted VMs / Workloads</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Monthly average uptime across all telemetry records and logged outages">Uptime (Monthly Avg)</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down</th>
                     <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
@@ -877,31 +878,55 @@
             <tbody>
                 {% for node in filtered_nodes %}
                 <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
-                    <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
+                    <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy); white-space: nowrap;">
                         {% if node.node_name == 'OLKVM' %}
-                            OLKVM
-                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ node.hosted_systems }}</div>
+                            <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy);">OLKVM</div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Host Cluster</div>
                         {% else %}
-                            {{ node.node_name }} &mdash; {{ node.display_name }}
-                            <div style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 0.1rem;">{{ node.hosted_systems }}</div>
+                            <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy);">{{ node.display_name }}</div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Proxmox VE Node</div>
                         {% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; vertical-align: middle;">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            {% for vm in node.hosted_vms %}
+                                <div style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #0284c7; flex-shrink: 0;"></span>
+                                    <strong style="color: #0f172a;">{{ vm.name }}</strong>
+                                    {% if vm.role %}
+                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.role }})</span>
+                                    {% elif vm.label and vm.label != vm.name %}
+                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.label }})</span>
+                                    {% endif %}
+                                </div>
+                            {% empty %}
+                                <span style="color: #64748b; font-size: 0.75rem;">{{ node.hosted_systems }}</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %}; white-space: nowrap;">
                         {{ node.uptime_str }}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.unplanned_down_hrs > 0 %}#c5221f{% else %}#475569{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.unplanned_down_hrs > 0 %}#c5221f{% else %}#475569{% endif %}; white-space: nowrap;">
                         {% if node.unplanned_down_hrs > 0 %}{{ node.unplanned_down_hrs }} hrs{% else %}0.00 hrs{% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.incident_count > 0 %}#c5221f{% else %}#334155{% endif %};">
                         {{ node.incident_count }}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
-                        {% if node.has_data and node.local_disk_capacity_gb > 0 %}{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }}{% else %}No Data{% endif %}
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600; white-space: nowrap;">
+                        {% if node.has_data and node.local_disk_capacity_gb > 0 %}
+                            <div>{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }}</div>
+                            {% if node.storage_breakdown %}
+                                <div style="font-size: 0.68rem; color: #94a3b8; font-weight: normal; margin-top: 0.1rem;" title="Workload storage breakdown">{{ node.storage_breakdown }}</div>
+                            {% endif %}
+                        {% else %}
+                            No Data
+                        {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {% if node.has_data %}{{ node.local_disk_util_pct }}%{% else %}No Data{% endif %}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600;">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600; white-space: nowrap;">
                         {% if node.has_data and node.memory_total_gb > 0 %}{{ node.memory_used_gb }} / {{ node.memory_total_gb }}{% else %}No Data{% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
