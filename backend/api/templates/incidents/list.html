@@ -223,7 +223,7 @@
                     <thead>
                         <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
                             <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Ticket ID</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Target / Scope</th>
+                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Target</th>
                             <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Outage Window</th>
                             <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;" title="Operational business-hours outage duration affecting SLA">Duration</th>
                             <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;">Severity</th>
@@ -283,7 +283,7 @@
                                 </script>
                             </td>
 
-                            <!-- Target / Scope -->
+                            <!-- Target -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle;">
                                 {% if incident.category == 'Infrastructure' %}
                                     <div>
