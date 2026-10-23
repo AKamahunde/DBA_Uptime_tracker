@@ -178,19 +178,19 @@
     line-height: 1.4;
   }
 
-  .kpi-deck {
+  .plain-metrics-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 12px;
+    padding: 6px 0 8px 0;
+    margin: 4px 0 10px 0;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1px solid var(--border-mist);
   }
-  .kpi-card {
-    background: #ffffff;
-    border: 1px solid var(--border-mist);
-    border-radius: 4px;
-    padding: 6px 10px;
+  .plain-metric {
+    padding: 0;
   }
-  .kpi-label {
+  .plain-metric-label {
     font-size: 7px;
     font-weight: 700;
     text-transform: uppercase;
@@ -198,7 +198,7 @@
     color: var(--text-soft);
     margin: 0 0 2px 0;
   }
-  .kpi-value {
+  .plain-metric-value {
     font-size: 14px;
     font-weight: 800;
     margin: 0 0 1px 0;
@@ -206,10 +206,10 @@
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
   }
-  .kpi-value.green {
+  .plain-metric-value.green {
     color: var(--primary-green);
   }
-  .kpi-subtext {
+  .plain-metric-subtext {
     font-size: 7px;
     color: #94a3b8;
     margin: 0;
@@ -412,26 +412,26 @@
     </p>
   </div>
 
-  <div class="kpi-deck">
-    <div class="kpi-card">
-      <div class="kpi-label">Provisioned Storage</div>
-      <div class="kpi-value">{{ kpi_total_storage_gb }} GB</div>
-      <div class="kpi-subtext">Across monitored node pools</div>
+  <div class="plain-metrics-strip">
+    <div class="plain-metric">
+      <div class="plain-metric-label">Provisioned Storage</div>
+      <div class="plain-metric-value">{{ kpi_total_storage_gb }} GB</div>
+      <div class="plain-metric-subtext">Across monitored node pools</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Used Storage</div>
-      <div class="kpi-value green">{{ kpi_used_storage_gb }} GB</div>
-      <div class="kpi-subtext">{{ kpi_storage_used_pct }}% aggregate utilisation</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Used Storage</div>
+      <div class="plain-metric-value green">{{ kpi_used_storage_gb }} GB</div>
+      <div class="plain-metric-subtext">{{ kpi_storage_used_pct }}% aggregate utilisation</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Free Headroom</div>
-      <div class="kpi-value">{{ kpi_free_storage_gb }} GB</div>
-      <div class="kpi-subtext">Unallocated &amp; usable volume</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Free Headroom</div>
+      <div class="plain-metric-value">{{ kpi_free_storage_gb }} GB</div>
+      <div class="plain-metric-subtext">Unallocated &amp; usable volume</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Monitored Storage Tiers</div>
-      <div class="kpi-value">{{ node_capacity_records|length }} Tiers</div>
-      <div class="kpi-subtext">Shared pools &amp; host disks</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Monitored Storage Tiers</div>
+      <div class="plain-metric-value">{{ node_capacity_records|length }} Tiers</div>
+      <div class="plain-metric-subtext">Shared pools &amp; host disks</div>
     </div>
   </div>
 

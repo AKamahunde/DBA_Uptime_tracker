@@ -184,27 +184,27 @@
     line-height: 1.45;
   }
 
-  .kpi-deck {
+  .plain-metrics-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 12px;
+    padding: 6px 0 8px 0;
+    margin: 4px 0 10px 0;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1px solid var(--border-mist);
   }
-  .kpi-card {
-    background: #ffffff;
-    border: 1px solid var(--border-mist);
-    border-radius: 4px;
-    padding: 7px 12px;
+  .plain-metric {
+    padding: 0;
   }
-  .kpi-label {
-    font-size: 7.5px;
+  .plain-metric-label {
+    font-size: 7.2px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-soft);
     margin: 0 0 2px 0;
   }
-  .kpi-value {
+  .plain-metric-value {
     font-size: 15px;
     font-weight: 800;
     margin: 0 0 1px 0;
@@ -212,11 +212,11 @@
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
   }
-  .kpi-value.green {
+  .plain-metric-value.green {
     color: var(--primary-green);
   }
-  .kpi-subtext {
-    font-size: 7.5px;
+  .plain-metric-subtext {
+    font-size: 7.2px;
     color: #94a3b8;
     margin: 0;
     font-variant-numeric: tabular-nums;
@@ -414,26 +414,26 @@
     <p class="summary-box-text">{{ lede_text|striptags }}</p>
   </div>
 
-  <div class="kpi-deck">
-    <div class="kpi-card">
-      <div class="kpi-label">Node Uptime (Monthly Avg)</div>
-      <div class="kpi-value green">{{ kpi_node_uptime }}</div>
-      <div class="kpi-subtext">{{ kpi_nodes_healthy }} • Target: &ge; {{ target_node_sla }}%</div>
+  <div class="plain-metrics-strip">
+    <div class="plain-metric">
+      <div class="plain-metric-label">Node Uptime (Monthly Avg)</div>
+      <div class="plain-metric-value green">{{ kpi_node_uptime }}</div>
+      <div class="plain-metric-subtext">{{ kpi_nodes_healthy }} &bull; Target: &ge; {{ target_node_sla }}%</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Logical CPUs</div>
-      <div class="kpi-value">{{ kpi_total_logical_cpus }} vCPUs</div>
-      <div class="kpi-subtext">OLKVM &amp; Proxmox compute</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Logical CPUs</div>
+      <div class="plain-metric-value">{{ kpi_total_logical_cpus }} vCPUs</div>
+      <div class="plain-metric-subtext">OLKVM &amp; Proxmox compute</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Memory</div>
-      <div class="kpi-value">{{ kpi_total_ram_gb }} GB</div>
-      <div class="kpi-subtext">{{ kpi_used_ram_gb }} GB in use</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Total Memory</div>
+      <div class="plain-metric-value">{{ kpi_total_ram_gb }} GB</div>
+      <div class="plain-metric-subtext">{{ kpi_used_ram_gb }} GB in use</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Storage</div>
-      <div class="kpi-value">{{ kpi_total_storage_gb }} GB</div>
-      <div class="kpi-subtext">{{ kpi_used_storage_gb }} GB used ({{ kpi_storage_used_pct }}%)</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Total Storage</div>
+      <div class="plain-metric-value">{{ kpi_total_storage_gb }} GB</div>
+      <div class="plain-metric-subtext">{{ kpi_used_storage_gb }} GB used ({{ kpi_storage_used_pct }}%)</div>
     </div>
   </div>
 
