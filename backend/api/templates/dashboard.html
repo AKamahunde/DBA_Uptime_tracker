@@ -173,6 +173,16 @@
             grid-template-columns: 1fr !important;
         }
     }
+    @keyframes modalSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.985);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
 </style>
 
 {% if can_view_db_dashboard %}
@@ -1166,62 +1176,125 @@
 
 {% if can_view_db_dashboard %}
 <!-- Export Performance Report Preview Modal -->
-<div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
+<div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08); max-width: 540px; width: 100%; overflow: hidden; display: flex; flex-direction: column; animation: modalSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         <!-- Modal Header -->
-        <div style="background-color: var(--primary-navy); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family: inherit;">Generate Performance Report</h3>
-            <button type="button" onclick="closeExportModal()" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.8); font-size: 1.25rem; cursor: pointer; line-height: 1; padding: 0;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'">&times;</button>
+        <div style="background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); padding: 1.15rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(255, 255, 255, 0.12); display: flex; align-items: center; justify-content: center; color: #ffffff; flex-shrink: 0;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25;">Generate Performance Report</h3>
+                    <p style="margin: 0.2rem 0 0 0; color: rgba(255, 255, 255, 0.75); font-size: 0.75rem; font-weight: 400;">Monthly telemetry publication, SLAs &amp; operational metrics</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeExportModal()" aria-label="Close" style="background: rgba(255, 255, 255, 0.12); border: none; color: #ffffff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; line-height: 1; padding: 0; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.12)'">&times;</button>
         </div>
         
         <!-- Modal Form -->
-        <form action="{% url 'dashboard_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeExportModal, 500)" style="margin: 0; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+        <form action="{% url 'dashboard_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeExportModal, 500)" style="margin: 0; padding: 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
             {% csrf_token %}
             <input type="hidden" name="download" value="true">
+            <input type="hidden" name="month" value="{{ reporting_month }}">
+            <input type="hidden" name="database_select" value="{{ selected_db }}">
             
-            <!-- Metadata Fields (Readonly side-by-side) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
-                    <input type="text" value="{{ reporting_month }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
-                    <input type="hidden" name="month" value="{{ reporting_month }}">
+            <!-- Metadata Scope Badges -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
+                <div>
+                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Reporting Period</span>
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        {{ reporting_month }}
+                    </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
-                    <input type="text" value="{{ selected_db }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
-                    <input type="hidden" name="database_select" value="{{ selected_db }}">
+                <div style="border-left: 1px solid #e2e8f0; padding-left: 0.85rem;">
+                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Database Scope</span>
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                        </svg>
+                        {{ selected_db }}
+                    </div>
                 </div>
             </div>
             
             <!-- Report Contents Checklist -->
-            <div style="background-color: #f4f7fc; border-radius: 6px; padding: 0.75rem 1rem; border: 1px dashed rgba(90, 123, 156, 0.25);">
-                <span style="font-size: 0.72rem; font-weight: 700; color: var(--primary-navy); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.35rem; font-family: inherit;">Included Sections</span>
-                <ul style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: #475569; line-height: 1.45;">
-                    <li>Executive performance summary and editorial analysis</li>
-                    <li>SLA performance &amp; target compliance scorecard</li>
-                    <li>Detailed operations metrics (Downtime, incidents, backups, replication)</li>
-                    <li>Infrastructure architecture &amp; environment specifications</li>
-                    <li>Formal multi-tier sign-off and approval block</li>
-                </ul>
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #00205B; text-transform: uppercase; letter-spacing: 0.05em;">Included Sections</span>
+                    <span style="font-size: 0.68rem; font-weight: 600; color: #15803d; background: #dcfce7; padding: 0.15rem 0.5rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: #16a34a; display: inline-block;"></span> 5 Sections Ready
+                    </span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.76rem; color: #334155;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Performance summary &amp; editorial narrative</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>SLA performance &amp; target compliance scorecard</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Operations metrics (Downtime, incidents, backups, replication)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Infrastructure architecture &amp; environment specifications</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Formal multi-tier sign-off and approval block</span>
+                    </div>
+                </div>
             </div>
             
             <!-- Narrative Summary (Editable) -->
-            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                <label for="summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Executive Summary Narrative</label>
-                <textarea id="summary_narrative" name="summary_narrative" rows="4" style="padding: 0.5rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; font-family: inherit; line-height: 1.4; resize: vertical; color: #1e293b; width: 100%;" placeholder="Add custom narrative context...">{{ default_lede_text }}</textarea>
-                <span style="font-size: 0.68rem; color: #64748b; font-style: italic;">Note: You can edit or append custom commentary directly in the text box above to override the automated summary text.</span>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label for="summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Summary Narrative</label>
+                    <span style="font-size: 0.68rem; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 0.12rem 0.45rem; border-radius: 4px;">Editable Commentary</span>
+                </div>
+                <textarea id="summary_narrative" name="summary_narrative" rows="4" style="padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-family: inherit; line-height: 1.5; resize: vertical; color: #0f172a; width: 100%; box-sizing: border-box; background: #ffffff; transition: border-color 0.15s, box-shadow 0.15s;" onfocus="this.style.borderColor='#00205B'; this.style.boxShadow='0 0 0 3px rgba(0, 32, 91, 0.1)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';" placeholder="Add custom narrative context...">{{ default_lede_text }}</textarea>
+                <div style="font-size: 0.71rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem; line-height: 1.35;">
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="#94a3b8" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                    <span>Edit or append custom notes to tailor the summary text included in the publication.</span>
+                </div>
             </div>
             
             <!-- Action Buttons -->
-            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
                 <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" style="color: #64748b; font-size: 0.72rem; text-decoration: underline; font-weight: 600; font-family: inherit;" download onclick="closeExportModal()">
-                    Export raw Excel summary instead
+                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                    Excel Summary (.xlsx)
                 </a>
                 
-                <div style="display: flex; gap: 0.75rem;">
-                    <button type="button" onclick="closeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
-                    <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                <div style="display: flex; gap: 0.65rem;">
+                    <button type="button" onclick="closeExportModal()" style="padding: 0.48rem 0.95rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f8fafc'">Cancel</button>
+                    <button type="submit" style="padding: 0.48rem 1.15rem; border: none; border-radius: 6px; background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; font-family: inherit; box-shadow: 0 2px 4px rgba(0, 32, 91, 0.2); transition: all 0.15s;" onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="12" y2="18"></line>
+                            <line x1="15" y1="15" x2="12" y2="18"></line>
+                        </svg>
                         Generate PDF Report
                     </button>
                 </div>
@@ -1233,62 +1306,125 @@
 
 {% if can_view_infra_dashboard %}
 <!-- Export Node Performance Report Preview Modal -->
-<div id="exportNodeReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
+<div id="exportNodeReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08); max-width: 540px; width: 100%; overflow: hidden; display: flex; flex-direction: column; animation: modalSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         <!-- Modal Header -->
-        <div style="background-color: var(--primary-navy); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family: inherit;">Generate Node Infrastructure Report</h3>
-            <button type="button" onclick="closeNodeExportModal()" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.8); font-size: 1.25rem; cursor: pointer; line-height: 1; padding: 0;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'">&times;</button>
+        <div style="background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); padding: 1.15rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(255, 255, 255, 0.12); display: flex; align-items: center; justify-content: center; color: #ffffff; flex-shrink: 0;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25;">Generate Node Infrastructure Report</h3>
+                    <p style="margin: 0.2rem 0 0 0; color: rgba(255, 255, 255, 0.75); font-size: 0.75rem; font-weight: 400;">Monthly telemetry publication, SLAs &amp; hypervisor metrics</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeNodeExportModal()" aria-label="Close" style="background: rgba(255, 255, 255, 0.12); border: none; color: #ffffff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; line-height: 1; padding: 0; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.12)'">&times;</button>
         </div>
 
         <!-- Modal Form -->
-        <form action="{% url 'dashboard_node_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeNodeExportModal, 500)" style="margin: 0; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+        <form action="{% url 'dashboard_node_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeNodeExportModal, 500)" style="margin: 0; padding: 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
             {% csrf_token %}
             <input type="hidden" name="download" value="true">
+            <input type="hidden" name="month" value="{{ reporting_month }}">
+            <input type="hidden" name="node_select" value="{{ selected_node }}">
 
-            <!-- Metadata Fields (Readonly side-by-side) -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
-                    <input type="text" value="{{ reporting_month }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
-                    <input type="hidden" name="month" value="{{ reporting_month }}">
+            <!-- Metadata Scope Badges -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
+                <div>
+                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Reporting Period</span>
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        {{ reporting_month }}
+                    </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
-                    <input type="text" value="{{ selected_node }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
-                    <input type="hidden" name="node_select" value="{{ selected_node }}">
+                <div style="border-left: 1px solid #e2e8f0; padding-left: 0.85rem;">
+                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Node Scope</span>
+                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                        {{ selected_node }}
+                    </div>
                 </div>
             </div>
 
             <!-- Report Contents Checklist -->
-            <div style="background-color: #f4f7fc; border-radius: 6px; padding: 0.75rem 1rem; border: 1px dashed rgba(90, 123, 156, 0.25);">
-                <span style="font-size: 0.72rem; font-weight: 700; color: var(--primary-navy); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.35rem; font-family: inherit;">Included Sections</span>
-                <ul style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: #475569; line-height: 1.45;">
-                    <li>Executive node infrastructure summary and editorial analysis</li>
-                    <li>Node uptime SLA &amp; compute/memory/storage KPI deck</li>
-                    <li>Capacity &amp; performance records across OLKVM and Proxmox</li>
-                    <li>6-month node uptime trend and active status alerts</li>
-                    <li>Formal multi-tier sign-off and approval block</li>
-                </ul>
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
+                    <span style="font-size: 0.7rem; font-weight: 700; color: #00205B; text-transform: uppercase; letter-spacing: 0.05em;">Included Sections</span>
+                    <span style="font-size: 0.68rem; font-weight: 600; color: #15803d; background: #dcfce7; padding: 0.15rem 0.5rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: #16a34a; display: inline-block;"></span> 5 Sections Ready
+                    </span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.76rem; color: #334155;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Node infrastructure summary &amp; editorial narrative</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Node uptime SLA &amp; compute/memory/storage KPI deck</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Capacity &amp; performance records across OLKVM and Proxmox</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>6-month node uptime trend and active status alerts</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        <span>Formal multi-tier sign-off and approval block</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Narrative Summary (Editable) -->
-            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
-                <label for="node_summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Executive Summary Narrative</label>
-                <textarea id="node_summary_narrative" name="summary_narrative" rows="4" style="padding: 0.5rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; font-family: inherit; line-height: 1.4; resize: vertical; color: #1e293b; width: 100%;" placeholder="Add custom narrative context...">{{ default_node_lede_text }}</textarea>
-                <span style="font-size: 0.68rem; color: #64748b; font-style: italic;">Note: You can edit or append custom commentary directly in the text box above to override the automated summary text.</span>
+            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label for="node_summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Summary Narrative</label>
+                    <span style="font-size: 0.68rem; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 0.12rem 0.45rem; border-radius: 4px;">Editable Commentary</span>
+                </div>
+                <textarea id="node_summary_narrative" name="summary_narrative" rows="4" style="padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-family: inherit; line-height: 1.5; resize: vertical; color: #0f172a; width: 100%; box-sizing: border-box; background: #ffffff; transition: border-color 0.15s, box-shadow 0.15s;" onfocus="this.style.borderColor='#00205B'; this.style.boxShadow='0 0 0 3px rgba(0, 32, 91, 0.1)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';" placeholder="Add custom narrative context...">{{ default_node_lede_text }}</textarea>
+                <div style="font-size: 0.71rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem; line-height: 1.35;">
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="#94a3b8" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                    <span>Edit or append custom notes to tailor the summary text included in the publication.</span>
+                </div>
             </div>
 
             <!-- Action Buttons -->
-            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
                 <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_node_excel' %}?month={{ reporting_month }}&node_select={{ selected_node }}" style="color: #64748b; font-size: 0.72rem; text-decoration: underline; font-weight: 600; font-family: inherit;" download onclick="closeNodeExportModal()">
-                    Export raw Excel summary instead
+                <a href="{% url 'dashboard_node_excel' %}?month={{ reporting_month }}&node_select={{ selected_node }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeNodeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+                    Excel Summary (.xlsx)
                 </a>
 
-                <div style="display: flex; gap: 0.75rem;">
-                    <button type="button" onclick="closeNodeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
-                    <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                <div style="display: flex; gap: 0.65rem;">
+                    <button type="button" onclick="closeNodeExportModal()" style="padding: 0.48rem 0.95rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f8fafc'">Cancel</button>
+                    <button type="submit" style="padding: 0.48rem 1.15rem; border: none; border-radius: 6px; background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; font-family: inherit; box-shadow: 0 2px 4px rgba(0, 32, 91, 0.2); transition: all 0.15s;" onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="12" y2="18"></line>
+                            <line x1="15" y1="15" x2="12" y2="18"></line>
+                        </svg>
                         Generate PDF Report
                     </button>
                 </div>
@@ -1333,6 +1469,14 @@
             closeExportModal();
             closeNodeExportModal();
         }
+    });
+
+    // Close modal on backdrop click outside dialog
+    document.getElementById('exportReportModal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeExportModal();
+    });
+    document.getElementById('exportNodeReportModal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeNodeExportModal();
     });
 
     // Node Scope and Database Filter Navigation
