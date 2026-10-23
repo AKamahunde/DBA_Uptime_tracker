@@ -314,7 +314,7 @@
 
                     <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
                         <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
-                        <span>Headroom: <strong style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
+                        <span>Headroom: <strong title="Projected operational runway before storage exhaustion at current daily consumption rate" style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
                     </div>
                 </div>
                 {% endfor %}
@@ -343,7 +343,7 @@
                     <th>Utilisation %</th>
                     <th>24h Delta</th>
                     <th>24h Delta %</th>
-                    <th>Headroom</th>
+                    <th title="Projected operational runway before volume exhaustion at current consumption rate">Headroom</th>
                 </tr>
             </thead>
             <tbody>

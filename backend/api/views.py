@@ -2429,24 +2429,47 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         return lbl
 
     def _calculate_runway(free_gb, daily_burn_gb, used_pct=0.0):
-        if free_gb <= 0:
+        free_gb = float(free_gb or 0.0)
+        daily_burn_gb = float(daily_burn_gb or 0.0)
+        used_pct = float(used_pct or 0.0)
+
+        # 1. Truly exhausted / 0 bytes free
+        if free_gb <= 0.0:
             return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
+
+        # 2. Critical utilization boundary (>= 95% full)
         if used_pct >= 95.0:
-            return {'days': 0, 'text': '< 10 days', 'badge': 'critical'}
-        if daily_burn_gb and daily_burn_gb > 0.05 and free_gb > 0:
-            days = int(free_gb / daily_burn_gb)
-            if days <= 7:
-                return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
-            elif days <= 30:
-                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-            elif days <= 90:
-                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-            elif days <= 365:
-                mos = round(days / 30.4, 1)
-                return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
-            else:
-                return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
-        return {'days': 9999, 'text': "> 1 Year", 'badge': 'stable'}
+            return {'days': 3, 'text': '< 7 days (Critical)', 'badge': 'critical'}
+
+        # 3. Non-positive or negligible daily growth (stable or shrinking)
+        if daily_burn_gb <= 0.05:
+            return {'days': 9999, 'text': '> 1 Year', 'badge': 'stable'}
+
+        # 4. Compute projected days until storage exhaustion
+        days = max(1, int(free_gb / daily_burn_gb))
+
+        # 5. Sanity guard against temporary delta bursts on healthy disks:
+        # A 24h burst (backup dump, archivelog surge, index rebuild) on a healthy disk (<75% used, >100GB free)
+        # must NOT falsely trigger "0 days" or "< 7 days" panic alarms.
+        if used_pct < 75.0 and free_gb >= 100.0:
+            if days < 60:
+                return {'days': 365, 'text': '> 1 Year (Stable)', 'badge': 'stable'}
+        elif used_pct < 85.0 and free_gb >= 50.0:
+            if days < 14:
+                return {'days': 90, 'text': '> 3 mos (Spike)', 'badge': 'healthy'}
+
+        # 6. Standard threshold categorization
+        if days <= 7:
+            return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
+        elif days <= 30:
+            return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
+        elif days <= 90:
+            return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
+        elif days <= 365:
+            mos = round(days / 30.4, 1)
+            return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
+        else:
+            return {'days': days, 'text': '> 1 Year', 'badge': 'stable'}
 
     node_overview_data = []
     for nd in node_definitions:
@@ -2571,34 +2594,46 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d3_used = float(latest_rec.disk_3_used_gb or 0.0)
 
             # Baseline confirmed telemetry starts from October 1, 2026
-            # Daily 24h Delta: compare against yesterday's run (most recent prior run)
+            # Daily 24h Delta: compare against yesterday's run (most recent prior run with valid telemetry)
             oct_baseline_date = datetime(2026, 10, 1).date()
             prev_run_rec = None
             if latest_rec.date > oct_baseline_date:
                 prev_run_rec = (
                     ServerHealth.objects.filter(nd['filter_q'], date__lt=latest_rec.date, date__gte=oct_baseline_date)
+                    .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
                     .order_by('-date', '-updated_at')
                     .first()
                 )
 
             if prev_run_rec:
-                prev_d1_used = float(prev_run_rec.disk_1_used_gb or 0.0)
-                prev_d2_used = float(prev_run_rec.disk_2_used_gb or 0.0)
-                prev_d3_used = float(prev_run_rec.disk_3_used_gb or 0.0)
+                prev_d1_used = float(prev_run_rec.disk_1_used_gb or 0.0) if float(prev_run_rec.disk_1_size_gb or 0.0) > 0 else 0.0
+                prev_d2_used = float(prev_run_rec.disk_2_used_gb or 0.0) if float(prev_run_rec.disk_2_size_gb or 0.0) > 0 else 0.0
+                prev_d3_used = float(prev_run_rec.disk_3_used_gb or 0.0) if float(prev_run_rec.disk_3_size_gb or 0.0) > 0 else 0.0
                 prev_local_used = prev_d2_used + prev_d3_used
                 curr_local_used = d2_used + d3_used
 
-                d1_delta_gb = round(d1_used - prev_d1_used, 2)
-                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if prev_d1_used > 0 else 0.0
+                # Safe delta calculation: only compute if previous run had positive usage
+                d1_delta_gb = round(d1_used - prev_d1_used, 2) if (prev_d1_used > 0 and d1_used > 0) else 0.0
+                # Guard against delta anomalies (>25% disk size jump or baseline shift)
+                if d1_size > 0 and abs(d1_delta_gb) > (d1_size * 0.25):
+                    d1_delta_gb = 0.0
+                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if (prev_d1_used > 0 and d1_delta_gb != 0.0) else 0.0
 
-                d2_delta_gb = round(d2_used - prev_d2_used, 2)
-                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if prev_d2_used > 0 else 0.0
+                d2_delta_gb = round(d2_used - prev_d2_used, 2) if (prev_d2_used > 0 and d2_used > 0) else 0.0
+                if d2_size > 0 and abs(d2_delta_gb) > (d2_size * 0.25):
+                    d2_delta_gb = 0.0
+                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if (prev_d2_used > 0 and d2_delta_gb != 0.0) else 0.0
 
-                d3_delta_gb = round(d3_used - prev_d3_used, 2)
-                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if prev_d3_used > 0 else 0.0
+                d3_delta_gb = round(d3_used - prev_d3_used, 2) if (prev_d3_used > 0 and d3_used > 0) else 0.0
+                if d3_size > 0 and abs(d3_delta_gb) > (d3_size * 0.25):
+                    d3_delta_gb = 0.0
+                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if (prev_d3_used > 0 and d3_delta_gb != 0.0) else 0.0
 
-                local_delta_gb = round(curr_local_used - prev_local_used, 2)
-                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if prev_local_used > 0 else 0.0
+                local_delta_gb = round(curr_local_used - prev_local_used, 2) if (prev_local_used > 0 and curr_local_used > 0) else 0.0
+                local_cap_est = d2_size + d3_size
+                if local_cap_est > 0 and abs(local_delta_gb) > (local_cap_est * 0.25):
+                    local_delta_gb = 0.0
+                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if (prev_local_used > 0 and local_delta_gb != 0.0) else 0.0
             else:
                 d1_delta_gb = 0.0
                 d1_delta_pct = 0.0
@@ -3045,6 +3080,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             filter_node_q = nd_m['filter_q'] if nd_m else Q(server=hr.server)
             prev_hr = (
                 ServerHealth.objects.filter(filter_node_q, date__lt=hr.date, date__gte=oct_baseline_date)
+                .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
                 .order_by('-date', '-updated_at')
                 .first()
             )
@@ -3055,8 +3091,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d2_fr = max(0.0, d2_sz - d2_us)
             d2_pct = float(hr.disk_2_percent or 0.0)
             prev_d2 = float(prev_hr.disk_2_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_2_size_gb or 0.0) > 0) else 0.0
-            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0) else 0.0
-            if abs(d2_delta) > (d2_sz * 0.4):
+            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0 and d2_us > 0) else 0.0
+            if d2_sz > 0 and abs(d2_delta) > (d2_sz * 0.25):
                 d2_delta = 0.0
             d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (prev_hr and prev_d2 > 0 and d2_delta != 0.0) else 0.0
             d2_rw = _calculate_runway(d2_fr, d2_delta, d2_pct)
@@ -3092,8 +3128,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             d3_fr = max(0.0, d3_sz - d3_us)
             d3_pct = float(hr.disk_3_percent or 0.0)
             prev_d3 = float(prev_hr.disk_3_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_3_size_gb or 0.0) > 0) else 0.0
-            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0) else 0.0
-            if abs(d3_delta) > (d3_sz * 0.4):
+            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0 and d3_us > 0) else 0.0
+            if d3_sz > 0 and abs(d3_delta) > (d3_sz * 0.25):
                 d3_delta = 0.0
             d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (prev_hr and prev_d3 > 0 and d3_delta != 0.0) else 0.0
             d3_rw = _calculate_runway(d3_fr, d3_delta, d3_pct)
@@ -3132,8 +3168,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 d1_fr = max(0.0, d1_sz - d1_us)
                 d1_pct = float(hr.disk_1_percent or 0.0)
                 prev_d1 = float(prev_hr.disk_1_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_1_size_gb or 0.0) > 0) else 0.0
-                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0) else 0.0
-                if abs(d1_delta) > (d1_sz * 0.4):
+                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0 and d1_us > 0) else 0.0
+                if d1_sz > 0 and abs(d1_delta) > (d1_sz * 0.25):
                     d1_delta = 0.0
                 d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (prev_hr and prev_d1 > 0 and d1_delta != 0.0) else 0.0
                 d1_rw = _calculate_runway(d1_fr, d1_delta, d1_pct)
@@ -4569,7 +4605,9 @@ def capacity_list(request):
                 
                 if growth_val > 0.01 and fleet_free > 0:
                     daily_burn = round(growth_val / 30.4, 2)
-                    runway_days = int(fleet_free / (growth_val / 30.4)) if (growth_val / 30.4) > 0 else 9999
+                    runway_days = max(1, int(fleet_free / (growth_val / 30.4))) if (growth_val / 30.4) > 0 else 9999
+                    if used_pct < 75.0 and fleet_free >= 50.0 and runway_days < 60:
+                        runway_days = 9999
                     headroom_months = space_left_gb / growth_val
                     if headroom_months < 0:
                         headroom_str = "Exceeded threshold"
@@ -4588,9 +4626,15 @@ def capacity_list(request):
                     daily_burn = 0.0
                     runway_days = 9999
 
-                if runway_days <= 30:
+                if used_pct >= 95.0:
+                    runway_text = "< 7 days (Critical)"
+                    runway_badge = 'critical'
+                elif runway_days <= 7:
                     runway_text = f"{runway_days} days"
                     runway_badge = 'critical'
+                elif runway_days <= 30:
+                    runway_text = f"{runway_days} days"
+                    runway_badge = 'warning'
                 elif runway_days <= 90:
                     runway_text = f"{runway_days} days"
                     runway_badge = 'warning'

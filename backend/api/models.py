@@ -707,11 +707,20 @@ class CapacityPlanning(models.Model):
     def runway_info(self):
         growth = float(self.growth_gb or 0.0)
         free = float(self.available_capacity_gb or 0.0)
+        used_pct = float(self.disk_used_percent or 0.0)
+        if free <= 0.0:
+            return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
+        if used_pct >= 95.0:
+            return {'days': 3, 'text': '< 7 days (Critical)', 'badge': 'critical'}
         if growth > 0.01 and free > 0:
             daily_burn = growth / 30.4
-            days = int(free / daily_burn) if daily_burn > 0 else 9999
-            if days <= 30:
+            days = max(1, int(free / daily_burn)) if daily_burn > 0 else 9999
+            if used_pct < 75.0 and free >= 50.0 and days < 60:
+                return {'days': 365, 'text': '> 1 Year (Stable)', 'badge': 'stable'}
+            if days <= 7:
                 return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
+            elif days <= 30:
+                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
             elif days <= 90:
                 return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
             elif days <= 365:
