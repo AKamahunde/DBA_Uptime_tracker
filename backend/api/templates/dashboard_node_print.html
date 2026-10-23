@@ -510,7 +510,9 @@
       <tr>
         <td>
           <strong>{{ vm.display_name }}</strong>
-          <div style="font-size: 7pt; color: #64748b;">{% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}{{ vm.vmid }} &bull; {% endif %}{{ vm.ip_address }}</div>
+          {% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}
+          <div style="font-size: 7pt; color: #64748b; font-family: monospace;">{{ vm.vmid }}</div>
+          {% endif %}
         </td>
         <td style="font-size: 8pt;">
           <strong>{{ vm.host_node }}</strong>

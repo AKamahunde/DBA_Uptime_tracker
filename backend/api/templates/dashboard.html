@@ -1004,9 +1004,9 @@
                 <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
                     <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
                         <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">{{ vm.display_name }}</div>
-                        <div style="font-size: 0.7rem; color: #64748b; font-family: monospace; margin-top: 0.1rem;">
-                            {% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}{{ vm.vmid }} &bull; {% endif %}{{ vm.ip_address }}
-                        </div>
+                        {% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}
+                        <div style="font-size: 0.7rem; color: #64748b; font-family: monospace; margin-top: 0.1rem;">{{ vm.vmid }}</div>
+                        {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
                         <div style="font-weight: 600; color: #1e293b; font-size: 0.82rem;">{{ vm.host_node }}</div>
