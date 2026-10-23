@@ -1038,10 +1038,10 @@
                         {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <span style="font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 9999px;
-                                    {% if vm.status == 'Healthy' %}background: #e6f4ea; color: #137333;
-                                    {% elif vm.status == 'Critical' %}background: #fce8e6; color: #c5221f;
-                                    {% else %}background: #fef7e0; color: #b06000;{% endif %}">
+                        <span style="font-size: 0.75rem; font-weight: 700;
+                                    {% if vm.status == 'Healthy' %}color: #137333;
+                                    {% elif vm.status == 'Critical' %}color: #c5221f;
+                                    {% else %}color: #b06000;{% endif %}">
                             {{ vm.status }}
                         </span>
                     </td>
