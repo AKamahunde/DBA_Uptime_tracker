@@ -210,6 +210,60 @@
             display: block;
         }
 
+        /* ── Export Dropdown ── */
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .export-dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: #ffffff;
+            min-width: 160px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            z-index: 1000;
+            margin-top: 4px;
+            overflow: visible;
+        }
+        .export-dropdown-content::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: -15px;
+            right: -15px;
+            height: 16px;
+            background: transparent;
+        }
+        .export-dropdown:hover .export-dropdown-content,
+        .export-dropdown.open .export-dropdown-content {
+            display: block !important;
+        }
+        .export-dropdown-content a {
+            color: #334155;
+            padding: 0.55rem 0.85rem;
+            text-decoration: none;
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: background-color 0.15s;
+            text-align: left;
+        }
+        .export-dropdown-content a:first-child {
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+        }
+        .export-dropdown-content a:last-child {
+            border-bottom-left-radius: 5px;
+            border-bottom-right-radius: 5px;
+        }
+        .export-dropdown-content a:hover {
+            background-color: #f1f5f9;
+            color: var(--primary-navy);
+        }
+
         /* ── Container & Card ── */
         .container {
             max-width: 95%;
@@ -668,6 +722,35 @@
             });
             document.addEventListener('click', () => {
                 document.querySelectorAll('.nav-dropdown.open').forEach(d => d.classList.remove('open'));
+            });
+
+            // Toggle export dropdowns on click and close on click outside
+            document.querySelectorAll('.export-dropdown').forEach(dropdown => {
+                const btn = dropdown.querySelector('button');
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const isOpen = dropdown.classList.contains('open');
+                        document.querySelectorAll('.export-dropdown.open').forEach(d => {
+                            if (d !== dropdown) d.classList.remove('open');
+                        });
+                        if (!isOpen) {
+                            dropdown.classList.add('open');
+                        } else {
+                            dropdown.classList.remove('open');
+                        }
+                    });
+                }
+                dropdown.querySelectorAll('.export-dropdown-content a').forEach(item => {
+                    item.addEventListener('click', () => {
+                        dropdown.classList.remove('open');
+                    });
+                });
+            });
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('.export-dropdown.open').forEach(d => {
+                    if (!d.contains(e.target)) d.classList.remove('open');
+                });
             });
         });
     </script>
