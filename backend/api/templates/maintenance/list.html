@@ -106,12 +106,13 @@
             <table class="modern-table">
                 <thead>
                     <tr>
-                        <th class="text-left" style="width: 25%;">Date &amp; Window</th>
-                        <th class="text-left" style="width: 25%;">Scope &amp; Change</th>
-                        <th class="text-left" style="width: 20%;">Summary</th>
-                        <th style="width: 10%;">Status</th>
-                        <th style="width: 10%;">Risk</th>
-                        <th style="width: 10%;">Actions</th>
+                        <th class="text-left" style="width: 14%;">Change ID</th>
+                        <th class="text-left" style="width: 18%;">Target / Database</th>
+                        <th class="text-left" style="width: 20%;">Date &amp; Window</th>
+                        <th class="text-left" style="width: 24%;">Summary</th>
+                        <th style="width: 10%; text-align: center;">Status</th>
+                        <th style="width: 8%; text-align: center;">Risk</th>
+                        <th style="width: 6%; text-align: center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,27 +137,11 @@
                         data-approved-by="{{ maintenance.approved_by|default:'—' }}"
                         data-logged-by="{{ maintenance.created_by.username|default:'System' }}">
                         
-                        <!-- Date & Window -->
-                        <td class="text-left" style="vertical-align: top;">
-                            <div style="font-weight: 600; color: var(--primary-navy);">{{ maintenance.date|date:"d M Y" }}</div>
-                            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ maintenance.start|date:"H:i" }} - {{ maintenance.end|date:"H:i" }} ({{ maintenance.duration_hrs }}h)</div>
-                        </td>
-
-                        <!-- Change ID & Systems -->
-                        <td class="text-left" style="vertical-align: top;">
-                            <div style="font-weight: 600; color: #0f172a; word-break: break-all;">{{ maintenance.change_id }}</div>
-                            <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; font-weight: 500; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                                {% if maintenance.category == 'Infrastructure' or maintenance.database == 'Infrastructure' %}
-                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">INFRA</span>
-                                    <strong>{{ maintenance.node_name|default:maintenance.system }}</strong>
-                                {% else %}
-                                    <span style="display: inline-block; background: #f0fdf4; color: #15803d; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">DB</span>
-                                    <strong>{{ maintenance.database }}</strong>
-                                    {% if maintenance.system and maintenance.system != maintenance.database %}
-                                        <span style="color: #64748b;">({{ maintenance.system }})</span>
-                                    {% endif %}
-                                {% endif %}
-                            </div>
+                        <!-- Change ID -->
+                        <td class="text-left" style="vertical-align: top; white-space: nowrap;">
+                            <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.85rem; font-weight: 700; color: #00205B;">
+                                {{ maintenance.change_id }}
+                            </span>
                             <script type="application/json" id="logs-data-{{ maintenance.pk }}">
                             [
                                 {% for log in maintenance.change_logs.all %}
@@ -173,13 +158,42 @@
                             </script>
                         </td>
 
+                        <!-- Target / Database -->
+                        <td class="text-left" style="vertical-align: top;">
+                            {% if maintenance.category == 'Infrastructure' or maintenance.database == 'Infrastructure' %}
+                                <div>
+                                    <strong style="color: #0f172a; font-size: 0.86rem; white-space: nowrap;">{{ maintenance.node_name|default:maintenance.system }}</strong>
+                                    {% if maintenance.system and maintenance.node_name and maintenance.system != maintenance.node_name %}
+                                        <div style="color: #64748b; font-size: 0.72rem; margin-top: 0.15rem;">{{ maintenance.system }}</div>
+                                    {% elif current_tab == 'all' %}
+                                        <div style="color: #0284c7; font-size: 0.7rem; font-weight: 600; margin-top: 0.15rem;">Infrastructure Node</div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div>
+                                    <strong style="color: #0f172a; font-size: 0.86rem; white-space: nowrap;">{{ maintenance.database }}</strong>
+                                    {% if maintenance.system and maintenance.system != maintenance.database %}
+                                        <div style="color: #64748b; font-size: 0.72rem; margin-top: 0.15rem;">{{ maintenance.system }}</div>
+                                    {% elif current_tab == 'all' %}
+                                        <div style="color: #16a34a; font-size: 0.7rem; font-weight: 600; margin-top: 0.15rem;">Database</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Date & Window -->
+                        <td class="text-left" style="vertical-align: top; white-space: nowrap;">
+                            <div style="font-weight: 600; color: var(--primary-navy);">{{ maintenance.date|date:"d M Y" }}</div>
+                            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ maintenance.start|date:"H:i" }} - {{ maintenance.end|date:"H:i" }} ({{ maintenance.duration_hrs }}h)</div>
+                        </td>
+
                         <!-- Summary -->
-                        <td class="text-left" style="max-width: 180px; word-wrap: break-word; white-space: normal; vertical-align: top; font-size: 0.8rem; color: #475569;">
+                        <td class="text-left" style="vertical-align: top; font-size: 0.8rem; color: #475569; line-height: 1.4; word-wrap: break-word;">
                             {{ maintenance.activity|truncatechars:85 }}
                         </td>
 
                         <!-- Status Badge -->
-                        <td style="vertical-align: middle;">
+                        <td style="vertical-align: middle; text-align: center;">
                             <span class="status-badge status-{{ maintenance.status|lower }}" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.72rem; font-weight: 600; text-align: center; width: 85px; text-transform: uppercase;
                                         {% if maintenance.status == 'Completed' %}background: #e2f0d9; color: #385723;
                                         {% elif maintenance.status == 'Failed' %}background: #fce4d6; color: #c65911;
@@ -190,7 +204,7 @@
                         </td>
 
                         <!-- Risk Badge -->
-                        <td style="vertical-align: middle;">
+                        <td style="vertical-align: middle; text-align: center;">
                             <span class="risk-badge" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; width: 60px; text-align: center; text-transform: uppercase;
                                         {% if maintenance.risk == 'High' %}background: #fce4d6; color: #c65911;
                                         {% elif maintenance.risk == 'Medium' %}background: #fff2cc; color: #d59400;
@@ -200,7 +214,7 @@
                         </td>
 
                         <!-- Action Dropdown -->
-                        <td style="vertical-align: middle; position: relative;" onclick="event.stopPropagation()">
+                        <td style="vertical-align: middle; text-align: center; position: relative;" onclick="event.stopPropagation()">
                             <div class="actions-dropdown" style="position: relative; display: inline-block;">
                                 <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ maintenance.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1;">⋮</button>
                                 <div id="actions-{{ maintenance.pk }}" class="actions-dropdown-content" style="display: none; position: absolute; right: 0; background: var(--pure-white); box-shadow: var(--shadow); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; z-index: 100; min-width: 120px; overflow: hidden;">
@@ -218,7 +232,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No maintenance records found.</td>
+                        <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No maintenance records found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -442,9 +456,9 @@
 
         var metaStr = "";
         if (category === "Infrastructure" || database === "Infrastructure") {
-            metaStr = "[INFRA] " + (nodeName || system || "Host Node") + " (" + duration + "h window)";
+            metaStr = (nodeName || system || "Infrastructure Host") + " (" + duration + "h window)";
         } else {
-            metaStr = "[DB] " + (system !== "—" ? system + " | " : "") + database + " (" + duration + "h window)";
+            metaStr = database + (system && system !== "—" && system !== database ? " · " + system : "") + " (" + duration + "h window)";
         }
         document.getElementById("panel-meta").textContent = metaStr;
 
