@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Infrastructure Storage Capacity Planning Report — {{ reporting_period_str }}</title>
+<title>Infrastructure Storage Capacity Tracking Report — {{ reporting_period_str }}</title>
 <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
 <style>
   :root {
@@ -380,9 +380,9 @@
 
     <h1 class="report-title">
       {% if selected_node == 'All Nodes' %}
-        INFRASTRUCTURE STORAGE CAPACITY PLANNING &amp; RUNWAY REPORT
+        INFRASTRUCTURE STORAGE CAPACITY TRACKING REPORT
       {% else %}
-        {{ selected_node|upper }} STORAGE CAPACITY &amp; RUNWAY REPORT
+        {{ selected_node|upper }} STORAGE CAPACITY TRACKING REPORT
       {% endif %}
     </h1>
     <div class="report-org-subtitle">National Medical Stores • Database Tracking for Reliability, Administration and Compliance (DBTRAC)</div>
@@ -435,7 +435,7 @@
     </div>
   </div>
 
-  <div class="section-heading">Infrastructure Storage Capacity &amp; Operational Runway Breakdown</div>
+  <div class="section-heading">Infrastructure Storage Capacity Tracking &amp; Runway Breakdown</div>
   <table class="report-table">
     <thead>
       <tr>

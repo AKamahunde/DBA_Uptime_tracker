@@ -5228,7 +5228,7 @@ def capacity_infra_excel(request):
 
         # Title Block
         ws.merge_cells('A1:J1')
-        ws['A1'] = f"Infrastructure Storage Capacity & Runway Report — {node_scope_display} ({reporting_period_str})"
+        ws['A1'] = f"Infrastructure Storage Capacity Tracking Report — {node_scope_display} ({reporting_period_str})"
         ws['A1'].font = font_title
         ws['A1'].alignment = align_left
         ws.row_dimensions[1].height = 30
@@ -5361,7 +5361,7 @@ def capacity_infra_excel(request):
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         clean_scope = node_scope_display.replace(' ', '_')
-        filename = f"Infra_Capacity_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        filename = f"Infra_Storage_Capacity_Tracking_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         wb.save(response)
         return response
@@ -5370,11 +5370,11 @@ def capacity_infra_excel(request):
         import csv
         response = HttpResponse(content_type='text/csv')
         clean_scope = node_scope_display.replace(' ', '_')
-        filename = f"Infra_Capacity_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.csv"
+        filename = f"Infra_Storage_Capacity_Tracking_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         writer = csv.writer(response)
-        writer.writerow([f"Infrastructure Storage Capacity Report - {node_scope_display} ({reporting_period_str})"])
+        writer.writerow([f"Infrastructure Storage Capacity Tracking Report - {node_scope_display} ({reporting_period_str})"])
         writer.writerow([])
         writer.writerow([
             "Timestamp", "Cluster / Node", "Host / Workload", "Storage Tier",
