@@ -667,7 +667,7 @@ def consolidate_olkvm_incidents():
             processed_stg.add(dup.id)
 
 
-def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=36):
+def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=120):
     """
     Scans OLKVM and Proxmox node metrics in Prometheus for reboot events and telemetry gaps.
     If an outage occurred outside of a registered maintenance window, it is automatically

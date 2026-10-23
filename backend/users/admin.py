@@ -94,13 +94,17 @@ class CustomAdminUserCreationForm(AdminUserCreationForm):
 class UserAdmin(BaseUserAdmin):
     add_form = CustomAdminUserCreationForm
     change_password_form = CustomAdminPasswordChangeForm
-    list_display = ['username', 'email', 'is_admin', 'must_change_password', 'is_staff', 'is_active']
+    list_display = ['username', 'email', 'display_groups', 'is_admin', 'must_change_password', 'is_staff', 'is_active']
     list_editable = ['must_change_password']
-    list_filter = ['is_admin', 'must_change_password', 'is_staff', 'is_active']
+    list_filter = ['groups', 'is_admin', 'must_change_password', 'is_staff', 'is_active']
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Custom Settings', {'fields': ('is_admin', 'must_change_password')}),
     )
     actions = ['require_password_change', 'reset_to_temporary_password']
+
+    def display_groups(self, obj):
+        return ", ".join(g.name for g in obj.groups.all()) or "—"
+    display_groups.short_description = "Groups"
 
     def save_model(self, request, obj, form, change):
         if not change:

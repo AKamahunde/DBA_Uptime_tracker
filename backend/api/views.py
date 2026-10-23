@@ -484,6 +484,28 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 
 @login_required
 def dashboard(request):
+    can_view_db_dashboard = (
+        request.user.is_admin
+        or request.user.is_superuser
+        or request.user.has_perm('api.view_databasedashboard')
+    )
+    can_view_infra_dashboard = (
+        request.user.is_admin
+        or request.user.is_superuser
+        or request.user.has_perm('api.view_infrastructuredashboard')
+    )
+
+    if not can_view_db_dashboard and not can_view_infra_dashboard:
+        # Route users without dashboard permissions directly to their operational workspace
+        if request.user.has_perm('api.view_serverhealth'):
+            return redirect('server_health_list')
+        elif request.user.has_perm('api.view_infrastructureincident') or is_sysadmin_user(request.user):
+            return redirect('incident_list')
+        elif request.user.has_perm('api.view_infrastructuremaintenance'):
+            return redirect('maintenance_list')
+        elif request.user.has_perm('api.view_infrastructurecapacity'):
+            return redirect('capacity_list')
+
     # Run all counts in a single DB round-trip by using lazy evaluation
     from django.db import connection
     with connection.cursor() as cursor:
@@ -2538,17 +2560,25 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 (Q(node_name__icontains='infra') if 'infra' in nd['node_key'] else Q(node_name__icontains='ebs'))
             )
         else:
+            pve_key = (nd['node_key'] or '').lower()
+            pve_vm_q = Q()
+            if 'pvenode1' in pve_key:
+                pve_vm_q = Q(system__icontains='tomcat') | Q(node_name__icontains='tomcat') | Q(node_name__icontains='pvenode1')
+            elif 'pvenode2' in pve_key:
+                pve_vm_q = Q(system__icontains='jumphost') | Q(system__icontains='monitoring') | Q(node_name__icontains='pvenode2') | Q(node_name__icontains='jumphost') | Q(node_name__icontains='monitoring')
+            elif 'pvenode3' in pve_key:
+                pve_vm_q = Q(system__icontains='databasevm') | Q(system__icontains='pentana') | Q(node_name__icontains='pvenode3') | Q(node_name__icontains='databasevm')
+
             node_inc_qs = IncidentRegister.objects.filter(
                 month_inc_filter,
                 planned=False
             ).filter(
-                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
-            ).filter(
                 Q(node_name__iexact=nd['node_key']) |
                 Q(node_name__iexact=nd['display_name']) |
-                Q(node_name__iexact='Proxmox') |
+                Q(node_name__icontains='Proxmox') |
                 Q(system__icontains=nd['node_key']) |
-                Q(system__icontains='proxmox')
+                Q(system__icontains='proxmox') |
+                pve_vm_q
             )
 
         node_unplanned_hrs = 0.0
@@ -6219,6 +6249,18 @@ class CustomLoginView(auth_views.LoginView):
         user = form.get_user()
         if getattr(user, 'must_change_password', False):
             return redirect('password_change_required')
+        # Route users without dashboard permissions directly to their operational workspace
+        can_view_db = user.is_admin or user.is_superuser or user.has_perm('api.view_databasedashboard')
+        can_view_infra = user.is_admin or user.is_superuser or user.has_perm('api.view_infrastructuredashboard')
+        if not can_view_db and not can_view_infra:
+            if user.has_perm('api.view_serverhealth'):
+                return redirect('server_health_list')
+            elif user.has_perm('api.view_infrastructureincident') or is_sysadmin_user(user):
+                return redirect('incident_list')
+            elif user.has_perm('api.view_infrastructuremaintenance'):
+                return redirect('maintenance_list')
+            elif user.has_perm('api.view_infrastructurecapacity'):
+                return redirect('capacity_list')
         return redirect(self.get_success_url())
 
 
