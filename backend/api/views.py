@@ -3778,7 +3778,7 @@ def dashboard_node_excel(request):
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "Node Performance & Capacity"
+        ws.title = "Node Performance & SLA"
 
         font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
         font_section = Font(name='Segoe UI', size=11, bold=True, color='002569')
@@ -3799,7 +3799,7 @@ def dashboard_node_excel(request):
         )
 
         ws.merge_cells('A1:I1')
-        ws['A1'] = f"Node Infrastructure Performance & Capacity Summary ({selected_node}) - {month_display}"
+        ws['A1'] = f"Node Infrastructure Performance & SLA Summary ({selected_node}) - {month_display}"
         ws['A1'].font = font_title
         ws['A1'].alignment = align_left
         ws.row_dimensions[1].height = 30
@@ -3851,7 +3851,7 @@ def dashboard_node_excel(request):
 
         ws.append([])
         row_num += 1
-        ws.cell(row=row_num, column=1, value="Node Capacity Records (3 Disk Tiers & Shared Storage)").font = font_section
+        ws.cell(row=row_num, column=1, value="Storage Allocation & Operational Runway Summary").font = font_section
         row_num += 1
 
         cap_headers = [
@@ -3922,7 +3922,7 @@ def dashboard_node_excel(request):
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         safe_scope = selected_node.replace(' ', '_').replace('.', '_')
-        filename = f"Node_Performance_Report_{safe_scope}_{reporting_month.strftime('%Y_%m')}.xlsx"
+        filename = f"Node_Performance_SLA_{safe_scope}_{reporting_month.strftime('%Y_%m')}.xlsx"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         wb.save(response)
         return response
@@ -3930,10 +3930,10 @@ def dashboard_node_excel(request):
         import csv
         response = HttpResponse(content_type='text/csv')
         safe_scope = selected_node.replace(' ', '_').replace('.', '_')
-        filename = f"Node_Performance_Report_{safe_scope}_{reporting_month.strftime('%Y_%m')}.csv"
+        filename = f"Node_Performance_SLA_{safe_scope}_{reporting_month.strftime('%Y_%m')}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         writer = csv.writer(response)
-        writer.writerow([f"Node Infrastructure Performance & Capacity Summary ({selected_node}) - {month_display}"])
+        writer.writerow([f"Node Infrastructure Performance & SLA Summary ({selected_node}) - {month_display}"])
         writer.writerow([])
         writer.writerow(["Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
         for n in filtered_nodes:
@@ -3946,7 +3946,7 @@ def dashboard_node_excel(request):
             ])
 
         writer.writerow([])
-        writer.writerow(["Node Capacity Records (3 Disk Tiers & Shared Storage)"])
+        writer.writerow(["Storage Allocation & Operational Runway Summary"])
         writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"])
         for cap in node_capacity_records:
             cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']

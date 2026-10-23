@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{% if selected_node == 'All Nodes' %}Node Infrastructure{% else %}{{ selected_node }}{% endif %} Performance &amp; Capacity Report — {{ reporting_month_str }} — DBTRAC</title>
+<title>{% if selected_node == 'All Nodes' %}Node Infrastructure{% else %}{{ selected_node }}{% endif %} Performance &amp; SLA Report — {{ reporting_month_str }} — DBTRAC</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=3">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=3">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=3">
@@ -364,7 +364,7 @@
 <div class="screen-toolbar no-print">
   <div class="toolbar-content">
     <div class="toolbar-title">
-      <strong>Report Ready:</strong> {{ reporting_month_str }} Node Infrastructure Summary
+      <strong>Report Ready:</strong> {{ reporting_month_str }} Node Infrastructure Performance &amp; SLA Report
     </div>
     <div class="toolbar-actions">
       <button type="button" onclick="window.print()" class="btn-print">
@@ -384,9 +384,9 @@
 
     <h1 class="report-title">
       {% if selected_node == 'All Nodes' %}
-        NODE INFRASTRUCTURE PERFORMANCE &amp; CAPACITY REPORT
+        NODE INFRASTRUCTURE PERFORMANCE &amp; SLA REPORT
       {% else %}
-        {{ selected_node|upper }} NODE PERFORMANCE &amp; CAPACITY REPORT
+        {{ selected_node|upper }} NODE PERFORMANCE &amp; SLA REPORT
       {% endif %}
     </h1>
     <div class="report-org-subtitle">National Medical Stores • Database Tracking for Reliability, Administration and Compliance (DBTRAC)</div>
@@ -437,7 +437,7 @@
     </div>
   </div>
 
-  <div class="section-heading">Node Capacity &amp; Performance Records</div>
+  <div class="section-heading">Node Performance &amp; SLA Compliance Records</div>
   <table class="report-table">
     <thead>
       <tr>
@@ -545,7 +545,7 @@
     </tbody>
   </table>
 
-  <div class="section-heading">Node Storage Capacity &amp; Growth Breakdown</div>
+  <div class="section-heading">Storage Allocation &amp; Operational Runway Summary</div>
   <table class="report-table">
     <thead>
       <tr>
