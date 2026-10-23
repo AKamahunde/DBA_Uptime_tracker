@@ -242,15 +242,16 @@
                     <th>Status</th>
                     <th>Agent / Source</th>
                     {% else %}
-                    <th style="text-align: left;">Host Node / Server</th>
-                    <th>Uptime</th>
-                    <th>CPU</th>
-                    <th>Memory</th>
-                    <th>Shared Storage</th>
-                    <th>Data / LVM</th>
-                    <th>Local / OS</th>
-                    <th>Status</th>
-                    <th>Logged By</th>
+                    <th style="text-align: left; width: 13%;">Host Node / Server</th>
+                    <th style="text-align: left; width: 18%;">Hosted VMs / Workloads</th>
+                    <th style="text-align: center; width: 7%;">Uptime</th>
+                    <th style="text-align: center; width: 6%;">CPU</th>
+                    <th style="text-align: center; width: 10%;">Memory</th>
+                    <th style="text-align: center; width: 11%;">Shared Storage</th>
+                    <th style="text-align: center; width: 11%;">Data / LVM</th>
+                    <th style="text-align: center; width: 11%;">Local / OS</th>
+                    <th style="text-align: center; width: 6%;">Status</th>
+                    <th style="text-align: center; width: 7%;">Logged By</th>
                     {% endif %}
                     {% if is_admin %}
                     <th style="width: 50px;"></th>
@@ -317,11 +318,32 @@
                         {% endif %}
                     </td>
                     {% else %}
-                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left;">
-                        <div style="font-weight: 600; color: #0f172a;">
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left; white-space: nowrap;">
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.88rem;">
                             {{ health.display_node_label }}
                         </div>
-                        <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.clean_hosted_systems }}</div>
+                        <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">
+                            {% if health.node_name == 'OLKVM' %}Host Cluster{% else %}Proxmox VE Node{% endif %}
+                        </div>
+                    </td>
+
+                    <!-- Hosted VMs / Workloads Column -->
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: left;">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            {% for vm in health.hosted_vms %}
+                                <div style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem;">
+                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #0284c7; flex-shrink: 0;"></span>
+                                    <strong style="color: #0f172a;">{{ vm.name }}</strong>
+                                    {% if vm.role %}
+                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.role }})</span>
+                                    {% elif vm.label and vm.label != vm.name %}
+                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.label }})</span>
+                                    {% endif %}
+                                </div>
+                            {% empty %}
+                                <span style="color: #64748b; font-size: 0.75rem;">{{ health.clean_hosted_systems }}</span>
+                            {% endfor %}
+                        </div>
                     </td>
 
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #137333;">
@@ -358,6 +380,9 @@
                         {% if health.disk_3_size_gb > 0 %}
                         <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_3_type }}">{{ health.disk_3_used_gb }} / {{ health.disk_3_size_gb }} GB</div>
                         {% endif %}
+                        {% if health.storage_breakdown %}
+                        <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.1rem;" title="Workload storage breakdown">{{ health.storage_breakdown }}</div>
+                        {% endif %}
                     </td>
 
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
@@ -369,7 +394,7 @@
                         </span>
                     </td>
 
-                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-weight: 500; color: #475569;">
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 500; color: #475569;">
                         {% if health.created_by %}
                             {{ health.created_by.username }}
                         {% elif health.entered_by %}

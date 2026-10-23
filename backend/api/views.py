@@ -3494,20 +3494,174 @@ def server_health_list(request):
     ).values_list('server', flat=True).distinct().order_by('server'))
 
     if current_tab == 'nodes':
-        queryset = ServerHealth.objects.filter(
+        base_qs = ServerHealth.objects.filter(
             Q(entered_by='Prometheus') | Q(entered_by='User')
-        ).order_by('-date', '-updated_at')
+        ).order_by('-date', '-updated_at', '-id')
 
-        if selected_node == 'OLKVM':
-            queryset = queryset.filter(
-                Q(node_name__iexact='OLKVM') | Q(server__icontains='infra') | Q(server__icontains='ebs')
-            )
-        elif selected_node == 'Proxmox':
-            queryset = queryset.filter(
-                Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode')
-            )
-        elif selected_node != 'All Nodes':
-            queryset = queryset.filter(server__iexact=selected_node)
+        if current_db:
+            base_qs = base_qs.filter(database=current_db)
+        if start_date:
+            base_qs = base_qs.filter(date__gte=start_date)
+        if end_date:
+            base_qs = base_qs.filter(date__lte=end_date)
+
+        from collections import defaultdict
+        grouped_by_date = defaultdict(list)
+        for r in base_qs:
+            grouped_by_date[r.date].append(r)
+
+        consolidated_nodes = []
+        for d, recs in grouped_by_date.items():
+            # 1. Check for OLKVM workloads on this date
+            olkvm_recs = [
+                r for r in recs 
+                if (r.node_name or '').upper() == 'OLKVM' or any(k in (r.server or '').lower() for k in ['infra', 'ebs', 'olkvm'])
+            ]
+            proxmox_recs = [r for r in recs if r not in olkvm_recs]
+
+            if olkvm_recs and (selected_node in ['All Nodes', 'OLKVM']):
+                infra_r = next((r for r in olkvm_recs if 'infra' in (r.server or '').lower()), olkvm_recs[0])
+                ebs_r = next((r for r in olkvm_recs if 'ebs' in (r.server or '').lower()), None)
+
+                # Weighted CPU (64 logical cores for nmsinfra, 16 for nmsebs)
+                tot_c = sum(64 if 'infra' in (r.server or '').lower() else 16 for r in olkvm_recs)
+                c_weight = sum((float(r.cpu_percent or 0.0)) * (64 if 'infra' in (r.server or '').lower() else 16) for r in olkvm_recs)
+                olkvm_cpu = round(c_weight / tot_c, 2) if tot_c > 0 else float(olkvm_recs[0].cpu_percent or 0.0)
+
+                # Combined memory
+                mem_tot = round(sum(float(r.memory_total_gb or 0.0) for r in olkvm_recs), 2)
+                mem_used = round(sum(float(r.memory_used_gb or 0.0) for r in olkvm_recs), 2)
+                mem_pct = round((mem_used / mem_tot * 100.0), 2) if mem_tot > 0 else round(sum(float(r.memory_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
+
+                # Storage tiers
+                d1_type = infra_r.disk_1_type or '/nmsddbkp (Shared NFS)'
+                d1_size = float(infra_r.disk_1_size_gb or 0.0)
+                d1_used = float(infra_r.disk_1_used_gb or 0.0)
+                d1_pct = float(infra_r.disk_1_percent or 0.0)
+
+                d2_size = round(sum(float(r.disk_2_size_gb or 0.0) for r in olkvm_recs), 2)
+                d2_used = round(sum(float(r.disk_2_used_gb or 0.0) for r in olkvm_recs), 2)
+                d2_pct = round((d2_used / d2_size * 100.0), 2) if d2_size > 0 else round(sum(float(r.disk_2_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
+                d2_type = '/u01 (nmsinfra) + /stagearea (nmsebs)'
+
+                d3_size = round(sum(float(r.disk_3_size_gb or 0.0) for r in olkvm_recs), 2)
+                d3_used = round(sum(float(r.disk_3_used_gb or 0.0) for r in olkvm_recs), 2)
+                d3_pct = round((d3_used / d3_size * 100.0), 2) if d3_size > 0 else round(sum(float(r.disk_3_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
+                d3_type = 'OS Root (nmsinfra + nmsebs)'
+
+                storage_breakdown = ""
+                if infra_r and ebs_r and infra_r.disk_3_used_gb and ebs_r.disk_3_used_gb:
+                    storage_breakdown = f"nmsinfra: {round(float(infra_r.disk_3_used_gb)/1024.0, 2)} TB · nmsebs: {round(float(ebs_r.disk_3_used_gb)/1024.0, 2)} TB"
+
+                if any(r.status == 'Critical' for r in olkvm_recs):
+                    olkvm_status = 'Critical'
+                elif any(r.status == 'Warning' for r in olkvm_recs):
+                    olkvm_status = 'Warning'
+                else:
+                    olkvm_status = 'Healthy'
+
+                uptime_avg = round(sum(float(r.uptime_percent or 100.0) for r in olkvm_recs) / len(olkvm_recs), 2)
+                latest_up = max(r.updated_at for r in olkvm_recs if r.updated_at)
+
+                hosted_vms = [
+                    {'name': 'nmsinfra', 'label': 'Oracle DB (nmsinfra)', 'role': 'Oracle Database'},
+                ]
+                if ebs_r:
+                    hosted_vms.append({'name': 'nmsebs', 'label': 'Oracle EBS App (nmsebs)', 'role': 'Oracle EBS App'})
+
+                consolidated_nodes.append({
+                    'pk': infra_r.pk,
+                    'date': d,
+                    'updated_at': latest_up,
+                    'node_name': 'OLKVM',
+                    'display_node_label': 'OLKVM',
+                    'server': 'OLKVM',
+                    'clean_hosted_systems': 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)',
+                    'hosted_vms': hosted_vms,
+                    'uptime_percent': uptime_avg,
+                    'cpu_percent': olkvm_cpu,
+                    'memory_percent': mem_pct,
+                    'memory_used_gb': mem_used,
+                    'memory_total_gb': mem_tot,
+                    'disk_1_type': d1_type,
+                    'disk_1_size_gb': d1_size,
+                    'disk_1_used_gb': d1_used,
+                    'disk_1_percent': d1_pct,
+                    'disk_2_type': d2_type,
+                    'disk_2_size_gb': d2_size,
+                    'disk_2_used_gb': d2_used,
+                    'disk_2_percent': d2_pct,
+                    'disk_3_type': d3_type,
+                    'disk_3_size_gb': d3_size,
+                    'disk_3_used_gb': d3_used,
+                    'disk_3_percent': d3_pct,
+                    'storage_breakdown': storage_breakdown,
+                    'status': olkvm_status,
+                    'entered_by': 'Prometheus',
+                    'created_by': None,
+                })
+
+            # 2. Add Proxmox nodes
+            if selected_node in ['All Nodes', 'Proxmox'] or selected_node.startswith('pvenode'):
+                for p_rec in proxmox_recs:
+                    pserver = (p_rec.server or '').lower()
+                    if selected_node.startswith('pvenode') and selected_node.lower() not in pserver:
+                        continue
+
+                    if 'pvenode1' in pserver:
+                        p_vms = [{'name': 'tomcatvm', 'label': 'tomcatvm (qemu/102)', 'role': 'Internal Web'}]
+                    elif 'pvenode2' in pserver:
+                        p_vms = [
+                            {'name': 'jumphostvm', 'label': 'jumphostvm (qemu/100)', 'role': 'Secure Access'},
+                            {'name': 'monitoringvm', 'label': 'monitoringvm (qemu/101)', 'role': 'Prometheus & Ops'}
+                        ]
+                    elif 'pvenode3' in pserver:
+                        p_vms = [{'name': 'databasevm', 'label': 'databasevm (qemu/103)', 'role': 'MySQL / Pentana'}]
+                    else:
+                        p_vms = [{'name': p_rec.server, 'label': p_rec.clean_hosted_systems, 'role': ''}]
+
+                    consolidated_nodes.append({
+                        'pk': p_rec.pk,
+                        'date': p_rec.date,
+                        'updated_at': p_rec.updated_at,
+                        'node_name': p_rec.node_name or 'Proxmox',
+                        'display_node_label': p_rec.display_node_label,
+                        'server': p_rec.server,
+                        'clean_hosted_systems': p_rec.clean_hosted_systems,
+                        'hosted_vms': p_vms,
+                        'uptime_percent': float(p_rec.uptime_percent or 100.0),
+                        'cpu_percent': float(p_rec.cpu_percent or 0.0),
+                        'memory_percent': float(p_rec.memory_percent or 0.0),
+                        'memory_used_gb': float(p_rec.memory_used_gb or 0.0),
+                        'memory_total_gb': float(p_rec.memory_total_gb or 0.0),
+                        'disk_1_type': p_rec.disk_1_type,
+                        'disk_1_size_gb': float(p_rec.disk_1_size_gb or 0.0),
+                        'disk_1_used_gb': float(p_rec.disk_1_used_gb or 0.0),
+                        'disk_1_percent': float(p_rec.disk_1_percent or 0.0),
+                        'disk_2_type': p_rec.disk_2_type,
+                        'disk_2_size_gb': float(p_rec.disk_2_size_gb or 0.0),
+                        'disk_2_used_gb': float(p_rec.disk_2_used_gb or 0.0),
+                        'disk_2_percent': float(p_rec.disk_2_percent or 0.0),
+                        'disk_3_type': p_rec.disk_3_type,
+                        'disk_3_size_gb': float(p_rec.disk_3_size_gb or 0.0),
+                        'disk_3_used_gb': float(p_rec.disk_3_used_gb or 0.0),
+                        'disk_3_percent': float(p_rec.disk_3_percent or 0.0),
+                        'storage_breakdown': '',
+                        'status': p_rec.status or 'Healthy',
+                        'entered_by': p_rec.entered_by or 'Prometheus',
+                        'created_by': p_rec.created_by,
+                    })
+
+        total_node_health_count = len(consolidated_nodes)
+        paginator = Paginator(consolidated_nodes, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        kpi_unhealthy_count = sum(1 for n in consolidated_nodes if n['status'] in ['Critical', 'Warning'])
+        avg_cpu = sum(n['cpu_percent'] for n in consolidated_nodes) / len(consolidated_nodes) if consolidated_nodes else 0.0
+        avg_mem = sum(n['memory_percent'] for n in consolidated_nodes) / len(consolidated_nodes) if consolidated_nodes else 0.0
+        kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if consolidated_nodes else 'N/A'
+        kpi_avg_mem = f"{round(avg_mem, 1)}%" if consolidated_nodes else 'N/A'
     else:
         # Virtual Machines (VM-level)
         queryset = ServerHealth.objects.filter(
@@ -3517,22 +3671,22 @@ def server_health_list(request):
         if selected_vm:
             queryset = queryset.filter(server__iexact=selected_vm)
 
-    if current_db:
-        queryset = queryset.filter(database=current_db)
-    if start_date:
-        queryset = queryset.filter(date__gte=start_date)
-    if end_date:
-        queryset = queryset.filter(date__lte=end_date)
+        if current_db:
+            queryset = queryset.filter(database=current_db)
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
 
-    paginator = Paginator(queryset, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+        paginator = Paginator(queryset, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
 
-    kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
-    avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
-    avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
-    kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
-    kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
+        kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
+        avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
+        avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
+        kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
+        kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
 
     ctx = {
         'page_obj': page_obj,
