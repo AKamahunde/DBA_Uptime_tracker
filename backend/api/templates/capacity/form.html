@@ -6,9 +6,9 @@
 <div class="card">
     <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
     {% if form.errors %}
-    <div style="background-color: #fde8e8; border: 1px solid #f8b4b4; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; color: #9b1c1c;">
-        <strong style="font-weight: 700;">Please correct the errors below:</strong>
-        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 0.9rem;">
+    <div style="background-color: #fee2e2; border: 1px solid #ef4444; padding: 1rem 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; color: #991b1b;">
+        <strong style="font-size: 0.95rem; display: block; margin-bottom: 0.35rem;">⚠️ Please correct the errors below:</strong>
+        <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem;">
             {% for field, errors in form.errors.items %}
                 {% for error in errors %}
                     <li><strong>{{ field|capfirst }}</strong>: {{ error }}</li>
@@ -23,35 +23,68 @@
         <div class="form-group">
             <label for="{{ form.month.id_for_label }}">Month:</label>
             {{ form.month }}
+            {% if form.month.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.month.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.database_size_gb.id_for_label }}">Database Size (GB):</label>
             {{ form.database_size_gb }}
+            {% if form.database_size_gb.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.database_size_gb.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.disk_used_percent.id_for_label }}">Disk Used %:</label>
             {{ form.disk_used_percent }}
+            {% if form.disk_used_percent.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.disk_used_percent.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.tablespace_used_percent.id_for_label }}">Tablespace Used %:</label>
             {{ form.tablespace_used_percent }}
+            {% if form.tablespace_used_percent.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.tablespace_used_percent.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.available_capacity_gb.id_for_label }}">Free Disk Space (GB):</label>
             {{ form.available_capacity_gb }}
+            {% if form.available_capacity_gb.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.available_capacity_gb.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.largest_table.id_for_label }}">Largest Table:</label>
             {{ form.largest_table }}
+            {% if form.largest_table.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.largest_table.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.growth_gb.id_for_label }}">Growth (GB):</label>
             {{ form.growth_gb }}
+            {% if form.growth_gb.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.growth_gb.errors.0 }}</div>
+            {% endif %}
         </div>
         <div class="form-group">
             <label for="{{ form.database.id_for_label }}">Database:</label>
             {{ form.database }}
+            {% if form.database.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.database.errors.0 }}</div>
+            {% endif %}
         </div>
+        {% if capacity %}
+        <div class="form-group" style="margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+            <label for="{{ form.change_comment.id_for_label }}">{{ form.change_comment.label }}</label>
+            {{ form.change_comment }}
+            {% if form.change_comment.errors %}
+                <div style="color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem; font-weight: 600;">{{ form.change_comment.errors.0 }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
         {% if can_edit == False %}
         <p style="color: #e74c3c; margin-bottom: 1rem;">You can only edit this record within 5 minutes of creation.</p>
         {% endif %}
@@ -59,4 +92,25 @@
         <a href="{% url 'capacity_list' %}" class="btn btn-danger" style="margin-left: 0.5rem;">Cancel</a>
     </form>
 </div>
+
+{% if capacity and change_logs %}
+<div class="card" style="margin-top: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--primary-navy); font-weight: 700;">Capacity Audit History</h3>
+    <div class="timeline" style="border-left: 2px solid var(--color-primary); padding-left: 1.5rem; margin-left: 1rem;">
+        {% for log in change_logs %}
+        <div class="timeline-item" style="position: relative; margin-bottom: 1.5rem;">
+            <div style="position: absolute; left: -2rem; top: 0.25rem; width: 12px; height: 12px; background: var(--color-accent); border-radius: 50%; border: 2px solid white;"></div>
+            <div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">{{ log.changed_at|date:"d M Y - H:i" }}</div>
+            <div style="font-weight: 500;">{{ log.action }}</div>
+            <div style="font-size: 0.9rem; color: #444;">By: {{ log.changed_by.username|default:"System" }}</div>
+            {% if log.comment %}
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f9f9f9; border-left: 3px solid #ddd; font-style: italic; font-size: 0.9rem;">
+                "{{ log.comment }}"
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}

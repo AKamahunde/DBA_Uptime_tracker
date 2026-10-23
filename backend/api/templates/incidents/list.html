@@ -63,6 +63,33 @@
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
+    /* Live Active Incident Pulse Animation */
+    @keyframes livePulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.35); opacity: 0.5; }
+    }
+    .live-pulse-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background-color: #dc2626;
+        border-radius: 50%;
+        animation: livePulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .live-active-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        padding: 0.2rem 0.55rem;
+        border-radius: 9999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #991b1b;
+        white-space: nowrap;
+    }
+
     /* Custom columns layout styling */
     .kpi-metric-col {
         display: flex;
@@ -279,9 +306,16 @@
 
                             <!-- Duration -->
                             <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; color: #0f172a; white-space: nowrap;">
-                                <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
-                                    {{ incident.human_duration }}
-                                </div>
+                                {% if incident.status == 'Open' or incident.status == 'In Progress' %}
+                                    <div class="live-active-indicator" data-start="{{ incident.start|date:'c' }}" title="Incident is currently active and accumulating outage time">
+                                        <span class="live-pulse-dot"></span>
+                                        <span class="live-duration-text">Active: {{ incident.human_duration }}</span>
+                                    </div>
+                                {% else %}
+                                    <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
+                                        {{ incident.human_duration }}
+                                    </div>
+                                {% endif %}
                             </td>
 
                             <!-- Severity -->
@@ -720,5 +754,39 @@
             }
         }
     }
+
+    // Real-Time Live Running Active Incident Ticker
+    function formatLiveDuration(diffMs) {
+        if (diffMs <= 0) return '< 1 min';
+        var totalSecs = Math.floor(diffMs / 1000);
+        if (totalSecs < 60) return '< 1 min';
+        var totalMins = Math.floor(totalSecs / 60);
+        var hrs = Math.floor(totalMins / 60);
+        var mins = totalMins % 60;
+        if (hrs > 0 && mins > 0) return hrs + 'h ' + mins + 'm';
+        if (hrs > 0) return hrs + 'h';
+        return mins + (mins === 1 ? ' min' : ' mins');
+    }
+
+    function updateLiveActiveDurations() {
+        var badges = document.querySelectorAll('.live-active-indicator');
+        var now = new Date();
+        badges.forEach(function(badge) {
+            var startStr = badge.getAttribute('data-start');
+            if (startStr) {
+                var startDate = new Date(startStr);
+                if (!isNaN(startDate.getTime())) {
+                    var diffMs = now.getTime() - startDate.getTime();
+                    var textEl = badge.querySelector('.live-duration-text');
+                    if (textEl) {
+                        textEl.textContent = 'Active: ' + formatLiveDuration(diffMs);
+                    }
+                }
+            }
+        });
+    }
+
+    // Run active incident duration ticker every 30 seconds
+    setInterval(updateLiveActiveDurations, 30000);
 </script>
 {% endblock %}

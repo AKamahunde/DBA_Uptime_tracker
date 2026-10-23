@@ -224,6 +224,11 @@ class MaintenanceRegisterForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'placeholder': 'Auto-generated (e.g., CHG2108)'}),
         label="Change ID"
     )
+    change_comment = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status changes)'}),
+        required=False,
+        label="Change Comment / Reason"
+    )
 
     class Meta:
         model = MaintenanceRegister
@@ -244,6 +249,13 @@ class MaintenanceRegisterForm(forms.ModelForm):
             self.fields['rollback_plan'].required = False
         if 'status' in self.fields and not self.fields['status'].initial:
             self.fields['status'].initial = 'Scheduled'
+        if 'system' in self.fields:
+            self.fields['system'].required = False
+        if 'node_name' in self.fields:
+            self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
+            self.fields['node_name'].required = False
+        if 'database' in self.fields:
+            self.fields['database'].required = False
         iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
         if 'start' in self.fields:
             self.fields['start'].input_formats = iso_formats
@@ -252,6 +264,36 @@ class MaintenanceRegisterForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        cat = cleaned_data.get('category') or 'Database'
+        cleaned_data['category'] = cat
+        node = cleaned_data.get('node_name')
+        db = cleaned_data.get('database')
+
+        if not cleaned_data.get('date'):
+            start_val = cleaned_data.get('start')
+            from django.utils import timezone
+            cleaned_data['date'] = start_val.date() if start_val else timezone.now().date()
+
+        if cat == 'Infrastructure':
+            if not node:
+                self.add_error('node_name', forms.ValidationError(
+                    "Please select the target Infrastructure Node for an infrastructure maintenance activity."
+                ))
+            else:
+                if node in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster'] or any(k in str(node).lower() for k in ['infra', 'ebs', 'olkvm']):
+                    cleaned_data['node_name'] = 'OLKVM'
+                    node = 'OLKVM'
+                if not cleaned_data.get('system'):
+                    cleaned_data['system'] = 'OLKVM' if node == 'OLKVM' else str(node)
+            cleaned_data['database'] = 'Infrastructure'
+        elif cat == 'Database':
+            if not db or db == 'Infrastructure':
+                self.add_error('database', forms.ValidationError(
+                    "Please select the database platform (Oracle, MySQL, or MS SQL Server)."
+                ))
+            if not cleaned_data.get('system'):
+                cleaned_data['system'] = db or 'Database'
+
         start = cleaned_data.get('start')
         end = cleaned_data.get('end')
         if start and end:
@@ -265,10 +307,24 @@ class MaintenanceRegisterForm(forms.ModelForm):
                     self.add_error('end', forms.ValidationError(
                         f"End datetime ({end.strftime('%d/%m/%Y %H:%M')}) cannot be earlier than start datetime ({start.strftime('%d/%m/%Y %H:%M')})."
                     ))
+
+        if self.instance and self.instance.pk:
+            old_status = self.instance.status
+            new_status = cleaned_data.get('status')
+            comment = cleaned_data.get('change_comment', '').strip()
+            if old_status != new_status and not comment:
+                self.add_error('change_comment', forms.ValidationError(
+                    "A change-reason comment is required whenever you change the maintenance status."
+                ))
         return cleaned_data
 
 class CapacityPlanningForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
+    change_comment = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for capacity update / note'}),
+        required=False,
+        label="Change Comment / Reason"
+    )
 
     class Meta:
         model = CapacityPlanning

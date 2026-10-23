@@ -4,7 +4,7 @@
 
 {% block content %}
 <!-- Three Maintenance KPI Cards -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
     <!-- 1. Scheduled -->
     <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1rem; box-shadow: var(--shadow); border-left: 4px solid var(--accent-muted-blue);">
         <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Active Windows</div>
@@ -27,6 +27,25 @@
     </div>
 </div>
 
+<!-- Maintenance Category Filter Tabs -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    <a href="?tab=all{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        All Changes ({{ total_all_count }})
+    </a>
+    <a href="?tab=database{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        Database ({{ total_db_count }})
+    </a>
+    <a href="?tab=infrastructure{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
+       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
+              {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
+        Infrastructure Nodes ({{ total_infra_count }})
+    </a>
+</div>
+
 <!-- Main Workspace Layout -->
 <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 2rem;">
     <!-- Left Workspace Table (2/3 width) -->
@@ -40,6 +59,7 @@
 
         <!-- Filter Bar -->
         <form method="get" style="display: flex; gap: 0.75rem; margin-bottom: 1rem; background: var(--bg-cool); padding: 0.75rem; border-radius: 6px; border: 1px solid rgba(90, 123, 156, 0.15); align-items: center; flex-wrap: wrap;">
+            <input type="hidden" name="tab" value="{{ current_tab }}">
             <div style="display: flex; flex-direction: column; gap: 0.2rem;">
                 <label for="start_date" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase;">From</label>
                 <input type="date" id="start_date" name="start_date" value="{{ start_date }}" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.8rem;">
@@ -49,17 +69,30 @@
                 <input type="date" id="end_date" name="end_date" value="{{ end_date }}" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.8rem;">
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.2rem;">
-                <label for="database" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase;">Database</label>
-                <select id="database" name="database" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 130px; font-size: 0.8rem; background: #fff;">
-                    <option value="">All Databases</option>
-                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
-                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
-                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                <label for="target" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase;">
+                    {% if current_tab == 'database' %}Database{% elif current_tab == 'infrastructure' %}Host / Node{% else %}Scope / Target{% endif %}
+                </label>
+                <select id="target" name="target" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 140px; font-size: 0.8rem; background: #fff;">
+                    <option value="">{% if current_tab == 'database' %}All Databases{% elif current_tab == 'infrastructure' %}All Host Nodes{% else %}All Scopes{% endif %}</option>
+                    {% if current_tab != 'infrastructure' %}
+                        {% if current_tab == 'all' %}<optgroup label="Databases">{% endif %}
+                        <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle</option>
+                        <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
+                        <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                        {% if current_tab == 'all' %}</optgroup>{% endif %}
+                    {% endif %}
+                    {% if current_tab != 'database' %}
+                        {% if current_tab == 'all' %}<optgroup label="Infrastructure Nodes">{% endif %}
+                        {% for n_val, n_lbl in node_choices %}
+                        <option value="{{ n_val }}" {% if current_target == n_val %}selected{% endif %}>{{ n_lbl }}</option>
+                        {% endfor %}
+                        {% if current_tab == 'all' %}</optgroup>{% endif %}
+                    {% endif %}
                 </select>
             </div>
             <div style="display: flex; gap: 0.35rem; align-items: flex-end; margin-left: auto; padding-top: 0.9rem;">
                 <button type="submit" class="btn btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Apply</button>
-                <a href="?" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: #e2e8f0; color: #475569; border: none; text-decoration: none; text-align: center; border-radius: 4px;">Reset</a>
+                <a href="?tab={{ current_tab }}" class="btn btn-secondary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; background: #e2e8f0; color: #475569; border: none; text-decoration: none; text-align: center; border-radius: 4px;">Reset</a>
             </div>
         </form>
 
@@ -68,7 +101,7 @@
                 <thead>
                     <tr>
                         <th class="text-left" style="width: 25%;">Date &amp; Window</th>
-                        <th class="text-left" style="width: 25%;">Change</th>
+                        <th class="text-left" style="width: 25%;">Scope &amp; Change</th>
                         <th class="text-left" style="width: 20%;">Summary</th>
                         <th style="width: 10%;">Status</th>
                         <th style="width: 10%;">Risk</th>
@@ -82,6 +115,8 @@
                         onclick="selectMaintenanceRow('row-{{ maintenance.pk }}')"
                         data-pk="{{ maintenance.pk }}"
                         data-change-id="{{ maintenance.change_id }}"
+                        data-category="{{ maintenance.category|default:'Database' }}"
+                        data-node="{{ maintenance.node_name|default:'' }}"
                         data-system="{{ maintenance.system|default:'—' }}"
                         data-database="{{ maintenance.database }}"
                         data-date="{{ maintenance.date|date:'d M Y' }}"
@@ -104,9 +139,32 @@
                         <!-- Change ID & Systems -->
                         <td class="text-left" style="vertical-align: top;">
                             <div style="font-weight: 600; color: #0f172a; word-break: break-all;">{{ maintenance.change_id }}</div>
-                            <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;">
-                                {% if maintenance.system %}{{ maintenance.system }} | {% endif %}{{ maintenance.database }}
+                            <div style="font-size: 0.72rem; color: #475569; margin-top: 0.2rem; font-weight: 500; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                                {% if maintenance.category == 'Infrastructure' or maintenance.database == 'Infrastructure' %}
+                                    <span style="display: inline-block; background: #e0f2fe; color: #0369a1; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">INFRA</span>
+                                    <strong>{{ maintenance.node_name|default:maintenance.system }}</strong>
+                                {% else %}
+                                    <span style="display: inline-block; background: #f0fdf4; color: #15803d; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">DB</span>
+                                    <strong>{{ maintenance.database }}</strong>
+                                    {% if maintenance.system and maintenance.system != maintenance.database %}
+                                        <span style="color: #64748b;">({{ maintenance.system }})</span>
+                                    {% endif %}
+                                {% endif %}
                             </div>
+                            <script type="application/json" id="logs-data-{{ maintenance.pk }}">
+                            [
+                                {% for log in maintenance.change_logs.all %}
+                                {
+                                    "changed_at": "{{ log.changed_at|date:'d M Y, H:i' }}",
+                                    "action": "{{ log.action|escapejs }}",
+                                    "changed_by": "{{ log.changed_by.username|default:'System'|escapejs }}",
+                                    "comment": "{{ log.comment|default:''|escapejs }}",
+                                    "old_status": "{{ log.old_status|default:''|escapejs }}",
+                                    "new_status": "{{ log.new_status|default:''|escapejs }}"
+                                }{% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            ]
+                            </script>
                         </td>
 
                         <!-- Summary -->
@@ -169,16 +227,16 @@
             </div>
             <div style="display: flex; gap: 0.35rem;">
                 {% if page_obj.has_previous %}
-                    <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
-                    <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
+                    <a href="?page=1&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                    <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
                 {% else %}
                     <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                     <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
                 {% endif %}
 
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
-                    <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                    <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                    <a href="?page={{ page_obj.paginator.num_pages }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
                 {% else %}
                     <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; border-color: #cbd5e1;">Next</span>
                     <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1; border-color: #cbd5e1;">Last &raquo;</span>
@@ -197,7 +255,10 @@
                     <h3 id="panel-change-id" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--primary-navy); word-break: break-all;">—</h3>
                     <div id="panel-meta" style="font-size: 0.75rem; color: #64748b; font-weight: 500; margin-top: 0.25rem;">—</div>
                 </div>
-                <span id="panel-status-badge" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;">—</span>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span id="panel-status-badge" style="display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;">—</span>
+                    <button type="button" onclick="closeMaintenanceDetails()" style="background: none; border: none; font-size: 1.25rem; line-height: 1; color: #94a3b8; cursor: pointer; padding: 0 0.25rem;" title="Close Details">&times;</button>
+                </div>
             </div>
 
             <!-- Time Metrics -->
@@ -239,6 +300,16 @@
                     <strong id="panel-logged-by" style="color: #1e293b; font-weight: 500;">—</strong>
                 </div>
             </div>
+
+            <!-- Change History / Audit Trail -->
+            <div id="panel-logs-section" style="border-top: 1px solid rgba(90, 123, 156, 0.1); padding-top: 1rem; margin-top: 0.25rem; display: none;">
+                <h4 style="font-size: 0.72rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem 0;">
+                    Maintenance Change Logs
+                </h4>
+                <div id="panel-logs-timeline" style="max-height: 180px; overflow-y: auto; padding-right: 0.25rem;">
+                    <!-- JS Injected -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -259,7 +330,7 @@
         width: 100%;
         border-collapse: collapse;
         text-align: left;
-        font-size: 0.82rem; /* Consistent smaller font size matching other tabs */
+        font-size: 0.82rem;
     }
     .modern-table th {
         padding: 0.8rem 0.75rem; 
@@ -315,6 +386,17 @@
         }
     }
 
+    function closeMaintenanceDetails() {
+        var rows = document.getElementsByClassName("maintenance-row");
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].classList.remove("row-highlight");
+        }
+        var detailsPanel = document.getElementById("details-panel");
+        if (detailsPanel) {
+            detailsPanel.style.display = "none";
+        }
+    }
+
     // Trigger details panel display from actions menu trigger
     function showDetailsFromTrigger(rowId) {
         // Close dropdown
@@ -330,6 +412,8 @@
     function populateDetailsPanel(rowEl) {
         // Retrieve values from data-attributes
         var changeId = rowEl.getAttribute("data-change-id");
+        var category = rowEl.getAttribute("data-category") || "Database";
+        var nodeName = rowEl.getAttribute("data-node");
         var system = rowEl.getAttribute("data-system");
         var database = rowEl.getAttribute("data-database");
         var date = rowEl.getAttribute("data-date");
@@ -349,15 +433,21 @@
 
         // Inject content
         document.getElementById("panel-change-id").textContent = changeId;
-        document.getElementById("panel-meta").textContent = (system !== "—" ? system + " | " : "") + database + " (" + duration + "h window)";
+
+        var metaStr = "";
+        if (category === "Infrastructure" || database === "Infrastructure") {
+            metaStr = "[INFRA] " + (nodeName || system || "Host Node") + " (" + duration + "h window)";
+        } else {
+            metaStr = "[DB] " + (system !== "—" ? system + " | " : "") + database + " (" + duration + "h window)";
+        }
+        document.getElementById("panel-meta").textContent = metaStr;
+
         document.getElementById("panel-start").textContent = start;
         document.getElementById("panel-end").textContent = end;
         document.getElementById("panel-activity").textContent = activity;
         document.getElementById("panel-rollback").textContent = rollback;
         document.getElementById("panel-approved-by").textContent = approvedBy;
         document.getElementById("panel-logged-by").textContent = loggedBy;
-
-
 
         // Setup status badge classes & colors dynamically
         var badge = document.getElementById("panel-status-badge");
@@ -386,6 +476,39 @@
         badge.style.borderRadius = "12px";
         badge.style.fontSize = "0.68rem";
         badge.style.fontWeight = "600";
+
+        // Populate Change Logs Timeline
+        var logsData = [];
+        var logsScript = document.getElementById("logs-data-" + pk);
+        if (logsScript) {
+            try {
+                logsData = JSON.parse(logsScript.textContent || '[]');
+            } catch (e) {
+                console.error("Error parsing maintenance change logs JSON:", e);
+                logsData = [];
+            }
+        }
+        var logsSection = document.getElementById("panel-logs-section");
+        var logsTimeline = document.getElementById("panel-logs-timeline");
+        if (logsData && logsData.length > 0) {
+            logsSection.style.display = "block";
+            var logsHtml = "";
+            logsData.forEach(function(log) {
+                logsHtml += `
+                    <div style="position: relative; padding-left: 1.25rem; margin-bottom: 0.85rem; font-size: 0.78rem;">
+                        <div style="position: absolute; left: 0; top: 0.25rem; width: 6px; height: 6px; background-color: var(--primary-green); border-radius: 50%;"></div>
+                        <div style="color: #64748b; font-size: 0.7rem; font-weight: 500;">${log.changed_at}</div>
+                        <div style="font-weight: 600; color: #1e293b; margin-top: 0.1rem;">${log.action}</div>
+                        <div style="color: #475569; margin-top: 0.05rem;">By: ${log.changed_by}</div>
+                        ${log.comment ? `<div style="margin-top: 0.25rem; padding: 0.35rem 0.5rem; background: #f8fafc; border-left: 2px solid #cbd5e1; font-style: italic; color: #475569; font-size: 0.75rem;">"${log.comment}"</div>` : ''}
+                    </div>
+                `;
+            });
+            logsTimeline.innerHTML = logsHtml;
+        } else {
+            logsSection.style.display = "none";
+            logsTimeline.innerHTML = "";
+        }
     }
 
     // Close actions menus if user clicks outside

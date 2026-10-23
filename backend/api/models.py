@@ -583,11 +583,17 @@ class MaintenanceRegister(models.Model):
         ('Completed', 'Completed'),
         ('Failed', 'Failed')
     ], default='Scheduled')
+    category = models.CharField(max_length=20, choices=[
+        ('Database', 'Database'),
+        ('Infrastructure', 'Infrastructure'),
+    ], default='Database')
+    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-    ])
+        ('Infrastructure', 'Infrastructure'),
+    ], blank=True, default='MySQL')
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -622,6 +628,23 @@ class MaintenanceRegister(models.Model):
 
     def __str__(self):
         return f"{self.change_id} - {self.date}"
+
+
+class MaintenanceChangeLog(models.Model):
+    maintenance = models.ForeignKey(MaintenanceRegister, on_delete=models.CASCADE, related_name='change_logs')
+    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=50)
+    old_status = models.CharField(max_length=50, blank=True)
+    new_status = models.CharField(max_length=50, blank=True)
+    comment = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'maintenance_change_log'
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f"{self.maintenance.change_id} - {self.action} on {self.changed_at}"
 
 class CapacityPlanning(models.Model):
     month = models.DateField()
@@ -706,6 +729,21 @@ class CapacityPlanning(models.Model):
 
     def __str__(self):
         return f"{self.database} - {self.month}"
+
+
+class CapacityChangeLog(models.Model):
+    capacity = models.ForeignKey(CapacityPlanning, on_delete=models.CASCADE, related_name='change_logs')
+    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=50)
+    comment = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'capacity_change_log'
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        return f"{self.capacity.database} ({self.capacity.month}) - {self.action} on {self.changed_at}"
 
 class SLAConfig(models.Model):
     month = models.DateField()
@@ -865,4 +903,3 @@ class IncidentStaging(models.Model):
     def human_elapsed_duration(self):
         """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
         return format_human_duration(self.elapsed_duration_hrs)
-

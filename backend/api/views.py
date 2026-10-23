@@ -15,7 +15,7 @@ from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
     MaintenanceRegister, CapacityPlanning, SLAConfig, IncidentChangeLog, UgandaHoliday,
-    IncidentStaging
+    IncidentStaging, MaintenanceChangeLog, CapacityChangeLog
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
@@ -3379,48 +3379,112 @@ def maintenance_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-    # Filter Maintenance Register strictly for DB-level activities
-    queryset = MaintenanceRegister.objects.exclude(
-        Q(database='Infrastructure') | 
-        Q(database__icontains='Infrastructure') |
-        Q(system__icontains='Host Node') | 
-        Q(system__icontains='OLKVM') |
-        Q(system__icontains='Proxmox')
-    ).order_by('-date', '-created_at')
-    
-    current_db = request.GET.get('database', '')
+
+    from django.db.models import Sum, Q
+
+    base_qs = MaintenanceRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-created_at')
+
+    # Tabs: 'all', 'database', 'infrastructure'
+    current_tab = request.GET.get('tab', 'all').lower()
+    if current_tab not in ['all', 'database', 'infrastructure']:
+        current_tab = 'all'
+
+    # Target filter: single db or single node
+    current_target = request.GET.get('target', '').strip()
+    if not current_target and request.GET.get('database'):
+        current_target = request.GET.get('database').strip()
+
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-    if current_db:
-        queryset = queryset.filter(database=current_db)
+
+    # Tab counts for headers
+    total_all_count = MaintenanceRegister.objects.count()
+    total_db_count = MaintenanceRegister.objects.filter(
+        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+    ).exclude(category='Infrastructure').count()
+    total_infra_count = MaintenanceRegister.objects.filter(
+        Q(category='Infrastructure') | Q(database='Infrastructure')
+    ).count()
+
+    queryset = base_qs
+
+    # Filter by tab
+    if current_tab == 'database':
+        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server']:
+            current_target = ''
+        queryset = queryset.filter(
+            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+        ).exclude(category='Infrastructure')
+    elif current_tab == 'infrastructure':
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+            current_target = ''
+        queryset = queryset.filter(
+            Q(category='Infrastructure') | Q(database='Infrastructure')
+        )
+
+    # Filter by specific target
+    if current_target:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+            queryset = queryset.filter(database=current_target)
+        elif current_target == 'Infrastructure':
+            queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
+        elif current_target == 'OLKVM' or current_target in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']:
+            queryset = queryset.filter(
+                Q(node_name__iexact='OLKVM') |
+                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
+                Q(system__icontains='olkvm') |
+                Q(system__icontains='nmsinfra') |
+                Q(system__icontains='nmsebs')
+            )
+        else:
+            queryset = queryset.filter(
+                Q(node_name__icontains=current_target) |
+                Q(system__icontains=current_target) |
+                Q(database__icontains=current_target)
+            )
+
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
-        
+
     # Calculate KPIs based on the active query filters
     kpis = {
         'scheduled': queryset.filter(status__in=['Scheduled', 'In Progress']).count(),
         'completed': queryset.filter(status='Completed').count(),
         'downtime': round(sum(float(r.duration_hrs) for r in queryset.filter(status__in=['Completed', 'Failed'])), 1),
     }
-    
+
     completed_failed_count = queryset.filter(status__in=['Completed', 'Failed']).count()
     if completed_failed_count > 0:
         kpis['success_rate'] = round((kpis['completed'] / completed_failed_count * 100.0), 1)
     else:
         kpis['success_rate'] = 100.0
-        
+
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
+    node_choices = [
+        ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
+        ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
+        ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
+        ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
+        ('Proxmox', 'Proxmox Cluster (General)'),
+    ]
+
     return render(request, 'maintenance/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'current_db': current_db,
+        'current_tab': current_tab,
+        'current_target': current_target,
+        'current_db': current_target,
         'start_date': start_date,
         'end_date': end_date,
+        'total_all_count': total_all_count,
+        'total_db_count': total_db_count,
+        'total_infra_count': total_infra_count,
+        'node_choices': node_choices,
         'kpis': kpis
     })
 
@@ -3436,8 +3500,20 @@ def maintenance_create(request):
             maintenance = form.save(commit=False)
             maintenance.created_by = request.user
             maintenance.save()
-            messages.success(request, 'Maintenance record created successfully.')
-            return redirect('maintenance_list')
+
+            MaintenanceChangeLog.objects.create(
+                maintenance=maintenance,
+                changed_by=request.user,
+                action='Created',
+                new_status=maintenance.status,
+                comment=form.cleaned_data.get('change_comment', '') or 'Initial change window registration'
+            )
+
+            messages.success(request, f'Maintenance record {maintenance.change_id} created successfully.')
+            redirect_tab = 'infrastructure' if maintenance.category == 'Infrastructure' else 'database'
+            return redirect(f'/maintenance/?tab={redirect_tab}')
+        else:
+            messages.error(request, 'Failed to save maintenance record. Please review the highlighted errors below.')
     else:
         form = MaintenanceRegisterForm()
     return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record'})
@@ -3459,19 +3535,35 @@ def maintenance_edit(request, pk):
         return redirect('maintenance_list')
     
     if request.method == 'POST':
+        old_status = maintenance.status
         form = MaintenanceRegisterForm(request.POST, instance=maintenance)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Maintenance record updated successfully.')
-            return redirect('maintenance_list')
+            maint = form.save()
+            comment = form.cleaned_data.get('change_comment', '').strip()
+            MaintenanceChangeLog.objects.create(
+                maintenance=maint,
+                changed_by=request.user,
+                action='Updated',
+                old_status=old_status,
+                new_status=maint.status,
+                comment=comment or f'Status updated to {maint.status}'
+            )
+            messages.success(request, f'Maintenance record {maint.change_id} updated successfully.')
+            redirect_tab = 'infrastructure' if maint.category == 'Infrastructure' else 'database'
+            return redirect(f'/maintenance/?tab={redirect_tab}')
+        else:
+            messages.error(request, 'Failed to update maintenance record. Please review the errors below.')
     else:
         form = MaintenanceRegisterForm(instance=maintenance)
+    
+    change_logs = maintenance.change_logs.all().select_related('changed_by')
     
     return render(request, 'maintenance/form.html', {
         'form': form, 
         'title': 'Edit Maintenance Record',
         'can_edit': True,
-        'maintenance': maintenance
+        'maintenance': maintenance,
+        'change_logs': change_logs
     })
 
 @login_required
@@ -4057,6 +4149,8 @@ def capacity_create(request):
                 month__year=capacity.month.year,
                 month__month=capacity.month.month
             ).first()
+            target_record = None
+            action_type = 'Created'
             if existing_record:
                 # Update existing record
                 existing_record.database_size_gb = capacity.database_size_gb
@@ -4067,11 +4161,23 @@ def capacity_create(request):
                 existing_record.growth_gb = capacity.growth_gb
                 existing_record.created_by = request.user
                 existing_record.save()
+                target_record = existing_record
+                action_type = 'Updated'
                 messages.success(request, f"Updated existing capacity planning record for {capacity.database} in {capacity.month.strftime('%B %Y')}.")
             else:
                 capacity.created_by = request.user
                 capacity.save()
+                target_record = capacity
+                action_type = 'Created'
                 messages.success(request, 'Capacity planning record created successfully.')
+
+            comment = form.cleaned_data.get('change_comment', '').strip()
+            CapacityChangeLog.objects.create(
+                capacity=target_record,
+                changed_by=request.user,
+                action=action_type,
+                comment=comment or f"{action_type} capacity record for {target_record.database} ({target_record.month.strftime('%b %Y')})"
+            )
             return redirect('capacity_list')
     else:
         form = CapacityPlanningForm()
@@ -4096,17 +4202,27 @@ def capacity_edit(request, pk):
     if request.method == 'POST':
         form = CapacityPlanningForm(request.POST, instance=capacity)
         if form.is_valid():
-            form.save()
+            cap = form.save()
+            comment = form.cleaned_data.get('change_comment', '').strip()
+            CapacityChangeLog.objects.create(
+                capacity=cap,
+                changed_by=request.user,
+                action='Updated',
+                comment=comment or f"Updated capacity figures for {cap.database} ({cap.month.strftime('%b %Y')})"
+            )
             messages.success(request, 'Capacity planning record updated successfully.')
             return redirect('capacity_list')
     else:
         form = CapacityPlanningForm(instance=capacity)
     
+    change_logs = capacity.change_logs.all().select_related('changed_by')
+
     return render(request, 'capacity/form.html', {
         'form': form, 
         'title': 'Edit Capacity Planning Record',
         'can_edit': True,
-        'capacity': capacity
+        'capacity': capacity,
+        'change_logs': change_logs
     })
 
 # --- DELETE VIEWS ---
