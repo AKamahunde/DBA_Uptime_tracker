@@ -465,9 +465,6 @@
         </td>
         <td class="text-left" style="color: #334155; font-weight: 500;">
           {{ cap.storage_tier }}
-          {% if cap.is_shared %}
-          <span style="font-size: 6.5pt; background: #e0f2fe; color: #0284c7; padding: 1px 4px; border-radius: 2px; font-weight: 700; margin-left: 2px;">Shared</span>
-          {% endif %}
         </td>
         <td style="font-variant-numeric: tabular-nums;">{{ cap.capacity_gb }} GB</td>
         <td style="font-variant-numeric: tabular-nums;">{{ cap.used_gb }} GB</td>
