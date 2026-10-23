@@ -190,28 +190,28 @@
     line-height: 1.45;
   }
 
-  /* KPI Summary Cards */
-  .kpi-deck {
+  /* Plain Metrics Strip (No Cards) */
+  .plain-metrics-strip {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 14px;
+    padding: 6px 0 8px 0;
+    margin: 4px 0 10px 0;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1px solid var(--border-mist);
   }
-  .kpi-card {
-    background: #ffffff;
-    border: 1px solid var(--border-mist);
-    border-radius: 4px;
-    padding: 7px 12px;
+  .plain-metric {
+    padding: 0;
   }
-  .kpi-label {
-    font-size: 7.5px;
+  .plain-metric-label {
+    font-size: 7.2px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-soft);
     margin: 0 0 2px 0;
   }
-  .kpi-value {
+  .plain-metric-value {
     font-size: 16px;
     font-weight: 800;
     margin: 0 0 1px 0;
@@ -219,11 +219,11 @@
     line-height: 1.15;
     font-variant-numeric: tabular-nums;
   }
-  .kpi-value.green {
+  .plain-metric-value.green {
     color: var(--primary-green);
   }
-  .kpi-subtext {
-    font-size: 7.5px;
+  .plain-metric-subtext {
+    font-size: 7.2px;
     color: #94a3b8;
     margin: 0;
     font-variant-numeric: tabular-nums;
@@ -439,7 +439,7 @@
       padding: 0 !important;
       margin-bottom: 8px !important;
     }
-    .kpi-deck {
+    .plain-metrics-strip {
       margin-bottom: 8px !important;
     }
     .signoff-grid {
@@ -518,22 +518,22 @@
     <p class="summary-box-text">{{ lede_text|striptags }}</p>
   </div>
 
-  <!-- 3 Key Metric Cards -->
-  <div class="kpi-deck">
-    <div class="kpi-card">
-      <div class="kpi-label">Average System Uptime</div>
-      <div class="kpi-value green">{{ avg_uptime }}</div>
-      <div class="kpi-subtext">Target SLA: &ge; {{ target_sla_val }}%</div>
+  <!-- 3 Key Metrics Strip (Plain / No Cards) -->
+  <div class="plain-metrics-strip">
+    <div class="plain-metric">
+      <div class="plain-metric-label">Average System Uptime</div>
+      <div class="plain-metric-value green">{{ avg_uptime }}</div>
+      <div class="plain-metric-subtext">Target SLA: &ge; {{ target_sla_val }}%</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Active SLA Breaches</div>
-      <div class="kpi-value">{{ total_breaches }}</div>
-      <div class="kpi-subtext">Threshold: 0 breaches</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Active SLA Breaches</div>
+      <div class="plain-metric-value">{{ total_breaches }}</div>
+      <div class="plain-metric-subtext">Threshold: 0 breaches</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Outages &amp; Incidents</div>
-      <div class="kpi-value">{{ total_incidents }}</div>
-      <div class="kpi-subtext">Baseline: &lt; 4 incidents</div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Total Outages &amp; Incidents</div>
+      <div class="plain-metric-value">{{ total_incidents }}</div>
+      <div class="plain-metric-subtext">Baseline: &lt; 4 incidents</div>
     </div>
   </div>
 
