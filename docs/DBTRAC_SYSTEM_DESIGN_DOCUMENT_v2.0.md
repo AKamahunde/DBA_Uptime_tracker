@@ -391,8 +391,11 @@ The primary model for operational downtime records:
 * **Health Parameters:** IO Thread state (`Yes`/`No`), SQL Thread state (`Yes`/`No`), and Seconds Behind Master (`lag_seconds`).
 
 ### 5.7 Server Health & Telemetry (`ServerHealth`)
-* **Host Resource Profiling:** Captures daily utilization profiles for CPU, memory, and filesystem mounts.
-* **Provenance Tagging:** Distinguishes records entered manually from automated telemetry (`entered_by='Prometheus'`).
+* **Host Resource Profiling:** Captures daily utilization profiles for CPU, memory, and filesystem mounts across both physical hypervisor host nodes and guest virtual machines.
+* **Dual-Surface Presentation Architecture:**
+  1. **Physical Hypervisor Host Node Tier:** Consolidates workloads (e.g., OLKVM cluster) to host node level with weighted CPU, aggregated memory, and workload mapping (`hosted_vms`).
+  2. **Guest Virtual Machine Fleet Status (Single Pane of Glass):** Deduplicated 1-row-per-VM snapshot matrix providing instant operational visibility into CPU, RAM, OS disk, and SLA availability across all production virtual machines (`nmsinfra`, `nmsebs`, `databasevm`, `tomcatvm`, `jumphostvm`, `monitoringvm`).
+* **Provenance Tagging:** Distinguishes records entered manually from automated telemetry (`entered_by='Prometheus'` or `entered_by='Script'`).
 
 ### 5.8 Capacity Planning (`CapacityPlanning`)
 * **Storage Metrics:** Captures total capacity, allocated storage, active database size, net monthly growth, and calculated runway.
@@ -595,9 +598,12 @@ Let:
 * **Filter Controls:** Month-by-month historical selector enabling audits of previous fiscal periods.
 
 ### 9.2 Infrastructure & Virtualization Dashboard
-* **Primary Route:** `/incidents/?tab=infrastructure` and `/capacity/?tab=infrastructure`
-* **Features:** Dedicated visibility into OLKVM and Proxmox hypervisor nodes. Displays live CPU and memory utilization gauges, mountpoint storage consumption, and active infrastructure incidents.
-* **Node Filter:** Instant selector for `All Nodes`, `nmsinfra`, `nmsebs`, `pvenode1`, `pvenode2`, or `pvenode3`.
+* **Primary Routes:** `/dashboard/#node-infrastructure`, `/server_health/`, `/incidents/?tab=infrastructure`, and `/capacity/?tab=infrastructure`
+* **Features:** Dedicated visibility into OLKVM and Proxmox hypervisor nodes, combined with real-time Guest Virtual Machine Fleet tracking:
+  * **Hypervisor Node Overview Table:** Consolidated at physical node level (`OLKVM`, `pvenode1`, `pvenode2`, `pvenode3`), featuring the dedicated **Hosted VMs / Workloads** column with interactive status pills, weighted CPU, combined memory, and multi-tier storage tracking.
+  * **Guest Virtual Machine Fleet Status (Single Pane of Glass):** A comprehensive status matrix embedded directly on the main dashboard and at `/server_health/?tab=vms`, rendering the latest compute, RAM, OS disk, and SLA uptime for each production VM (`nmsinfra`, `nmsebs`, `databasevm`, `tomcatvm`, `jumphostvm`, `monitoringvm`).
+  * **Two-Tier Server Health Architecture:** Separates the deduplicated current fleet snapshot from the paginated historical telemetry audit trail (550+ log records).
+* **Node Filter:** Instant selector for `All Nodes`, `OLKVM`, or `Proxmox`, automatically synchronizing both host node and guest VM fleet views.
 
 ### 9.3 Capacity Planning & Storage Analytics
 * **Primary Route:** `/capacity/`
@@ -612,11 +618,12 @@ Let:
 
 ## 10. Security, Governance & Access Control
 
-### 10.1 Role-Based Access Control (RBAC)
-DBTRAC enforces fine-grained authorization across distinct user groups:
-* **Database Administrator (DBA):** Full management of Database Incidents, Maintenance, Backups, Replication, and Capacity Planning.
-* **System Administrator (SysAdmin):** Management of Infrastructure Incidents, Node Capacity, and Prometheus telemetry reviews.
+### 10.1 Role-Based Access Control (RBAC) & Granular Scopes
+DBTRAC enforces fine-grained authorization across distinct user groups with segregated Database and Infrastructure domain permissions:
+* **Database Administrator (DBA):** Management of Database Incidents (`add_databaseincident`), Database Maintenance (`add_databasemaintenance`), Backups, Replication, and Capacity Planning under `view_databasedashboard`.
+* **System Administrator (SysAdmin):** Management of Infrastructure Incidents (`add_infrastructureincident`), Infrastructure Maintenance (`add_infrastructuremaintenance`), Hypervisor Node Capacity, Prometheus telemetry syncing, and Server Health reviews under `view_infrastructuredashboard`.
 * **Executive / Auditor:** Read-only access to Dashboards, Analytics, and Excel/Print report generators.
+* **Separation of Operational Registers:** Domain users are strictly prevented from viewing, creating, or editing cross-domain records without explicit granular permission assignments.
 
 ### 10.2 Five-Minute Creator Self-Correction Window
 To safeguard data integrity while accommodating human error during manual incident logging:

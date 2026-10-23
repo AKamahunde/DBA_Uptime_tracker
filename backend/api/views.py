@@ -2027,6 +2027,282 @@ def server_health_sync_prometheus(request):
     return redirect('server_health_list')
 
 
+def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None):
+    """
+    Summarizes Guest Virtual Machine health across the hypervisor fleet
+    (OLKVM and Proxmox) into a consolidated single-pane-of-glass status matrix.
+    """
+    from django.db.models import Q
+    today_dt = timezone.now().date()
+
+    canonical_vms = [
+        {
+            'vm_key': 'nmsinfra',
+            'display_name': 'nmsinfra.nms.go.ug',
+            'short_name': 'nmsinfra',
+            'host_node': 'OLKVM Host Cluster',
+            'parent_node_key': 'OLKVM',
+            'cluster': 'OLKVM',
+            'role': 'Oracle ERP Database (Production)',
+            'database': 'Oracle',
+            'ip_address': '192.168.30.26',
+            'vmid': 'N/A (OLKVM)',
+            'filter_q': Q(server__icontains='infra') | Q(hosted_systems__icontains='nmsinfra'),
+            'default_cores': 64,
+            'default_ram_gb': 128.0,
+        },
+        {
+            'vm_key': 'nmsebs',
+            'display_name': 'nmsebs.nms.go.ug',
+            'short_name': 'nmsebs',
+            'host_node': 'OLKVM Host Cluster',
+            'parent_node_key': 'OLKVM',
+            'cluster': 'OLKVM',
+            'role': 'Oracle EBS Applications (Production)',
+            'database': 'Oracle',
+            'ip_address': '192.168.30.25',
+            'vmid': 'N/A (OLKVM)',
+            'filter_q': Q(server__icontains='ebs') | Q(hosted_systems__icontains='nmsebs'),
+            'default_cores': 16,
+            'default_ram_gb': 32.0,
+        },
+        {
+            'vm_key': 'databasevm',
+            'display_name': 'databasevm (nickledbnew)',
+            'short_name': 'databasevm',
+            'host_node': 'pvenode3',
+            'parent_node_key': 'pvenode3',
+            'cluster': 'Proxmox',
+            'role': 'MySQL Database / Pentana Audit Server',
+            'database': 'MySQL',
+            'ip_address': '10.10.17.34',
+            'vmid': 'qemu/103',
+            'filter_q': Q(server__icontains='databasevm') | Q(server__icontains='nickledb') | Q(hosted_systems__icontains='databasevm'),
+            'fallback_host_q': Q(server__iexact='pvenode3'),
+            'default_cores': 8,
+            'default_ram_gb': 16.0,
+        },
+        {
+            'vm_key': 'tomcatvm',
+            'display_name': 'tomcatvm',
+            'short_name': 'tomcatvm',
+            'host_node': 'pvenode1',
+            'parent_node_key': 'pvenode1',
+            'cluster': 'Proxmox',
+            'role': 'Internal Web Applications & Services',
+            'database': 'Internal Apps',
+            'ip_address': '10.10.17.34',
+            'vmid': 'qemu/102',
+            'filter_q': Q(server__icontains='tomcat') | Q(hosted_systems__icontains='tomcat'),
+            'fallback_host_q': Q(server__iexact='pvenode1'),
+            'default_cores': 4,
+            'default_ram_gb': 8.0,
+        },
+        {
+            'vm_key': 'jumphostvm',
+            'display_name': 'jumphostvm',
+            'short_name': 'jumphostvm',
+            'host_node': 'pvenode2',
+            'parent_node_key': 'pvenode2',
+            'cluster': 'Proxmox',
+            'role': 'Secure Bastion & Gateway Access',
+            'database': 'Infrastructure',
+            'ip_address': '10.10.17.34',
+            'vmid': 'qemu/100',
+            'filter_q': Q(server__icontains='jumphost') | Q(hosted_systems__icontains='jumphost'),
+            'fallback_host_q': Q(server__iexact='pvenode2'),
+            'default_cores': 2,
+            'default_ram_gb': 4.0,
+        },
+        {
+            'vm_key': 'monitoringvm',
+            'display_name': 'monitoringvm',
+            'short_name': 'monitoringvm',
+            'host_node': 'pvenode2',
+            'parent_node_key': 'pvenode2',
+            'cluster': 'Proxmox',
+            'role': 'Prometheus, Grafana & Ops Telemetry',
+            'database': 'Monitoring',
+            'ip_address': '10.10.17.34',
+            'vmid': 'qemu/101',
+            'filter_q': Q(server__icontains='monitoring') | Q(hosted_systems__icontains='monitoring'),
+            'fallback_host_q': Q(server__iexact='pvenode2'),
+            'default_cores': 4,
+            'default_ram_gb': 8.0,
+        },
+    ]
+
+    fleet_vms = []
+    seen_canonical_servers = set()
+    for defn in canonical_vms:
+        rec = ServerHealth.objects.filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
+        is_fallback = False
+        if not rec and defn.get('fallback_host_q'):
+            rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
+            is_fallback = True
+
+        if rec:
+            if not is_fallback:
+                seen_canonical_servers.add((rec.server or '').lower())
+            up_pct = float(rec.uptime_percent if rec.uptime_percent is not None else 100.0)
+            cpu_pct = float(rec.cpu_percent or 0.0)
+            mem_pct = float(rec.memory_percent or 0.0)
+            mem_tot = float(rec.memory_total_gb or defn['default_ram_gb'])
+            mem_used = float(rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
+
+            disk_pct = float(rec.disk_3_percent or rec.disk_percent or 0.0)
+            disk_sz = float(rec.disk_3_size_gb or 0.0)
+            disk_us = float(rec.disk_3_used_gb or 0.0)
+
+            status = rec.status or ('Healthy' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Critical'))
+            last_date = rec.date
+            last_updated = rec.updated_at
+            source = rec.entered_by or ('Prometheus' if is_fallback else 'System')
+            has_data = True
+        else:
+            up_pct = 100.00
+            cpu_pct = 0.0
+            mem_pct = 0.0
+            mem_tot = defn['default_ram_gb']
+            mem_used = 0.0
+            disk_pct = 0.0
+            disk_sz = 0.0
+            disk_us = 0.0
+            status = 'Healthy'
+            last_date = today_dt
+            last_updated = None
+            source = 'Baseline'
+            has_data = False
+
+        fleet_vms.append({
+            'pk': rec.pk if rec else None,
+            'vm_key': defn['vm_key'],
+            'display_name': defn['display_name'],
+            'short_name': defn['short_name'],
+            'host_node': defn['host_node'],
+            'parent_node_key': defn['parent_node_key'],
+            'cluster': defn['cluster'],
+            'role': defn['role'],
+            'database': defn['database'],
+            'ip_address': defn['ip_address'],
+            'vmid': defn['vmid'],
+            'logical_cpus': int(rec.logical_cpus or defn['default_cores']) if rec else defn['default_cores'],
+            'uptime_percent': round(up_pct, 2),
+            'uptime_str': f"{round(up_pct, 2)}%",
+            'cpu_percent': round(cpu_pct, 2),
+            'memory_percent': round(mem_pct, 2),
+            'memory_total_gb': round(mem_tot, 2),
+            'memory_used_gb': round(mem_used, 2),
+            'disk_percent': round(disk_pct, 2),
+            'disk_size_gb': round(disk_sz, 2),
+            'disk_used_gb': round(disk_us, 2),
+            'status': status,
+            'has_data': has_data,
+            'is_fallback': is_fallback,
+            'last_date': last_date,
+            'last_updated': last_updated,
+            'entered_by': source,
+        })
+
+    # Discover any additional unique guest VMs recorded in ServerHealth
+    dynamic_vm_recs = (
+        ServerHealth.objects.filter(Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)'))
+        .order_by('-date', '-updated_at', '-id')
+    )
+    seen_dynamic = set()
+    for d_rec in dynamic_vm_recs:
+        s_low = (d_rec.server or '').lower()
+        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring']):
+            continue
+        if s_low in seen_dynamic:
+            continue
+        seen_dynamic.add(s_low)
+
+        up_pct = float(d_rec.uptime_percent if d_rec.uptime_percent is not None else 100.0)
+        cpu_pct = float(d_rec.cpu_percent or 0.0)
+        mem_pct = float(d_rec.memory_percent or 0.0)
+        mem_tot = float(d_rec.memory_total_gb or 0.0)
+        mem_used = float(d_rec.memory_used_gb or 0.0)
+        disk_pct = float(d_rec.disk_3_percent or d_rec.disk_percent or 0.0)
+        disk_sz = float(d_rec.disk_3_size_gb or 0.0)
+        disk_us = float(d_rec.disk_3_used_gb or 0.0)
+
+        fleet_vms.append({
+            'pk': d_rec.pk,
+            'vm_key': d_rec.server,
+            'display_name': d_rec.server,
+            'short_name': d_rec.server,
+            'host_node': d_rec.node_name or 'Proxmox',
+            'parent_node_key': d_rec.node_name or 'Proxmox',
+            'cluster': d_rec.node_name or 'Proxmox',
+            'role': d_rec.clean_hosted_systems or 'Guest Virtual Machine',
+            'database': d_rec.database or 'System',
+            'ip_address': 'DHCP / Static',
+            'vmid': 'qemu',
+            'logical_cpus': int(d_rec.logical_cpus or 4),
+            'uptime_percent': round(up_pct, 2),
+            'uptime_str': f"{round(up_pct, 2)}%",
+            'cpu_percent': round(cpu_pct, 2),
+            'memory_percent': round(mem_pct, 2),
+            'memory_total_gb': round(mem_tot, 2),
+            'memory_used_gb': round(mem_used, 2),
+            'disk_percent': round(disk_pct, 2),
+            'disk_size_gb': round(disk_sz, 2),
+            'disk_used_gb': round(disk_us, 2),
+            'status': d_rec.status or 'Healthy',
+            'has_data': True,
+            'is_fallback': False,
+            'last_date': d_rec.date,
+            'last_updated': d_rec.updated_at,
+            'entered_by': d_rec.entered_by or 'Script',
+        })
+
+    # Apply Node Scope and VM selection filter
+    filtered_fleet = fleet_vms
+    if selected_node == 'OLKVM':
+        filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'OLKVM']
+    elif selected_node == 'Proxmox':
+        filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'Proxmox']
+    elif selected_node != 'All Nodes':
+        sel_low = selected_node.lower()
+        filtered_fleet = [
+            v for v in fleet_vms
+            if sel_low in v['parent_node_key'].lower() or sel_low in v['host_node'].lower() or sel_low in v['vm_key'].lower()
+        ]
+
+    if selected_vm:
+        vm_low = selected_vm.lower()
+        filtered_fleet = [v for v in filtered_fleet if vm_low in v['vm_key'].lower() or vm_low in v['display_name'].lower()]
+
+    total_count = len(filtered_fleet)
+    healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
+    warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
+    critical_count = sum(1 for v in filtered_fleet if v['status'] == 'Critical')
+
+    active_data_vms = [v for v in filtered_fleet if v['has_data']]
+    avg_up = round(sum(v['uptime_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 100.00
+    avg_cpu = round(sum(v['cpu_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
+    avg_mem = round(sum(v['memory_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
+    avg_disk = round(sum(v['disk_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
+
+    kpis = {
+        'total_vms_count': total_count,
+        'vms_healthy_count': healthy_count,
+        'vms_healthy_display': f"{healthy_count}/{total_count} Online & Healthy",
+        'vms_warning_count': warning_count,
+        'vms_critical_count': critical_count,
+        'fleet_avg_uptime': f"{avg_up}%",
+        'fleet_avg_cpu': f"{avg_cpu}%",
+        'fleet_avg_mem': f"{avg_mem}%",
+        'fleet_avg_disk': f"{avg_disk}%",
+    }
+
+    return {
+        'vms': filtered_fleet,
+        'kpis': kpis,
+    }
+
+
 def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=None):
     from django.db.models import Avg, Q
     import math
@@ -3168,12 +3444,19 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             f"Total provisioned storage stands at {kpi_total_storage_gb} GB ({kpi_used_storage_gb} GB used, {kpi_storage_used_pct}%)."
         )
 
+    # Build Guest Virtual Machine Fleet status summary
+    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt)
+    guest_vms_summary = vm_fleet_info['vms']
+    guest_vm_kpis = vm_fleet_info['kpis']
+
     return {
         'selected_node': selected_node,
         'prometheus_url': PROMETHEUS_URL,
         'node_overview_data': node_overview_data,
         'filtered_nodes': filtered_nodes,
         'scoped_node_detail': scoped_node_detail,
+        'guest_vms_summary': guest_vms_summary,
+        'guest_vm_kpis': guest_vm_kpis,
         'shared_storage_records': shared_storage_records,
         'node_capacity_records': node_capacity_records,
         'kpi_node_uptime': kpi_node_uptime,
@@ -3688,8 +3971,15 @@ def server_health_list(request):
         kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
         kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
 
+    # Build deduplicated single-pane-of-glass current VM fleet status
+    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node='All Nodes', selected_vm=selected_vm)
+    current_vm_fleet = vm_fleet_info['vms']
+    vm_fleet_kpis = vm_fleet_info['kpis']
+
     ctx = {
         'page_obj': page_obj,
+        'current_vm_fleet': current_vm_fleet,
+        'vm_fleet_kpis': vm_fleet_kpis,
         'is_admin': request.user.is_admin,
         'current_tab': current_tab,
         'selected_node': selected_node,

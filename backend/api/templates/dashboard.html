@@ -948,6 +948,112 @@
     </div>
 </div>
 
+<!-- Guest Virtual Machine Fleet Status Card -->
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
+                    Guest Virtual Machine Fleet Status
+                </h3>
+                <span style="font-size: 0.72rem; font-weight: 700; background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.6rem; border-radius: 9999px;">
+                    {{ guest_vm_kpis.vms_healthy_display }}
+                </span>
+            </div>
+            <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">
+                Live compute, memory, storage utilization and SLA availability across virtual machine instances hosted on the hypervisor fleet.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center; font-size: 0.75rem; flex-wrap: wrap;">
+            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
+                <strong>Fleet Avg CPU:</strong> {{ guest_vm_kpis.fleet_avg_cpu }}
+            </span>
+            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
+                <strong>Fleet Avg RAM:</strong> {{ guest_vm_kpis.fleet_avg_mem }}
+            </span>
+            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
+                <strong>Fleet Avg Disk:</strong> {{ guest_vm_kpis.fleet_avg_disk }}
+            </span>
+            <a href="{% url 'server_health_list' %}?tab=vms" style="color: var(--primary-navy); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.25rem;">
+                Server Health Logs &rarr;
+            </a>
+        </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background-color: var(--bg-cool);">
+                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 17%;">Virtual Machine (Server)</th>
+                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 14%;">Host Hypervisor</th>
+                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 19%;">Workload / Role</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 9%;">Database</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 8%;">Uptime SLA</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 7%;">CPU Util %</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 11%;">Memory (RAM)</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 8%;">OS Disk %</th>
+                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 7%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm in guest_vms_summary %}
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
+                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">{{ vm.display_name }}</div>
+                        <div style="font-size: 0.7rem; color: #64748b; font-family: monospace; margin-top: 0.1rem;">
+                            {% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}{{ vm.vmid }} &bull; {% endif %}{{ vm.ip_address }}
+                        </div>
+                    </td>
+                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #1e293b; font-size: 0.82rem;">{{ vm.host_node }}</div>
+                        <div style="font-size: 0.68rem; color: #94a3b8;">{{ vm.cluster }}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
+                        <div style="font-weight: 500; color: #334155; font-size: 0.82rem;">{{ vm.role }}</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        <span style="font-weight: 600; color: var(--primary-navy); font-size: 0.82rem;">{{ vm.database }}</span>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}#137333{% elif vm.uptime_percent >= 99.0 %}#b06000{% else %}#c5221f{% endif %}; white-space: nowrap; vertical-align: middle;">
+                        {{ vm.uptime_str }}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ vm.cpu_percent }}%</div>
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.logical_cpus }} cores</div>
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ vm.memory_percent }}%</div>
+                        {% if vm.memory_total_gb > 0 %}
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.memory_used_gb }} / {{ vm.memory_total_gb }} GB</div>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        <div style="font-weight: 600; color: #0f172a;">{{ vm.disk_percent }}%</div>
+                        {% if vm.disk_size_gb > 0 %}
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.disk_used_gb }} / {{ vm.disk_size_gb }} GB</div>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        <span style="font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 9999px;
+                                    {% if vm.status == 'Healthy' %}background: #e6f4ea; color: #137333;
+                                    {% elif vm.status == 'Critical' %}background: #fce8e6; color: #c5221f;
+                                    {% else %}background: #fef7e0; color: #b06000;{% endif %}">
+                            {{ vm.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 1.75rem; color: #94a3b8; font-style: italic;">
+                        No virtual machines found for the selected node scope.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Node Uptime Trend Graph & Node Status & Alerts -->
 <div class="scoped-grid scoped-grid-2col" style="margin-bottom: 2rem;">
     <!-- Left: Node Uptime Trend Card -->

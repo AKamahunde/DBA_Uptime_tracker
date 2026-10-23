@@ -485,6 +485,61 @@
     </tbody>
   </table>
 
+  <!-- Guest Virtual Machine Fleet Status Section -->
+  <div class="section-heading" style="display: flex; justify-content: space-between; align-items: center;">
+    <span>Guest Virtual Machine Fleet Status</span>
+    <span style="font-size: 8pt; font-weight: 600; text-transform: none; color: var(--text-soft);">
+      {{ guest_vm_kpis.vms_healthy_display }} &bull; Avg CPU: {{ guest_vm_kpis.fleet_avg_cpu }} &bull; Avg RAM: {{ guest_vm_kpis.fleet_avg_mem }}
+    </span>
+  </div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th style="width: 18%;">Virtual Machine</th>
+        <th style="width: 14%;">Host Hypervisor</th>
+        <th style="width: 22%;">Workload / Role</th>
+        <th style="text-align: center; width: 10%;">Database</th>
+        <th style="text-align: center; width: 9%;">Uptime SLA</th>
+        <th style="text-align: center; width: 8%;">CPU Util %</th>
+        <th style="text-align: center; width: 11%;">Memory (RAM)</th>
+        <th style="text-align: center; width: 8%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for vm in guest_vms_summary %}
+      <tr>
+        <td>
+          <strong>{{ vm.display_name }}</strong>
+          <div style="font-size: 7pt; color: #64748b;">{% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}{{ vm.vmid }} &bull; {% endif %}{{ vm.ip_address }}</div>
+        </td>
+        <td style="font-size: 8pt;">
+          <strong>{{ vm.host_node }}</strong>
+          <div style="font-size: 7pt; color: #64748b;">{{ vm.cluster }}</div>
+        </td>
+        <td style="font-size: 8pt; color: #334155;">{{ vm.role }}</td>
+        <td style="text-align: center; font-weight: 600; font-size: 8pt;">{{ vm.database }}</td>
+        <td style="text-align: center; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}var(--green-text){% elif vm.uptime_percent >= 99.0 %}#d97706{% else %}var(--red-text){% endif %};">
+          {{ vm.uptime_str }}
+        </td>
+        <td style="text-align: center; font-weight: 600;">{{ vm.cpu_percent }}%</td>
+        <td style="text-align: center;">
+          <div style="font-weight: 600;">{{ vm.memory_percent }}%</div>
+          {% if vm.memory_total_gb > 0 %}
+          <div style="font-size: 7pt; color: #64748b;">{{ vm.memory_used_gb }} / {{ vm.memory_total_gb }} GB</div>
+          {% endif %}
+        </td>
+        <td style="text-align: center; font-weight: 700; color: {% if vm.status == 'Healthy' %}var(--green-text){% elif vm.status == 'Warning' %}#d97706{% else %}var(--red-text){% endif %};">
+          {{ vm.status }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 10px; color: var(--text-soft); font-style: italic;">No virtual machines found for the selected scope.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
   <div class="section-heading">Node Storage Capacity &amp; Growth Breakdown</div>
   <table class="report-table">
     <thead>
