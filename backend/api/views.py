@@ -2149,10 +2149,14 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             mem_pct = float(rec.memory_percent or 0.0)
             mem_tot = float(rec.memory_total_gb or defn['default_ram_gb'])
             mem_used = float(rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
+            if mem_used == 0.0 and mem_tot > 0 and mem_pct > 0:
+                mem_used = round(mem_tot * mem_pct / 100.0, 2)
 
             disk_pct = float(rec.disk_3_percent or rec.disk_percent or 0.0)
             disk_sz = float(rec.disk_3_size_gb or 0.0)
-            disk_us = float(rec.disk_3_used_gb or 0.0)
+            disk_us = float(rec.disk_3_used_gb or (disk_sz * disk_pct / 100.0 if disk_sz > 0 else 0.0))
+            if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
+                disk_us = round(disk_sz * disk_pct / 100.0, 2)
 
             status = rec.status or ('Healthy' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Critical'))
             last_date = rec.date
@@ -2222,10 +2226,14 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         cpu_pct = float(d_rec.cpu_percent or 0.0)
         mem_pct = float(d_rec.memory_percent or 0.0)
         mem_tot = float(d_rec.memory_total_gb or 0.0)
-        mem_used = float(d_rec.memory_used_gb or 0.0)
+        mem_used = float(d_rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
+        if mem_used == 0.0 and mem_tot > 0 and mem_pct > 0:
+            mem_used = round(mem_tot * mem_pct / 100.0, 2)
         disk_pct = float(d_rec.disk_3_percent or d_rec.disk_percent or 0.0)
         disk_sz = float(d_rec.disk_3_size_gb or 0.0)
-        disk_us = float(d_rec.disk_3_used_gb or 0.0)
+        disk_us = float(d_rec.disk_3_used_gb or (disk_sz * disk_pct / 100.0 if disk_sz > 0 else 0.0))
+        if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
+            disk_us = round(disk_sz * disk_pct / 100.0, 2)
 
         fleet_vms.append({
             'pk': d_rec.pk,
@@ -2429,6 +2437,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         return lbl
 
     def _calculate_runway(free_gb, daily_burn_gb, used_pct=0.0):
+        if daily_burn_gb is None:
+            if free_gb is not None and float(free_gb or 0.0) <= 0.0:
+                return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
+            return {'days': None, 'text': '—', 'badge': 'neutral'}
+
         free_gb = float(free_gb or 0.0)
         daily_burn_gb = float(daily_burn_gb or 0.0)
         used_pct = float(used_pct or 0.0)
@@ -2575,23 +2588,31 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             cpu_val = float(latest_rec.cpu_percent or 0.0)
             mem_val = float(latest_rec.memory_percent or 0.0)
             mem_tot = float(latest_rec.memory_total_gb or 0.0)
-            mem_used = float(latest_rec.memory_used_gb or 0.0)
+            mem_used = float(latest_rec.memory_used_gb or (mem_tot * mem_val / 100.0 if mem_tot > 0 else 0.0))
+            if mem_used == 0.0 and mem_tot > 0 and mem_val > 0:
+                mem_used = round(mem_tot * mem_val / 100.0, 2)
             growth_gb = float(getattr(latest_rec, 'storage_growth_gb', 0.0) or 0.0)
             growth_pct = float(latest_rec.storage_growth_pct or 0.0)
 
             d1_pct = float(latest_rec.disk_1_percent or 0.0)
             d1_size = float(latest_rec.disk_1_size_gb or 0.0)
-            d1_used = float(latest_rec.disk_1_used_gb or 0.0)
+            d1_used = float(latest_rec.disk_1_used_gb or (d1_size * d1_pct / 100.0 if d1_size > 0 else 0.0))
+            if d1_used == 0.0 and d1_size > 0 and d1_pct > 0:
+                d1_used = round(d1_size * d1_pct / 100.0, 2)
             if d1_pct == 0.0 and d1_size == 0.0 and float(latest_rec.disk_percent or 0.0) > 0:
                 d1_pct = float(latest_rec.disk_percent)
 
             d2_pct = float(latest_rec.disk_2_percent or 0.0)
             d2_size = float(latest_rec.disk_2_size_gb or 0.0)
-            d2_used = float(latest_rec.disk_2_used_gb or 0.0)
+            d2_used = float(latest_rec.disk_2_used_gb or (d2_size * d2_pct / 100.0 if d2_size > 0 else 0.0))
+            if d2_used == 0.0 and d2_size > 0 and d2_pct > 0:
+                d2_used = round(d2_size * d2_pct / 100.0, 2)
 
             d3_pct = float(latest_rec.disk_3_percent or 0.0)
             d3_size = float(latest_rec.disk_3_size_gb or 0.0)
-            d3_used = float(latest_rec.disk_3_used_gb or 0.0)
+            d3_used = float(latest_rec.disk_3_used_gb or (d3_size * d3_pct / 100.0 if d3_size > 0 else 0.0))
+            if d3_used == 0.0 and d3_size > 0 and d3_pct > 0:
+                d3_used = round(d3_size * d3_pct / 100.0, 2)
 
             # Baseline confirmed telemetry starts from October 1, 2026
             # Daily 24h Delta: compare against yesterday's run (most recent prior run with valid telemetry)
@@ -2606,43 +2627,58 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 )
 
             if prev_run_rec:
-                prev_d1_used = float(prev_run_rec.disk_1_used_gb or 0.0) if float(prev_run_rec.disk_1_size_gb or 0.0) > 0 else 0.0
-                prev_d2_used = float(prev_run_rec.disk_2_used_gb or 0.0) if float(prev_run_rec.disk_2_size_gb or 0.0) > 0 else 0.0
-                prev_d3_used = float(prev_run_rec.disk_3_used_gb or 0.0) if float(prev_run_rec.disk_3_size_gb or 0.0) > 0 else 0.0
+                prev_d1_sz = float(prev_run_rec.disk_1_size_gb or 0.0)
+                prev_d1_pct = float(prev_run_rec.disk_1_percent or 0.0)
+                prev_d1_used = float(prev_run_rec.disk_1_used_gb or (prev_d1_sz * prev_d1_pct / 100.0 if prev_d1_sz > 0 else 0.0))
+                if prev_d1_used == 0.0 and prev_d1_sz > 0 and prev_d1_pct > 0:
+                    prev_d1_used = round(prev_d1_sz * prev_d1_pct / 100.0, 2)
+
+                prev_d2_sz = float(prev_run_rec.disk_2_size_gb or 0.0)
+                prev_d2_pct = float(prev_run_rec.disk_2_percent or 0.0)
+                prev_d2_used = float(prev_run_rec.disk_2_used_gb or (prev_d2_sz * prev_d2_pct / 100.0 if prev_d2_sz > 0 else 0.0))
+                if prev_d2_used == 0.0 and prev_d2_sz > 0 and prev_d2_pct > 0:
+                    prev_d2_used = round(prev_d2_sz * prev_d2_pct / 100.0, 2)
+
+                prev_d3_sz = float(prev_run_rec.disk_3_size_gb or 0.0)
+                prev_d3_pct = float(prev_run_rec.disk_3_percent or 0.0)
+                prev_d3_used = float(prev_run_rec.disk_3_used_gb or (prev_d3_sz * prev_d3_pct / 100.0 if prev_d3_sz > 0 else 0.0))
+                if prev_d3_used == 0.0 and prev_d3_sz > 0 and prev_d3_pct > 0:
+                    prev_d3_used = round(prev_d3_sz * prev_d3_pct / 100.0, 2)
+
                 prev_local_used = prev_d2_used + prev_d3_used
                 curr_local_used = d2_used + d3_used
 
                 # Safe delta calculation: only compute if previous run had positive usage
-                d1_delta_gb = round(d1_used - prev_d1_used, 2) if (prev_d1_used > 0 and d1_used > 0) else 0.0
+                d1_delta_gb = round(d1_used - prev_d1_used, 2) if (prev_d1_used > 0 and d1_used > 0) else None
                 # Guard against delta anomalies (>25% disk size jump or baseline shift)
-                if d1_size > 0 and abs(d1_delta_gb) > (d1_size * 0.25):
-                    d1_delta_gb = 0.0
-                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if (prev_d1_used > 0 and d1_delta_gb != 0.0) else 0.0
+                if d1_delta_gb is not None and d1_size > 0 and abs(d1_delta_gb) > (d1_size * 0.25):
+                    d1_delta_gb = None
+                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if (d1_delta_gb is not None and prev_d1_used > 0) else None
 
-                d2_delta_gb = round(d2_used - prev_d2_used, 2) if (prev_d2_used > 0 and d2_used > 0) else 0.0
-                if d2_size > 0 and abs(d2_delta_gb) > (d2_size * 0.25):
-                    d2_delta_gb = 0.0
-                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if (prev_d2_used > 0 and d2_delta_gb != 0.0) else 0.0
+                d2_delta_gb = round(d2_used - prev_d2_used, 2) if (prev_d2_used > 0 and d2_used > 0) else None
+                if d2_delta_gb is not None and d2_size > 0 and abs(d2_delta_gb) > (d2_size * 0.25):
+                    d2_delta_gb = None
+                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if (d2_delta_gb is not None and prev_d2_used > 0) else None
 
-                d3_delta_gb = round(d3_used - prev_d3_used, 2) if (prev_d3_used > 0 and d3_used > 0) else 0.0
-                if d3_size > 0 and abs(d3_delta_gb) > (d3_size * 0.25):
-                    d3_delta_gb = 0.0
-                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if (prev_d3_used > 0 and d3_delta_gb != 0.0) else 0.0
+                d3_delta_gb = round(d3_used - prev_d3_used, 2) if (prev_d3_used > 0 and d3_used > 0) else None
+                if d3_delta_gb is not None and d3_size > 0 and abs(d3_delta_gb) > (d3_size * 0.25):
+                    d3_delta_gb = None
+                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if (d3_delta_gb is not None and prev_d3_used > 0) else None
 
-                local_delta_gb = round(curr_local_used - prev_local_used, 2) if (prev_local_used > 0 and curr_local_used > 0) else 0.0
+                local_delta_gb = round(curr_local_used - prev_local_used, 2) if (prev_local_used > 0 and curr_local_used > 0) else None
                 local_cap_est = d2_size + d3_size
-                if local_cap_est > 0 and abs(local_delta_gb) > (local_cap_est * 0.25):
-                    local_delta_gb = 0.0
-                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if (prev_local_used > 0 and local_delta_gb != 0.0) else 0.0
+                if local_delta_gb is not None and local_cap_est > 0 and abs(local_delta_gb) > (local_cap_est * 0.25):
+                    local_delta_gb = None
+                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if (local_delta_gb is not None and prev_local_used > 0) else None
             else:
-                d1_delta_gb = 0.0
-                d1_delta_pct = 0.0
-                d2_delta_gb = 0.0
-                d2_delta_pct = 0.0
-                d3_delta_gb = 0.0
-                d3_delta_pct = 0.0
-                local_delta_gb = 0.0
-                local_delta_pct = 0.0
+                d1_delta_gb = None
+                d1_delta_pct = None
+                d2_delta_gb = None
+                d2_delta_pct = None
+                d3_delta_gb = None
+                d3_delta_pct = None
+                local_delta_gb = None
+                local_delta_pct = None
 
             d1_runway = _calculate_runway(max(0.0, d1_size - d1_used), d1_delta_gb, d1_pct)
             d2_runway = _calculate_runway(max(0.0, d2_size - d2_used), d2_delta_gb, d2_pct)
@@ -2746,10 +2782,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'memory_total_gb': round(mem_tot, 2),
                 'memory_used_gb': round(mem_used, 2),
                 'disk_percent': peak_disk,
-                'storage_growth_gb': round(local_delta_gb, 2),
-                'storage_growth_pct': round(local_delta_pct, 2),
-                'delta_24h_gb': round(local_delta_gb, 2),
-                'delta_24h_pct': round(local_delta_pct, 2),
+                'storage_growth_gb': round(local_delta_gb, 2) if local_delta_gb is not None else None,
+                'storage_growth_pct': round(local_delta_pct, 2) if local_delta_pct is not None else None,
+                'delta_24h_gb': round(local_delta_gb, 2) if local_delta_gb is not None else None,
+                'delta_24h_pct': round(local_delta_pct, 2) if local_delta_pct is not None else None,
                 'runway_days': node_runway['days'],
                 'runway_text': node_runway['text'],
                 'runway_badge': node_runway['badge'],
@@ -2805,8 +2841,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'memory_total_gb': 0.0,
                 'memory_used_gb': 0.0,
                 'disk_percent': 0.0,
-                'storage_growth_gb': 0.0,
-                'storage_growth_pct': 0.0,
+                'storage_growth_gb': None,
+                'storage_growth_pct': None,
+                'delta_24h_gb': None,
+                'delta_24h_pct': None,
+                'runway_days': None,
+                'runway_text': '—',
+                'runway_badge': 'neutral',
                 'disks': empty_disks,
                 'disk_1': empty_disks[0],
                 'disk_2': empty_disks[1],
@@ -2898,8 +2939,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         olkvm_local_free = round(max(0.0, olkvm_local_cap - olkvm_local_used), 2)
         olkvm_local_pct = round((olkvm_local_used / olkvm_local_cap * 100.0), 2) if olkvm_local_cap > 0 else 0.0
 
-        olkvm_storage_growth = round(sum(w['storage_growth_gb'] for w in olkvm_workloads), 2)
-        olkvm_delta_24h = round(sum(w['delta_24h_gb'] for w in olkvm_workloads), 2)
+        olkvm_growth_vals = [w['storage_growth_gb'] for w in olkvm_workloads if w.get('storage_growth_gb') is not None]
+        olkvm_storage_growth = round(sum(olkvm_growth_vals), 2) if olkvm_growth_vals else None
+        olkvm_delta_vals = [w['delta_24h_gb'] for w in olkvm_workloads if w.get('delta_24h_gb') is not None]
+        olkvm_delta_24h = round(sum(olkvm_delta_vals), 2) if olkvm_delta_vals else None
         olkvm_runway = _calculate_runway(olkvm_local_free, olkvm_delta_24h, olkvm_local_pct)
 
         active_olkvm_inc = olkvm_inc_qs.filter(status__in=['Open', 'In Progress']).count()
@@ -2972,9 +3015,9 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'memory_used_gb': olkvm_mem_used,
             'disk_percent': max(w['disk_percent'] for w in olkvm_workloads),
             'storage_growth_gb': olkvm_storage_growth,
-            'storage_growth_pct': round((olkvm_storage_growth / olkvm_local_used * 100.0), 2) if olkvm_local_used > 0 else 0.0,
+            'storage_growth_pct': round((olkvm_storage_growth / olkvm_local_used * 100.0), 2) if (olkvm_storage_growth is not None and olkvm_local_used > 0) else None,
             'delta_24h_gb': olkvm_delta_24h,
-            'delta_24h_pct': round((olkvm_delta_24h / olkvm_local_used * 100.0), 2) if olkvm_local_used > 0 else 0.0,
+            'delta_24h_pct': round((olkvm_delta_24h / olkvm_local_used * 100.0), 2) if (olkvm_delta_24h is not None and olkvm_local_used > 0) else None,
             'runway_days': olkvm_runway['days'],
             'runway_text': olkvm_runway['text'],
             'runway_badge': olkvm_runway['badge'],
@@ -3087,14 +3130,22 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
             # Disk 2 (LVM)
             d2_sz = float(hr.disk_2_size_gb or 0.0)
-            d2_us = float(hr.disk_2_used_gb or 0.0)
-            d2_fr = max(0.0, d2_sz - d2_us)
             d2_pct = float(hr.disk_2_percent or 0.0)
-            prev_d2 = float(prev_hr.disk_2_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_2_size_gb or 0.0) > 0) else 0.0
-            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0 and d2_us > 0) else 0.0
-            if d2_sz > 0 and abs(d2_delta) > (d2_sz * 0.25):
-                d2_delta = 0.0
-            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (prev_hr and prev_d2 > 0 and d2_delta != 0.0) else 0.0
+            d2_us = float(hr.disk_2_used_gb or (d2_sz * d2_pct / 100.0 if d2_sz > 0 else 0.0))
+            if d2_us == 0.0 and d2_sz > 0 and d2_pct > 0:
+                d2_us = round(d2_sz * d2_pct / 100.0, 2)
+            d2_fr = max(0.0, d2_sz - d2_us)
+
+            prev_d2_sz = float(prev_hr.disk_2_size_gb or 0.0) if prev_hr else 0.0
+            prev_d2_pct = float(prev_hr.disk_2_percent or 0.0) if prev_hr else 0.0
+            prev_d2 = float(prev_hr.disk_2_used_gb or (prev_d2_sz * prev_d2_pct / 100.0 if prev_d2_sz > 0 else 0.0)) if prev_hr else 0.0
+            if prev_d2 == 0.0 and prev_d2_sz > 0 and prev_d2_pct > 0:
+                prev_d2 = round(prev_d2_sz * prev_d2_pct / 100.0, 2)
+
+            d2_delta = round(d2_us - prev_d2, 2) if (prev_hr and prev_d2 > 0 and d2_us > 0) else None
+            if d2_delta is not None and d2_sz > 0 and abs(d2_delta) > (d2_sz * 0.25):
+                d2_delta = None
+            d2_delta_p = round((d2_delta / prev_d2) * 100.0, 2) if (d2_delta is not None and prev_d2 > 0) else None
             d2_rw = _calculate_runway(d2_fr, d2_delta, d2_pct)
 
             if d2_sz > 0:
@@ -3124,14 +3175,22 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
             # Disk 3 (Local)
             d3_sz = float(hr.disk_3_size_gb or 0.0)
-            d3_us = float(hr.disk_3_used_gb or 0.0)
-            d3_fr = max(0.0, d3_sz - d3_us)
             d3_pct = float(hr.disk_3_percent or 0.0)
-            prev_d3 = float(prev_hr.disk_3_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_3_size_gb or 0.0) > 0) else 0.0
-            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0 and d3_us > 0) else 0.0
-            if d3_sz > 0 and abs(d3_delta) > (d3_sz * 0.25):
-                d3_delta = 0.0
-            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (prev_hr and prev_d3 > 0 and d3_delta != 0.0) else 0.0
+            d3_us = float(hr.disk_3_used_gb or (d3_sz * d3_pct / 100.0 if d3_sz > 0 else 0.0))
+            if d3_us == 0.0 and d3_sz > 0 and d3_pct > 0:
+                d3_us = round(d3_sz * d3_pct / 100.0, 2)
+            d3_fr = max(0.0, d3_sz - d3_us)
+
+            prev_d3_sz = float(prev_hr.disk_3_size_gb or 0.0) if prev_hr else 0.0
+            prev_d3_pct = float(prev_hr.disk_3_percent or 0.0) if prev_hr else 0.0
+            prev_d3 = float(prev_hr.disk_3_used_gb or (prev_d3_sz * prev_d3_pct / 100.0 if prev_d3_sz > 0 else 0.0)) if prev_hr else 0.0
+            if prev_d3 == 0.0 and prev_d3_sz > 0 and prev_d3_pct > 0:
+                prev_d3 = round(prev_d3_sz * prev_d3_pct / 100.0, 2)
+
+            d3_delta = round(d3_us - prev_d3, 2) if (prev_hr and prev_d3 > 0 and d3_us > 0) else None
+            if d3_delta is not None and d3_sz > 0 and abs(d3_delta) > (d3_sz * 0.25):
+                d3_delta = None
+            d3_delta_p = round((d3_delta / prev_d3) * 100.0, 2) if (d3_delta is not None and prev_d3 > 0) else None
             d3_rw = _calculate_runway(d3_fr, d3_delta, d3_pct)
 
             if d3_sz > 0:
@@ -3164,14 +3223,22 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             if shared_key not in seen_shared_days and float(hr.disk_1_size_gb or 0.0) > 0:
                 seen_shared_days.add(shared_key)
                 d1_sz = float(hr.disk_1_size_gb)
-                d1_us = float(hr.disk_1_used_gb or 0.0)
-                d1_fr = max(0.0, d1_sz - d1_us)
                 d1_pct = float(hr.disk_1_percent or 0.0)
-                prev_d1 = float(prev_hr.disk_1_used_gb or 0.0) if (prev_hr and float(prev_hr.disk_1_size_gb or 0.0) > 0) else 0.0
-                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0 and d1_us > 0) else 0.0
-                if d1_sz > 0 and abs(d1_delta) > (d1_sz * 0.25):
-                    d1_delta = 0.0
-                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (prev_hr and prev_d1 > 0 and d1_delta != 0.0) else 0.0
+                d1_us = float(hr.disk_1_used_gb or (d1_sz * d1_pct / 100.0 if d1_sz > 0 else 0.0))
+                if d1_us == 0.0 and d1_sz > 0 and d1_pct > 0:
+                    d1_us = round(d1_sz * d1_pct / 100.0, 2)
+                d1_fr = max(0.0, d1_sz - d1_us)
+
+                prev_d1_sz = float(prev_hr.disk_1_size_gb or 0.0) if prev_hr else 0.0
+                prev_d1_pct = float(prev_hr.disk_1_percent or 0.0) if prev_hr else 0.0
+                prev_d1 = float(prev_hr.disk_1_used_gb or (prev_d1_sz * prev_d1_pct / 100.0 if prev_d1_sz > 0 else 0.0)) if prev_hr else 0.0
+                if prev_d1 == 0.0 and prev_d1_sz > 0 and prev_d1_pct > 0:
+                    prev_d1 = round(prev_d1_sz * prev_d1_pct / 100.0, 2)
+
+                d1_delta = round(d1_us - prev_d1, 2) if (prev_hr and prev_d1 > 0 and d1_us > 0) else None
+                if d1_delta is not None and d1_sz > 0 and abs(d1_delta) > (d1_sz * 0.25):
+                    d1_delta = None
+                d1_delta_p = round((d1_delta / prev_d1) * 100.0, 2) if (d1_delta is not None and prev_d1 > 0) else None
                 d1_rw = _calculate_runway(d1_fr, d1_delta, d1_pct)
 
                 storage_id = 'VMSAN' if node_lbl == 'Proxmox' else '/nmsddbkp'
@@ -3849,22 +3916,22 @@ def server_health_list(request):
 
                 # Combined memory
                 mem_tot = round(sum(float(r.memory_total_gb or 0.0) for r in olkvm_recs), 2)
-                mem_used = round(sum(float(r.memory_used_gb or 0.0) for r in olkvm_recs), 2)
+                mem_used = round(sum(float(r.memory_used_gb or ((float(r.memory_total_gb or 0.0) * float(r.memory_percent or 0.0) / 100.0) if float(r.memory_total_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
                 mem_pct = round((mem_used / mem_tot * 100.0), 2) if mem_tot > 0 else round(sum(float(r.memory_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
 
                 # Storage tiers
                 d1_type = infra_r.disk_1_type or '/nmsddbkp (Shared NFS)'
                 d1_size = float(infra_r.disk_1_size_gb or 0.0)
-                d1_used = float(infra_r.disk_1_used_gb or 0.0)
                 d1_pct = float(infra_r.disk_1_percent or 0.0)
+                d1_used = float(infra_r.disk_1_used_gb or (d1_size * d1_pct / 100.0 if d1_size > 0 else 0.0))
 
                 d2_size = round(sum(float(r.disk_2_size_gb or 0.0) for r in olkvm_recs), 2)
-                d2_used = round(sum(float(r.disk_2_used_gb or 0.0) for r in olkvm_recs), 2)
+                d2_used = round(sum(float(r.disk_2_used_gb or ((float(r.disk_2_size_gb or 0.0) * float(r.disk_2_percent or 0.0) / 100.0) if float(r.disk_2_size_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
                 d2_pct = round((d2_used / d2_size * 100.0), 2) if d2_size > 0 else round(sum(float(r.disk_2_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
                 d2_type = '/u01 (nmsinfra) + /stagearea (nmsebs)'
 
                 d3_size = round(sum(float(r.disk_3_size_gb or 0.0) for r in olkvm_recs), 2)
-                d3_used = round(sum(float(r.disk_3_used_gb or 0.0) for r in olkvm_recs), 2)
+                d3_used = round(sum(float(r.disk_3_used_gb or ((float(r.disk_3_size_gb or 0.0) * float(r.disk_3_percent or 0.0) / 100.0) if float(r.disk_3_size_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
                 d3_pct = round((d3_used / d3_size * 100.0), 2) if d3_size > 0 else round(sum(float(r.disk_3_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
                 d3_type = 'OS Root (nmsinfra + nmsebs)'
 
@@ -3948,22 +4015,22 @@ def server_health_list(request):
                         'server': p_rec.server,
                         'clean_hosted_systems': p_rec.clean_hosted_systems,
                         'hosted_vms': p_vms,
-                        'uptime_percent': float(p_rec.uptime_percent or 100.0),
+                        'uptime_percent': float(p_rec.uptime_percent if p_rec.uptime_percent is not None else 100.0),
                         'cpu_percent': float(p_rec.cpu_percent or 0.0),
                         'memory_percent': float(p_rec.memory_percent or 0.0),
-                        'memory_used_gb': float(p_rec.memory_used_gb or 0.0),
+                        'memory_used_gb': round(float(p_rec.memory_used_gb or ((float(p_rec.memory_total_gb or 0.0) * float(p_rec.memory_percent or 0.0) / 100.0) if float(p_rec.memory_total_gb or 0.0) > 0 else 0.0)), 2),
                         'memory_total_gb': float(p_rec.memory_total_gb or 0.0),
                         'disk_1_type': p_rec.disk_1_type,
                         'disk_1_size_gb': float(p_rec.disk_1_size_gb or 0.0),
-                        'disk_1_used_gb': float(p_rec.disk_1_used_gb or 0.0),
+                        'disk_1_used_gb': round(float(p_rec.disk_1_used_gb or ((float(p_rec.disk_1_size_gb or 0.0) * float(p_rec.disk_1_percent or 0.0) / 100.0) if float(p_rec.disk_1_size_gb or 0.0) > 0 else 0.0)), 2),
                         'disk_1_percent': float(p_rec.disk_1_percent or 0.0),
                         'disk_2_type': p_rec.disk_2_type,
                         'disk_2_size_gb': float(p_rec.disk_2_size_gb or 0.0),
-                        'disk_2_used_gb': float(p_rec.disk_2_used_gb or 0.0),
+                        'disk_2_used_gb': round(float(p_rec.disk_2_used_gb or ((float(p_rec.disk_2_size_gb or 0.0) * float(p_rec.disk_2_percent or 0.0) / 100.0) if float(p_rec.disk_2_size_gb or 0.0) > 0 else 0.0)), 2),
                         'disk_2_percent': float(p_rec.disk_2_percent or 0.0),
                         'disk_3_type': p_rec.disk_3_type,
                         'disk_3_size_gb': float(p_rec.disk_3_size_gb or 0.0),
-                        'disk_3_used_gb': float(p_rec.disk_3_used_gb or 0.0),
+                        'disk_3_used_gb': round(float(p_rec.disk_3_used_gb or ((float(p_rec.disk_3_size_gb or 0.0) * float(p_rec.disk_3_percent or 0.0) / 100.0) if float(p_rec.disk_3_size_gb or 0.0) > 0 else 0.0)), 2),
                         'disk_3_percent': float(p_rec.disk_3_percent or 0.0),
                         'storage_breakdown': '',
                         'status': p_rec.status or 'Healthy',

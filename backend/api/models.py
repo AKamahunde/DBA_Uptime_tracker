@@ -447,16 +447,58 @@ class ServerHealth(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     @property
+    def safe_memory_used_gb(self):
+        us = float(self.memory_used_gb or 0)
+        tot = float(self.memory_total_gb or 0)
+        pct = float(self.memory_percent or 0)
+        if us == 0 and tot > 0 and pct > 0:
+            return round(tot * pct / 100.0, 2)
+        return us
+
+    @property
+    def safe_disk_1_used_gb(self):
+        us = float(self.disk_1_used_gb or 0)
+        sz = float(self.disk_1_size_gb or 0)
+        pct = float(self.disk_1_percent or 0)
+        if us == 0 and sz > 0 and pct > 0:
+            return round(sz * pct / 100.0, 2)
+        return us
+
+    @property
+    def safe_disk_2_used_gb(self):
+        us = float(self.disk_2_used_gb or 0)
+        sz = float(self.disk_2_size_gb or 0)
+        pct = float(self.disk_2_percent or 0)
+        if us == 0 and sz > 0 and pct > 0:
+            return round(sz * pct / 100.0, 2)
+        return us
+
+    @property
+    def safe_disk_3_used_gb(self):
+        us = float(self.disk_3_used_gb or 0)
+        sz = float(self.disk_3_size_gb or 0)
+        pct = float(self.disk_3_percent or 0)
+        if us == 0 and sz > 0 and pct > 0:
+            return round(sz * pct / 100.0, 2)
+        return us
+
+    @property
     def disk_1_free_gb(self):
-        return round(max(0.0, float(self.disk_1_size_gb or 0) - float(self.disk_1_used_gb or 0)), 2)
+        sz = float(self.disk_1_size_gb or 0)
+        us = self.safe_disk_1_used_gb
+        return round(max(0.0, sz - us), 2)
 
     @property
     def disk_2_free_gb(self):
-        return round(max(0.0, float(self.disk_2_size_gb or 0) - float(self.disk_2_used_gb or 0)), 2)
+        sz = float(self.disk_2_size_gb or 0)
+        us = self.safe_disk_2_used_gb
+        return round(max(0.0, sz - us), 2)
 
     @property
     def disk_3_free_gb(self):
-        return round(max(0.0, float(self.disk_3_size_gb or 0) - float(self.disk_3_used_gb or 0)), 2)
+        sz = float(self.disk_3_size_gb or 0)
+        us = self.safe_disk_3_used_gb
+        return round(max(0.0, sz - us), 2)
 
     @property
     def display_server(self):
@@ -728,6 +770,8 @@ class CapacityPlanning(models.Model):
                 return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
             else:
                 return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
+        if self.growth_gb is None:
+            return {'days': None, 'text': '—', 'badge': 'neutral'}
         return {'days': 9999, 'text': "Stable", 'badge': 'stable'}
 
     @property

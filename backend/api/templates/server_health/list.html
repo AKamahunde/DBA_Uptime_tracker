@@ -414,7 +414,7 @@
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.memory_percent }}%</div>
                         {% if health.memory_total_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.safe_memory_used_gb|default:health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
                         {% endif %}
                     </td>
 
@@ -480,28 +480,28 @@
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.memory_percent }}%</div>
                         {% if health.memory_total_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;">{{ health.safe_memory_used_gb|default:health.memory_used_gb }} / {{ health.memory_total_gb }} GB</div>
                         {% endif %}
                     </td>
 
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
                         <div style="font-weight: 600; color: #0f172a;">{% if health.disk_1_percent > 0 %}{{ health.disk_1_percent }}%{% else %}{{ health.disk_percent }}%{% endif %}</div>
                         {% if health.disk_1_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_1_type }}">{{ health.disk_1_used_gb }} / {{ health.disk_1_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_1_type }}">{{ health.safe_disk_1_used_gb|default:health.disk_1_used_gb }} / {{ health.disk_1_size_gb }} GB</div>
                         {% endif %}
                     </td>
 
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.disk_2_percent }}%</div>
                         {% if health.disk_2_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_2_type }}">{{ health.disk_2_used_gb }} / {{ health.disk_2_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_2_type }}">{{ health.safe_disk_2_used_gb|default:health.disk_2_used_gb }} / {{ health.disk_2_size_gb }} GB</div>
                         {% endif %}
                     </td>
 
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.disk_3_percent }}%</div>
                         {% if health.disk_3_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_3_type }}">{{ health.disk_3_used_gb }} / {{ health.disk_3_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #64748b;" title="{{ health.disk_3_type }}">{{ health.safe_disk_3_used_gb|default:health.disk_3_used_gb }} / {{ health.disk_3_size_gb }} GB</div>
                         {% endif %}
                         {% if health.storage_breakdown %}
                         <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 0.1rem;" title="Workload storage breakdown">{{ health.storage_breakdown }}</div>

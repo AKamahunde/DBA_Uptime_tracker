@@ -313,8 +313,10 @@
                     </div>
 
                     <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; padding-top: 0.25rem; border-top: 1px dashed #e2e8f0;">
-                        <span>24h: <strong style="{% if d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB</strong></span>
-                        <span>Headroom: <strong title="Projected operational runway before storage exhaustion at current daily consumption rate" style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% else %}color: #16a34a;{% endif %}">{{ d.runway_text }}</strong></span>
+                        <span>24h: <strong style="{% if d.delta_24h_gb and d.delta_24h_gb > 0 %}color: #ef4444;{% elif d.delta_24h_gb and d.delta_24h_gb < 0 %}color: #10b981;{% else %}color: #64748b;{% endif %}">
+                            {% if d.delta_24h_gb is not None %}{% if d.delta_24h_gb > 0 %}+{% endif %}{{ d.delta_24h_gb }} GB{% else %}&mdash;{% endif %}
+                        </strong></span>
+                        <span>Headroom: <strong title="Projected operational runway before storage exhaustion at current daily consumption rate" style="{% if d.runway_badge == 'critical' %}color: #dc2626;{% elif d.runway_badge == 'warning' %}color: #d97706;{% elif d.runway_badge == 'healthy' %}color: #16a34a;{% elif d.runway_badge == 'stable' %}color: #0284c7;{% else %}color: #64748b;{% endif %}">{{ d.runway_text }}</strong></span>
                     </div>
                 </div>
                 {% endfor %}
@@ -367,21 +369,29 @@
                     <td>{{ cap.free_gb }} GB</td>
                     <td style="font-weight: bold; color: var(--primary-navy);">{{ cap.used_percent }}%</td>
                     <td>
-                        {% if cap.delta_24h_gb > 0 %}
-                            <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
-                        {% elif cap.delta_24h_gb < 0 %}
-                            <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
+                        {% if cap.delta_24h_gb is not None %}
+                            {% if cap.delta_24h_gb > 0 %}
+                                <span style="color: #ef4444; font-weight: 600;">+{{ cap.delta_24h_gb }} GB</span>
+                            {% elif cap.delta_24h_gb < 0 %}
+                                <span style="color: #10b981; font-weight: 600;">{{ cap.delta_24h_gb }} GB</span>
+                            {% else %}
+                                <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
+                            {% endif %}
                         {% else %}
-                            <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
+                            <span style="color: #64748b; font-weight: 600;">&mdash;</span>
                         {% endif %}
                     </td>
                     <td style="font-weight: 600;">
-                        {% if cap.delta_24h_percent > 0 %}
-                            <span style="color: #ef4444;">+{{ cap.delta_24h_percent }}%</span>
-                        {% elif cap.delta_24h_percent < 0 %}
-                            <span style="color: #10b981;">{{ cap.delta_24h_percent }}%</span>
+                        {% if cap.delta_24h_percent is not None %}
+                            {% if cap.delta_24h_percent > 0 %}
+                                <span style="color: #ef4444;">+{{ cap.delta_24h_percent }}%</span>
+                            {% elif cap.delta_24h_percent < 0 %}
+                                <span style="color: #10b981;">{{ cap.delta_24h_percent }}%</span>
+                            {% else %}
+                                <span style="color: #64748b;">0.00%</span>
+                            {% endif %}
                         {% else %}
-                            <span style="color: #64748b;">0.00%</span>
+                            <span style="color: #64748b;">&mdash;</span>
                         {% endif %}
                     </td>
                     <td>
@@ -389,7 +399,8 @@
                             {% if cap.runway_badge == 'critical' %}color: #dc2626;
                             {% elif cap.runway_badge == 'warning' %}color: #d97706;
                             {% elif cap.runway_badge == 'healthy' %}color: #16a34a;
-                            {% else %}color: #0284c7;{% endif %}">
+                            {% elif cap.runway_badge == 'stable' %}color: #0284c7;
+                            {% else %}color: #64748b;{% endif %}">
                             {{ cap.runway_text }}
                         </span>
                     </td>
@@ -590,7 +601,9 @@
             <span style="font-size: 0.88rem; font-weight: 700;
                         {% if forecast_info.runway_badge == 'critical' %}color: #c5221f;
                         {% elif forecast_info.runway_badge == 'warning' %}color: #d59400;
-                        {% else %}color: #137333;{% endif %}">
+                        {% elif forecast_info.runway_badge == 'healthy' %}color: #137333;
+                        {% elif forecast_info.runway_badge == 'stable' %}color: #0284c7;
+                        {% else %}color: #64748b;{% endif %}">
                 {{ forecast_info.runway_text }}
             </span>
         </div>
@@ -634,19 +647,32 @@
                     <td style="font-weight: bold; color: var(--primary-navy);">{{ capacity.disk_used_percent }}%</td>
                     <td style="font-weight: 600;">{{ capacity.tablespace_used_percent }}%</td>
                     <td>
-                        {% if capacity.growth_gb > 0 %}
-                            <span style="color: #ef4444; font-weight: 600;">+{{ capacity.growth_gb }} GB</span>
+                        {% if capacity.growth_gb is not None %}
+                            {% if capacity.growth_gb > 0 %}
+                                <span style="color: #ef4444; font-weight: 600;">+{{ capacity.growth_gb }} GB</span>
+                            {% elif capacity.growth_gb < 0 %}
+                                <span style="color: #10b981; font-weight: 600;">{{ capacity.growth_gb }} GB</span>
+                            {% else %}
+                                <span style="color: #64748b; font-weight: 600;">0.00 GB</span>
+                            {% endif %}
                         {% else %}
-                            <span style="color: #10b981; font-weight: 600;">{{ capacity.growth_gb }} GB</span>
+                            <span style="color: #64748b; font-weight: 600;">&mdash;</span>
                         {% endif %}
                     </td>
-                    <td style="font-weight: 600;">{{ capacity.growth_percent }}%</td>
+                    <td style="font-weight: 600;">
+                        {% if capacity.growth_percent is not None %}
+                            {{ capacity.growth_percent }}%
+                        {% else %}
+                            &mdash;
+                        {% endif %}
+                    </td>
                     <td>
                         <span style="font-size: 0.82rem; font-weight: 700;
                             {% if capacity.runway_badge == 'critical' %}color: #dc2626;
                             {% elif capacity.runway_badge == 'warning' %}color: #d97706;
                             {% elif capacity.runway_badge == 'healthy' %}color: #16a34a;
-                            {% else %}color: #0284c7;{% endif %}">
+                            {% elif capacity.runway_badge == 'stable' %}color: #0284c7;
+                            {% else %}color: #64748b;{% endif %}">
                             {{ capacity.runway_text }}
                         </span>
                     </td>
