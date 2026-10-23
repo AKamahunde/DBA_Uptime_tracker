@@ -99,6 +99,12 @@ class IncidentRegister(models.Model):
         verbose_name = 'Incident Register'
         verbose_name_plural = 'Incident Registers'
         default_permissions = ('add', 'view')
+        permissions = [
+            ('view_databaseincident', 'Can view Database Incidents'),
+            ('view_infrastructureincident', 'Can view Infrastructure Incidents'),
+            ('add_databaseincident', 'Can add Database Incidents'),
+            ('add_infrastructureincident', 'Can add Infrastructure Incidents'),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.ticket or not str(self.ticket).strip():
@@ -625,6 +631,12 @@ class MaintenanceRegister(models.Model):
         verbose_name = 'Maintenance Register'
         verbose_name_plural = 'Maintenance Registers'
         default_permissions = ('add', 'view')
+        permissions = [
+            ('view_databasemaintenance', 'Can view Database Maintenance'),
+            ('view_infrastructuremaintenance', 'Can view Infrastructure Maintenance'),
+            ('add_databasemaintenance', 'Can add Database Maintenance'),
+            ('add_infrastructuremaintenance', 'Can add Infrastructure Maintenance'),
+        ]
 
     def __str__(self):
         return f"{self.change_id} - {self.date}"

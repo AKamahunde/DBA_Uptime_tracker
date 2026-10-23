@@ -41,12 +41,21 @@ class IncidentRegisterForm(forms.ModelForm):
             'business_impact': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, can_add_db=True, can_add_infra=True, **kwargs):
         super().__init__(*args, **kwargs)
+        if not can_add_infra and can_add_db:
+            if 'category' in self.fields:
+                self.fields['category'].choices = [('Database', 'Database')]
+                self.fields['category'].initial = 'Database'
+        elif not can_add_db and can_add_infra:
+            if 'category' in self.fields:
+                self.fields['category'].choices = [('Infrastructure', 'Infrastructure')]
+                self.fields['category'].initial = 'Infrastructure'
+
         if not self.instance.pk:
             from .models import generate_incident_ticket
             from django.utils import timezone
-            cat = self.initial.get('category') or (self.data.get('category') if self.data else 'Database')
+            cat = self.initial.get('category') or (self.data.get('category') if self.data else ('Infrastructure' if can_add_infra and not can_add_db else 'Database'))
             if not self.initial.get('ticket') and (not self.data or not self.data.get('ticket')):
                 self.initial['ticket'] = generate_incident_ticket(category=cat)
             now = timezone.now()
@@ -241,8 +250,17 @@ class MaintenanceRegisterForm(forms.ModelForm):
             'rollback_plan': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, can_add_db=True, can_add_infra=True, **kwargs):
         super().__init__(*args, **kwargs)
+        if not can_add_infra and can_add_db:
+            if 'category' in self.fields:
+                self.fields['category'].choices = [('Database', 'Database')]
+                self.fields['category'].initial = 'Database'
+        elif not can_add_db and can_add_infra:
+            if 'category' in self.fields:
+                self.fields['category'].choices = [('Infrastructure', 'Infrastructure')]
+                self.fields['category'].initial = 'Infrastructure'
+
         if 'duration_hrs' in self.fields:
             self.fields['duration_hrs'].required = False
         if 'rollback_plan' in self.fields:

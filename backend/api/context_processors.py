@@ -9,8 +9,20 @@ def is_sysadmin_user(user):
     is_sysadmin_group = user.groups.filter(
         Q(name__icontains='sysadmin') | Q(name__icontains='infra') | Q(name__icontains='system admin')
     ).exists()
-    has_infra = user.has_perm('api.view_infrastructuredashboard') or user.has_perm('api.view_infrastructurecapacity')
-    has_db = user.has_perm('api.view_databasedashboard') or user.has_perm('api.view_databasecapacity') or user.has_perm('api.view_incidentregister')
+    has_infra = (
+        user.has_perm('api.view_infrastructuredashboard') or 
+        user.has_perm('api.view_infrastructurecapacity') or
+        user.has_perm('api.view_infrastructureincident') or
+        user.has_perm('api.view_infrastructuremaintenance')
+    )
+    has_db = (
+        user.has_perm('api.view_databasedashboard') or 
+        user.has_perm('api.view_databasecapacity') or 
+        user.has_perm('api.view_incidentregister') or
+        user.has_perm('api.view_maintenanceregister') or
+        user.has_perm('api.view_databaseincident') or
+        user.has_perm('api.view_databasemaintenance')
+    )
     return is_sysadmin_group or (has_infra and not has_db)
 
 def pending_staging_count(request):

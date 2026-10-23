@@ -122,14 +122,14 @@
                     <option value="" {% if not current_target %}selected{% endif %}>
                         {% if current_tab == 'database' %}All Databases{% elif current_tab == 'infrastructure' %}All Host Nodes{% else %}All Scopes{% endif %}
                     </option>
-                    {% if current_tab != 'infrastructure' %}
+                    {% if can_view_db_incident and current_tab != 'infrastructure' %}
                         {% if current_tab == 'all' %}<optgroup label="Database Platforms">{% endif %}
                         <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
                         <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
                         <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server (MKInsight)</option>
                         {% if current_tab == 'all' %}</optgroup>{% endif %}
                     {% endif %}
-                    {% if current_tab != 'database' %}
+                    {% if can_view_infra_incident and current_tab != 'database' %}
                         {% if current_tab == 'all' %}<optgroup label="Infrastructure Nodes">{% endif %}
                         {% for node_val, node_lbl in node_choices %}
                         <option value="{{ node_val }}" {% if current_target == node_val %}selected{% endif %}>{{ node_lbl }}</option>
@@ -153,7 +153,7 @@
             {% endif %}
         </form>
         
-        {% if is_admin or perms.api.add_incidentregister %}
+        {% if can_add_incident %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <a href="{% url 'incident_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Incident</a>
         </div>
@@ -163,21 +163,27 @@
 
 <!-- Incident Category Filter Tabs -->
 <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    {% if can_view_all_incidents %}
     <a href="?tab=all{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         All Incidents ({{ total_all_count }})
     </a>
+    {% endif %}
+    {% if can_view_db_incident %}
     <a href="?tab=database{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Database Incidents ({{ total_db_count }})
     </a>
+    {% endif %}
+    {% if can_view_infra_incident %}
     <a href="?tab=infrastructure{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Infrastructure Incidents ({{ total_infra_count }})
     </a>
+    {% endif %}
 </div>
 
 <!-- Combined Overall Summary Card (Three Incident KPIs) -->

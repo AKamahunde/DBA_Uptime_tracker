@@ -1453,7 +1453,12 @@ def dashboard_excel(request):
 
 @login_required
 def incident_list(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_view_db_incident = is_admin_or_super or request.user.has_perm('api.view_databaseincident') or request.user.has_perm('api.view_incidentregister')
+    can_view_infra_incident = is_admin_or_super or request.user.has_perm('api.view_infrastructureincident') or request.user.has_perm('api.view_incidentregister')
+    can_view_all_incidents = is_admin_or_super or (can_view_db_incident and can_view_infra_incident) or request.user.has_perm('api.view_incidentregister')
+
+    if not can_view_db_incident and not can_view_infra_incident:
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
         
@@ -1461,10 +1466,30 @@ def incident_list(request):
     
     base_qs = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
     
-    # Tabs: 'all', 'database', 'infrastructure'
-    current_tab = request.GET.get('tab', 'all').lower()
-    if current_tab not in ['all', 'database', 'infrastructure']:
-        current_tab = 'all'
+    # Tabs: 'all', 'database', 'infrastructure' with granular permissions enforcement
+    requested_tab = request.GET.get('tab', '').lower()
+    if requested_tab == 'infrastructure':
+        if not can_view_infra_incident:
+            messages.warning(request, 'You do not have permission to view Infrastructure Incidents.')
+            return redirect('/incidents/?tab=database')
+        current_tab = 'infrastructure'
+    elif requested_tab == 'database':
+        if not can_view_db_incident:
+            messages.warning(request, 'You do not have permission to view Database Incidents.')
+            return redirect('/incidents/?tab=infrastructure')
+        current_tab = 'database'
+    elif requested_tab == 'all':
+        if not can_view_all_incidents:
+            current_tab = 'database' if can_view_db_incident else 'infrastructure'
+        else:
+            current_tab = 'all'
+    else:
+        if can_view_all_incidents:
+            current_tab = 'all'
+        elif can_view_db_incident:
+            current_tab = 'database'
+        else:
+            current_tab = 'infrastructure'
 
     # Target filter: single db or single node
     current_target = request.GET.get('target', '').strip()
@@ -1544,9 +1569,20 @@ def incident_list(request):
         ('Proxmox', 'Proxmox Cluster (General)'),
     ]
 
+    can_add_incident = (
+        is_admin_or_super or 
+        request.user.has_perm('api.add_incidentregister') or 
+        (can_view_db_incident and request.user.has_perm('api.add_databaseincident')) or
+        (can_view_infra_incident and request.user.has_perm('api.add_infrastructureincident'))
+    )
+
     return render(request, 'incidents/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
+        'can_view_all_incidents': can_view_all_incidents,
+        'can_view_db_incident': can_view_db_incident,
+        'can_view_infra_incident': can_view_infra_incident,
+        'can_add_incident': can_add_incident,
         'current_tab': current_tab,
         'current_target': current_target,
         'current_db': current_target,
@@ -1563,14 +1599,25 @@ def incident_list(request):
 
 @login_required
 def incident_create(request):
-    if not (request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_add_db = is_admin_or_super or request.user.has_perm('api.add_databaseincident') or request.user.has_perm('api.add_incidentregister')
+    can_add_infra = is_admin_or_super or request.user.has_perm('api.add_infrastructureincident') or request.user.has_perm('api.add_incidentregister')
+
+    if not can_add_db and not can_add_infra:
         messages.error(request, 'You do not have permission to create incident records.')
         return redirect('incident_list')
         
     if request.method == 'POST':
-        form = IncidentRegisterForm(request.POST)
+        form = IncidentRegisterForm(request.POST, can_add_db=can_add_db, can_add_infra=can_add_infra)
         if form.is_valid():
             incident = form.save(commit=False)
+            if incident.category == 'Infrastructure' and not can_add_infra:
+                messages.error(request, 'You do not have permission to create Infrastructure Incidents.')
+                return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+            if incident.category == 'Database' and not can_add_db:
+                messages.error(request, 'You do not have permission to create Database Incidents.')
+                return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+
             incident.created_by = request.user
             incident.save()
             action_text = 'Created'
@@ -1591,12 +1638,20 @@ def incident_create(request):
         else:
             messages.error(request, 'Failed to save incident. Please review the highlighted errors below.')
     else:
-        form = IncidentRegisterForm()
-    return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident'})
+        form = IncidentRegisterForm(can_add_db=can_add_db, can_add_infra=can_add_infra)
+    return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
 
 @login_required
 def incident_edit(request, pk):
     incident = get_object_or_404(IncidentRegister, pk=pk)
+
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_view_db = is_admin_or_super or request.user.has_perm('api.view_databaseincident') or request.user.has_perm('api.view_incidentregister')
+    can_view_infra = is_admin_or_super or request.user.has_perm('api.view_infrastructureincident') or request.user.has_perm('api.view_incidentregister')
+
+    if (incident.category == 'Database' and not can_view_db) or (incident.category == 'Infrastructure' and not can_view_infra):
+        messages.error(request, 'You do not have permission to view or edit this incident.')
+        return redirect('incident_list')
     
     can_edit_always = (
         request.user.is_admin or 
@@ -1614,7 +1669,7 @@ def incident_edit(request, pk):
         old_status = incident.status
         old_assigned = incident.assigned_to
         
-        form = IncidentRegisterForm(request.POST, instance=incident)
+        form = IncidentRegisterForm(request.POST, instance=incident, can_add_db=can_view_db, can_add_infra=can_view_infra)
         if form.is_valid():
             incident = form.save()
             
@@ -1647,14 +1702,16 @@ def incident_edit(request, pk):
             messages.success(request, 'Incident updated successfully.')
             return redirect('incident_list')
     else:
-        form = IncidentRegisterForm(instance=incident)
+        form = IncidentRegisterForm(instance=incident, can_add_db=can_view_db, can_add_infra=can_view_infra)
     
     return render(request, 'incidents/form.html', {
         'form': form, 
         'title': 'Edit Incident',
         'can_edit': True,
         'incident': incident,
-        'change_logs': incident.change_logs.all()
+        'change_logs': incident.change_logs.all(),
+        'can_add_db': can_view_db,
+        'can_add_infra': can_view_infra
     })
 
 
@@ -3551,7 +3608,12 @@ def server_health_edit(request, pk):
 
 @login_required
 def maintenance_list(request):
-    if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_view_db_maint = is_admin_or_super or request.user.has_perm('api.view_databasemaintenance') or request.user.has_perm('api.view_maintenanceregister')
+    can_view_infra_maint = is_admin_or_super or request.user.has_perm('api.view_infrastructuremaintenance') or request.user.has_perm('api.view_maintenanceregister')
+    can_view_all_maint = is_admin_or_super or (can_view_db_maint and can_view_infra_maint) or request.user.has_perm('api.view_maintenanceregister')
+
+    if not can_view_db_maint and not can_view_infra_maint:
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
 
@@ -3559,10 +3621,30 @@ def maintenance_list(request):
 
     base_qs = MaintenanceRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-created_at')
 
-    # Tabs: 'all', 'database', 'infrastructure'
-    current_tab = request.GET.get('tab', 'all').lower()
-    if current_tab not in ['all', 'database', 'infrastructure']:
-        current_tab = 'all'
+    # Tabs: 'all', 'database', 'infrastructure' with granular permissions enforcement
+    requested_tab = request.GET.get('tab', '').lower()
+    if requested_tab == 'infrastructure':
+        if not can_view_infra_maint:
+            messages.warning(request, 'You do not have permission to view Infrastructure Maintenance.')
+            return redirect('/maintenance/?tab=database')
+        current_tab = 'infrastructure'
+    elif requested_tab == 'database':
+        if not can_view_db_maint:
+            messages.warning(request, 'You do not have permission to view Database Maintenance.')
+            return redirect('/maintenance/?tab=infrastructure')
+        current_tab = 'database'
+    elif requested_tab == 'all':
+        if not can_view_all_maint:
+            current_tab = 'database' if can_view_db_maint else 'infrastructure'
+        else:
+            current_tab = 'all'
+    else:
+        if can_view_all_maint:
+            current_tab = 'all'
+        elif can_view_db_maint:
+            current_tab = 'database'
+        else:
+            current_tab = 'infrastructure'
 
     # Target filter: single db or single node
     current_target = request.GET.get('target', '').strip()
@@ -3648,9 +3730,20 @@ def maintenance_list(request):
         ('Proxmox', 'Proxmox Cluster (General)'),
     ]
 
+    can_add_maint = (
+        is_admin_or_super or 
+        request.user.has_perm('api.add_maintenanceregister') or 
+        (can_view_db_maint and request.user.has_perm('api.add_databasemaintenance')) or
+        (can_view_infra_maint and request.user.has_perm('api.add_infrastructuremaintenance'))
+    )
+
     return render(request, 'maintenance/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
+        'can_view_all_maint': can_view_all_maint,
+        'can_view_db_maint': can_view_db_maint,
+        'can_view_infra_maint': can_view_infra_maint,
+        'can_add_maint': can_add_maint,
         'current_tab': current_tab,
         'current_target': current_target,
         'current_db': current_target,
@@ -3665,14 +3758,25 @@ def maintenance_list(request):
 
 @login_required
 def maintenance_create(request):
-    if not (request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_add_db = is_admin_or_super or request.user.has_perm('api.add_databasemaintenance') or request.user.has_perm('api.add_maintenanceregister')
+    can_add_infra = is_admin_or_super or request.user.has_perm('api.add_infrastructuremaintenance') or request.user.has_perm('api.add_maintenanceregister')
+
+    if not can_add_db and not can_add_infra:
         messages.error(request, 'You do not have permission to create maintenance records.')
         return redirect('maintenance_list')
 
     if request.method == 'POST':
-        form = MaintenanceRegisterForm(request.POST)
+        form = MaintenanceRegisterForm(request.POST, can_add_db=can_add_db, can_add_infra=can_add_infra)
         if form.is_valid():
             maintenance = form.save(commit=False)
+            if maintenance.category == 'Infrastructure' and not can_add_infra:
+                messages.error(request, 'You do not have permission to create Infrastructure Maintenance records.')
+                return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+            if maintenance.category == 'Database' and not can_add_db:
+                messages.error(request, 'You do not have permission to create Database Maintenance records.')
+                return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+
             maintenance.created_by = request.user
             maintenance.save()
 
@@ -3690,12 +3794,20 @@ def maintenance_create(request):
         else:
             messages.error(request, 'Failed to save maintenance record. Please review the highlighted errors below.')
     else:
-        form = MaintenanceRegisterForm()
-    return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record'})
+        form = MaintenanceRegisterForm(can_add_db=can_add_db, can_add_infra=can_add_infra)
+    return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
 
 @login_required
 def maintenance_edit(request, pk):
     maintenance = get_object_or_404(MaintenanceRegister, pk=pk)
+
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_view_db = is_admin_or_super or request.user.has_perm('api.view_databasemaintenance') or request.user.has_perm('api.view_maintenanceregister')
+    can_view_infra = is_admin_or_super or request.user.has_perm('api.view_infrastructuremaintenance') or request.user.has_perm('api.view_maintenanceregister')
+
+    if (maintenance.category == 'Database' and not can_view_db) or (maintenance.category == 'Infrastructure' and not can_view_infra):
+        messages.error(request, 'You do not have permission to view or edit this maintenance record.')
+        return redirect('maintenance_list')
     
     can_edit_always = (
         request.user.is_admin or 
@@ -3711,7 +3823,7 @@ def maintenance_edit(request, pk):
     
     if request.method == 'POST':
         old_status = maintenance.status
-        form = MaintenanceRegisterForm(request.POST, instance=maintenance)
+        form = MaintenanceRegisterForm(request.POST, instance=maintenance, can_add_db=can_view_db, can_add_infra=can_view_infra)
         if form.is_valid():
             maint = form.save()
             comment = form.cleaned_data.get('change_comment', '').strip()
@@ -3729,7 +3841,7 @@ def maintenance_edit(request, pk):
         else:
             messages.error(request, 'Failed to update maintenance record. Please review the errors below.')
     else:
-        form = MaintenanceRegisterForm(instance=maintenance)
+        form = MaintenanceRegisterForm(instance=maintenance, can_add_db=can_view_db, can_add_infra=can_view_infra)
     
     change_logs = maintenance.change_logs.all().select_related('changed_by')
     
@@ -3738,7 +3850,9 @@ def maintenance_edit(request, pk):
         'title': 'Edit Maintenance Record',
         'can_edit': True,
         'maintenance': maintenance,
-        'change_logs': change_logs
+        'change_logs': change_logs,
+        'can_add_db': can_view_db,
+        'can_add_infra': can_view_infra
     })
 
 @login_required
@@ -4407,6 +4521,13 @@ def incident_delete(request, pk):
     if request.method != 'POST':
         return redirect('incident_list')
     obj = get_object_or_404(IncidentRegister, pk=pk)
+
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_delete_db = is_admin_or_super or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.view_databaseincident')
+    can_delete_infra = is_admin_or_super or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.view_infrastructureincident')
+    if (obj.category == 'Database' and not can_delete_db) or (obj.category == 'Infrastructure' and not can_delete_infra):
+        messages.error(request, 'You do not have permission to delete this incident.')
+        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
     
     can_delete_always = (
         request.user.is_admin or 
@@ -4484,6 +4605,13 @@ def maintenance_delete(request, pk):
     if request.method != 'POST':
         return redirect('maintenance_list')
     obj = get_object_or_404(MaintenanceRegister, pk=pk)
+
+    is_admin_or_super = request.user.is_admin or request.user.is_superuser
+    can_delete_db = is_admin_or_super or request.user.has_perm('api.delete_maintenanceregister') or request.user.has_perm('api.view_databasemaintenance')
+    can_delete_infra = is_admin_or_super or request.user.has_perm('api.delete_maintenanceregister') or request.user.has_perm('api.view_infrastructuremaintenance')
+    if (obj.category == 'Database' and not can_delete_db) or (obj.category == 'Infrastructure' and not can_delete_infra):
+        messages.error(request, 'You do not have permission to delete this maintenance record.')
+        return redirect(request.META.get('HTTP_REFERER', 'maintenance_list'))
     
     can_delete_always = request.user.is_admin
     is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
@@ -5139,6 +5267,8 @@ def incident_staging_list(request):
         getattr(request.user, 'is_admin', False) or
         request.user.has_perm('api.view_incidentregister') or
         request.user.has_perm('api.view_incidentstaging') or
+        request.user.has_perm('api.view_databaseincident') or
+        request.user.has_perm('api.view_infrastructureincident') or
         is_sysadmin
     )
     if not can_view:

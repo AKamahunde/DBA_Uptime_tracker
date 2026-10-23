@@ -29,21 +29,27 @@
 
 <!-- Maintenance Category Filter Tabs -->
 <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
+    {% if can_view_all_maint %}
     <a href="?tab=all{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         All Changes ({{ total_all_count }})
     </a>
+    {% endif %}
+    {% if can_view_db_maint %}
     <a href="?tab=database{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Database ({{ total_db_count }})
     </a>
+    {% endif %}
+    {% if can_view_infra_maint %}
     <a href="?tab=infrastructure{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
        style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
               {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
         Infrastructure Nodes ({{ total_infra_count }})
     </a>
+    {% endif %}
 </div>
 
 <!-- Main Workspace Layout -->
@@ -52,7 +58,7 @@
     <div class="card" style="flex: 2; min-width: 0; padding: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
             <h2 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--primary-navy);">Change Registry</h2>
-            {% if is_admin or perms.api.add_maintenanceregister %}
+            {% if can_add_maint %}
             <a href="{% url 'maintenance_create' %}" class="btn btn-success" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">Create Change Record</a>
             {% endif %}
         </div>
@@ -74,14 +80,14 @@
                 </label>
                 <select id="target" name="target" style="padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 140px; font-size: 0.8rem; background: #fff;">
                     <option value="">{% if current_tab == 'database' %}All Databases{% elif current_tab == 'infrastructure' %}All Host Nodes{% else %}All Scopes{% endif %}</option>
-                    {% if current_tab != 'infrastructure' %}
+                    {% if can_view_db_maint and current_tab != 'infrastructure' %}
                         {% if current_tab == 'all' %}<optgroup label="Databases">{% endif %}
                         <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle</option>
                         <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
                         <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
                         {% if current_tab == 'all' %}</optgroup>{% endif %}
                     {% endif %}
-                    {% if current_tab != 'database' %}
+                    {% if can_view_infra_maint and current_tab != 'database' %}
                         {% if current_tab == 'all' %}<optgroup label="Infrastructure Nodes">{% endif %}
                         {% for n_val, n_lbl in node_choices %}
                         <option value="{{ n_val }}" {% if current_target == n_val %}selected{% endif %}>{{ n_lbl }}</option>
