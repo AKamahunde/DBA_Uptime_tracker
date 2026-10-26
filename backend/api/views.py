@@ -2296,7 +2296,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     seen_dynamic = set()
     for d_rec in dynamic_vm_recs:
         s_low = (d_rec.server or '').lower()
-        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring']):
+        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight']):
             continue
         if s_low in seen_dynamic:
             continue
