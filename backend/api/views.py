@@ -3455,6 +3455,15 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
     kpi_total_ram_gb = round(sum(n['memory_total_gb'] for n in filtered_nodes), 1)
     kpi_used_ram_gb = round(sum(n['memory_used_gb'] for n in filtered_nodes), 1)
 
+    if selected_node == 'All Nodes':
+        kpi_compute_subtext = "OLKVM & Proxmox compute"
+    elif selected_node == 'Proxmox':
+        kpi_compute_subtext = "Proxmox cluster compute"
+    elif selected_node == 'OLKVM':
+        kpi_compute_subtext = "OLKVM compute"
+    else:
+        kpi_compute_subtext = f"{selected_node} compute"
+
     seen_shared_clusters = set()
     dedup_total_gb = 0.0
     dedup_used_gb = 0.0
@@ -3687,6 +3696,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         'kpi_node_uptime_val': avg_node_up,
         'kpi_nodes_healthy': kpi_nodes_healthy,
         'kpi_total_logical_cpus': kpi_total_logical_cpus,
+        'kpi_compute_subtext': kpi_compute_subtext,
         'kpi_total_ram_gb': kpi_total_ram_gb,
         'kpi_used_ram_gb': kpi_used_ram_gb,
         'kpi_total_storage_gb': kpi_total_storage_gb,

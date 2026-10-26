@@ -423,7 +423,7 @@
     <div class="plain-metric">
       <div class="plain-metric-label">Logical CPUs</div>
       <div class="plain-metric-value">{{ kpi_total_logical_cpus }} vCPUs</div>
-      <div class="plain-metric-subtext">OLKVM &amp; Proxmox compute</div>
+      <div class="plain-metric-subtext">{{ kpi_compute_subtext|default:"Compute Fleet" }}</div>
     </div>
     <div class="plain-metric">
       <div class="plain-metric-label">Total Memory</div>
