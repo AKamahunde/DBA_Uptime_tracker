@@ -222,9 +222,9 @@
         <div>
             <div style="display: flex; align-items: center; gap: 0.6rem;">
                 <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
-                    Current Guest Virtual Machine Fleet (Single Pane of Glass)
+                    Current Guest Virtual Machines (Single Pane of Glass)
                 </h3>
-                <span style="font-size: 0.82rem; font-weight: 600; color: #0284c7;">
+                <span style="font-size: 0.82rem; font-weight: 600; color: {{ vm_fleet_kpis.vms_status_color|default:'#0284c7' }};">
                     &bull; {{ vm_fleet_kpis.vms_healthy_display }}
                 </span>
             </div>
@@ -234,13 +234,13 @@
         </div>
         <div style="display: flex; gap: 0.6rem; align-items: center; font-size: 0.75rem; flex-wrap: wrap;">
             <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.5rem; color: #475569;">
-                <strong>Fleet Avg CPU:</strong> {{ vm_fleet_kpis.fleet_avg_cpu }}
+                <strong>Avg CPU:</strong> {{ vm_fleet_kpis.fleet_avg_cpu }}
             </span>
             <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.5rem; color: #475569;">
-                <strong>Fleet Avg RAM:</strong> {{ vm_fleet_kpis.fleet_avg_mem }}
+                <strong>Avg RAM:</strong> {{ vm_fleet_kpis.fleet_avg_mem }}
             </span>
             <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.5rem; color: #475569;">
-                <strong>Fleet Avg OS Disk:</strong> {{ vm_fleet_kpis.fleet_avg_disk }}
+                <strong>Avg OS Disk:</strong> {{ vm_fleet_kpis.fleet_avg_disk }}
             </span>
         </div>
     </div>

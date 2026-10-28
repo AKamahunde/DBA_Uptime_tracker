@@ -2364,8 +2364,30 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
 
     total_count = len(filtered_fleet)
     healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
+    outage_count = sum(1 for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline'])
+    online_count = total_count - outage_count
+    below_sla_count = sum(1 for v in filtered_fleet if v['status'] == 'Below SLA')
     warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
-    critical_count = sum(1 for v in filtered_fleet if v['status'] == 'Critical')
+    critical_count = outage_count
+
+    if total_count == 0:
+        vms_healthy_display = "0 Virtual Machines"
+        vms_status_color = "#64748b"
+    elif outage_count > 0:
+        vms_healthy_display = f"{online_count}/{total_count} Online ({outage_count} Outage)"
+        vms_status_color = "#dc2626"
+    elif warning_count > 0 and healthy_count > 0:
+        vms_healthy_display = f"{online_count}/{total_count} Online ({healthy_count} Healthy, {warning_count} Warning)"
+        vms_status_color = "#d97706"
+    elif warning_count > 0 and healthy_count == 0:
+        vms_healthy_display = f"{online_count}/{total_count} Online ({warning_count} Warning)"
+        vms_status_color = "#d97706"
+    elif below_sla_count > 0:
+        vms_healthy_display = f"{online_count}/{total_count} Online ({below_sla_count} Below SLA)"
+        vms_status_color = "#dc2626"
+    else:
+        vms_healthy_display = f"{online_count}/{total_count} Online & Healthy"
+        vms_status_color = "#16a34a"
 
     active_data_vms = [v for v in filtered_fleet if v['has_data']]
     avg_up = round(sum(v['uptime_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 100.00
@@ -2376,7 +2398,10 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     kpis = {
         'total_vms_count': total_count,
         'vms_healthy_count': healthy_count,
-        'vms_healthy_display': f"{healthy_count}/{total_count} Online & Healthy",
+        'vms_online_count': online_count,
+        'vms_outage_count': outage_count,
+        'vms_healthy_display': vms_healthy_display,
+        'vms_status_color': vms_status_color,
         'vms_warning_count': warning_count,
         'vms_critical_count': critical_count,
         'fleet_avg_uptime': f"{avg_up}%",
@@ -3863,7 +3888,7 @@ def dashboard_node_excel(request):
 
         ws.append([])
         row_num += 1
-        ws.cell(row=row_num, column=1, value="Guest Virtual Machine Fleet Status").font = font_section
+        ws.cell(row=row_num, column=1, value="Guest Virtual Machine Status").font = font_section
         row_num += 1
 
         vm_headers = [
@@ -3945,7 +3970,7 @@ def dashboard_node_excel(request):
             ])
 
         writer.writerow([])
-        writer.writerow(["Guest Virtual Machine Fleet Status"])
+        writer.writerow(["Guest Virtual Machine Status"])
         writer.writerow(["Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"])
         for vm in node_ctx.get('guest_vms_summary', []):
             writer.writerow([
