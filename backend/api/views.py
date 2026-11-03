@@ -1762,30 +1762,50 @@ def incident_reclassify_maintenance(request, pk):
         messages.error(request, 'You do not have permission to reclassify this incident.')
         return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
 
-    if incident.planned:
-        messages.info(request, f"Incident {incident.ticket} is already classified as planned Maintenance.")
-        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+    ticket_ref = incident.ticket
+    maint_date = incident.start.date() if incident.start else incident.date
+    maint_start = incident.start if incident.start else timezone.now()
+    maint_end = incident.end if incident.end else maint_start
 
-    incident.planned = True
-    if incident.category == 'Infrastructure':
-        incident.business_impact = 'Approved scheduled infrastructure maintenance activity.'
-        log_comment = 'Reclassified as scheduled infrastructure maintenance by SysAdmin.'
-    else:
-        incident.business_impact = 'Approved scheduled database maintenance activity.'
-        log_comment = 'Reclassified as scheduled database maintenance by DBA.'
-
-    incident.save()  # Automatically creates/syncs MaintenanceRegister entry via IncidentRegister.save()
-
-    IncidentChangeLog.objects.create(
-        incident=incident,
-        changed_by=request.user,
-        action='Reclassified as Scheduled Maintenance',
-        new_status=incident.status,
-        comment=log_comment
+    # Create/update the MaintenanceRegister entry
+    maint, created = MaintenanceRegister.objects.update_or_create(
+        change_id=ticket_ref,
+        defaults={
+            'database': incident.database,
+            'system': incident.system,
+            'date': maint_date,
+            'activity': f"Scheduled Maintenance (Transferred from Incident {ticket_ref}): {incident.root_cause or 'Approved RFC'}",
+            'start': maint_start,
+            'end': maint_end,
+            'risk': 'Medium',
+            'rollback_plan': 'Awaiting DBA input.',
+            'approved_by': '',
+            'success': True if incident.status in ['Resolved', 'Closed'] else False,
+            'created_by': request.user
+        }
     )
 
-    messages.success(request, f"Incident {incident.ticket} successfully reclassified as scheduled Maintenance. It will no longer penalize SLA availability.")
-    return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
+    MaintenanceChangeLog.objects.create(
+        maintenance=maint,
+        changed_by=request.user,
+        action='Transferred from Incident Register',
+        comment=f"Reclassified and transferred from Incident {ticket_ref} by {request.user.username}."
+    )
+
+    # Re-point any staged alert records
+    IncidentStaging.objects.filter(incident_record=incident).update(
+        status='Promoted to Maintenance',
+        maintenance_record=maint,
+        incident_record=None,
+        processed_at=timezone.now()
+    )
+
+    # Cleanly remove the incident record so it never duplicates across registers
+    IncidentChangeLog.objects.filter(incident=incident).delete()
+    incident.delete()
+
+    messages.success(request, f"Incident {ticket_ref} successfully reclassified and moved to the Maintenance Register as {maint.change_id}. It no longer appears under Incidents or penalizes SLA availability.")
+    return redirect('maintenance_list')
 
 
 @login_required

@@ -86,9 +86,10 @@
             </div>
         </div>
         {% endif %}
-        <div class="form-group" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem; margin-bottom: 1.5rem;">
-            {{ form.planned }}
-            <label for="{{ form.planned.id_for_label }}" style="margin-bottom: 0; display: inline-block; cursor: pointer; font-weight: 500;">Planned Incident (occurs during maintenance/approved windows)</label>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.65rem 0.85rem; margin-bottom: 1.25rem; font-size: 0.82rem; color: #166534; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <strong>Planned Outage or RFC?</strong> Scheduled maintenance activities must be logged directly in the <a href="{% url 'maintenance_add' %}" style="color: #15803d; font-weight: 700; text-decoration: underline;">Maintenance Register</a> to prevent SLA downtime penalties.
+            </div>
         </div>
         <div class="form-group">
             <label for="{{ form.severity.id_for_label }}">Severity:</label>

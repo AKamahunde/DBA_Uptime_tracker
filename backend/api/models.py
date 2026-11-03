@@ -151,48 +151,6 @@ class IncidentRegister(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Sync to Maintenance Register ONLY for Database category
-        from api.models import MaintenanceRegister
-
-        is_db_planned = (
-            bool(self.planned)
-            and getattr(self, 'category', 'Database') == 'Database'
-            and self.database in ['MySQL', 'Oracle', 'MS SQL Server']
-        )
-
-        if is_db_planned:
-            maint_date = self.start.date() if self.start else self.date
-            maint_start = self.start if self.start else timezone.now()
-            maint_end = self.end if self.end else maint_start
-
-            # Remove any legacy duplicates for this change_id to avoid MultipleObjectsReturned
-            dup_qs = MaintenanceRegister.objects.filter(change_id=original_ticket)
-            if dup_qs.count() > 1:
-                first_pk = dup_qs.first().pk
-                MaintenanceRegister.objects.filter(change_id=original_ticket).exclude(pk=first_pk).delete()
-
-            MaintenanceRegister.objects.update_or_create(
-                change_id=original_ticket,   # look up by ORIGINAL ticket
-                defaults={
-                    'change_id': self.ticket,    # update to NEW ticket name
-                    'database': self.database,
-                    'system': self.system,        # Sync system name (e.g. nmsinfra (DB))
-                    'date': maint_date,
-                    'activity': f"Planned Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
-                    'start': maint_start,
-                    'end': maint_end,
-                    'risk': 'Medium',
-                    'rollback_plan': 'Awaiting DBA input.',
-                    'approved_by': '',  # Leave blank so a DBA can update it later
-                    'success': True if self.status in ['Resolved', 'Closed'] else False,
-                    'created_by': self.created_by
-                }
-            )
-        else:
-            # Unplanned or Infrastructure outage — remove any linked maintenance record
-            # (check both current and original ticket name in case it was renamed)
-            MaintenanceRegister.objects.filter(change_id__in=[self.ticket, original_ticket]).delete()
-
     def __str__(self):
         return f"{self.ticket} - {self.date}"
 
