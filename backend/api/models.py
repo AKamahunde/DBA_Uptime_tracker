@@ -691,6 +691,8 @@ class CapacityPlanning(models.Model):
 
     @property
     def disk_capacity_gb(self):
+        if self.database == 'Oracle' and self.database_size_gb and self.available_capacity_gb:
+            return round(self.database_size_gb + self.available_capacity_gb, 2)
         if self.disk_used_percent is not None and self.disk_used_percent < 100:
             free_percent = 100 - self.disk_used_percent
             if free_percent > 0:

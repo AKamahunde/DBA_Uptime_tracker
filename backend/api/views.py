@@ -5922,6 +5922,11 @@ def capacity_ingest(request):
         
         database_instance = data.get('database', 'MySQL')
         incoming_size = Decimal(str(data.get('database_size_gb', 0)))
+        avail_gb = Decimal(str(data.get('available_capacity_gb', 0)))
+        ts_pct = Decimal(str(data.get('tablespace_percent', 0)))
+        if database_instance == 'Oracle' and incoming_size > avail_gb and avail_gb > 0 and ts_pct > 0:
+            if abs(float((incoming_size - avail_gb) / incoming_size * 100) - float(ts_pct)) < 1.0:
+                incoming_size = round(incoming_size - avail_gb, 2)
         
         # Get client IP address for debugging
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

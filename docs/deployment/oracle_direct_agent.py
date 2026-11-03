@@ -345,7 +345,7 @@ if __name__ == "__main__":
             
             payload = {
                 "database": "Oracle",
-                "database_size_gb": round(size_gb, 2),
+                "database_size_gb": round(used_gb, 2),
                 "disk_percent": disk_percent,
                 "tablespace_percent": round(tablespace_used_percent, 2),
                 "largest_table": largest_table,
