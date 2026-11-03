@@ -1527,7 +1527,7 @@ def incident_list(request):
         Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
     ).exclude(category='Infrastructure').count()
     total_infra_count = IncidentRegister.objects.filter(
-        Q(category='Infrastructure') | Q(database='Infrastructure')
+        Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
     ).count()
 
     queryset = base_qs
@@ -1543,7 +1543,7 @@ def incident_list(request):
         if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
             current_target = ''
         queryset = queryset.filter(
-            Q(category='Infrastructure') | Q(database='Infrastructure')
+            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
         )
 
     # 2. Filter by single target (specific DB or specific Node)
@@ -2633,13 +2633,15 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 month_inc_filter,
                 planned=False
             ).filter(
-                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
+                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure') | Q(database__iexact='Oracle')
             ).filter(
                 Q(node_name__iexact='OLKVM') |
                 Q(node_name__iexact=nd['node_key']) |
                 Q(node_name__iexact=nd['display_name']) |
                 Q(system__icontains=nd['node_key']) |
                 Q(system__icontains='olkvm') |
+                Q(system__icontains='nmsinfra') |
+                Q(system__icontains='nmsebs') |
                 (Q(node_name__icontains='infra') if 'infra' in nd['node_key'] else Q(node_name__icontains='ebs'))
             )
         else:
