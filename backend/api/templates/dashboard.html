@@ -200,7 +200,7 @@
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
                 <select name="database_select" onchange="submitDbFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
-                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases (Fleet Overview)</option>
+                    <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
                     <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle (ERP Suite)</option>
                     <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL (NMS360 / DMT)</option>
                     <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' or selected_db == 'MKInsight' %}selected{% endif %}>MS SQL Server (MKInsight / Pentana)</option>

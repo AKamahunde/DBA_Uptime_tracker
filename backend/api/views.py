@@ -4869,7 +4869,7 @@ def capacity_list(request):
                     runway_badge = 'stable'
                     
                 forecast_info = {
-                    'database': 'All Databases (Fleet)',
+                    'database': 'All Databases',
                     'current_used_pct': round(used_pct, 1),
                     'monthly_burn': round(growth_val, 2),
                     'daily_burn': daily_burn,
