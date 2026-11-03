@@ -153,9 +153,15 @@ def _get_dashboard_data(reporting_month):
         )
         total_incidents = incidents.count()
 
-        # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI
+        # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI.
+        # Events under 5 minutes (< 0.0833 hrs) are classified as transient alerts / intermittent network blips
+        # and do not contribute to SLA downtime or MTTR calculations.
         unplanned_incidents = incidents.filter(planned=False)
-        total_unplanned = unplanned_incidents.count()
+        qualifying_unplanned = [
+            inc for inc in unplanned_incidents
+            if not inc.duration_hrs or float(inc.duration_hrs) >= (5.0 / 60.0)
+        ]
+        total_unplanned = len(qualifying_unplanned)
 
         # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
         SLA_RESOLUTION_TARGETS = {
@@ -168,10 +174,11 @@ def _get_dashboard_data(reporting_month):
         unplanned = 0
         sla_breach_count = 0
         now = timezone.now()
-        for inc in unplanned_incidents:
+        for inc in qualifying_unplanned:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 active_downtime = calculate_operational_downtime(inc.start, now, inc.database)
-                unplanned += float(active_downtime)
+                if float(active_downtime) >= (5.0 / 60.0):
+                    unplanned += float(active_downtime)
             elif inc.duration_hrs:
                 unplanned += float(inc.duration_hrs)
                 target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
@@ -1580,7 +1587,8 @@ def incident_list(request):
     kpi_active_outages = queryset.filter(status__in=['Open', 'In Progress']).count()
     kpi_resolved_count = queryset.filter(status__in=['Resolved', 'Closed']).count()
     
-    kpi_downtime_hours = queryset.filter(planned=False).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+    # Exclude intermittent network alerts under 5 minutes (< 0.0833h)
+    kpi_downtime_hours = queryset.filter(planned=False, duration_hrs__gte=0.0833).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
     kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
 
     node_choices = [
@@ -2197,9 +2205,13 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         vm_inc_qs = IncidentRegister.objects.filter(month_inc_filter, planned=False).filter(vm_inc_q)
         vm_unplanned_hrs = 0.0
         for inc in vm_inc_qs:
+            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
+            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
+                continue
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                vm_unplanned_hrs += float(active_dt)
+                if float(active_dt) >= (5.0 / 60.0):
+                    vm_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 vm_unplanned_hrs += float(inc.duration_hrs)
         vm_unplanned_hrs = round(vm_unplanned_hrs, 2)
@@ -2669,9 +2681,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         node_unplanned_hrs = 0.0
         now_dt = timezone.now()
         for inc in node_inc_qs:
+            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
+            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
+                continue
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                node_unplanned_hrs += float(active_dt)
+                if float(active_dt) >= (5.0 / 60.0):
+                    node_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 node_unplanned_hrs += float(inc.duration_hrs)
 
@@ -3024,9 +3040,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         )
         olkvm_unplanned_hrs = 0.0
         for inc in olkvm_inc_qs:
+            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
+            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
+                continue
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                olkvm_unplanned_hrs += float(active_dt)
+                if float(active_dt) >= (5.0 / 60.0):
+                    olkvm_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 olkvm_unplanned_hrs += float(inc.duration_hrs)
         olkvm_unplanned_hrs = round(olkvm_unplanned_hrs, 2)
