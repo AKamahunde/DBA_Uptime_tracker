@@ -4597,6 +4597,39 @@ def maintenance_edit(request, pk):
         'can_add_infra': can_view_infra
     })
 
+def _annotate_cumulative_growth(queryset):
+    """
+    Annotates each CapacityPlanning record in a queryset/list with:
+    - cumulative_growth_gb: net growth from the earliest record of that database in the filtered period
+    - cumulative_growth_percent: percentage growth relative to that earliest baseline record
+    - baseline_month_label: formatted month of the baseline record (e.g., 'Jul 2026')
+    """
+    records = list(queryset)
+    baselines = {}
+    for rec in reversed(records):
+        db = rec.database
+        if db not in baselines:
+            baselines[db] = rec
+
+    for rec in records:
+        base_rec = baselines.get(rec.database)
+        if base_rec and base_rec.database_size_gb and float(base_rec.database_size_gb) > 0:
+            base_size = float(base_rec.database_size_gb)
+            curr_size = float(rec.database_size_gb or 0.0)
+            cum_gb = round(curr_size - base_size, 2)
+            cum_pct = round((cum_gb / base_size) * 100.0, 2)
+            rec.cumulative_growth_gb = Decimal(f"{cum_gb:.2f}")
+            rec.cumulative_growth_percent = Decimal(f"{cum_pct:.2f}")
+            rec.baseline_month_label = base_rec.month.strftime('%b %Y')
+            rec.is_baseline_month = (rec.pk == base_rec.pk)
+        else:
+            rec.cumulative_growth_gb = Decimal('0.00')
+            rec.cumulative_growth_percent = Decimal('0.00')
+            rec.baseline_month_label = ''
+            rec.is_baseline_month = True
+    return records
+
+
 @login_required
 def capacity_list(request):
     is_admin_or_super = request.user.is_admin or request.user.is_superuser
@@ -4635,8 +4668,9 @@ def capacity_list(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
-        
-    paginator = Paginator(queryset, 10)
+
+    annotated_records = _annotate_cumulative_growth(queryset)
+    paginator = Paginator(annotated_records, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
@@ -4977,6 +5011,7 @@ def capacity_print(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
+    queryset = _annotate_cumulative_growth(queryset)
 
     # Format user extracted name
     user = request.user
@@ -5017,6 +5052,7 @@ def capacity_excel(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
+    queryset = _annotate_cumulative_growth(queryset)
 
     db_display = current_db if current_db else "All Databases"
     period_display = f"{start_date}_to_{end_date}" if (start_date or end_date) else "All_Time"
@@ -5070,7 +5106,8 @@ def capacity_excel(request):
         
         # Headers
         headers = [
-            "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
+            "Month", "Database", "Database Size (GB)", "Monthly Growth (GB)", "Monthly Growth (%)",
+            "Cumulative Growth (GB)", "Cumulative Growth (%)",
             "Total Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Free Disk Space (GB)", "Largest Table"
         ]
         ws.append(headers)
@@ -5095,6 +5132,8 @@ def capacity_excel(request):
                 float(item.database_size_gb),
                 float(item.growth_gb),
                 growth_pct,
+                float(getattr(item, 'cumulative_growth_gb', 0.0)),
+                f"{getattr(item, 'cumulative_growth_percent', 0.0)}%",
                 float(disk_cap),
                 float(item.disk_used_percent),
                 tablespace_val if tablespace_val == 'N/A' else float(item.tablespace_used_percent),
@@ -5104,14 +5143,14 @@ def capacity_excel(request):
             ws.append(row_data)
             ws.row_dimensions[row_num].height = 20
             
-            for col_num in range(1, 11):
+            for col_num in range(1, 13):
                 cell = ws.cell(row=row_num, column=col_num)
                 cell.font = font_body
                 cell.border = border_thin
                 if row_num % 2 == 0:
                     cell.fill = fill_even
                 
-                if col_num in [1, 2, 10]:
+                if col_num in [1, 2, 12]:
                     cell.alignment = align_left
                 else:
                     cell.alignment = align_center

@@ -651,6 +651,7 @@
                     <th>Tablespace %</th>
                     <th>Monthly Growth</th>
                     <th>Growth %</th>
+                    <th title="Cumulative growth and percentage rate from the start of the selected period">Cumulative Growth</th>
                     <th title="Estimated capacity headroom remaining before 100% disk exhaustion at current monthly burn rate">Headroom</th>
                     <th style="text-align: left;">Largest Table</th>
                 </tr>
@@ -687,6 +688,19 @@
                             &mdash;
                         {% endif %}
                     </td>
+                    <td title="Cumulative growth since {{ capacity.baseline_month_label }} baseline">
+                        {% if capacity.is_baseline_month %}
+                            <span style="color: #64748b; font-size: 0.78rem; font-weight: 600;">Baseline (0.00%)</span>
+                        {% elif capacity.cumulative_growth_gb > 0 %}
+                            <span style="color: #0284c7; font-weight: 700;">+{{ capacity.cumulative_growth_percent }}%</span>
+                            <span style="color: #64748b; font-size: 0.74rem; font-weight: 500; display: block;">(+{{ capacity.cumulative_growth_gb }} GB)</span>
+                        {% elif capacity.cumulative_growth_gb < 0 %}
+                            <span style="color: #10b981; font-weight: 700;">{{ capacity.cumulative_growth_percent }}%</span>
+                            <span style="color: #64748b; font-size: 0.74rem; font-weight: 500; display: block;">({{ capacity.cumulative_growth_gb }} GB)</span>
+                        {% else %}
+                            <span style="color: #64748b; font-weight: 600;">0.00% (0.00 GB)</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <span style="font-size: 0.82rem; font-weight: 700;
                             {% if capacity.runway_badge == 'critical' %}color: #dc2626;
@@ -703,7 +717,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="11" style="text-align: center; padding: 2rem; color: #64748b;">No capacity tracking records found.</td>
+                    <td colspan="12" style="text-align: center; padding: 2rem; color: #64748b;">No capacity tracking records found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

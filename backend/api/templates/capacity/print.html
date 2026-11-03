@@ -222,7 +222,8 @@
                 <th>Utilisation %</th>
                 <th>Growth</th>
                 <th>Growth %</th>
-                <th class="text-left" style="width: 20%;">Largest Table</th>
+                <th>Cumulative Growth</th>
+                <th class="text-left" style="width: 18%;">Largest Table</th>
             </tr>
         </thead>
         <tbody>
@@ -271,6 +272,17 @@
                     {% endif %}
                 </td>
                 <td>{{ item.growth_percent }}%</td>
+                <td>
+                    {% if item.is_baseline_month %}
+                        Baseline (0.00%)
+                    {% elif item.cumulative_growth_gb > 0 %}
+                        <strong>+{{ item.cumulative_growth_percent }}%</strong> (+{{ item.cumulative_growth_gb }} GB)
+                    {% elif item.cumulative_growth_gb < 0 %}
+                        <strong>{{ item.cumulative_growth_percent }}%</strong> ({{ item.cumulative_growth_gb }} GB)
+                    {% else %}
+                        0.00% (0.00 GB)
+                    {% endif %}
+                </td>
                 <td class="text-left" style="font-size: 0.7rem; color: #475569; max-width: 180px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ item.largest_table }}">{{ item.largest_table }}</td>
             </tr>
             {% empty %}
