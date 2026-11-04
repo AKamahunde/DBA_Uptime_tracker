@@ -2370,18 +2370,21 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
             disk_us = round(disk_sz * disk_pct / 100.0, 2)
 
+        is_container = 'ccisprod_db' in s_low or 'container' in (d_rec.hosted_systems or '').lower()
+        is_ccis_vm = 'ccis-vm' in s_low or 'ccisuganda' in s_low
+
         fleet_vms.append({
             'pk': d_rec.pk,
             'vm_key': d_rec.server,
             'display_name': d_rec.server,
             'short_name': d_rec.server,
-            'host_node': d_rec.node_name or 'Proxmox',
+            'host_node': 'ccis-vm' if is_container else (d_rec.node_name or 'Proxmox'),
             'parent_node_key': d_rec.node_name or 'Proxmox',
-            'cluster': d_rec.node_name or 'Proxmox',
+            'cluster': 'Docker Swarm' if is_container else (d_rec.node_name or 'Proxmox'),
             'role': d_rec.clean_hosted_systems or 'Guest Virtual Machine',
             'database': d_rec.database or 'System',
             'ip_address': 'DHCP / Static',
-            'vmid': 'qemu',
+            'vmid': 'docker / postgis:17-3.5' if is_container else ('Linux Host VM (LVM)' if is_ccis_vm else 'qemu'),
             'logical_cpus': int(d_rec.logical_cpus or 4),
             'uptime_percent': round(up_pct, 2),
             'uptime_str': f"{round(up_pct, 2)}%",
