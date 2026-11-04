@@ -2350,7 +2350,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     seen_dynamic = set()
     for d_rec in dynamic_vm_recs:
         s_low = (d_rec.server or '').lower()
-        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight'] if include_ccis else ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight', 'ccis']
+        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight']
         if any(c in s_low for c in skip_keys):
             continue
         if s_low in seen_dynamic:
