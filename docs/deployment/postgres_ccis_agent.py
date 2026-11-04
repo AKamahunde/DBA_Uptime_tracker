@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:8000")
+DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:90")
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 
 PG_CONTAINER_FILTER = os.environ.get("PG_CONTAINER_FILTER", "ccisprod_db")
@@ -298,7 +298,7 @@ def handle_outage_state(is_up, failure_reason=""):
                 "end": now_iso,
                 "root_cause": f"[AUTO-DETECTED] {reason}",
             }
-            code, resp = _post_json("/api/incidents/ingest/", payload)
+            code, resp = _post_json("/api/incident/ingest/", payload)
             print(f"[RECOVERY] Reported outage ({start_iso} -> {now_iso}) to DBTRAC: HTTP {code} {resp}")
         except Exception as exc:
             print(f"[WARN] Failed to push recovery incident: {exc}")
@@ -364,7 +364,7 @@ def main():
         "threads": cont["pids"],
         "status": status,
     }
-    h_code, h_resp = _post_json("/api/server-health/ingest/", health_payload)
+    h_code, h_resp = _post_json("/api/health/ingest/", health_payload)
     print(f"[OK] ServerHealth ingest: HTTP {h_code} -> {h_resp}")
 
     # 2. Push CapacityPlanning payload
