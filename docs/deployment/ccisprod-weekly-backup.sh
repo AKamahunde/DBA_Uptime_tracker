@@ -8,8 +8,9 @@
 #
 # Key Upgrades from Original:
 #   1. Writes directly to the external Backup Appliance (APPLIANCE_MOUNT), NEVER
-#      to the local CCIS server disk.
-#   2. Verifies APPLIANCE_MOUNT is an active mountpoint before writing a single byte.
+#      to the local CCIS server root '/' disk.
+#   2. Verifies APPLIANCE_MOUNT resides on a non-root mounted filesystem before
+#      writing a single byte (works for mount roots and subdirectories alike).
 #   3. Automatically pushes backup status (Success/Failed, duration, size, path)
 #      to DBTRAC (http://192.168.35.38:90/api/backup/ingest/).
 #
@@ -44,23 +45,30 @@ report_to_dbtrac() {
   local end_iso
   end_iso="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   local dur_mins
-  dur_mins=$(awk "BEGIN {printf "%.2f", ($end_epoch - $START_EPOCH) / 60.0}")
+  dur_mins="$(awk "BEGIN {printf \"%.2f\", ($end_epoch - $START_EPOCH) / 60.0}")"
   local bkp_name
   bkp_name="$(basename "$dump_file")"
+  local is_verified="false"
+  if [ "$outcome" = "Success" ]; then
+    is_verified="true"
+  fi
 
-  curl -fsS -m 15 -X POST "$DBTRAC_API_URL"     -H "Content-Type: application/json"     -H "X-API-KEY: $DBTRAC_API_KEY"     -d "{
-      "database": "PostgreSQL",
-      "database_instance": "ccisprod_db",
-      "backup_type": "Full",
-      "backup_used": "${bkp_name}",
-      "start": "${START_ISO}",
-      "end": "${end_iso}",
-      "duration_mins": ${dur_mins},
-      "outcome": "${outcome}",
-      "failure_reason": "${reason}",
-      "location": "${dump_file}",
-      "verified": $( [ "$outcome" = "Success" ] && echo "true" || echo "false" ),
-      "compression": true
+  curl -fsS -m 15 -X POST "$DBTRAC_API_URL" \
+    -H "Content-Type: application/json" \
+    -H "X-API-KEY: $DBTRAC_API_KEY" \
+    -d "{
+      \"database\": \"PostgreSQL\",
+      \"database_instance\": \"ccisprod_db\",
+      \"backup_type\": \"Full\",
+      \"backup_used\": \"${bkp_name}\",
+      \"start\": \"${START_ISO}\",
+      \"end\": \"${end_iso}\",
+      \"duration_mins\": ${dur_mins},
+      \"outcome\": \"${outcome}\",
+      \"failure_reason\": \"${reason}\",
+      \"location\": \"${dump_file}\",
+      \"verified\": ${is_verified},
+      \"compression\": true
     }" >/dev/null 2>&1 || echo "WARN: Could not notify DBTRAC API at $DBTRAC_API_URL"
 }
 
@@ -72,41 +80,52 @@ fail() {
 }
 
 # 0. Verify Backup Appliance is mounted (Never write to local root '/')
-if ! mountpoint -q "$APPLIANCE_MOUNT"; then
-  report_to_dbtrac "Failed" "Backup appliance mount $APPLIANCE_MOUNT is not mounted"
-  echo "ERROR: Backup appliance '$APPLIANCE_MOUNT' is NOT mounted! Refusing to write to local disk." >&2
+CHECK_PATH="$APPLIANCE_MOUNT"
+while [ ! -d "$CHECK_PATH" ] && [ "$CHECK_PATH" != "/" ]; do
+  CHECK_PATH="$(dirname "$CHECK_PATH")"
+done
+TARGET_MNT="$(df -P "$CHECK_PATH" 2>/dev/null | awk 'NR==2 {print $6}')"
+if [ -z "$TARGET_MNT" ] || [ "$TARGET_MNT" = "/" ]; then
+  report_to_dbtrac "Failed" "Backup appliance path $APPLIANCE_MOUNT is not mounted (resolves to /)"
+  echo "ERROR: Backup appliance '$APPLIANCE_MOUNT' resolves to local root '/'! Refusing to write to local disk." >&2
   exit 1
 fi
 
 mkdir -p "$DEST"
 exec >>"$LOG" 2>&1
-echo "===== $(date -u '+%F %T UTC') backup start -> $DEST (Backup Appliance)"
+echo "===== $(date -u '+%F %T UTC') backup start -> $DEST (Backup Appliance Mount: $TARGET_MNT)"
 
 # 1. Free-space check on Backup Appliance
-FREE_GB=$(df -BG --output=avail "$BACKUP_ROOT" | tail -1 | tr -dc '0-9')
-[ "$FREE_GB" -ge "$MIN_FREE_GB" ] || fail "only ${FREE_GB}G free on appliance $BACKUP_ROOT"
+FREE_GB="$(df -BG --output=avail "$DEST" | tail -1 | tr -dc '0-9')"
+[ -n "$FREE_GB" ] && [ "$FREE_GB" -ge "$MIN_FREE_GB" ] || fail "only ${FREE_GB:-0}G free on appliance $BACKUP_ROOT"
 
 # 2. Database (exact name match: avoid ccisprod_db-bootstrap)
-DB_C=$(docker ps --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^ccisprod_db\.1\./ {print $1; exit}')
+DB_C="$(docker ps --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^ccisprod_db\.1\./ {print $1; exit}')"
 [ -n "$DB_C" ] || fail "ccisprod_db container not running"
 
-docker exec "$DB_C" sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d postgres -Fc'   > "$DEST/ccisprod_db_$STAMP.dump" || fail "pg_dump failed"
-docker exec "$DB_C" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}" --globals-only'   > "$DEST/ccisprod_globals_$STAMP.sql" || fail "pg_dumpall globals failed"
+docker exec "$DB_C" sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d postgres -Fc' \
+  > "$DEST/ccisprod_db_$STAMP.dump" || fail "pg_dump failed"
+docker exec "$DB_C" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}" --globals-only' \
+  > "$DEST/ccisprod_globals_$STAMP.sql" || fail "pg_dumpall globals failed"
 
 # Verify the dump is readable via pg_restore -l
-docker exec -i "$DB_C" pg_restore -l < "$DEST/ccisprod_db_$STAMP.dump" > /dev/null   || fail "dump verification failed"
+docker exec -i "$DB_C" pg_restore -l < "$DEST/ccisprod_db_$STAMP.dump" > /dev/null \
+  || fail "dump verification failed"
 DUMP_SIZE="$(du -h "$DEST/ccisprod_db_$STAMP.dump" | cut -f1)"
 echo "DB dump OK: $DUMP_SIZE"
 
 # 3. LDAP volumes (small; backed up together so schema and data match)
 for VOL in ccisprod_ldap-vol ccisprod_ldap-slapd.d-vol; do
-  MP=$(docker volume inspect -f '{{.Mountpoint}}' "$VOL" 2>/dev/null) || { echo "WARN: volume $VOL not found"; continue; }
+  MP="$(docker volume inspect -f '{{.Mountpoint}}' "$VOL" 2>/dev/null)" || { echo "WARN: volume $VOL not found"; continue; }
   tar czf "$DEST/${VOL}_$STAMP.tar.gz" -C "$MP" . || fail "tar of $VOL failed"
 done
 echo "LDAP volumes OK"
 
 # 4. Stack config (compose, env, nginx configs, scripts) - no source trees / node_modules
-tar czf "$DEST/ccisprod_config_$STAMP.tar.gz" -C "$STACK_DIR"   --exclude='node_modules' --exclude='*.jar' --exclude='target'   docker-compose.yml deploy.sh scripts frontend/.env $(ls -d "$STACK_DIR"/*.conf 2>/dev/null | xargs -r -n1 basename)   2>/dev/null || echo "WARN: some config files missing (check list)"
+tar czf "$DEST/ccisprod_config_$STAMP.tar.gz" -C "$STACK_DIR" \
+  --exclude='node_modules' --exclude='*.jar' --exclude='target' \
+  docker-compose.yml deploy.sh scripts frontend/.env $(ls -d "$STACK_DIR"/*.conf 2>/dev/null | xargs -r -n1 basename) \
+  2>/dev/null || echo "WARN: some config files missing (check list)"
 
 # 5. Checksums
 ( cd "$DEST" && sha256sum * > SHA256SUMS )

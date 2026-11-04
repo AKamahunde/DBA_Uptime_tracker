@@ -6,8 +6,9 @@
 #
 # Key Upgrades from Original:
 #   1. Writes directly to the external Backup Appliance (APPLIANCE_MOUNT), NEVER
-#      to the local CCIS server disk.
-#   2. Verifies APPLIANCE_MOUNT is an active mountpoint before running.
+#      to the local CCIS server root '/' disk.
+#   2. Verifies APPLIANCE_MOUNT resides on a non-root mounted filesystem before
+#      running (works for mount roots and subdirectories alike).
 #   3. Explicitly skips the retired/legacy 'ccis' stack (EXCLUDE_STACKS="ccis")
 #      moving forward after its one-time archive.
 #
@@ -30,22 +31,32 @@ LOG="$BACKUP_ROOT/backup.log"
 ERRORS=0
 
 # 0. Verify Backup Appliance is mounted (Never write to local root '/')
-if ! mountpoint -q "$APPLIANCE_MOUNT"; then
-  echo "ERROR: Backup appliance '$APPLIANCE_MOUNT' is NOT mounted! Refusing to write to local disk." >&2
+CHECK_PATH="$APPLIANCE_MOUNT"
+while [ ! -d "$CHECK_PATH" ] && [ "$CHECK_PATH" != "/" ]; do
+  CHECK_PATH="$(dirname "$CHECK_PATH")"
+done
+TARGET_MNT="$(df -P "$CHECK_PATH" 2>/dev/null | awk 'NR==2 {print $6}')"
+if [ -z "$TARGET_MNT" ] || [ "$TARGET_MNT" = "/" ]; then
+  echo "ERROR: Backup appliance '$APPLIANCE_MOUNT' resolves to local root '/'! Refusing to write to local disk." >&2
   exit 1
 fi
 
 mkdir -p "$DEST"
 exec >>"$LOG" 2>&1
-echo "===== $(date -u '+%F %T UTC') all-stacks backup start -> $DEST (Backup Appliance, excluding: $EXCLUDE_STACKS)"
+echo "===== $(date -u '+%F %T UTC') all-stacks backup start -> $DEST (Appliance Mount: $TARGET_MNT, excluding: $EXCLUDE_STACKS)"
 
 err() { echo "ERROR: $*"; ERRORS=$((ERRORS+1)); }
 
-FREE_GB=$(df -BG --output=avail "$BACKUP_ROOT" | tail -1 | tr -dc '0-9')
-if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then echo "ERROR: only ${FREE_GB}G free on appliance $BACKUP_ROOT"; echo "===== FAILED"; exit 1; fi
+FREE_GB="$(df -BG --output=avail "$DEST" | tail -1 | tr -dc '0-9')"
+if [ -z "$FREE_GB" ] || [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+  echo "ERROR: only ${FREE_GB:-0}G free on appliance $BACKUP_ROOT"
+  echo "===== FAILED"
+  exit 1
+fi
 
 # Find compose files once
-COMPOSE_FILES=$(find $COMPOSE_SEARCH -maxdepth 5 \( -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' -o -name 'stack*.yml' \)   -not -path '*/node_modules/*' 2>/dev/null || true)
+COMPOSE_FILES="$(find $COMPOSE_SEARCH -maxdepth 5 \( -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' -o -name 'stack*.yml' \) \
+  -not -path '*/node_modules/*' 2>/dev/null || true)"
 
 for STACK in $(docker stack ls --format '{{.Name}}'); do
   # Skip legacy 'ccis' stack (already archived once and retired)
@@ -65,7 +76,9 @@ for STACK in $(docker stack ls --format '{{.Name}}'); do
   # 2. Databases: dump every running Postgres/PostGIS container of this stack
   DB_VOLS=""
   while IFS='|' read -r CID CNAME IMG; do
-    [ -z "$CID" ] && continue
+    if [ -z "$CID" ]; then
+      continue
+    fi
     if echo "$IMG" | grep -qiE 'postgres|postgis'; then
       SVC="${CNAME%%.*}"
       if docker exec "$CID" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}"' | gzip > "$D/${SVC}_pg_dumpall.sql.gz"; then
@@ -80,7 +93,7 @@ for STACK in $(docker stack ls --format '{{.Name}}'); do
   # 3. Other named volumes (LDAP, uploads, etc.)
   for V in $(docker volume ls -q --filter "label=com.docker.stack.namespace=$STACK"); do
     if echo " $DB_VOLS " | grep -q " $V "; then echo "skip $V (DB volume - covered by dump)"; continue; fi
-    MP=$(docker volume inspect -f '{{.Mountpoint}}' "$V")
+    MP="$(docker volume inspect -f '{{.Mountpoint}}' "$V")"
     tar czf "$D/volumes/$V.tar.gz" -C "$MP" . || err "tar $V"
   done
 
@@ -91,12 +104,14 @@ for STACK in $(docker stack ls --format '{{.Name}}'); do
 
   # 5. Compose files whose path mentions the stack name
   for F in $COMPOSE_FILES; do
-    case "$F" in *"$STACK"*) cp --parents "$F" "$D/compose/" 2>/dev/null ;; esac
+    case "$F" in *"$STACK"*) cp --parents "$F" "$D/compose/" 2>/dev/null || true ;; esac
   done
 done
 
 # ccisprod compose lives in odkx-prod (name does not contain "ccisprod")
-[ -f /home/techsupport/odkx-prod/docker-compose.yml ] &&   cp --parents /home/techsupport/odkx-prod/docker-compose.yml "$DEST/ccisprod/compose/" 2>/dev/null
+if [ -d "$DEST/ccisprod/compose" ] && [ -f /home/techsupport/odkx-prod/docker-compose.yml ]; then
+  cp --parents /home/techsupport/odkx-prod/docker-compose.yml "$DEST/ccisprod/compose/" 2>/dev/null || true
+fi
 
 ( cd "$DEST" && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS )
 find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -print -exec rm -rf {} +
