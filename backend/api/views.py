@@ -2099,7 +2099,7 @@ def server_health_sync_prometheus(request):
     return redirect('server_health_list')
 
 
-def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None):
+def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None, include_ccis=False):
     """
     Summarizes Guest Virtual Machine health across the hypervisor fleet
     (OLKVM and Proxmox) into a consolidated single-pane-of-glass status matrix.
@@ -2350,7 +2350,8 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     seen_dynamic = set()
     for d_rec in dynamic_vm_recs:
         s_low = (d_rec.server or '').lower()
-        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight', 'ccis']):
+        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight'] if include_ccis else ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight', 'ccis']
+        if any(c in s_low for c in skip_keys):
             continue
         if s_low in seen_dynamic:
             continue
@@ -4292,7 +4293,7 @@ def server_health_list(request):
         kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
 
     # Build deduplicated single-pane-of-glass current VM fleet status
-    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node='All Nodes', selected_vm=selected_vm)
+    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node='All Nodes', selected_vm=selected_vm, include_ccis=True)
     current_vm_fleet = vm_fleet_info['vms']
     vm_fleet_kpis = vm_fleet_info['kpis']
 
