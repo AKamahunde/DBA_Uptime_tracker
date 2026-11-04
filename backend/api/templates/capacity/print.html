@@ -201,6 +201,8 @@
             the MySQL database
         {% elif current_db == 'MS SQL Server' %}
             the MS SQL Server database
+        {% elif current_db == 'PostgreSQL' %}
+            the PostgreSQL (ccisprod_db) database
         {% else %}
             databases
         {% endif %}, reporting sizing metrics to assist database administrators in projecting storage needs.
@@ -236,6 +238,8 @@
                         Oracle (nmsinfra)
                     {% elif item.database == 'MS SQL Server' %}
                         MS SQL (Pentana)
+                    {% elif item.database == 'PostgreSQL' %}
+                        PostgreSQL (ccisprod_db)
                     {% else %}
                         {{ item.database }}
                     {% endif %}

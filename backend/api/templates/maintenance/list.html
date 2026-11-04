@@ -85,6 +85,7 @@
                         <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle</option>
                         <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
                         <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
+                        <option value="PostgreSQL" {% if current_target == 'PostgreSQL' %}selected{% endif %}>PostgreSQL (CCIS / ODK-X)</option>
                         {% if current_tab == 'all' %}</optgroup>{% endif %}
                     {% endif %}
                     {% if can_view_infra_maint and current_tab != 'database' %}

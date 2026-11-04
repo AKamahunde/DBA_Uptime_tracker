@@ -118,7 +118,7 @@ class IncidentRegisterForm(forms.ModelForm):
         elif cat == 'Database':
             if not db or db == 'Infrastructure':
                 self.add_error('database', forms.ValidationError(
-                    "Please select the database platform (Oracle, MySQL, or MS SQL Server)."
+                    "Please select the database platform (Oracle, MySQL, MS SQL Server, or PostgreSQL)."
                 ))
             if not cleaned_data.get('system'):
                 cleaned_data['system'] = db or 'Database'
@@ -307,7 +307,7 @@ class MaintenanceRegisterForm(forms.ModelForm):
         elif cat == 'Database':
             if not db or db == 'Infrastructure':
                 self.add_error('database', forms.ValidationError(
-                    "Please select the database platform (Oracle, MySQL, or MS SQL Server)."
+                    "Please select the database platform (Oracle, MySQL, MS SQL Server, or PostgreSQL)."
                 ))
             if not cleaned_data.get('system'):
                 cleaned_data['system'] = db or 'Database'
@@ -361,6 +361,7 @@ class CapacityPlanningForm(forms.ModelForm):
             ('MySQL', 'MySQL'),
             ('Oracle', 'Oracle (nmsinfra)'),
             ('MS SQL Server', 'MS SQL Server'),
+            ('PostgreSQL', 'PostgreSQL (ccisprod_db)'),
         ]
         if self.instance and self.instance.pk and self.instance.month:
             self.fields['month'].initial = self.instance.month.strftime('%Y-%m')
@@ -382,6 +383,7 @@ class SLAConfigForm(forms.ModelForm):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
+        ('PostgreSQL', 'PostgreSQL'),
     ])
     target_hours = forms.DecimalField(
         required=False,

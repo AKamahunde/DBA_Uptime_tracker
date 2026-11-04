@@ -136,7 +136,12 @@ def get_status(current, target_val, operator, warning_val=None):
     return 'N/A'
 
 def _get_dashboard_data(reporting_month):
+    from datetime import date as _date
     db_types = ['Oracle', 'MySQL', 'MS SQL Server']
+    if (reporting_month.year, reporting_month.month) >= (2026, 11) or SLAConfig.objects.filter(
+        database__iexact='PostgreSQL', month__year=reporting_month.year, month__month=reporting_month.month
+    ).exists():
+        db_types.append('PostgreSQL')
 
     dashboard_data = []
 
@@ -216,7 +221,7 @@ def _get_dashboard_data(reporting_month):
                         calc_th += 9
             if calc_th > 0:
                 try:
-                    target_pct_default = 99.50 if db_type == 'MySQL' else 99.95
+                    target_pct_default = 99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95)
                     first_of_month = reporting_month.replace(day=1)
                     sla_config_record, _ = SLAConfig.objects.get_or_create(
                         database=db_type,
@@ -258,7 +263,7 @@ def _get_dashboard_data(reporting_month):
         ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
         
-        if db_type in ['MS SQL Server']:
+        if db_type in ['MS SQL Server', 'PostgreSQL']:
             rep_status = 'N/A'
 
         # Health status calculation
@@ -315,7 +320,7 @@ def _get_dashboard_data(reporting_month):
         if last_backup:
             last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
 
-        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else 99.95)
+        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95))
 
         dashboard_data.append({
             'database': db_type,
@@ -354,8 +359,10 @@ def _get_dashboard_data(reporting_month):
 def _get_database_detail(selected_db, reporting_month, dashboard_data):
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
+    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
+        selected_db = 'PostgreSQL'
     database_detail = None
-    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
     if selected_db in db_types:
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
@@ -399,11 +406,12 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
             else:
                 rep_lag_str = "No Data"
                 
-            if selected_db in ['MS SQL Server']:
+            if selected_db in ['MS SQL Server', 'PostgreSQL']:
                 rep_lag_str = 'N/A'
 
             # Calculate Statuses
-            avail_status = get_status(row_data['availability'], 99.95, '>=', 99.90) if selected_sla_exists else 'N/A'
+            target_avail_sla = float(row_data.get('target_sla_val', 99.95))
+            avail_status = get_status(row_data['availability'], target_avail_sla, '>=', round(target_avail_sla - 0.05, 2)) if selected_sla_exists else 'N/A'
             planned_status = get_status(row_data['planned_downtime'], 48.0, '<=', 40.0) if selected_sla_exists else 'N/A'
             unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=', 1.5) if selected_sla_exists else 'N/A'
             incidents_status = get_status(row_data['total_incidents'], 4, '<=', 3) if selected_sla_exists else 'N/A'
@@ -540,6 +548,8 @@ def dashboard(request):
     selected_db = request.GET.get('database_select', 'All Databases')
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
+    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
+        selected_db = 'PostgreSQL'
     dashboard_data, db_types = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
 
@@ -696,6 +706,8 @@ def dashboard(request):
             target_sla_val = float(sla_conf.sla_percent)
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
+        elif selected_db.lower() == 'postgresql':
+            target_sla_val = 99.90
 
     valid_trend_vals = [m['value'] for m in trend_months if m['value'] > 0.0]
     trend_recent_avg = round(sum(valid_trend_vals) / len(valid_trend_vals), 2) if valid_trend_vals else 100.0
@@ -867,8 +879,9 @@ def dashboard(request):
         else:
             lede_suffix = "No incidents or service interruptions were logged during this period."
     else:
+        db_count_word = 'four' if len(filtered_dashboard_data) == 4 else ('three' if len(filtered_dashboard_data) == 3 else str(len(filtered_dashboard_data)))
         if all_within_sla_dashboard:
-            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
         else:
             lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
 
@@ -954,6 +967,8 @@ def dashboard_print(request):
 
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
+    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
+        selected_db = 'PostgreSQL'
 
     if month_str:
         try:
@@ -981,6 +996,8 @@ def dashboard_print(request):
             target_sla_val = float(sla_conf.sla_percent)
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
+        elif selected_db.lower() == 'postgresql':
+            target_sla_val = 99.90
     
     user_display = request.user.get_full_name()
     if not user_display:
@@ -1041,12 +1058,12 @@ def dashboard_print(request):
         target_val = item.get('target_sla_val', 99.95)
         target_scaled = round((target_val - 99.0) * 100.0, 2) if target_val >= 99.0 else 0.0
 
-        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else ('OLKVM & Proxmox Virtualization Fleet' if db_type == 'Infrastructure' else 'MKInsight Audit Framework'))
-        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else ('OLKVM, pvenode1, pvenode2, pvenode3' if db_type == 'Infrastructure' else 'Windows Server Host (Standalone)'))
+        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else ('Cold Chain Information System (CCIS / ODK-X)' if db_type == 'PostgreSQL' else ('OLKVM & Proxmox Virtualization Fleet' if db_type == 'Infrastructure' else 'MKInsight Audit Framework')))
+        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else ('ccisprod_db (PostgreSQL 17 + PostGIS 3.5 on Docker Swarm)' if db_type == 'PostgreSQL' else ('OLKVM, pvenode1, pvenode2, pvenode3' if db_type == 'Infrastructure' else 'Windows Server Host (Standalone)')))
 
         formatted_data.append({
             'database': db_type,
-            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else ('OLKVM & Proxmox' if db_type == 'Infrastructure' else 'Pentana')),
+            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else ('ccisprod_db' if db_type == 'PostgreSQL' else ('OLKVM & Proxmox' if db_type == 'Infrastructure' else 'Pentana'))),
             'role_desc': role_desc,
             'host_desc': host_desc,
             'availability': avail_str,
@@ -1086,8 +1103,9 @@ def dashboard_print(request):
         else:
             lede_suffix = "No incidents or service interruptions were logged during this period."
     else:
+        db_count_word = 'four' if len(dashboard_data) == 4 else ('three' if len(dashboard_data) == 3 else str(len(dashboard_data)))
         if all_within_sla:
-            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
         else:
             lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
 
@@ -1154,6 +1172,8 @@ def dashboard_excel(request):
     selected_db = request.GET.get('database_select', 'All Databases')
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
+    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
+        selected_db = 'PostgreSQL'
     dashboard_data, _ = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     month_display = reporting_month.strftime('%B %Y')
@@ -1367,6 +1387,7 @@ def dashboard_excel(request):
         ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite supporting finance, procurement, stores, and order management.").font = font_body
         ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, DMT, and other in-house applications.").font = font_body
         ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.").font = font_body
+        ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform.").font = font_body
         
         # Adjust Column Widths
         for col in ws.columns:
@@ -1478,6 +1499,7 @@ def dashboard_excel(request):
         writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite supporting finance, procurement, stores, and order management."])
         writer.writerow(["MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, DMT, and other in-house applications."])
         writer.writerow(["MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors."])
+        writer.writerow(["PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform."])
         return response
 
 @login_required
@@ -1531,7 +1553,7 @@ def incident_list(request):
     # Tab counts for headers
     total_all_count = IncidentRegister.objects.count()
     total_db_count = IncidentRegister.objects.filter(
-        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
     ).exclude(category='Infrastructure').count()
     total_infra_count = IncidentRegister.objects.filter(
         Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
@@ -1541,13 +1563,13 @@ def incident_list(request):
 
     # 1. Filter by category tab and normalize cross-tab target filters
     if current_tab == 'database':
-        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             current_target = ''
         queryset = queryset.filter(
-            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
         ).exclude(category='Infrastructure')
     elif current_tab == 'infrastructure':
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             current_target = ''
         queryset = queryset.filter(
             Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
@@ -1555,7 +1577,7 @@ def incident_list(request):
 
     # 2. Filter by single target (specific DB or specific Node)
     if current_target:
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             queryset = queryset.filter(database=current_target)
         elif current_target == 'Infrastructure':
             queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
@@ -2328,7 +2350,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     seen_dynamic = set()
     for d_rec in dynamic_vm_recs:
         s_low = (d_rec.server or '').lower()
-        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight']):
+        if any(c in s_low for c in ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight', 'ccis']):
             continue
         if s_low in seen_dynamic:
             continue
@@ -4399,7 +4421,7 @@ def maintenance_list(request):
     # Tab counts for headers
     total_all_count = MaintenanceRegister.objects.count()
     total_db_count = MaintenanceRegister.objects.filter(
-        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
     ).exclude(category='Infrastructure').count()
     total_infra_count = MaintenanceRegister.objects.filter(
         Q(category='Infrastructure') | Q(database='Infrastructure')
@@ -4409,13 +4431,13 @@ def maintenance_list(request):
 
     # Filter by tab
     if current_tab == 'database':
-        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             current_target = ''
         queryset = queryset.filter(
-            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server'])
+            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
         ).exclude(category='Infrastructure')
     elif current_tab == 'infrastructure':
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             current_target = ''
         queryset = queryset.filter(
             Q(category='Infrastructure') | Q(database='Infrastructure')
@@ -4423,7 +4445,7 @@ def maintenance_list(request):
 
     # Filter by specific target
     if current_target:
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server']:
+        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
             queryset = queryset.filter(database=current_target)
         elif current_target == 'Infrastructure':
             queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
@@ -4675,7 +4697,7 @@ def capacity_list(request):
     page_obj = paginator.get_page(page_number)
     
     # Capacity Redesign calculations
-    dbs = ['Oracle', 'MySQL', 'MS SQL Server']
+    dbs = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
     latest_records = {}
     for db in dbs:
         rec = CapacityPlanning.objects.filter(database=db).order_by('-month', '-updated_at').first()
@@ -6056,6 +6078,10 @@ def incident_ingest(request):
             category = 'Database'
             db_type = 'MS SQL Server'
             system = data.get('system') or 'MKInsight (Pentana)'
+        elif raw_db.strip().lower() in ['postgresql', 'postgres', 'ccis', 'odkx', 'odk-x', 'ccisprod', 'ccisprod_db']:
+            category = 'Database'
+            db_type = 'PostgreSQL'
+            system = data.get('system') or 'CCIS (ODK-X)'
         else:
             category = 'Database'
             db_type = raw_db or 'MySQL'
