@@ -3,9 +3,10 @@
 # 1_archive_and_cleanup_legacy_ccis_once.sh
 # Purpose:
 #   1. Backs up the legacy 'ccis' Docker Swarm stack (services, databases,
-#      volumes, configs, compose files) AND all 'ccis_data-sync' (/logsAndData)
-#      containers (~95.5 GB+) ONCE directly to the external Backup Appliance
-#      (zero temporary files written to the local root '/' filesystem).
+#      volumes, configs, compose files, and any local /backups/all-stacks/*/ccis
+#      folders) AND all 'ccis_data-sync' (/logsAndData) containers (~95.5 GB+)
+#      ONCE directly to the external Backup Appliance (zero temporary files
+#      written to the local root '/' filesystem).
 #   2. Verifies non-empty archives, gzip integrity, and SHA256SUMS on the
 #      Backup Appliance.
 #   3. Safely removes the legacy 'ccis' stack, exited 'ccis_data-sync'
@@ -49,7 +50,6 @@ fail() {
 }
 
 # 1. Verify APPLIANCE_MOUNT is on an external mounted filesystem (NOT local root '/')
-#    First check that the parent mount exists before mkdir -p creates anything.
 CHECK_PATH="$APPLIANCE_MOUNT"
 while [ ! -d "$CHECK_PATH" ] && [ "$CHECK_PATH" != "/" ]; do
   CHECK_PATH="$(dirname "$CHECK_PATH")"
@@ -81,11 +81,13 @@ ACTIVE_STACKS="$(docker stack ls --format '{{.Name}}')"
 if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
   echo "--- Archiving service definitions for legacy stack: $STACK"
   for S in $(docker stack services "$STACK" --format '{{.Name}}'); do
+    if [ -z "$S" ]; then
+      continue
+    fi
     docker service inspect "$S" > "$DEST/services/${S}.json" || fail "Failed to inspect service $S"
   done
 
   # 3a. Databases in legacy 'ccis' stack (if any running)
-  DB_VOLS=""
   while IFS='|' read -r CID CNAME IMG; do
     if [ -z "$CID" ]; then
       continue
@@ -95,15 +97,18 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
       echo "--- Dumping Postgres database container $CNAME ($CID)"
       docker exec "$CID" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}"' | gzip -1 > "$DEST/${SVC}_pg_dumpall.sql.gz" \
         || fail "pg_dumpall failed for $SVC"
-      gzip -t "$DEST/${SVC}_pg_dumpall.sql.gz" || fail "Corrupt gzip dump for $SVC"
-      DB_VOLS="$DB_VOLS $(docker inspect -f '{{range .Mounts}}{{.Name}} {{end}}' "$CID")"
+      if [ ! -s "$DEST/${SVC}_pg_dumpall.sql.gz" ] || ! gzip -t "$DEST/${SVC}_pg_dumpall.sql.gz"; then
+        fail "Postgres dump for $SVC is empty or corrupt"
+      fi
     fi
     if echo "$IMG" | grep -qiE 'mysql|mariadb'; then
       SVC="${CNAME%%.*}"
       echo "--- Dumping MySQL/MariaDB container $CNAME ($CID)"
       docker exec "$CID" sh -c 'mysqldump --all-databases --single-transaction -u root -p"${MYSQL_ROOT_PASSWORD:-}"' | gzip -1 > "$DEST/${SVC}_mysqldump.sql.gz" \
         || fail "mysqldump failed for $SVC"
-      gzip -t "$DEST/${SVC}_mysqldump.sql.gz" || fail "Corrupt gzip dump for $SVC"
+      if [ ! -s "$DEST/${SVC}_mysqldump.sql.gz" ] || ! gzip -t "$DEST/${SVC}_mysqldump.sql.gz"; then
+        fail "MySQL dump for $SVC is empty or corrupt"
+      fi
     fi
   done < <(docker ps --filter "label=com.docker.stack.namespace=$STACK" --format '{{.ID}}|{{.Names}}|{{.Image}}')
 
@@ -112,14 +117,15 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
     if [ -z "$V" ]; then
       continue
     fi
-    # Extra safety guard: never touch anything starting with ccisprod
     case "$V" in
       ccisprod*) continue ;;
     esac
     MP="$(docker volume inspect -f '{{.Mountpoint}}' "$V")"
     echo "--- Archiving volume $V ($MP)"
     tar czf "$DEST/volumes/${V}.tar.gz" -C "$MP" . || fail "Failed to tar volume $V"
-    gzip -t "$DEST/volumes/${V}.tar.gz" || fail "Archive integrity check failed for volume $V"
+    if [ ! -s "$DEST/volumes/${V}.tar.gz" ] || ! gzip -t "$DEST/volumes/${V}.tar.gz"; then
+      fail "Archive integrity check failed for volume $V"
+    fi
     LEGACY_VOLUMES_ARCHIVED+=("$V")
   done
 
@@ -132,16 +138,18 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
       || fail "Failed to export Swarm config $C"
   done
 
-  # 3d. Compose files referencing 'ccis' (strictly excluding 'ccisprod' and 'odkx-prod')
-  COMPOSE_FILES="$(find /home /opt /srv /root -maxdepth 5 \( -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' -o -name 'stack*.yml' \) -not -path '*/node_modules/*' 2>/dev/null || true)"
-  for F in $COMPOSE_FILES; do
+  # 3d. Compose files referencing 'ccis' (strictly excluding 'ccisprod' and 'odkx-prod', safe with spaces)
+  while IFS= read -r F; do
+    if [ -z "$F" ]; then
+      continue
+    fi
     case "$F" in
       *ccisprod*|*odkx-prod*) continue ;;
       */ccis/*|*/ccis-*|*/ccis_*|*docker-compose*ccis*)
         cp --parents "$F" "$DEST/compose/" 2>/dev/null || true
         ;;
     esac
-  done
+  done < <(find /home /opt /srv /root -maxdepth 5 \( -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' -o -name 'stack*.yml' \) -not -path '*/node_modules/*' 2>/dev/null || true)
 else
   echo "WARN: Stack 'ccis' not currently active in 'docker stack ls'."
 fi
@@ -159,7 +167,6 @@ while IFS='|' read -r CID CNAME CSTATE; do
   echo "--- Archiving /logsAndData from container: $CNAME ($CID, state=$CSTATE)"
   ARCHIVE_FILE="$DEST/data_sync_containers/${CNAME}_${CID}_${CSTATE}_logsAndData.tar.gz"
 
-  # Stream directly from the container's overlay2 layer to the Backup Appliance
   if docker cp "${CID}:/logsAndData" - | gzip -1 > "$ARCHIVE_FILE"; then
     if [ ! -s "$ARCHIVE_FILE" ] || ! gzip -t "$ARCHIVE_FILE"; then
       fail "Archive $ARCHIVE_FILE is empty or failed gzip integrity check!"
@@ -183,7 +190,7 @@ if [ "$FILE_COUNT" -eq 0 ]; then
   fail "No files were written to $DEST! Aborting before any cleanup."
 fi
 
-( cd "$DEST" && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS )
+( cd "$DEST" && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS ) || fail "Failed to generate SHA256SUMS"
 ( cd "$DEST" && sha256sum -c SHA256SUMS >/dev/null ) || fail "SHA256 verification failed on Backup Appliance!"
 echo "Archive verified OK ($FILE_COUNT files). Total archived size on appliance: $(du -sh "$DEST" | cut -f1)"
 
@@ -208,7 +215,7 @@ if [ "$PERFORM_CLEANUP" = "true" ]; then
     fi
   fi
 
-  # 6b. Remove all exited ccis_data-sync containers (~79.5 GB to ~95.5 GB)
+  # 6b. Remove all exited/dead ccis_data-sync containers (~79.5 GB to ~95.5 GB)
   for ECID in $(docker ps -aq --filter "name=ccis_data-sync" --filter "status=exited" --filter "status=dead"); do
     if [ -z "$ECID" ]; then
       continue
@@ -219,7 +226,7 @@ if [ "$PERFORM_CLEANUP" = "true" ]; then
 
   # 6c. If legacy stack was removed, also remove any remaining exited 'ccis' stack containers and archived 'ccis' volumes
   if [ "$REMOVE_LEGACY_STACK" = "true" ]; then
-    for SCID in $(docker ps -aq --filter "label=com.docker.stack.namespace=ccis" --filter "status=exited"); do
+    for SCID in $(docker ps -aq --filter "label=com.docker.stack.namespace=ccis" --filter "status=exited" --filter "status=dead"); do
       if [ -z "$SCID" ]; then
         continue
       fi

@@ -6,13 +6,16 @@
 #   - LDAP volumes (ccisprod_ldap-vol, ccisprod_ldap-slapd.d-vol)
 #   - Stack config files (/home/techsupport/odkx-prod)
 #
-# Key Upgrades from Original:
+# Key Upgrades & Bug Fixes from Original:
 #   1. Writes directly to the external Backup Appliance (APPLIANCE_MOUNT), NEVER
 #      to the local CCIS server root '/' disk.
 #   2. Verifies APPLIANCE_MOUNT resides on a non-root mounted filesystem before
 #      writing a single byte (works for mount roots and subdirectories alike).
-#   3. Automatically pushes backup status (Success/Failed, duration, size, path)
-#      to DBTRAC (http://192.168.35.38:90/api/backup/ingest/).
+#   3. Safe SHA256SUMS generation (excludes SHA256SUMS itself, guarded with fail).
+#   4. Safe config archiving (only tars existing files so missing optional files
+#      do not cause tar exit code 2).
+#   5. Automatically pushes clean backup metadata (Success/Failed, duration,
+#      clean filename, clean path) to DBTRAC (http://192.168.35.38:90/api/backup/ingest/).
 #
 # Install:  /home/techsupport/odkx-prod/scripts/ccisprod-weekly-backup.sh (chmod 750)
 # Schedule: /etc/cron.d/ccisprod-backup (0 23 * * 6 root ...)
@@ -38,7 +41,7 @@ START_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 report_to_dbtrac() {
   local outcome="$1"
-  local reason="${2:-}"
+  local raw_reason="${2:-}"
   local dump_file="${3:-$DEST/ccisprod_db_$STAMP.dump}"
   local end_epoch
   end_epoch="$(date +%s)"
@@ -53,6 +56,10 @@ report_to_dbtrac() {
     is_verified="true"
   fi
 
+  # Sanitize failure_reason so quotes or newlines never break JSON
+  local clean_reason
+  clean_reason="$(printf '%s' "$raw_reason" | tr '\n\r"' "  '")"
+
   curl -fsS -m 15 -X POST "$DBTRAC_API_URL" \
     -H "Content-Type: application/json" \
     -H "X-API-KEY: $DBTRAC_API_KEY" \
@@ -65,7 +72,7 @@ report_to_dbtrac() {
       \"end\": \"${end_iso}\",
       \"duration_mins\": ${dur_mins},
       \"outcome\": \"${outcome}\",
-      \"failure_reason\": \"${reason}\",
+      \"failure_reason\": \"${clean_reason}\",
       \"location\": \"${dump_file}\",
       \"verified\": ${is_verified},
       \"compression\": true
@@ -75,7 +82,7 @@ report_to_dbtrac() {
 fail() {
   echo "ERROR: $*"
   echo "===== backup FAILED"
-  report_to_dbtrac "Failed" "$*"
+  report_to_dbtrac "Failed" "$*" "$DEST/ccisprod_db_$STAMP.dump"
   exit 1
 }
 
@@ -86,32 +93,55 @@ while [ ! -d "$CHECK_PATH" ] && [ "$CHECK_PATH" != "/" ]; do
 done
 TARGET_MNT="$(df -P "$CHECK_PATH" 2>/dev/null | awk 'NR==2 {print $6}')"
 if [ -z "$TARGET_MNT" ] || [ "$TARGET_MNT" = "/" ]; then
-  report_to_dbtrac "Failed" "Backup appliance path $APPLIANCE_MOUNT is not mounted (resolves to /)"
+  report_to_dbtrac "Failed" "Backup appliance path $APPLIANCE_MOUNT is not mounted (resolves to /)" "$DEST/ccisprod_db_$STAMP.dump"
   echo "ERROR: Backup appliance '$APPLIANCE_MOUNT' resolves to local root '/'! Refusing to write to local disk." >&2
   exit 1
 fi
 
-mkdir -p "$DEST"
+mkdir -p "$DEST" || fail "Could not create backup directory $DEST"
 exec >>"$LOG" 2>&1
 echo "===== $(date -u '+%F %T UTC') backup start -> $DEST (Backup Appliance Mount: $TARGET_MNT)"
 
 # 1. Free-space check on Backup Appliance
 FREE_GB="$(df -BG --output=avail "$DEST" | tail -1 | tr -dc '0-9')"
-[ -n "$FREE_GB" ] && [ "$FREE_GB" -ge "$MIN_FREE_GB" ] || fail "only ${FREE_GB:-0}G free on appliance $BACKUP_ROOT"
+if [ -z "$FREE_GB" ] || [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
+  fail "only ${FREE_GB:-0}G free on appliance $BACKUP_ROOT (need ${MIN_FREE_GB}G)"
+fi
 
 # 2. Database (exact name match: avoid ccisprod_db-bootstrap)
 DB_C="$(docker ps --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^ccisprod_db\.1\./ {print $1; exit}')"
-[ -n "$DB_C" ] || fail "ccisprod_db container not running"
+if [ -z "$DB_C" ]; then
+  fail "ccisprod_db container not running"
+fi
+
+DUMP_FILE="$DEST/ccisprod_db_$STAMP.dump"
+GLOBALS_FILE="$DEST/ccisprod_globals_$STAMP.sql"
 
 docker exec "$DB_C" sh -c 'pg_dump -U "${POSTGRES_USER:-postgres}" -d postgres -Fc' \
-  > "$DEST/ccisprod_db_$STAMP.dump" || fail "pg_dump failed"
+  > "$DUMP_FILE" || fail "pg_dump of postgres database failed"
 docker exec "$DB_C" sh -c 'pg_dumpall -U "${POSTGRES_USER:-postgres}" --globals-only' \
-  > "$DEST/ccisprod_globals_$STAMP.sql" || fail "pg_dumpall globals failed"
+  > "$GLOBALS_FILE" || fail "pg_dumpall globals failed"
 
-# Verify the dump is readable via pg_restore -l
-docker exec -i "$DB_C" pg_restore -l < "$DEST/ccisprod_db_$STAMP.dump" > /dev/null \
-  || fail "dump verification failed"
-DUMP_SIZE="$(du -h "$DEST/ccisprod_db_$STAMP.dump" | cut -f1)"
+# Verify the dump is non-empty and readable via pg_restore -l
+if [ ! -s "$DUMP_FILE" ]; then
+  fail "Database dump file $DUMP_FILE is empty"
+fi
+docker exec -i "$DB_C" pg_restore -l < "$DUMP_FILE" > /dev/null \
+  || fail "dump verification (pg_restore -l) failed"
+
+# Also dump any additional non-template user databases (e.g. odkx) if present
+OTHER_DBS="$(docker exec "$DB_C" sh -c 'psql -U "${POSTGRES_USER:-postgres}" -d postgres -Atc "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('\''postgres'\'');"' 2>/dev/null || true)"
+for ODB in $OTHER_DBS; do
+  if [ -z "$ODB" ]; then
+    continue
+  fi
+  docker exec "$DB_C" sh -c "pg_dump -U \"\${POSTGRES_USER:-postgres}\" -d \"$ODB\" -Fc" \
+    > "$DEST/ccisprod_db_${ODB}_$STAMP.dump" || fail "pg_dump of $ODB failed"
+  docker exec -i "$DB_C" pg_restore -l < "$DEST/ccisprod_db_${ODB}_$STAMP.dump" > /dev/null \
+    || fail "dump verification for $ODB failed"
+done
+
+DUMP_SIZE="$(du -h "$DUMP_FILE" | cut -f1)"
 echo "DB dump OK: $DUMP_SIZE"
 
 # 3. LDAP volumes (small; backed up together so schema and data match)
@@ -121,23 +151,41 @@ for VOL in ccisprod_ldap-vol ccisprod_ldap-slapd.d-vol; do
 done
 echo "LDAP volumes OK"
 
-# 4. Stack config (compose, env, nginx configs, scripts) - no source trees / node_modules
-tar czf "$DEST/ccisprod_config_$STAMP.tar.gz" -C "$STACK_DIR" \
-  --exclude='node_modules' --exclude='*.jar' --exclude='target' \
-  docker-compose.yml deploy.sh scripts frontend/.env $(ls -d "$STACK_DIR"/*.conf 2>/dev/null | xargs -r -n1 basename) \
-  2>/dev/null || echo "WARN: some config files missing (check list)"
+# 4. Stack config (only include existing items so tar does not exit with code 2 on missing optional files)
+if [ -d "$STACK_DIR" ]; then
+  CFG_ITEMS=()
+  for ITEM in docker-compose.yml deploy.sh scripts frontend/.env; do
+    if [ -e "$STACK_DIR/$ITEM" ]; then
+      CFG_ITEMS+=("$ITEM")
+    fi
+  done
+  for CONF in "$STACK_DIR"/*.conf; do
+    if [ -e "$CONF" ]; then
+      CFG_ITEMS+=("$(basename "$CONF")")
+    fi
+  done
+  if [ "${#CFG_ITEMS[@]}" -gt 0 ]; then
+    tar czf "$DEST/ccisprod_config_$STAMP.tar.gz" -C "$STACK_DIR" \
+      --exclude='node_modules' --exclude='*.jar' --exclude='target' \
+      "${CFG_ITEMS[@]}" || echo "WARN: tar of stack config returned non-zero"
+  fi
+else
+  echo "WARN: STACK_DIR $STACK_DIR not found"
+fi
 
-# 5. Checksums
-( cd "$DEST" && sha256sum * > SHA256SUMS )
+# 5. Checksums (exclude SHA256SUMS itself, verify integrity)
+( cd "$DEST" && find . -maxdepth 1 -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS ) \
+  || fail "sha256sum generation failed"
 
-# 6. Retention on Backup Appliance
-find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -print -exec rm -rf {} +
+# 6. Retention on Backup Appliance (do not fail the current backup if an old folder fails to delete)
+find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +"$KEEP_DAYS" -print -exec rm -rf {} + \
+  || echo "WARN: retention cleanup encountered a non-fatal error"
 
 echo "Total size: $(du -sh "$DEST" | cut -f1)"
 echo "===== $(date -u '+%F %T UTC') backup OK"
 
-# 7. Notify DBTRAC Backup & Recovery Register
-report_to_dbtrac "Success" "" "$DEST/ccisprod_db_$STAMP.dump ($DUMP_SIZE)"
+# 7. Notify DBTRAC Backup & Recovery Register (pass clean file path so backup_used & location are clean)
+report_to_dbtrac "Success" "" "$DUMP_FILE"
 
 # ---------------------------------------------------------------------------
 # /etc/cron.d/ccisprod-backup   (server clock is UTC; 23:00 Sat UTC = 02:00 Sun Uganda)
