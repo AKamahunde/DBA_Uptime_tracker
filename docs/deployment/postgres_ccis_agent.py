@@ -334,7 +334,7 @@ def main():
     # 1. Push ServerHealth payload
     health_payload = {
         "node_name": "Proxmox",
-        "hosted_systems": "CCIS / ODK-X (ccisprod_db)",
+        "hosted_systems": "CCIS / ODK-X — ccisprod_db",
         "server": "ccisprod_db (ODK-X)",
         "database": "PostgreSQL",
         "entered_by": "Script",
@@ -372,6 +372,7 @@ def main():
         "database": "PostgreSQL",
         "database_size_gb": pg["db_size_gb"],
         "available_capacity_gb": host["disk_free_gb"],
+        "disk_percent": host["disk_pct"],
         "disk_used_percent": host["disk_pct"],
         "tablespace_percent": host["disk_pct"],
         "largest_table": pg["largest_table"],
