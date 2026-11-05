@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 1_archive_and_cleanup_legacy_ccis_once.sh
+# 1_archive_and_cleanup_legacy_ccis_once.sh (100% Read-Only One-Time Archive)
 # Purpose:
-#   1. Backs up the legacy 'ccis' Docker Swarm stack ONCE directly to the
-#      external Backup Appliance (zero temporary files on local root '/'):
+#   1. Archives the legacy 'ccis' Docker Swarm stack ONCE directly to the
+#      external Backup Appliance (zero temporary files written to local root '/',
+#      and ZERO containers, volumes, or files deleted/stopped on the server):
 #      - Service definitions (ccis_nginx, ccis_ldap-service, ccis_phpldapadmin,
 #        ccis_dashboard, ccis_dashboard-database, ccis_data-sync)
 #      - Full PostgreSQL dump of ccis_dashboard-database (image: ccis/dashboard-database)
@@ -16,20 +17,13 @@
 #        from Docker overlay2 UpperDir so even 'Dead' containers archive cleanly.
 #   2. Verifies non-empty archives, gzip integrity, and SHA256SUMS on the
 #      Backup Appliance.
-#   3. Reclaims the ~88 GB of disk space on /dev/mapper/ubuntu--vg-root and
-#      stops ccis_data-sync from generating ~6.5 GB/day of new hourly snapshots.
 #
-# Modes:
-#   Default:         Archives everything, removes the ~88 GB of /logsAndData &
-#                    exited/dead ccis_data-sync containers, and scales
-#                    ccis_data-sync, ccis_dashboard, and ccis_dashboard-database
-#                    to 0 replicas (preserving ccis_nginx & ccis_ldap-service
-#                    which proxy *.ccisuganda.org for the 6 regional stacks).
-#   --remove-stack:  Also runs 'docker stack rm ccis' and removes ccis volumes
-#                    (use ONLY if the 6 regional *.ccisuganda.org proxies are
-#                    also being retired).
-#   --archive-only:  Archives to Backup Appliance and verifies SHA256SUMS without
-#                    deleting or stopping anything on the local server.
+# Safety Guarantees:
+#   - 100% READ-ONLY on the CCIS server: does NOT remove, stop, or modify any
+#     containers, volumes, stacks, or local files.
+#   - Does NOT touch 'ccisprod' or '/home/techsupport/' backups.
+#   - Verifies the target path resides on a non-root mounted filesystem before
+#     writing a single byte.
 # ==============================================================================
 
 set -euo pipefail
@@ -42,25 +36,9 @@ DEST="${BACKUP_ROOT}/${STAMP}"
 LOG="${BACKUP_ROOT}/legacy_archive_${STAMP}.log"
 MIN_FREE_GB=100
 
-PERFORM_CLEANUP="${PERFORM_CLEANUP:-true}"
-REMOVE_FULL_CCIS_STACK="${REMOVE_FULL_CCIS_STACK:-false}"
-
-for arg in "$@"; do
-  case "$arg" in
-    --archive-only)
-      PERFORM_CLEANUP="false"
-      REMOVE_FULL_CCIS_STACK="false"
-      ;;
-    --remove-stack)
-      PERFORM_CLEANUP="true"
-      REMOVE_FULL_CCIS_STACK="true"
-      ;;
-  esac
-done
-
 fail() {
   echo "[ERROR] $*" | tee -a "${LOG:-/dev/stderr}" >&2
-  echo "===== LEGACY ARCHIVE FAILED (No local data was deleted) =====" | tee -a "${LOG:-/dev/stderr}" >&2
+  echo "===== LEGACY ARCHIVE FAILED =====" | tee -a "${LOG:-/dev/stderr}" >&2
   exit 1
 }
 
@@ -80,7 +58,7 @@ fi
 mkdir -p "$DEST/services" "$DEST/volumes" "$DEST/configs" "$DEST/compose" "$DEST/data_sync_containers" "$DEST/sql_dumps"
 exec > >(tee -a "$LOG") 2>&1
 
-echo "===== $(date -u '+%F %T UTC') Starting ONE-TIME Legacy 'ccis' Archive -> $DEST (Mount: $TARGET_MNT) ====="
+echo "===== $(date -u '+%F %T UTC') Starting ONE-TIME Read-Only Legacy 'ccis' Archive -> $DEST (Mount: $TARGET_MNT) ====="
 
 # 2. Check free space on the Backup Appliance
 FREE_GB="$(df -BG --output=avail "$DEST" | tail -1 | tr -dc '0-9')"
@@ -89,7 +67,6 @@ if [ -z "$FREE_GB" ] || [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
 fi
 
 STACK="ccis"
-LEGACY_VOLUMES_ARCHIVED=()
 
 # 3. Export legacy 'ccis' service definitions, databases, volumes, configs, and /root/uganda-ccis-server-setup
 ACTIVE_STACKS="$(docker stack ls --format '{{.Name}}')"
@@ -102,7 +79,7 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
     docker service inspect "$S" > "$DEST/services/${S}.json" || fail "Failed to inspect service $S"
   done
 
-  # 3a. Databases in legacy 'ccis' stack (matches postgres, postgis, dashboard-database, or db-sync)
+  # 3a. Databases in legacy 'ccis' stack (matches postgres, postgis, dashboard-database, or data-sync)
   while IFS='|' read -r CID CNAME IMG; do
     if [ -z "$CID" ]; then
       continue
@@ -117,7 +94,6 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
           echo "    Database dump OK: $(du -h "$DUMP_OUT" | cut -f1)"
         else
           rm -f "$DUMP_OUT"
-          # Only hard-fail if it is the primary dashboard-database
           if echo "$CNAME" | grep -qi "dashboard-database"; then
             fail "pg_dumpall failed for $CNAME ($CID)"
           else
@@ -142,7 +118,6 @@ if echo "$ACTIVE_STACKS" | grep -qx "$STACK"; then
     if [ ! -s "$DEST/volumes/${V}.tar.gz" ] || ! gzip -t "$DEST/volumes/${V}.tar.gz"; then
       fail "Archive integrity check failed for volume $V"
     fi
-    LEGACY_VOLUMES_ARCHIVED+=("$V")
   done
 
   # 3c. Swarm configs belonging to 'ccis'
@@ -165,19 +140,10 @@ if [ -d /root/uganda-ccis-server-setup ]; then
   gzip -t "$DEST/compose/uganda-ccis-server-setup.tar.gz" || fail "Corrupt uganda-ccis-server-setup.tar.gz"
 fi
 
-# 3e. Also archive any standalone ccis_all_databases_*.sql* files in /home/techsupport
-for SQLF in /home/techsupport/ccis_all_databases*; do
-  if [ -f "$SQLF" ]; then
-    echo "--- Copying standalone dump $SQLF to Backup Appliance..."
-    cp -a "$SQLF" "$DEST/sql_dumps/" || fail "Failed to copy $SQLF"
-  fi
-done
-
 # 4. Archive /logsAndData from ALL ccis_data-sync containers (running [13G], exited [22G], dead [53G])
 #    Reads directly from the host overlay2 UpperDir (/var/lib/docker/overlay2/.../diff/logsAndData)
 #    so even 'Dead' containers (where 'docker cp' fails) stream cleanly to the Backup Appliance!
 echo "--- Searching for all ccis_data-sync containers (running, exited, and dead)..."
-DATA_SYNC_CONTAINERS=()
 
 while IFS='|' read -r CID CNAME CSTATE; do
   if [ -z "$CID" ]; then
@@ -196,9 +162,8 @@ while IFS='|' read -r CID CNAME CSTATE; do
       fail "Archive $ARCHIVE_FILE is empty or failed gzip integrity check!"
     fi
     echo "    Archived OK: $(du -h "$ARCHIVE_FILE" | cut -f1) -> $ARCHIVE_FILE"
-    DATA_SYNC_CONTAINERS+=("${CID}|${CSTATE}|${UPPER_DIR}")
   else
-    echo "    WARN: $UPPER_DIR/logsAndData not found or already empty for $CLEAN_NAME ($CID)"
+    echo "    WARN: $UPPER_DIR/logsAndData not found or empty for $CLEAN_NAME ($CID)"
   fi
 done < <(docker ps -a --filter "name=ccis_data-sync" --format '{{.ID}}|{{.Names}}|{{.State}}')
 
@@ -206,66 +171,10 @@ done < <(docker ps -a --filter "name=ccis_data-sync" --format '{{.ID}}|{{.Names}
 echo "--- Generating and verifying SHA256SUMS on Backup Appliance..."
 FILE_COUNT="$(find "$DEST" -type f ! -name SHA256SUMS | wc -l)"
 if [ "$FILE_COUNT" -eq 0 ]; then
-  fail "No files were written to $DEST! Aborting before any cleanup."
+  fail "No files were written to $DEST!"
 fi
 
 ( cd "$DEST" && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS ) || fail "Failed to generate SHA256SUMS"
 ( cd "$DEST" && sha256sum -c SHA256SUMS >/dev/null ) || fail "SHA256 verification failed on Backup Appliance!"
 echo "Archive verified OK ($FILE_COUNT files). Total archived size on appliance: $(du -sh "$DEST" | cut -f1)"
-
-# 6. Cleanup old 'ccis' data from local server to reclaim ~88 GB+ and stop ~6.5 GB/day growth
-if [ "$PERFORM_CLEANUP" = "true" ]; then
-  echo "--- Starting safe cleanup of archived legacy 'ccis' data on local server..."
-  echo "    Local root disk usage BEFORE cleanup: $(df -h / | tail -1)"
-
-  # 6a. Scale down ccis_data-sync, ccis_dashboard, and ccis_dashboard-database so they stop running & writing snapshots
-  #     (Note: ccis_nginx and ccis_ldap-service are kept running unless --remove-stack is passed,
-  #      because ccis_nginx routes HTTPS for west/central/kampala/north/south/east.ccisuganda.org)
-  if [ "$REMOVE_FULL_CCIS_STACK" = "true" ]; then
-    if docker stack ls --format '{{.Name}}' | grep -qx "ccis"; then
-      echo "    Removing entire legacy stack 'ccis' (--remove-stack specified)..."
-      docker stack rm ccis
-      sleep 15
-    fi
-  else
-    echo "    Scaling retired legacy services (ccis_data-sync, ccis_dashboard, ccis_dashboard-database) to 0 replicas..."
-    echo "    (Keeping ccis_nginx & ccis_ldap-service active for regional *.ccisuganda.org routing)"
-    docker service scale ccis_data-sync=0 ccis_dashboard=0 ccis_dashboard-database=0 || true
-    sleep 10
-  fi
-
-  # 6b. Delete /logsAndData contents directly from each archived container's UpperDir first
-  #     (Ensures the 53 GB 'Dead' container e074cf60f8b6 frees its disk space even if Docker's overlay unmount is stuck!)
-  if [ "${#DATA_SYNC_CONTAINERS[@]}" -gt 0 ]; then
-    for ENTRY in "${DATA_SYNC_CONTAINERS[@]}"; do
-      IFS='|' read -r DCID DSTATE DUPPER <<< "$ENTRY"
-      if [ -n "$DUPPER" ] && [ -d "$DUPPER/logsAndData" ]; then
-        echo "    Purging archived snapshots in $DUPPER/logsAndData ($DCID)..."
-        rm -rf "${DUPPER}/logsAndData"/* 2>/dev/null || true
-      fi
-    done
-  fi
-
-  # 6c. Remove all stopped/exited/dead ccis_data-sync, ccis_dashboard, and ccis_dashboard-database containers
-  for ECID in $(docker ps -aq --filter "name=ccis_data-sync" --filter "name=ccis_dashboard" --filter "status=exited" --filter "status=dead"); do
-    if [ -z "$ECID" ]; then
-      continue
-    fi
-    echo "    Removing stopped legacy container $ECID..."
-    docker rm -f "$ECID" || echo "    WARN: Docker daemon could not remove container metadata for $ECID (its /logsAndData files were already purged)."
-  done
-
-  # 6d. Remove standalone /home/techsupport/ccis_all_databases* dumps that were archived in Step 3e
-  for SQLF in /home/techsupport/ccis_all_databases*; do
-    if [ -f "$SQLF" ] && [ -f "$DEST/sql_dumps/$(basename "$SQLF")" ]; then
-      echo "    Removing archived standalone SQL dump $SQLF..."
-      rm -f "$SQLF"
-    fi
-  done
-
-  echo "    Local root disk usage AFTER cleanup:  $(df -h / | tail -1)"
-else
-  echo "--- Archive-only mode requested; skipped local container/file deletion."
-fi
-
-echo "===== $(date -u '+%F %T UTC') ONE-TIME LEGACY CCIS ARCHIVE & CLEANUP COMPLETE ====="
+echo "===== $(date -u '+%F %T UTC') ONE-TIME READ-ONLY LEGACY CCIS ARCHIVE COMPLETE (Nothing removed from server) ====="
