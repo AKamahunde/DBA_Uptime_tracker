@@ -63,29 +63,6 @@
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
-    /* Live Active Incident Pulse Animation */
-    @keyframes livePulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.35); opacity: 0.5; }
-    }
-    .live-pulse-dot {
-        display: inline-block;
-        width: 6px;
-        height: 6px;
-        background-color: #dc2626;
-        border-radius: 50%;
-        animation: livePulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
-    .live-active-indicator {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #dc2626;
-        white-space: nowrap;
-    }
-
     /* Custom columns layout styling */
     .kpi-metric-col {
         display: flex;
@@ -101,38 +78,21 @@
 </style>
 
 <!-- Page Header with General Filters -->
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1.5rem;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1.5rem;">
     <div>
         <h2 style="margin: 0; font-weight: 700; color: #0f172a;">Incident Register</h2>
-        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time outage detection, SLA tracking, and resolution timeline across databases and host infrastructure.</p>
+        <p style="margin: 0.15rem 0 0 0; color: #64748b; font-size: 0.9rem;">Real-time outage detection, SLA tracking, and resolution timeline.</p>
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
         <form method="GET" style="display: flex; gap: 0.85rem; align-items: center; flex-wrap: wrap; margin: 0;">
-            <input type="hidden" name="tab" value="{{ current_tab }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
-                    {% if current_tab == 'database' %}Database Platform{% elif current_tab == 'infrastructure' %}Infrastructure Host Node{% else %}Scope Filter{% endif %}
-                </label>
-                <select name="target" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
-                    <option value="" {% if not current_target %}selected{% endif %}>
-                        {% if current_tab == 'database' %}All Databases{% elif current_tab == 'infrastructure' %}All Host Nodes{% else %}All Scopes{% endif %}
-                    </option>
-                    {% if can_view_db_incident and current_tab != 'infrastructure' %}
-                        {% if current_tab == 'all' %}<optgroup label="Database Platforms">{% endif %}
-                        <option value="Oracle" {% if current_target == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
-                        <option value="MySQL" {% if current_target == 'MySQL' %}selected{% endif %}>MySQL</option>
-                        <option value="MS SQL Server" {% if current_target == 'MS SQL Server' %}selected{% endif %}>MS SQL Server (MKInsight)</option>
-                        <option value="PostgreSQL" {% if current_target == 'PostgreSQL' %}selected{% endif %}>PostgreSQL (CCIS / ODK-X)</option>
-                        {% if current_tab == 'all' %}</optgroup>{% endif %}
-                    {% endif %}
-                    {% if can_view_infra_incident and current_tab != 'database' %}
-                        {% if current_tab == 'all' %}<optgroup label="Infrastructure Nodes">{% endif %}
-                        {% for node_val, node_lbl in node_choices %}
-                        <option value="{{ node_val }}" {% if current_target == node_val %}selected{% endif %}>{{ node_lbl }}</option>
-                        {% endfor %}
-                        {% if current_tab == 'all' %}</optgroup>{% endif %}
-                    {% endif %}
+                <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                <select name="database" onchange="this.form.submit()" style="padding: 0.45rem 1.75rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
+                    <option value="" {% if not current_db %}selected{% endif %}>All Databases</option>
+                    <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle (nmsinfra)</option>
+                    <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -143,44 +103,19 @@
                 <label style="font-size: 0.72rem; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
                 <input type="date" name="end_date" value="{{ end_date }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
-            {% if start_date or end_date or current_target %}
+            {% if start_date or end_date or current_db %}
             <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-                <a href="?tab={{ current_tab }}" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
+                <a href="?" class="btn btn-secondary" style="padding: 0.45rem 1rem; font-size: 0.85rem; font-weight: 600; background: #e2e8f0; color: #475569; border: none; text-decoration: none; border-radius: 4px; text-align: center; height: 34px; line-height: 20px;">Reset</a>
             </div>
             {% endif %}
         </form>
         
-        {% if can_add_incident %}
+        {% if is_admin or perms.api.add_incidentregister %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
             <a href="{% url 'incident_create' %}" class="btn btn-primary" style="background-color: var(--primary-navy); border-color: var(--primary-navy); padding: 0.45rem 1.25rem; font-weight: 600; height: 34px; line-height: 20px;">+ New Incident</a>
         </div>
         {% endif %}
     </div>
-</div>
-
-<!-- Incident Category Filter Tabs -->
-<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem;">
-    {% if can_view_all_incidents %}
-    <a href="?tab=all{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-              {% if current_tab == 'all' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-        All Incidents ({{ total_all_count }})
-    </a>
-    {% endif %}
-    {% if can_view_db_incident %}
-    <a href="?tab=database{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-              {% if current_tab == 'database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-        Database Incidents ({{ total_db_count }})
-    </a>
-    {% endif %}
-    {% if can_view_infra_incident %}
-    <a href="?tab=infrastructure{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-       style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-              {% if current_tab == 'infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-        Infrastructure Incidents ({{ total_infra_count }})
-    </a>
-    {% endif %}
 </div>
 
 <!-- Combined Overall Summary Card (Three Incident KPIs) -->
@@ -219,15 +154,14 @@
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
                     <thead>
                         <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background: var(--bg-cool);">
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Ticket ID</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Target</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; white-space: nowrap;">Outage Window</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;" title="Operational business-hours outage duration affecting SLA">Duration</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;">Severity</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap;">Status</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; white-space: nowrap; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
-                            <th style="padding: 0.85rem 0.85rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 40px;"></th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Incident / Target</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Outage Window</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Duration</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Severity</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Root Cause</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; cursor: help;" title="IT Service Desk SLA: Critical/High ≤ 9h · Medium ≤ 18h · Low ≤ 180h">SLA Status</th>
+                            <th style="padding: 0.8rem 0.75rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 50px;"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -236,71 +170,43 @@
                             style="cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid rgba(90, 123, 156, 0.1);"
                             onclick="selectIncidentRow('row-{{ incident.pk }}')"
                             data-pk="{{ incident.pk }}"
-                            data-ticket="{{ incident.ticket|escape }}"
-                            data-category="{{ incident.category|default:'Database'|escape }}"
-                            data-node-name="{{ incident.node_name|default:''|escape }}"
-                            data-system="{{ incident.system|default:'—'|escape }}"
-                            data-database="{{ incident.database|escape }}"
+                            data-ticket="{{ incident.ticket }}"
+                            data-system="{{ incident.system|default:'—' }}"
+                            data-database="{{ incident.database }}"
                             data-date="{{ incident.date|date:'d M Y' }}"
                             data-start="{{ incident.start|date:'d M Y, H:i' }}"
                             data-end="{{ incident.end|date:'d M Y, H:i'|default:'Active Outage' }}"
-                            data-duration="{{ incident.duration_hrs|default:'0' }}"
-                            data-duration-human="{{ incident.human_duration }}"
-                            data-elapsed-human="{{ incident.human_elapsed_duration }}"
-                            data-elapsed-hrs="{{ incident.elapsed_duration_hrs }}"
-                            data-has-offhours="{% if incident.has_off_hours_difference %}1{% else %}0{% endif %}"
-                            data-is-planned="{% if incident.planned %}1{% else %}0{% endif %}"
+                            data-duration="{{ incident.duration_hrs }}"
                             data-planned="{% if incident.planned %}Planned Outage{% else %}Unplanned Outage{% endif %}"
-                            data-severity="{{ incident.severity|escape }}"
-                            data-status="{{ incident.status|escape }}"
-                            data-root-cause="{{ incident.root_cause|escape }}"
-                            data-impact="{{ incident.business_impact|escape }}"
-                            data-resolved-by="{{ incident.resolved_by|default:'—'|escape }}"
-                            data-assigned-to="{{ incident.assigned_to|default:'—'|escape }}"
-                            data-logged-by="{% if incident.created_by %}{{ incident.created_by.username|escape }}{% else %}System{% endif %}">
+                            data-severity="{{ incident.severity }}"
+                            data-status="{{ incident.status }}"
+                            data-root-cause="{{ incident.root_cause }}"
+                            data-impact="{{ incident.business_impact }}"
+                            data-resolved-by="{{ incident.resolved_by|default:'—' }}"
+                            data-assigned-to="{{ incident.assigned_to|default:'—' }}"
+                            data-logged-by="{% if incident.created_by %}{{ incident.created_by.username }}{% else %}System{% endif %}"
+                            data-change-logs='[
+                                {% for log in incident.change_logs.all %}
+                                    {
+                                        "changed_at": "{{ log.changed_at|date:"d M Y, H:i" }}",
+                                        "action": "{{ log.action|escapejs }}",
+                                        "changed_by": "{{ log.changed_by.username|default:"System"|escapejs }}",
+                                        "assigned_to": "{{ log.assigned_to|default:""|escapejs }}",
+                                        "comment": "{{ log.comment|default:""|escapejs }}"
+                                    }{% if not forloop.last %},{% endif %}
+                                {% endfor %}
+                            ]'>
                             
-                            <!-- Ticket ID -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
-                                <span style="font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; font-size: 0.85rem; font-weight: 700; color: #00205B;">
-                                    {{ incident.ticket }}
-                                </span>
-                                <!-- Safe Isolated Change Logs JSON -->
-                                <script type="application/json" id="logs-data-{{ incident.pk }}">
-                                [
-                                    {% for log in incident.change_logs.all %}
-                                        {
-                                            "changed_at": "{{ log.changed_at|date:'d M Y, H:i' }}",
-                                            "action": "{{ log.action|escapejs }}",
-                                            "changed_by": "{{ log.changed_by.username|default:'System'|escapejs }}",
-                                            "assigned_to": "{{ log.assigned_to|default:''|escapejs }}",
-                                            "comment": "{{ log.comment|default:''|escapejs }}"
-                                        }{% if not forloop.last %},{% endif %}
-                                    {% endfor %}
-                                ]
-                                </script>
-                            </td>
-
-                            <!-- Target -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle;">
-                                {% if incident.category == 'Infrastructure' %}
-                                    <div>
-                                        <strong style="color: #0f172a; font-size: 0.88rem; white-space: nowrap;">{{ incident.node_name|default:incident.system }}</strong>
-                                        {% if incident.system and incident.node_name and incident.system != incident.node_name %}
-                                            <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.1rem;">{{ incident.system }}</div>
-                                        {% endif %}
-                                    </div>
-                                {% else %}
-                                    <div>
-                                        <strong style="color: #0f172a; font-size: 0.88rem; white-space: nowrap;">{{ incident.database }}</strong>
-                                        {% if incident.system and incident.system != incident.database %}
-                                            <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.1rem;">{{ incident.system }}</div>
-                                        {% endif %}
-                                    </div>
-                                {% endif %}
+                            <!-- Incident / Target -->
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
+                                <div style="font-weight: 600; color: var(--primary-navy); font-family: monospace;">{{ incident.ticket }}</div>
+                                <div style="font-size: 0.72rem; color: #475569; margin-top: 0.15rem; font-weight: 500;">
+                                    {{ incident.system }} | <span style="font-weight: 600;">{{ incident.database }}</span>
+                                </div>
                             </td>
 
                             <!-- Outage Window -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; white-space: nowrap;">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
                                 <div style="font-weight: 600; color: #0f172a;">{{ incident.start|date:"d M Y" }}</div>
                                 <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">
                                     {{ incident.start|date:"H:i" }} - {% if incident.end %}{{ incident.end|date:"H:i" }}{% else %}Active{% endif %}
@@ -308,41 +214,32 @@
                             </td>
 
                             <!-- Duration -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; color: #0f172a; white-space: nowrap;">
-                                {% if incident.status == 'Open' or incident.status == 'In Progress' %}
-                                    <div class="live-active-indicator" data-start="{{ incident.start|date:'c' }}" title="Incident is currently active and accumulating outage time">
-                                        <span class="live-pulse-dot"></span>
-                                        <span class="live-duration-text">Active: {{ incident.human_duration }}</span>
-                                    </div>
-                                {% else %}
-                                    <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
-                                        {{ incident.human_duration }}
-                                    </div>
-                                {% endif %}
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: #0f172a;">
+                                {{ incident.duration_hrs }} hrs
                             </td>
 
                             <!-- Severity -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
-                                <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-                                            {% if incident.severity == 'Critical' or incident.severity == 'High' %}color: #dc2626;
-                                            {% elif incident.severity == 'Medium' %}color: #d97706;
-                                            {% else %}color: #16a34a;{% endif %}">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 65px; text-align: center;
+                                            {% if incident.severity == 'Critical' or incident.severity == 'High' %}background: #fce8e6; color: #c5221f;
+                                            {% elif incident.severity == 'Medium' %}background: #fef7e0; color: #b06000;
+                                            {% else %}background: #e6f4ea; color: #137333;{% endif %}">
                                     {{ incident.severity }}
                                 </span>
                             </td>
 
                             <!-- Status -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
-                                <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-                                            {% if incident.status == 'Open' %}color: #dc2626;
-                                            {% elif incident.status == 'In Progress' %}color: #d97706;
-                                            {% else %}color: #16a34a;{% endif %}">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                                <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; width: 85px; text-align: center;
+                                            {% if incident.status == 'Open' %}background: #fce8e6; color: #c5221f;
+                                            {% elif incident.status == 'In Progress' %}background: #fef7e0; color: #b06000;
+                                            {% else %}background: #e6f4ea; color: #137333;{% endif %}">
                                     {{ incident.status }}
                                 </span>
                             </td>
 
                             <!-- Root Cause -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-weight: 500;" title="{{ incident.root_cause }}">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #475569; font-weight: 500;" title="{{ incident.root_cause }}">
                                 {% if incident.root_cause|slice:":12" == "AUTO-LOGGED:" %}
                                     <span style="font-family: monospace; font-size: 0.75rem; color: var(--primary-navy);">Auto-detected logs</span>
                                 {% else %}
@@ -351,56 +248,42 @@
                             </td>
 
                             <!-- SLA Status -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center; white-space: nowrap;">
-                                {% if incident.planned %}
-                                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #059669;">
-                                        Excluded
-                                    </span>
-                                {% elif incident.status == 'Open' or incident.status == 'In Progress' %}
-                                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7;">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; white-space: nowrap;">
+                                {% if incident.status == 'Open' or incident.status == 'In Progress' %}
+                                    <span style="display: inline-flex; align-items: center; gap: 0.3rem; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">
+                                        <span class="badge-running-dot" style="background-color: #0284c7;"></span>
                                         Running
                                     </span>
                                 {% else %}
                                     {% if incident.severity == 'Critical' or incident.severity == 'High' %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 9 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
+                                        {% if incident.duration_hrs <= 9 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
                                         {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
                                         {% endif %}
                                     {% elif incident.severity == 'Medium' %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 18 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
+                                        {% if incident.duration_hrs <= 18 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
                                         {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
                                         {% endif %}
                                     {% else %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 180 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
+                                        {% if incident.duration_hrs <= 180 %}
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #e6f4ea; color: #137333; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Met</span>
                                         {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
+                                            <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: #fce8e6; color: #c5221f; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 9999px;">⚠ Breached</span>
                                         {% endif %}
                                     {% endif %}
                                 {% endif %}
                             </td>
 
                             <!-- Action Menu -->
-                            <td style="padding: 0.85rem 0.85rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
+                            <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;" onclick="event.stopPropagation()">
                                 <div class="actions-dropdown">
                                     <button class="actions-trigger" onclick="toggleActionsDropdown(event, 'actions-{{ incident.pk }}')" style="background: none; border: none; font-size: 1.25rem; font-weight: 800; cursor: pointer; color: var(--text-soft); padding: 0.25rem 0.5rem; border-radius: 50%; width: 28px; height: 28px; line-height: 1; outline: none;">⋮</button>
                                     <div id="actions-{{ incident.pk }}" class="actions-dropdown-content">
-                                        <a href="javascript:void(0)" onclick="showDetailsFromTrigger('row-{{ incident.pk }}')">Details</a>
+                                        <a href="#" onclick="showDetailsFromTrigger('row-{{ incident.pk }}')">Details</a>
                                         <a href="{% url 'incident_edit' incident.pk %}">Edit</a>
-                                        {% if not incident.planned %}
-                                        <form method="post" action="{% url 'incident_reclassify_maintenance' incident.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Reclassify {{ incident.ticket }} as scheduled Maintenance? This will move it to the Maintenance Register and exclude it from unplanned downtime.');">
-                                            {% csrf_token %}
-                                            <button type="submit" style="color: #059669; font-weight: 600;">Reclassify as Maintenance</button>
-                                        </form>
-                                        {% else %}
-                                        <form method="post" action="{% url 'incident_reclassify_unplanned' incident.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Reclassify {{ incident.ticket }} back to an Unplanned Incident?');">
-                                            {% csrf_token %}
-                                            <button type="submit" style="color: #d97706; font-weight: 600;">Reclassify as Incident</button>
-                                        </form>
-                                        {% endif %}
                                         {% if is_admin or perms.api.delete_incidentregister or incident.created_by == request.user %}
                                         <form method="post" action="{% url 'incident_delete' incident.pk %}" style="margin: 0; border-top: 1px solid rgba(90, 123, 156, 0.1);" onsubmit="return confirm('Are you sure you want to delete this incident?');">
                                             {% csrf_token %}
@@ -413,7 +296,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No incidents found.</td>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-soft); font-style: italic;">No incidents found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -428,16 +311,16 @@
                 </div>
                 <div style="display: flex; gap: 0.35rem;">
                     {% if page_obj.has_previous %}
-                        <a href="?page=1&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
-                        <a href="?page={{ page_obj.previous_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
+                        <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">&laquo; First</a>
+                        <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem;">Prev</a>
                     {% else %}
                         <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                         <span class="btn btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed;">Prev</span>
                     {% endif %}
 
                     {% if page_obj.has_next %}
-                        <a href="?page={{ page_obj.next_page_number }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
-                        <a href="?page={{ page_obj.paginator.num_pages }}&tab={{ current_tab }}{% if current_target %}&target={{ current_target }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
+                        <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Next</a>
+                        <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; background-color: var(--primary-navy); border-color: var(--primary-navy);">Last &raquo;</a>
                     {% else %}
                         <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                         <span class="btn btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.78rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>
@@ -466,36 +349,15 @@
                     </div>
                 </div>
 
-                <!-- Quick Actions Bar in Details Drawer -->
-                <div style="display: flex; gap: 0.5rem; align-items: center; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 0.75rem;">
-                    <form id="panel-reclassify-form" method="post" action="" style="margin: 0; flex: 1;">
-                        {% csrf_token %}
-                        <button id="panel-reclassify-btn" type="submit" style="width: 100%; font-size: 0.75rem; font-weight: 700; padding: 0.35rem 0.65rem; border-radius: 4px; border: 1px solid #10b981; background: #ecfdf5; color: #065f46; cursor: pointer; transition: all 0.2s;">
-                            Reclassify as Maintenance
-                        </button>
-                    </form>
-                    <a id="panel-edit-btn" href="#" style="font-size: 0.75rem; font-weight: 600; padding: 0.35rem 0.75rem; border-radius: 4px; text-decoration: none; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; display: inline-flex; align-items: center; justify-content: center;">
-                        Edit
-                    </a>
-                </div>
-
                 <!-- Time Metrics -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; border-bottom: 1px solid rgba(90, 123, 156, 0.1); padding-bottom: 1rem; margin-bottom: 0.25rem;">
                     <div>
                         <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage Start</div>
-                        <div id="panel-start" style="font-size: 0.82rem; font-weight: 600; color: #0f172a; margin-top: 0.2rem;">—</div>
+                        <div id="panel-start" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
                     </div>
                     <div>
                         <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Outage End</div>
-                        <div id="panel-end" style="font-size: 0.82rem; font-weight: 600; color: #0f172a; margin-top: 0.2rem;">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Duration</div>
-                        <div id="panel-duration" style="font-size: 0.85rem; font-weight: 700; color: #00205B; margin-top: 0.2rem;">—</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em;">Wall-clock Total</div>
-                        <div id="panel-elapsed" style="font-size: 0.82rem; font-weight: 600; color: #475569; margin-top: 0.2rem;">—</div>
+                        <div id="panel-end" style="font-size: 0.85rem; font-weight: 500; color: #0f172a; margin-top: 0.25rem;">—</div>
                     </div>
                 </div>
 
@@ -580,61 +442,16 @@
 
         document.getElementById('panel-ticket').textContent = row.getAttribute('data-ticket');
         
-        const incidentPk = row.getAttribute('data-pk');
-        const isPlanned = row.getAttribute('data-is-planned') === '1';
-        const reclassForm = document.getElementById('panel-reclassify-form');
-        const reclassBtn = document.getElementById('panel-reclassify-btn');
-        const editBtn = document.getElementById('panel-edit-btn');
-
-        if (editBtn) {
-            editBtn.href = `/incidents/${incidentPk}/edit/`;
-        }
-
-        if (reclassForm && reclassBtn) {
-            if (isPlanned) {
-                reclassForm.action = `/incidents/${incidentPk}/reclassify-unplanned/`;
-                reclassBtn.textContent = 'Reclassify as Unplanned Incident';
-                reclassBtn.style.borderColor = '#f59e0b';
-                reclassBtn.style.background = '#fef3c7';
-                reclassBtn.style.color = '#92400e';
-                reclassForm.onsubmit = () => confirm('Reclassify back to an Unplanned Incident? This will affect SLA uptime calculations.');
-            } else {
-                reclassForm.action = `/incidents/${incidentPk}/reclassify-maintenance/`;
-                reclassBtn.textContent = 'Reclassify as Maintenance';
-                reclassBtn.style.borderColor = '#10b981';
-                reclassBtn.style.background = '#ecfdf5';
-                reclassBtn.style.color = '#065f46';
-                reclassForm.onsubmit = () => confirm('Reclassify this incident as scheduled Maintenance? This will move it to the Maintenance Register and exclude it from unplanned downtime.');
-            }
-        }
-        
-        const cat = row.getAttribute('data-category') || 'Database';
-        const nodeName = row.getAttribute('data-node-name') || '';
         const system = row.getAttribute('data-system');
         const db = row.getAttribute('data-database');
         const planned = row.getAttribute('data-planned');
+        document.getElementById('panel-meta').textContent = `${system} | ${db} | ${planned}`;
         
-        if (cat === 'Infrastructure') {
-            const sysLabel = (system && system !== nodeName) ? ` · ${system}` : '';
-            document.getElementById('panel-meta').innerHTML = `<span style="color: #6d28d9; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; margin-right: 0.35rem;">Infrastructure</span><strong>${nodeName || 'OLKVM'}</strong>${sysLabel} · ${planned}`;
-        } else {
-            document.getElementById('panel-meta').innerHTML = `<span style="color: #475569; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; margin-right: 0.35rem;">Database</span>${system} | <strong>${db}</strong> · ${planned}`;
-        }
+        document.getElementById('panel-start').textContent = row.getAttribute('data-start');
         
-        document.getElementById('panel-start').textContent = row.getAttribute('data-start') || '—';
-        
-        const end = row.getAttribute('data-end') || '—';
-        const duration = row.getAttribute('data-duration') || '0';
-        const durationHuman = row.getAttribute('data-duration-human') || '0 mins';
-        const hasOffhours = row.getAttribute('data-has-offhours') === '1';
-        const elapsedHuman = row.getAttribute('data-elapsed-human') || durationHuman;
-
-        document.getElementById('panel-end').textContent = end;
-        document.getElementById('panel-duration').textContent = `${durationHuman} (${duration}h)`;
-        const elapsedEl = document.getElementById('panel-elapsed');
-        if (elapsedEl) {
-            elapsedEl.textContent = hasOffhours ? elapsedHuman : '— (Identical)';
-        }
+        const end = row.getAttribute('data-end');
+        const duration = row.getAttribute('data-duration');
+        document.getElementById('panel-end').textContent = `${end} (${duration}h)`;
         
         const rootCause = row.getAttribute('data-root-cause') || '—';
         const rootCauseContainer = document.getElementById('panel-root-cause');
@@ -650,13 +467,13 @@
         }
         
         document.getElementById('panel-impact').textContent = row.getAttribute('data-impact') || '—';
-        document.getElementById('panel-assigned-to').textContent = row.getAttribute('data-assigned-to') || '—';
-        document.getElementById('panel-resolved-by').textContent = row.getAttribute('data-resolved-by') || '—';
-        document.getElementById('panel-logged-by').textContent = row.getAttribute('data-logged-by') || '—';
+        document.getElementById('panel-assigned-to').textContent = row.getAttribute('data-assigned-to');
+        document.getElementById('panel-resolved-by').textContent = row.getAttribute('data-resolved-by');
+        document.getElementById('panel-logged-by').textContent = row.getAttribute('data-logged-by');
 
         const severity = row.getAttribute('data-severity');
         const sevBadge = document.getElementById('panel-severity-badge');
-        sevBadge.textContent = severity || '—';
+        sevBadge.textContent = severity;
         sevBadge.style.display = "inline-block";
         if (severity === 'Critical' || severity === 'High') {
             sevBadge.style.background = '#fce8e6';
@@ -671,7 +488,7 @@
 
         const status = row.getAttribute('data-status');
         const statusBadge = document.getElementById('panel-status-badge');
-        statusBadge.textContent = status || '—';
+        statusBadge.textContent = status;
         statusBadge.style.display = "inline-block";
         if (status === 'Open') {
             statusBadge.style.background = '#fce8e6';
@@ -684,16 +501,7 @@
             statusBadge.style.color = '#137333';
         }
 
-        let logsData = [];
-        const logsScript = document.getElementById('logs-data-' + incidentPk);
-        if (logsScript) {
-            try {
-                logsData = JSON.parse(logsScript.textContent || '[]');
-            } catch (e) {
-                console.error("Error parsing change logs JSON:", e);
-                logsData = [];
-            }
-        }
+        const logsData = JSON.parse(row.getAttribute('data-change-logs') || '[]');
         const logsContainer = document.getElementById('panel-logs-timeline');
         const logsSection = document.getElementById('panel-logs-section');
         
@@ -757,39 +565,5 @@
             }
         }
     }
-
-    // Real-Time Live Running Active Incident Ticker
-    function formatLiveDuration(diffMs) {
-        if (diffMs <= 0) return '< 1 min';
-        var totalSecs = Math.floor(diffMs / 1000);
-        if (totalSecs < 60) return '< 1 min';
-        var totalMins = Math.floor(totalSecs / 60);
-        var hrs = Math.floor(totalMins / 60);
-        var mins = totalMins % 60;
-        if (hrs > 0 && mins > 0) return hrs + 'h ' + mins + 'm';
-        if (hrs > 0) return hrs + 'h';
-        return mins + (mins === 1 ? ' min' : ' mins');
-    }
-
-    function updateLiveActiveDurations() {
-        var badges = document.querySelectorAll('.live-active-indicator');
-        var now = new Date();
-        badges.forEach(function(badge) {
-            var startStr = badge.getAttribute('data-start');
-            if (startStr) {
-                var startDate = new Date(startStr);
-                if (!isNaN(startDate.getTime())) {
-                    var diffMs = now.getTime() - startDate.getTime();
-                    var textEl = badge.querySelector('.live-duration-text');
-                    if (textEl) {
-                        textEl.textContent = 'Active: ' + formatLiveDuration(diffMs);
-                    }
-                }
-            }
-        });
-    }
-
-    // Run active incident duration ticker every 30 seconds
-    setInterval(updateLiveActiveDurations, 30000);
 </script>
 {% endblock %}

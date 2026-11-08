@@ -2,61 +2,8 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 
-
-def format_human_duration(hrs_val):
-    """Format duration in hours into clean human-readable representation:
-       e.g., 0.01h -> '< 1 min', 0.02h -> '1 min', 0.30h -> '18 mins', 2.30h -> '2h 18m', 1.00h -> '1h'
-    """
-    if hrs_val is None:
-        return "0 mins"
-    try:
-        val = float(hrs_val)
-    except (ValueError, TypeError):
-        return "0 mins"
-
-    if val <= 0:
-        return "0 mins"
-
-    secs = int(round(val * 3600))
-    if secs < 60:
-        return "< 1 min"
-    if secs < 3600:
-        mins = int(round(secs / 60.0))
-        return "1 min" if mins <= 1 else f"{mins} mins"
-
-    h = int(secs // 3600)
-    m = int(round((secs % 3600) / 60.0))
-    if m == 60:
-        h += 1
-        m = 0
-    if m == 0:
-        return f"{h}h"
-    return f"{h}h {m}m"
-
-
-def generate_incident_ticket(category=None, dt=None):
-    """
-    Auto-generates a standardized incident ticket identifier.
-    Format: INC-YYMMDD-HHMM (or INC-INFRA-YYMMDD-HHMM for infrastructure)
-    e.g., INC-261021-0904, INC-INFRA-261021-0904
-    Guarantees uniqueness across existing incident records.
-    """
-    ref_dt = dt or timezone.now()
-    if hasattr(ref_dt, 'date') and not hasattr(ref_dt, 'hour'):
-        ref_dt = timezone.datetime.combine(ref_dt, timezone.now().time())
-    
-    prefix = "INC-INFRA" if category == 'Infrastructure' else "INC"
-    base_ticket = f"{prefix}-{ref_dt.strftime('%y%m%d-%H%M')}"
-    candidate = base_ticket
-    counter = 1
-    while IncidentRegister.objects.filter(ticket=candidate).exists():
-        candidate = f"{base_ticket}-{counter:02d}"
-        counter += 1
-    return candidate
-
-
 class IncidentRegister(models.Model):
-    ticket = models.CharField(max_length=50, blank=True)
+    ticket = models.CharField(max_length=50)
     date = models.DateField()
     start = models.DateTimeField(null=True, blank=True)
     end = models.DateTimeField(null=True, blank=True)
@@ -78,18 +25,11 @@ class IncidentRegister(models.Model):
         ('Resolved', 'Resolved'),
         ('Closed', 'Closed')
     ])
-    category = models.CharField(max_length=20, choices=[
-        ('Database', 'Database'),
-        ('Infrastructure', 'Infrastructure'),
-    ], default='Database')
-    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
-        ('Infrastructure', 'Infrastructure'),
-    ], default='MySQL', blank=True)
+    ])
     assigned_to = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -100,46 +40,22 @@ class IncidentRegister(models.Model):
         verbose_name = 'Incident Register'
         verbose_name_plural = 'Incident Registers'
         default_permissions = ('add', 'view')
-        permissions = [
-            ('view_databaseincident', 'Can view Database Incidents'),
-            ('view_infrastructureincident', 'Can view Infrastructure Incidents'),
-            ('add_databaseincident', 'Can add Database Incidents'),
-            ('add_infrastructureincident', 'Can add Infrastructure Incidents'),
-        ]
 
     def save(self, *args, **kwargs):
-        if not self.ticket or not str(self.ticket).strip():
-            self.ticket = generate_incident_ticket(self.category, self.start or getattr(self, 'date', None))
-
         if not self.start:
             self.start = timezone.now()
-
-        if not getattr(self, 'date', None):
-            self.date = self.start.date()
 
         if self.status in ['Resolved', 'Closed'] and not self.end:
             self.end = timezone.now()
 
-        if self.category == 'Infrastructure':
-            # Infrastructure host nodes run 24/7 (24 hours/day, 7 days/week)
-            if self.end and self.start and self.end > self.start:
-                secs = (self.end - self.start).total_seconds()
-                self.duration_hrs = round(secs / 3600.0, 2)
-            elif self.start and self.status not in ['Resolved', 'Closed']:
-                secs = (timezone.now() - self.start).total_seconds()
-                self.duration_hrs = round(max(0.0, secs) / 3600.0, 2)
-            else:
-                self.duration_hrs = 0
-            if not self.database or self.database == 'MySQL':
-                self.database = 'Infrastructure'
+        from api.sla_utils import calculate_operational_downtime
+
+        if self.end and self.start:
+            self.duration_hrs = calculate_operational_downtime(self.start, self.end, self.database)
+        elif self.start and self.status not in ['Resolved', 'Closed']:
+            self.duration_hrs = calculate_operational_downtime(self.start, timezone.now(), self.database)
         else:
-            from api.sla_utils import calculate_operational_downtime
-            if self.end and self.start:
-                self.duration_hrs = calculate_operational_downtime(self.start, self.end, self.database)
-            elif self.start and self.status not in ['Resolved', 'Closed']:
-                self.duration_hrs = calculate_operational_downtime(self.start, timezone.now(), self.database)
-            else:
-                self.duration_hrs = 0
+            self.duration_hrs = 0
             
         # Capture original ticket BEFORE saving so we can locate the existing
         # maintenance record even when the ticket ID is being renamed.
@@ -152,51 +68,38 @@ class IncidentRegister(models.Model):
 
         super().save(*args, **kwargs)
 
+        # Sync to Maintenance Register
+        from api.models import MaintenanceRegister
+
+        if self.planned:
+            maint_date = self.start.date() if self.start else self.date
+            maint_start = self.start if self.start else timezone.now()
+            maint_end = self.end if self.end else maint_start
+
+            MaintenanceRegister.objects.update_or_create(
+                change_id=original_ticket,   # look up by ORIGINAL ticket
+                defaults={
+                    'change_id': self.ticket,    # update to NEW ticket name
+                    'database': self.database,
+                    'system': self.system,        # Sync system name (e.g. nmsinfra (DB))
+                    'date': maint_date,
+                    'activity': f"Planned Incident Outage: {self.root_cause or 'Linked from ticket ' + self.ticket}",
+                    'start': maint_start,
+                    'end': maint_end,
+                    'risk': 'Medium',
+                    'rollback_plan': 'Awaiting DBA input.',
+                    'approved_by': '',  # Leave blank so a DBA can update it later
+                    'success': True if self.status in ['Resolved', 'Closed'] else False,
+                    'created_by': self.created_by
+                }
+            )
+        else:
+            # Incident marked unplanned — remove any linked maintenance record
+            # (check both current and original ticket name in case it was renamed)
+            MaintenanceRegister.objects.filter(change_id__in=[self.ticket, original_ticket]).delete()
+
     def __str__(self):
         return f"{self.ticket} - {self.date}"
-
-    @property
-    def elapsed_duration_hrs(self):
-        """Total wall-clock elapsed duration between start and end (24/7)."""
-        if self.start and self.end and self.end > self.start:
-            secs = (self.end - self.start).total_seconds()
-            return round(secs / 3600.0, 2)
-        return float(self.duration_hrs or 0.0)
-
-    @property
-    def elapsed_duration_mins(self):
-        """Total wall-clock elapsed duration in minutes."""
-        if self.start and self.end and self.end > self.start:
-            secs = (self.end - self.start).total_seconds()
-            return round(secs / 60.0, 1)
-        return round(float(self.duration_hrs or 0.0) * 60.0, 1)
-
-    @property
-    def has_off_hours_difference(self):
-        """Returns True if the elapsed wall-clock downtime differs noticeably from SLA business hours downtime."""
-        try:
-            return abs(float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)) >= 0.05
-        except Exception:
-            return False
-
-    @property
-    def off_hours_duration_hrs(self):
-        """Duration of the outage that fell outside the SLA business operating window."""
-        try:
-            diff = float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)
-            return round(max(0.0, diff), 2)
-        except Exception:
-            return 0.0
-
-    @property
-    def human_duration(self):
-        """Clean human-readable SLA outage duration (e.g., '18 mins', '2h 18m', '< 1 min')."""
-        return format_human_duration(self.duration_hrs)
-
-    @property
-    def human_elapsed_duration(self):
-        """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
-        return format_human_duration(self.elapsed_duration_hrs)
 
 class IncidentChangeLog(models.Model):
     incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
@@ -239,7 +142,6 @@ class ReplicationMonitor(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     severity = models.CharField(max_length=20, choices=[
         ('Low', 'Low'),
@@ -279,7 +181,6 @@ class BackupRecovery(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     date = models.DateField()
     database_instance = models.CharField(max_length=100)
@@ -319,25 +220,11 @@ class BackupRecovery(models.Model):
 
 class ServerHealth(models.Model):
     date = models.DateField()
-    node_name = models.CharField(max_length=50, choices=[
-        ('OLKVM', 'OLKVM Node'),
-        ('Proxmox', 'Proxmox Node'),
-    ], default='Proxmox', blank=True)
-    hosted_systems = models.CharField(max_length=200, blank=True, default='')
     server = models.CharField(max_length=100)
     entered_by = models.CharField(max_length=20, choices=[
         ('User', 'User'),
-        ('Script', 'Script'),
-        ('Prometheus', 'Prometheus')
+        ('Script', 'Script')
     ], default='User')
-    uptime_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=100.00,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
-    uptime_days = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-    logical_cpus = models.IntegerField(default=0)
     cpu_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,
@@ -348,41 +235,9 @@ class ServerHealth(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
-    memory_total_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    memory_used_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     disk_percent = models.DecimalField(
         max_digits=5, 
         decimal_places=2,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
-    storage_growth_gb = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    storage_growth_pct = models.DecimalField(max_digits=7, decimal_places=3, default=0.000)
-    # 3 Disk Types (Categorized by Size & Type)
-    disk_1_type = models.CharField(max_length=100, blank=True, default='Disk 1 (SSD / OS)')
-    disk_1_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_1_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_1_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.00,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
-    disk_2_type = models.CharField(max_length=100, blank=True, default='Disk 2 (SAS / Data)')
-    disk_2_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_2_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_2_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.00,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
-    disk_3_type = models.CharField(max_length=100, blank=True, default='Disk 3 (SAN / Backup)')
-    disk_3_size_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_3_used_gb = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    disk_3_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=0.00,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     tablespace_percent = models.DecimalField(
@@ -390,9 +245,9 @@ class ServerHealth(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
-    connections = models.IntegerField(default=0)
-    slow_queries = models.IntegerField(default=0)
-    threads = models.IntegerField(default=0)
+    connections = models.IntegerField()
+    slow_queries = models.IntegerField()
+    threads = models.IntegerField()
     status = models.CharField(max_length=20, choices=[
         ('Healthy', 'Healthy'),
         ('Warning', 'Warning'),
@@ -402,180 +257,19 @@ class ServerHealth(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-    @property
-    def safe_memory_used_gb(self):
-        us = float(self.memory_used_gb or 0)
-        tot = float(self.memory_total_gb or 0)
-        pct = float(self.memory_percent or 0)
-        if us == 0 and tot > 0 and pct > 0:
-            return round(tot * pct / 100.0, 2)
-        return us
-
-    @property
-    def safe_disk_1_used_gb(self):
-        us = float(self.disk_1_used_gb or 0)
-        sz = float(self.disk_1_size_gb or 0)
-        pct = float(self.disk_1_percent or 0)
-        if us == 0 and sz > 0 and pct > 0:
-            return round(sz * pct / 100.0, 2)
-        return us
-
-    @property
-    def safe_disk_2_used_gb(self):
-        us = float(self.disk_2_used_gb or 0)
-        sz = float(self.disk_2_size_gb or 0)
-        pct = float(self.disk_2_percent or 0)
-        if us == 0 and sz > 0 and pct > 0:
-            return round(sz * pct / 100.0, 2)
-        return us
-
-    @property
-    def safe_disk_3_used_gb(self):
-        us = float(self.disk_3_used_gb or 0)
-        sz = float(self.disk_3_size_gb or 0)
-        pct = float(self.disk_3_percent or 0)
-        if us == 0 and sz > 0 and pct > 0:
-            return round(sz * pct / 100.0, 2)
-        return us
-
-    @property
-    def disk_1_free_gb(self):
-        sz = float(self.disk_1_size_gb or 0)
-        us = self.safe_disk_1_used_gb
-        return round(max(0.0, sz - us), 2)
-
-    @property
-    def disk_2_free_gb(self):
-        sz = float(self.disk_2_size_gb or 0)
-        us = self.safe_disk_2_used_gb
-        return round(max(0.0, sz - us), 2)
-
-    @property
-    def disk_3_free_gb(self):
-        sz = float(self.disk_3_size_gb or 0)
-        us = self.safe_disk_3_used_gb
-        return round(max(0.0, sz - us), 2)
-
-    @property
-    def display_server(self):
-        s = self.server or ''
-        if s.startswith('infra'):
-            return 'nms' + s
-        if s.startswith('ebs'):
-            return 'nms' + s
-        return s
-
-    @property
-    def display_node_label(self):
-        # For OLKVM, maintain just "OLKVM" as node label (workload/server details are shown below the label)
-        srv_lower = (self.server or '').lower()
-        if (self.node_name or '').upper() == 'OLKVM' or self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'infra', 'ebs']):
-            return 'OLKVM'
-        srv = self.display_server
-        if self.database == 'MS SQL Server':
-            srv = 'Pentana'
-        elif self.database == 'PostgreSQL' and not srv:
-            srv = 'ccisprod_db (ODK-X)'
-        if self.node_name:
-            return f"{self.node_name} — {srv}"
-        return srv
-
-    @property
-    def clean_hosted_systems(self):
-        import re
-        txt = self.hosted_systems or ''
-        srv_lower = (self.server or '').lower()
-        if not txt or txt == self.database:
-            if 'infra' in srv_lower:
-                return 'Oracle DB (nmsinfra)'
-            elif 'ebs' in srv_lower:
-                return 'Oracle EBS App (nmsebs)'
-            elif 'pvenode1' in srv_lower:
-                return 'tomcatvm & Internal Systems'
-            elif 'pvenode2' in srv_lower:
-                return 'jumphostvm & monitoringvm'
-            elif 'pvenode3' in srv_lower:
-                return 'databasevm (MySQL / Pentana)'
-            elif (self.node_name or '').upper() == 'OLKVM':
-                return 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
-            elif self.database == 'PostgreSQL' or 'ccis' in srv_lower:
-                return 'CCIS / ODK-X (ccisprod_db)'
-            elif self.database:
-                return self.database
-        # Strip any IP addresses
-        txt = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', txt)
-        txt = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', txt)
-        # Normalize to nmsinfra and nmsebs
-        if 'infra' in txt and 'nmsinfra' not in txt:
-            txt = txt.replace('infra', 'nmsinfra')
-        if 'ebs' in txt and 'nmsebs' not in txt:
-            txt = txt.replace('ebs', 'nmsebs')
-        txt = re.sub(r'\(\s*\)', '', txt).strip(' -()')
-        return txt or self.database
-
-    @property
-    def total_disk_capacity_gb(self):
-        return round(float(self.disk_1_size_gb or 0) + float(self.disk_2_size_gb or 0) + float(self.disk_3_size_gb or 0), 2)
-
-    @property
-    def total_disk_used_gb(self):
-        return round(float(self.disk_1_used_gb or 0) + float(self.disk_2_used_gb or 0) + float(self.disk_3_used_gb or 0), 2)
-
-    @property
-    def total_disk_free_gb(self):
-        return round(max(0.0, self.total_disk_capacity_gb - self.total_disk_used_gb), 2)
-
-    def save(self, *args, **kwargs):
-        srv_lower = (self.server or '').lower()
-        if not self.node_name or (self.node_name == 'Proxmox' and (self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs', 'infra', 'ebs']))):
-            if self.database == 'Oracle' or any(k in srv_lower for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs', 'infra', 'ebs']):
-                self.node_name = 'OLKVM'
-            else:
-                self.node_name = 'Proxmox'
-
-        if not self.hosted_systems:
-            if 'nmsinfra' in srv_lower or 'infra' in srv_lower:
-                self.hosted_systems = 'Oracle DB (nmsinfra)'
-            elif 'nmsebs' in srv_lower or 'ebs' in srv_lower:
-                self.hosted_systems = 'Oracle EBS App (nmsebs)'
-            elif 'pvenode1' in srv_lower:
-                self.hosted_systems = 'tomcatvm & Internal Systems'
-            elif 'pvenode2' in srv_lower:
-                self.hosted_systems = 'jumphostvm & monitoringvm'
-            elif 'pvenode3' in srv_lower:
-                self.hosted_systems = 'databasevm (MySQL / Pentana)'
-            elif self.node_name == 'OLKVM':
-                self.hosted_systems = 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)'
-            elif self.database == 'PostgreSQL' or 'ccis' in srv_lower:
-                self.hosted_systems = 'CCIS / ODK-X (ccisprod_db)'
-            else:
-                self.hosted_systems = 'MySQL (nickledbnew), MS SQL (Pentana) & Internal Systems'
-
-        # If 3-disk percentages are provided and overall disk_percent is 0, set disk_percent to highest disk utilization
-        max_disk_pct = max(float(self.disk_1_percent or 0), float(self.disk_2_percent or 0), float(self.disk_3_percent or 0))
-        if max_disk_pct > 0 and float(self.disk_percent or 0) == 0:
-            self.disk_percent = round(max_disk_pct, 2)
-
-        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'server_health'
         verbose_name = 'Server Health'
         verbose_name_plural = 'Server Health'
         default_permissions = ('add', 'view')
-        permissions = [
-            ('view_databasedashboard', 'Can view Database Operations Dashboard'),
-            ('view_infrastructuredashboard', 'Can view Node Infrastructure Dashboard'),
-        ]
 
     def __str__(self):
-        return f"{self.node_name} ({self.server}) - {self.date}"
+        return f"{self.server} - {self.date}"
 
 class MaintenanceRegister(models.Model):
     date = models.DateField()
@@ -599,24 +293,17 @@ class MaintenanceRegister(models.Model):
         ('Completed', 'Completed'),
         ('Failed', 'Failed')
     ], default='Scheduled')
-    category = models.CharField(max_length=20, choices=[
-        ('Database', 'Database'),
-        ('Infrastructure', 'Infrastructure'),
-    ], default='Database')
-    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
-        ('Infrastructure', 'Infrastructure'),
-    ], blank=True, default='MySQL')
+    ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        if not self.change_id and self.start:
+        if self.start:
             # Auto-generate change ID based on start date: CHG + DD + MM (e.g. CHG2108 for 21 Aug)
             self.change_id = f"CHG{self.start.strftime('%d%m')}"
 
@@ -642,32 +329,9 @@ class MaintenanceRegister(models.Model):
         verbose_name = 'Maintenance Register'
         verbose_name_plural = 'Maintenance Registers'
         default_permissions = ('add', 'view')
-        permissions = [
-            ('view_databasemaintenance', 'Can view Database Maintenance'),
-            ('view_infrastructuremaintenance', 'Can view Infrastructure Maintenance'),
-            ('add_databasemaintenance', 'Can add Database Maintenance'),
-            ('add_infrastructuremaintenance', 'Can add Infrastructure Maintenance'),
-        ]
 
     def __str__(self):
         return f"{self.change_id} - {self.date}"
-
-
-class MaintenanceChangeLog(models.Model):
-    maintenance = models.ForeignKey(MaintenanceRegister, on_delete=models.CASCADE, related_name='change_logs')
-    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
-    changed_at = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=50)
-    old_status = models.CharField(max_length=50, blank=True)
-    new_status = models.CharField(max_length=50, blank=True)
-    comment = models.TextField(blank=True)
-
-    class Meta:
-        db_table = 'maintenance_change_log'
-        ordering = ['-changed_at']
-
-    def __str__(self):
-        return f"{self.maintenance.change_id} - {self.action} on {self.changed_at}"
 
 class CapacityPlanning(models.Model):
     month = models.DateField()
@@ -689,7 +353,6 @@ class CapacityPlanning(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     created_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -703,12 +366,6 @@ class CapacityPlanning(models.Model):
 
     @property
     def disk_capacity_gb(self):
-        if self.database == 'Oracle' and self.database_size_gb and self.available_capacity_gb:
-            return round(self.database_size_gb + self.available_capacity_gb, 2)
-        if self.database == 'PostgreSQL' and self.available_capacity_gb is not None and self.disk_used_percent is not None:
-            if float(self.disk_used_percent) < 100 and 320.0 <= (float(self.available_capacity_gb) * 100.0 / (100.0 - float(self.disk_used_percent))) <= 345.0:
-                from decimal import Decimal
-                return Decimal('342.00')
         if self.disk_used_percent is not None and self.disk_used_percent < 100:
             free_percent = 100 - self.disk_used_percent
             if free_percent > 0:
@@ -721,70 +378,14 @@ class CapacityPlanning(models.Model):
         used_pct = float(self.disk_used_percent)
         return round(cap * used_pct / 100.0, 2)
 
-    @property
-    def runway_info(self):
-        growth = float(self.growth_gb or 0.0)
-        free = float(self.available_capacity_gb or 0.0)
-        used_pct = float(self.disk_used_percent or 0.0)
-        if free <= 0.0:
-            return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
-        if used_pct >= 95.0:
-            return {'days': 3, 'text': '< 7 days (Critical)', 'badge': 'critical'}
-        if growth > 0.01 and free > 0:
-            daily_burn = growth / 30.4
-            days = max(1, int(free / daily_burn)) if daily_burn > 0 else 9999
-            if used_pct < 75.0 and free >= 50.0 and days < 60:
-                return {'days': 365, 'text': '> 1 Year (Stable)', 'badge': 'stable'}
-            if days <= 7:
-                return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
-            elif days <= 30:
-                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-            elif days <= 90:
-                return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-            elif days <= 365:
-                mos = round(days / 30.4, 1)
-                return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
-            else:
-                return {'days': days, 'text': "> 1 Year", 'badge': 'stable'}
-        if self.growth_gb is None:
-            return {'days': None, 'text': '—', 'badge': 'neutral'}
-        return {'days': 9999, 'text': "Stable", 'badge': 'stable'}
-
-    @property
-    def runway_text(self):
-        return self.runway_info['text']
-
-    @property
-    def runway_badge(self):
-        return self.runway_info['badge']
-
     class Meta:
         db_table = 'capacity_planning'
         verbose_name = 'Capacity Planning'
         verbose_name_plural = 'Capacity Planning'
         default_permissions = ('add', 'view')
-        permissions = [
-            ('view_databasecapacity', 'Can view Database Capacity'),
-            ('view_infrastructurecapacity', 'Can view Infrastructure Capacity'),
-        ]
 
     def __str__(self):
         return f"{self.database} - {self.month}"
-
-
-class CapacityChangeLog(models.Model):
-    capacity = models.ForeignKey(CapacityPlanning, on_delete=models.CASCADE, related_name='change_logs')
-    changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
-    changed_at = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=50)
-    comment = models.TextField(blank=True)
-
-    class Meta:
-        db_table = 'capacity_change_log'
-        ordering = ['-changed_at']
-
-    def __str__(self):
-        return f"{self.capacity.database} ({self.capacity.month}) - {self.action} on {self.changed_at}"
 
 class SLAConfig(models.Model):
     month = models.DateField()
@@ -792,7 +393,6 @@ class SLAConfig(models.Model):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     target_hours = models.DecimalField(max_digits=10, decimal_places=2)
     sla_percent = models.DecimalField(max_digits=5, decimal_places=2, default=99.95)
@@ -867,18 +467,11 @@ def update_target_hours_on_holiday_delete(sender, instance, **kwargs):
 
 
 class IncidentStaging(models.Model):
-    category = models.CharField(max_length=20, choices=[
-        ('Database', 'Database'),
-        ('Infrastructure', 'Infrastructure'),
-    ], default='Database')
-    node_name = models.CharField(max_length=100, blank=True, default='')
     database = models.CharField(max_length=50, choices=[
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
-        ('Infrastructure', 'Infrastructure'),
-    ], default='MySQL')
+    ])
     system = models.CharField(max_length=100)
     start = models.DateTimeField()
     end = models.DateTimeField()
@@ -904,45 +497,3 @@ class IncidentStaging(models.Model):
     def __str__(self):
         return f"Staged {self.database} ({self.start}) - {self.status}"
 
-    @property
-    def elapsed_duration_hrs(self):
-        """Total wall-clock elapsed duration between start and end (24/7)."""
-        if self.start and self.end and self.end > self.start:
-            secs = (self.end - self.start).total_seconds()
-            return round(secs / 3600.0, 2)
-        return float(self.duration_hrs or 0.0)
-
-    @property
-    def elapsed_duration_mins(self):
-        """Total wall-clock elapsed duration in minutes."""
-        if self.start and self.end and self.end > self.start:
-            secs = (self.end - self.start).total_seconds()
-            return round(secs / 60.0, 1)
-        return round(float(self.duration_hrs or 0.0) * 60.0, 1)
-
-    @property
-    def has_off_hours_difference(self):
-        """Returns True if the elapsed wall-clock downtime differs noticeably from SLA business hours downtime."""
-        try:
-            return abs(float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)) >= 0.05
-        except Exception:
-            return False
-
-    @property
-    def off_hours_duration_hrs(self):
-        """Duration of the outage that fell outside the SLA business operating window."""
-        try:
-            diff = float(self.elapsed_duration_hrs) - float(self.duration_hrs or 0.0)
-            return round(max(0.0, diff), 2)
-        except Exception:
-            return 0.0
-
-    @property
-    def human_duration(self):
-        """Clean human-readable SLA outage duration (e.g., '18 mins', '2h 18m', '< 1 min')."""
-        return format_human_duration(self.duration_hrs)
-
-    @property
-    def human_elapsed_duration(self):
-        """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
-        return format_human_duration(self.elapsed_duration_hrs)

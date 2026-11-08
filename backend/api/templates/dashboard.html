@@ -110,49 +110,36 @@
         position: absolute;
         right: 0;
         background-color: #ffffff;
-        min-width: 160px;
+        min-width: 140px;
         box-shadow: 0px 8px 16px rgba(15, 23, 42, 0.08);
         border: 1px solid #e2e8f0;
         border-radius: 6px;
         z-index: 100;
         margin-top: 4px;
-        overflow: visible;
+        overflow: hidden;
     }
-    /* Bridge the hover gap */
+    /* Bridge the 4px hover gap */
     .export-dropdown-content::before {
         content: '';
         position: absolute;
-        top: -12px;
-        left: -15px;
-        right: -15px;
-        height: 16px;
+        top: -6px;
+        left: 0;
+        right: 0;
+        height: 6px;
         background: transparent;
     }
-    .export-dropdown:hover .export-dropdown-content,
-    .export-dropdown.open .export-dropdown-content {
-        display: block !important;
+    .export-dropdown:hover .export-dropdown-content {
+        display: block;
     }
     .export-dropdown-content a {
         color: #334155;
-        padding: 0.55rem 0.85rem;
+        padding: 0.5rem 0.75rem;
         text-decoration: none;
         display: block;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 600;
         transition: background-color 0.15s;
         text-align: left;
-    }
-    .export-dropdown-content a:first-child {
-        border-top-left-radius: 5px;
-        border-top-right-radius: 5px;
-    }
-    .export-dropdown-content a:last-child {
-        border-bottom-left-radius: 5px;
-        border-bottom-right-radius: 5px;
-    }
-    .export-dropdown-content a:hover {
-        background-color: #f1f5f9;
-        color: var(--primary-navy);
     }
     /* Responsive Grid for Scoped/Fleet Layout */
     .scoped-grid {
@@ -173,19 +160,8 @@
             grid-template-columns: 1fr !important;
         }
     }
-    @keyframes modalSlideUp {
-        from {
-            opacity: 0;
-            transform: translateY(12px) scale(0.985);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
 </style>
 
-{% if can_view_db_dashboard %}
 <!-- Header & Scope Selection -->
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
@@ -195,21 +171,19 @@
     </div>
     
     <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-        <form method="GET" action="." style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
-            <input type="hidden" name="node_select" value="{{ selected_node }}">
+        <form method="GET" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
-                <select name="database_select" onchange="submitDbFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
+                <select name="database_select" onchange="this.form.submit()" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff;">
                     <option value="All Databases" {% if selected_db == 'All Databases' %}selected{% endif %}>All Databases</option>
-                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle (ERP Suite)</option>
-                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL (NMS360 / DMT)</option>
-                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' or selected_db == 'MKInsight' %}selected{% endif %}>MS SQL Server (MKInsight / Pentana)</option>
-                    <option value="PostgreSQL" {% if selected_db == 'PostgreSQL' %}selected{% endif %}>PostgreSQL (CCIS / ODK-X)</option>
+                    <option value="Oracle" {% if selected_db == 'Oracle' %}selected{% endif %}>Oracle</option>
+                    <option value="MySQL" {% if selected_db == 'MySQL' %}selected{% endif %}>MySQL</option>
+                    <option value="MS SQL Server" {% if selected_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
-                <input type="month" name="month" value="{{ reporting_month }}" onchange="submitDbFilter(this)" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem; cursor: pointer;">
+                <input type="month" name="month" value="{{ reporting_month }}" onchange="this.form.submit()" style="padding: 0.45rem 0.75rem; font-weight: 600; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; font-size: 0.85rem;">
             </div>
         </form>
         
@@ -300,7 +274,7 @@
                             {% elif row.database == 'PostgreSQL' %}
                                 <img src="/static/postgres_logo.png" alt="PostgreSQL Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                             {% else %}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00205B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                                <span style="font-size: 2rem;">🗄️</span>
                             {% endif %}
                         </div>
 
@@ -313,18 +287,16 @@
                                     NMS360, DMT and other in-house applications
                                 {% elif row.database == 'MS SQL Server' %}
                                     MKInsight Audit Framework
-                                {% elif row.database == 'PostgreSQL' %}
-                                    Cold Chain Information System (CCIS / ODK-X)
                                 {% else %}
                                     {{ row.database }} Profile
                                 {% endif %}
                             </h2>
                             <div style="font-family: monospace; font-size: 0.82rem; font-weight: 700; color: #0284c7; margin-top: 0.25rem;">
-                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% elif row.database == 'PostgreSQL' %}ccisprod_db (PostgreSQL 17 + PostGIS 3.5 on Docker Swarm){% else %}Pentana (Standalone){% endif %}
+                                {% if row.database == 'Oracle' %}nmsinfra / nmsebs{% elif row.database == 'MySQL' %}nickledbnew (Replicated to nickledbdr){% else %}Pentana (Standalone){% endif %}
                             </div>
                             {% if row.database != 'MySQL' %}
                             <p style="margin: 0.4rem 0 0 0; color: #475569; font-size: 0.82rem; font-weight: 500;">
-                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif row.database == 'MS SQL Server' %}MKInsight Audit Database for governance and compliance.{% elif row.database == 'PostgreSQL' %}Powers national Cold Chain Information System (CCIS) equipment inventory, maintenance logs, and ODK-X field synchronisation across Uganda.{% endif %}
+                                {% if row.database == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif row.database == 'MS SQL Server' %}MKInsight Audit Database for governance and compliance.{% endif %}
                             </p>
                             {% endif %}
                         </div>
@@ -389,7 +361,7 @@
                     <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy);">
                         {{ item.database }} 
                         <span style="font-weight: normal; color: #64748b; font-family: monospace; font-size: 0.72rem; margin-left: 0.25rem;">
-                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% elif item.database == 'PostgreSQL' %}ccisprod_db — CCIS{% else %}Pentana — MKInsight{% endif %})
+                            ({% if item.database == 'Oracle' %}nmsinfra / nmsebs{% elif item.database == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %})
                         </span>
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if item.availability_status == 'Meets SLA' %}#137333{% else %}#c5221f{% endif %};">
@@ -416,7 +388,7 @@
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {{ item.restore_success }}
                     </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' or item.replication_status == 'N/A' %}#64748b{% else %}#c5221f{% endif %};">
+                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if item.replication_status == 'Healthy' %}#137333{% elif item.replication_status == 'No Data' %}#64748b{% else %}#c5221f{% endif %};">
                         {{ item.replication_status }}
                     </td>
                 </tr>
@@ -575,7 +547,7 @@
                                 {{ database_detail.current.replication_status }}
                             </td>
                             <td style="padding: 0.45rem 0.35rem; text-align: center; color: #64748b; font-style: italic;">
-                                {% if selected_db == 'MS SQL Server' or selected_db == 'PostgreSQL' %}N/A{% else %}Healthy{% endif %}
+                                {% if selected_db == 'MS SQL Server' %}N/A{% else %}Healthy{% endif %}
                             </td>
                             <td style="padding: 0.45rem 0.35rem; text-align: center;" class="{% if database_detail.status.replication_status == 'Meets SLA' %}cell-meets{% elif database_detail.status.replication_status == 'Warning' %}cell-warning{% elif database_detail.status.replication_status == 'N/A' %}cell-na{% else %}cell-misses{% endif %}">
                                 {{ database_detail.status.replication_status }}
@@ -690,7 +662,7 @@
                             <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.76rem; color: #137333; font-weight: 600;">
                                 <span style="font-size: 0.95rem; font-weight: bold;">✓</span> Backup success rate meets SLA
                             </div>
-                            {% if selected_db != 'MS SQL Server' and selected_db != 'PostgreSQL' %}
+                            {% if selected_db != 'MS SQL Server' %}
                             <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.76rem; color: #137333; font-weight: 600;">
                                 <span style="font-size: 0.95rem; font-weight: bold;">✓</span> Replication is healthy
                             </div>
@@ -700,8 +672,8 @@
                             </div>
                         </div>
                     {% else %}
-                        <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; width: 100%;">
-                            All systems operating normally.
+                        <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; border: 1px dashed rgba(90, 123, 156, 0.2); border-radius: 4px; width: 100%;">
+                            ✓ All systems operating normally.
                         </div>
                     {% endif %}
                 {% endfor %}
@@ -731,7 +703,7 @@
                     Database Instance
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
-                    {% if selected_db == 'Oracle' %}nmsinfra{% elif selected_db == 'MySQL' %}nickledbnew{% elif selected_db == 'PostgreSQL' %}ccisprod_db (postgres / odk_sync){% else %}Pentana{% endif %}
+                    {% if selected_db == 'Oracle' %}nmsinfra{% elif selected_db == 'MySQL' %}nickledbnew{% else %}Pentana{% endif %}
                 </div>
             </div>
             <div>
@@ -739,7 +711,7 @@
                     Application Instance
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
-                    {% if selected_db == 'Oracle' %}nmsebs{% elif selected_db == 'MySQL' %}NMS360 / ServiceDesk / DMT{% elif selected_db == 'PostgreSQL' %}CCIS / ODK-X Sync Endpoint{% else %}MKInsight{% endif %}
+                    {% if selected_db == 'Oracle' %}nmsebs{% elif selected_db == 'MySQL' %}NMS360 / ServiceDesk / DMT{% else %}MKInsight{% endif %}
                 </div>
             </div>
         </div>
@@ -759,7 +731,7 @@
                     Purpose
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-top: 0.25rem; line-height: 1.4;">
-                    {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, DMT, and other in-house applications.{% elif selected_db == 'PostgreSQL' %}Hosts the Cold Chain Information System (CCIS / ODK-X) managing health-facility cold-chain assets, maintenance logs, and regional sync across Uganda.{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors.{% endif %}
+                    {% if selected_db == 'Oracle' %}Powers core NMS ERP suite supporting finance, procurement, stores, and order management.{% elif selected_db == 'MySQL' %}Hosts NMS360, IT ServiceDesk ticketing, DMT, and other in-house applications.{% else %}Hosts MKInsight (Pentana Audit) system used by internal auditors.{% endif %}
                 </div>
             </div>
         </div>
@@ -771,7 +743,7 @@
                     Backup Monitoring
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                    {% if selected_db == 'MS SQL Server' or selected_db == 'PostgreSQL' %}Active (Weekly Backup Logs Checked){% else %}Active (Daily Backup Logs Checked){% endif %}
+                    {% if selected_db == 'MS SQL Server' %}Active (Weekly Backup Logs Checked){% else %}Active (Daily Backup Logs Checked){% endif %}
                 </div>
             </div>
             <div>
@@ -779,7 +751,7 @@
                     Replication
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">
-                    {% if selected_db == 'Oracle' %}Not Configured{% elif selected_db == 'MySQL' %}Replicated to nickeldbdr{% else %}Not Applicable (Standalone){% endif %}
+                    {% if selected_db == 'Oracle' %}Not Configured{% elif selected_db == 'MySQL' %}Replicated to nickeldbdr{% else %}Not Applicable{% endif %}
                 </div>
             </div>
         </div>
@@ -791,7 +763,7 @@
                     Host / Server
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem; font-family: monospace;">
-                    {% if selected_db == 'Oracle' %}nmsinfra/nmsebs{% elif selected_db == 'MySQL' %}nickledbnew{% elif selected_db == 'PostgreSQL' %}ccisuganda.nms.go.ug (Swarm){% else %}Pentana Server{% endif %}
+                    {% if selected_db == 'Oracle' %}nmsinfra/nmsebs{% elif selected_db == 'MySQL' %}nickledbnew{% else %}Pentana Server{% endif %}
                 </div>
             </div>
             <div>
@@ -806,497 +778,64 @@
     </div>
 </div>
 {% endif %}
-{% endif %}
 
-{% if can_view_infra_dashboard %}
-<!-- Node Infrastructure Overview Section (KPI Cards, Capacity & Performance Records, Uptime Trend & Alerts) -->
-<div id="node-infrastructure" style="display: flex; justify-content: space-between; align-items: center; margin-top: 2.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem; scroll-margin-top: 1.5rem;">
-    <div>
-        <h2 style="margin: 0; font-weight: 700; color: #00205B; font-size: 1.45rem;">
-            Node Infrastructure Overview
-        </h2>
-    </div>
-
-    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-        <form method="GET" action="#node-infrastructure" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 0;">
-            <input type="hidden" name="database_select" value="{{ selected_db }}">
-            <input type="hidden" name="month" value="{{ reporting_month }}">
-            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
-                <select name="node_select" onchange="submitNodeScopeFilter(this)" style="padding: 0.45rem 1.5rem 0.45rem 0.75rem; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 4px; color: #0f172a; font-family: inherit; font-size: 0.85rem; background: #fff; cursor: pointer;">
-                    <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
-                    <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM</option>
-                    <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox</option>
-                </select>
-            </div>
-        </form>
-
-        <!-- Export Node Report Button -->
-        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-self: flex-end;">
-            <div class="export-dropdown">
-                <button class="btn btn-primary" type="button" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.48rem 0.85rem; font-size: 0.85rem; background-color: var(--primary-navy); border-color: var(--primary-navy); cursor: pointer; border-radius: 4px; font-weight: 600; color: #fff;">
-                    Export Report <span style="font-size: 0.7rem; margin-left: 0.25rem;">▼</span>
-                </button>
-                <div class="export-dropdown-content" style="min-width: 170px;">
-                    <a href="javascript:void(0)" onclick="openNodeExportModal()">
-                        Export PDF Report
-                    </a>
-                    <a href="{% url 'dashboard_node_excel' %}?month={{ reporting_month }}&node_select={{ selected_node }}" download>
-                        Export Excel Summary
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Node Summary Metrics Row (KPI Cards Deck) -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-    <!-- 1. Node Uptime -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;" title="Aggregated monthly average uptime across all active nodes">Node Uptime (Monthly Avg)</span>
-        <strong style="color: {% if kpi_node_uptime_val and kpi_node_uptime_val < target_node_sla %}#c5221f{% else %}#16a34a{% endif %}; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_node_uptime }}</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_nodes_healthy }} &bull; Target: &ge; {{ target_node_sla }}%</span>
-    </div>
-
-    <!-- 2. Total Logical CPUs -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Logical CPUs</span>
-        <strong style="color: #00205B; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_logical_cpus }} vCPUs</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_compute_subtext|default:"Compute Fleet" }}</span>
-    </div>
-
-    <!-- 3. Total Node Memory -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Node Memory</span>
-        <strong style="color: #0f172a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_ram_gb }} GB</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_used_ram_gb }} GB in use</span>
-    </div>
-
-    <!-- 4. Total Node Storage -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.15rem 1.25rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);">
-        <span style="color: #64748b; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Total Node Storage</span>
-        <strong style="color: #0f172a; font-size: 1.6rem; font-weight: 700; display: block; margin-top: 0.25rem; line-height: 1.2;">{{ kpi_total_storage_gb }} GB</strong>
-        <span style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; display: block;">{{ kpi_used_storage_gb }} GB used ({{ kpi_storage_used_pct }}%)</span>
-    </div>
-</div>
-
-<!-- Capacity & Performance Records Table -->
-<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04); margin-bottom: 1.5rem;">
-    <div style="margin-bottom: 1rem;">
-        <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #00205B;">Capacity &amp; Performance Records</h3>
-    </div>
-
-    <div style="overflow-x: auto;">
-        <table class="modern-table" style="font-size: 0.82rem; width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-                <tr style="background: var(--bg-cool); border-bottom: 2px solid rgba(90, 123, 156, 0.15);">
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Node</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Hosted VMs / Workloads</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;" title="Monthly average uptime across all telemetry records and logged outages">Uptime (Monthly Avg)</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Unplanned Down</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Incidents</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Local Storage (GB)</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Storage Util %</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory (GB)</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Memory Util %</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Logical CPUs</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">CPU Util %</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for node in filtered_nodes %}
-                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
-                    <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--primary-navy); white-space: nowrap;">
-                        {% if node.node_name == 'OLKVM' %}
-                            <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy);">OLKVM</div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Host Cluster</div>
-                        {% else %}
-                            <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy);">{{ node.display_name }}</div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Proxmox VE Node</div>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; vertical-align: middle;">
-                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                            {% for vm in node.hosted_vms %}
-                                <div style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem;">
-                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #0284c7; flex-shrink: 0;"></span>
-                                    <strong style="color: #0f172a;">{{ vm.name }}</strong>
-                                    {% if vm.role %}
-                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.role }})</span>
-                                    {% elif vm.label and vm.label != vm.name %}
-                                        <span style="color: #64748b; font-size: 0.7rem;">({{ vm.label }})</span>
-                                    {% endif %}
-                                </div>
-                            {% empty %}
-                                <span style="color: #64748b; font-size: 0.75rem;">{{ node.hosted_systems }}</span>
-                            {% endfor %}
-                        </div>
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if not node.has_data %}#64748b{% elif node.uptime_percent >= target_node_sla %}#137333{% else %}#c5221f{% endif %}; white-space: nowrap;">
-                        {{ node.uptime_str }}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.unplanned_down_hrs > 0 %}#c5221f{% else %}#475569{% endif %}; white-space: nowrap;">
-                        {% if node.unplanned_down_hrs > 0 %}{{ node.unplanned_down_hrs }} hrs{% else %}0.00 hrs{% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.incident_count > 0 %}#c5221f{% else %}#334155{% endif %};">
-                        {{ node.incident_count }}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600; white-space: nowrap;">
-                        {% if node.has_data and node.local_disk_capacity_gb > 0 %}
-                            <div>{{ node.local_disk_used_gb }} / {{ node.local_disk_capacity_gb }}</div>
-                            {% if node.storage_breakdown %}
-                                <div style="font-size: 0.68rem; color: #94a3b8; font-weight: normal; margin-top: 0.1rem;" title="Workload storage breakdown">{{ node.storage_breakdown }}</div>
-                            {% endif %}
-                        {% else %}
-                            No Data
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                        {% if node.has_data %}{{ node.local_disk_util_pct }}%{% else %}No Data{% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; color: #475569; font-weight: 600; white-space: nowrap;">
-                        {% if node.has_data and node.memory_total_gb > 0 %}{{ node.memory_used_gb }} / {{ node.memory_total_gb }}{% else %}No Data{% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                        {% if node.has_data %}{{ node.memory_percent }}%{% else %}No Data{% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                        {{ node.logical_cpus }}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                        {% if node.has_data %}{{ node.cpu_percent }}%{% else %}No Data{% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: {% if node.status == 'Healthy' %}#137333{% elif node.status == 'Warning' %}#d97706{% elif node.status == 'Below SLA' or node.status == 'Outage' %}#c5221f{% else %}#64748b{% endif %};">
-                        {{ node.status }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Guest Virtual Machine Status Card -->
-<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
-        <div>
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
-                    Guest Virtual Machine Status
-                </h3>
-                <span style="font-size: 0.82rem; font-weight: 600; color: {{ guest_vm_kpis.vms_status_color|default:'#0284c7' }};">
-                    &bull; {{ guest_vm_kpis.vms_healthy_display }}
-                </span>
-            </div>
-            <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.78rem;">
-                Live compute, memory, storage utilization and SLA availability across virtual machine instances hosted on the hypervisors.
-            </p>
-        </div>
-        <div style="display: flex; gap: 0.75rem; align-items: center; font-size: 0.75rem; flex-wrap: wrap;">
-            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
-                <strong>Avg CPU:</strong> {{ guest_vm_kpis.fleet_avg_cpu }}
-            </span>
-            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
-                <strong>Avg RAM:</strong> {{ guest_vm_kpis.fleet_avg_mem }}
-            </span>
-            <span style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 0.25rem 0.55rem; color: #475569;">
-                <strong>Avg Disk:</strong> {{ guest_vm_kpis.fleet_avg_disk }}
-            </span>
-            <a href="{% url 'server_health_list' %}?tab=vms" style="color: var(--primary-navy); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.25rem;">
-                Server Health Logs &rarr;
-            </a>
-        </div>
-    </div>
-
-    <div style="overflow-x: auto;">
-        <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
-            <thead>
-                <tr style="border-bottom: 2px solid rgba(90, 123, 156, 0.15); background-color: var(--bg-cool);">
-                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 17%;">Virtual Machine (Server)</th>
-                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 14%;">Host Hypervisor</th>
-                    <th style="padding: 0.75rem 0.6rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; width: 19%;">Workload / Role</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 9%;">Database</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 8%;">Uptime SLA</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 7%;">CPU Util %</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 11%;">Memory (RAM)</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 8%;">OS Disk %</th>
-                    <th style="padding: 0.75rem 0.5rem; color: var(--primary-navy); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; text-align: center; width: 7%;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for vm in guest_vms_summary %}
-                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
-                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
-                        <div style="font-weight: 700; color: #0f172a; font-size: 0.85rem;">{{ vm.display_name }}</div>
-                        {% if vm.vmid and vm.vmid != 'N/A (OLKVM)' %}
-                        <div style="font-size: 0.7rem; color: #64748b; font-family: monospace; margin-top: 0.1rem;">{{ vm.vmid }}</div>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
-                        <div style="font-weight: 600; color: #1e293b; font-size: 0.82rem;">{{ vm.host_node }}</div>
-                        <div style="font-size: 0.68rem; color: #94a3b8;">{{ vm.cluster }}</div>
-                    </td>
-                    <td style="padding: 0.65rem 0.6rem; vertical-align: middle;">
-                        <div style="font-weight: 500; color: #334155; font-size: 0.82rem;">{{ vm.role }}</div>
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <span style="font-weight: 600; color: var(--primary-navy); font-size: 0.82rem;">{{ vm.database }}</span>
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}#137333{% elif vm.uptime_percent >= 99.0 %}#b06000{% else %}#c5221f{% endif %}; white-space: nowrap; vertical-align: middle;">
-                        {{ vm.uptime_str }}
-                        {% if vm.unplanned_down_hrs > 0 %}
-                            <div style="font-size: 0.68rem; color: #dc2626; font-weight: normal; margin-top: 0.1rem;">{{ vm.unplanned_down_hrs }}h outage</div>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <div style="font-weight: 600; color: #0f172a;">{{ vm.cpu_percent }}%</div>
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.logical_cpus }} cores</div>
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <div style="font-weight: 600; color: #0f172a;">{{ vm.memory_percent }}%</div>
-                        {% if vm.memory_total_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.memory_used_gb }} / {{ vm.memory_total_gb }} GB</div>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <div style="font-weight: 600; color: #0f172a;">{{ vm.disk_percent }}%</div>
-                        {% if vm.disk_size_gb > 0 %}
-                        <div style="font-size: 0.68rem; color: #64748b;">{{ vm.disk_used_gb }} / {{ vm.disk_size_gb }} GB</div>
-                        {% endif %}
-                    </td>
-                    <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
-                        <span style="font-size: 0.75rem; font-weight: 700;
-                                    {% if vm.status == 'Healthy' %}color: #137333;
-                                    {% elif vm.status == 'Critical' %}color: #c5221f;
-                                    {% else %}color: #b06000;{% endif %}">
-                            {{ vm.status }}
-                        </span>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="9" style="text-align: center; padding: 1.75rem; color: #94a3b8; font-style: italic;">
-                        No virtual machines found for the selected node scope.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Node Uptime Trend Graph & Node Status & Alerts -->
-<div class="scoped-grid scoped-grid-2col" style="margin-bottom: 2rem;">
-    <!-- Left: Node Uptime Trend Card -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.65rem; margin-bottom: 0.75rem;">
-            <div>
-                <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
-                    {% if selected_node == 'All Nodes' %}Overall Node Uptime Trend{% else %}{{ selected_node }} Uptime Trend{% endif %}
-                </h3>
-                <p style="margin: 0.2rem 0 0 0; color: #64748b; font-size: 0.76rem;">Last 6 months trend</p>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px;">6-Mo Avg</div>
-                <div style="font-size: 1.2rem; font-weight: 800; color: {% if node_trend_recent_avg >= target_node_sla %}#137333{% else %}#c5221f{% endif %}; line-height: 1.1;">{{ node_trend_recent_avg }}%</div>
-            </div>
-        </div>
-
-        <div style="position: relative; flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 190px;">
-            <svg viewBox="0 0 400 150" style="width: 100%; height: auto; max-height: 240px; overflow: visible;">
-                <line x1="40" y1="22" x2="360" y2="22" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="54" x2="360" y2="54" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="86" x2="360" y2="86" stroke="#f1f5f9" stroke-width="1" />
-                <line x1="40" y1="118" x2="360" y2="118" stroke="#f1f5f9" stroke-width="1" />
-
-                <line x1="40" y1="{{ node_sla_y_coord }}" x2="360" y2="{{ node_sla_y_coord }}" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,3" />
-                <text x="363" y="{{ node_sla_y_coord }}" fill="#ef4444" font-size="6.5" font-weight="700" alignment-baseline="middle">SLA {{ target_node_sla }}%</text>
-
-                {% if node_trend_area_points %}
-                <polygon fill="rgba(37, 99, 235, 0.07)" points="{{ node_trend_area_points }}" />
-                {% endif %}
-
-                <polyline fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" points="{{ node_trend_polyline_points }}" />
-
-                {% for m in node_trend_months %}
-                    {% if m.has_data %}
-                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="3" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" />
-                        <text x="{{ m.x }}" y="{{ m.text_y }}" fill="#0f172a" font-size="7" font-weight="700" text-anchor="middle">{{ m.value }}%</text>
-                    {% else %}
-                        <circle cx="{{ m.x }}" cy="{{ m.y }}" r="2" fill="#cbd5e1" stroke="#ffffff" stroke-width="1" />
-                        <text x="{{ m.x }}" y="110" fill="#94a3b8" font-size="6.5" font-weight="600" text-anchor="middle" font-style="italic">No Data</text>
-                    {% endif %}
-                    <text x="{{ m.x }}" y="136" fill="#64748b" font-size="7.5" font-weight="600" text-anchor="middle">{{ m.name }}</text>
-                {% endfor %}
-            </svg>
-        </div>
-
-        <div style="display: flex; align-items: center; justify-content: center; gap: 1.25rem; margin-top: auto; padding-top: 0.65rem; border-top: 1px solid rgba(90, 123, 156, 0.1); font-size: 0.72rem; color: #64748b;">
-            <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <span style="display: inline-block; width: 12px; height: 3px; background-color: #2563eb; border-radius: 2px;"></span>
-                <span>Node Uptime %</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.35rem;">
-                <span style="display: inline-block; width: 12px; height: 0; border-top: 1.5px dashed #ef4444;"></span>
-                <span>Target SLA (&ge; {{ target_node_sla }}%)</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Right: Node Status & Alerts Card -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); display: flex; flex-direction: column;">
-        <div>
-            <h3 style="margin: 0 0 1rem 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy); border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem;">
-                {% if selected_node == 'All Nodes' %}Node Status &amp; Alerts{% else %}{{ selected_node }} Status &amp; Alerts{% endif %}
-            </h3>
-
-            <div style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 220px; overflow-y: auto; padding-right: 0.25rem;">
-                {% for item in node_attention_items %}
-                    <div style="display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.35rem 0.5rem; border-left: 3px solid {% if item.type == 'danger' %}#ef4444{% else %}#f59e0b{% endif %}; font-size: 0.75rem; color: #334155;">
-                        <div style="font-weight: 500; line-height: 1.35;">{{ item.message|safe }}</div>
-                    </div>
-                {% empty %}
-                    <div style="text-align: center; padding: 1.5rem 0.5rem; color: #94a3b8; font-size: 0.78rem; font-style: italic; width: 100%;">
-                        All monitored nodes operating normally.
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if not can_view_db_dashboard and not can_view_infra_dashboard %}
-<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 3rem 2rem; text-align: center; margin: 2rem auto; max-width: 600px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-    <div style="width: 56px; height: 56px; background-color: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-    </div>
-    <h3 style="font-size: 1.25rem; font-weight: 700; color: #00205B; margin-bottom: 0.5rem;">Access Restricted</h3>
-    <p style="font-size: 0.88rem; color: #64748b; line-height: 1.5; margin-bottom: 0;">
-        You do not currently have permission to view the Database Operations Dashboard or the Node Infrastructure Dashboard. Please contact your system administrator to request access.
-    </p>
-</div>
-{% endif %}
-
-{% if can_view_db_dashboard %}
 <!-- Export Performance Report Preview Modal -->
-<div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08); max-width: 540px; width: 100%; overflow: hidden; display: flex; flex-direction: column; animation: modalSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+<div id="exportReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); max-width: 520px; width: 100%; border: 1px solid var(--border-mist); overflow: hidden; display: flex; flex-direction: column;">
         <!-- Modal Header -->
-        <div style="background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); padding: 1.15rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(255, 255, 255, 0.12); display: flex; align-items: center; justify-content: center; color: #ffffff; flex-shrink: 0;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                </div>
-                <div>
-                    <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25;">Generate Performance Report</h3>
-                    <p style="margin: 0.2rem 0 0 0; color: rgba(255, 255, 255, 0.75); font-size: 0.75rem; font-weight: 400;">Monthly telemetry publication, SLAs &amp; operational metrics</p>
-                </div>
-            </div>
-            <button type="button" onclick="closeExportModal()" aria-label="Close" style="background: rgba(255, 255, 255, 0.12); border: none; color: #ffffff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; line-height: 1; padding: 0; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.12)'">&times;</button>
+        <div style="background-color: var(--primary-navy); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; font-family: inherit;">Generate Performance Report</h3>
+            <button type="button" onclick="closeExportModal()" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.8); font-size: 1.25rem; cursor: pointer; line-height: 1; padding: 0;" onmouseover="this.style.color='#ffffff'" onmouseout="this.style.color='rgba(255, 255, 255, 0.8)'">&times;</button>
         </div>
         
         <!-- Modal Form -->
-        <form action="{% url 'dashboard_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeExportModal, 500)" style="margin: 0; padding: 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
+        <form action="{% url 'dashboard_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeExportModal, 500)" style="margin: 0; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
             {% csrf_token %}
             <input type="hidden" name="download" value="true">
-            <input type="hidden" name="month" value="{{ reporting_month }}">
-            <input type="hidden" name="database_select" value="{{ selected_db }}">
             
-            <!-- Metadata Scope Badges -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
-                <div>
-                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Reporting Period</span>
-                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        {{ reporting_month }}
-                    </div>
+            <!-- Metadata Fields (Readonly side-by-side) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Reporting Period</label>
+                    <input type="text" value="{{ reporting_month }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
+                    <input type="hidden" name="month" value="{{ reporting_month }}">
                 </div>
-                <div style="border-left: 1px solid #e2e8f0; padding-left: 0.85rem;">
-                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Database Scope</span>
-                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-                        </svg>
-                        {{ selected_db }}
-                    </div>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
+                    <input type="text" value="{{ selected_db }}" readonly style="padding: 0.45rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; font-family: inherit;">
+                    <input type="hidden" name="database_select" value="{{ selected_db }}">
                 </div>
             </div>
             
             <!-- Report Contents Checklist -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
-                <div style="margin-bottom: 0.6rem;">
-                    <span style="font-size: 0.7rem; font-weight: 700; color: #00205B; text-transform: uppercase; letter-spacing: 0.05em;">Included Sections</span>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.76rem; color: #334155;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Performance summary &amp; editorial narrative</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>SLA performance &amp; target compliance scorecard</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Operations metrics (Downtime, incidents, backups, replication)</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Infrastructure architecture &amp; environment specifications</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Formal multi-tier sign-off and approval block</span>
-                    </div>
-                </div>
+            <div style="background-color: #f4f7fc; border-radius: 6px; padding: 0.75rem 1rem; border: 1px dashed rgba(90, 123, 156, 0.25);">
+                <span style="font-size: 0.72rem; font-weight: 700; color: var(--primary-navy); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.35rem; font-family: inherit;">Included Sections</span>
+                <ul style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: #475569; line-height: 1.45;">
+                    <li>Executive performance summary and editorial analysis</li>
+                    <li>SLA performance &amp; target compliance scorecard</li>
+                    <li>Detailed operations metrics (Downtime, incidents, backups, replication)</li>
+                    <li>Infrastructure architecture &amp; environment specifications</li>
+                    <li>Formal multi-tier sign-off and approval block</li>
+                </ul>
             </div>
             
             <!-- Narrative Summary (Editable) -->
-            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                <div>
-                    <label for="summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Summary Narrative</label>
-                </div>
-                <textarea id="summary_narrative" name="summary_narrative" rows="4" style="padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-family: inherit; line-height: 1.5; resize: vertical; color: #0f172a; width: 100%; box-sizing: border-box; background: #ffffff; transition: border-color 0.15s, box-shadow 0.15s;" onfocus="this.style.borderColor='#00205B'; this.style.boxShadow='0 0 0 3px rgba(0, 32, 91, 0.1)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';" placeholder="Add custom narrative context...">{{ default_lede_text }}</textarea>
-                <div style="font-size: 0.71rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem; line-height: 1.35;">
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="#94a3b8" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
-                    <span>Edit or append custom notes to tailor the summary text included in the publication.</span>
-                </div>
+            <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                <label for="summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Executive Summary Narrative</label>
+                <textarea id="summary_narrative" name="summary_narrative" rows="4" style="padding: 0.5rem 0.65rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; font-family: inherit; line-height: 1.4; resize: vertical; color: #1e293b; width: 100%;" placeholder="Add custom narrative context...">{{ default_lede_text }}</textarea>
+                <span style="font-size: 0.68rem; color: #64748b; font-style: italic;">Note: You can edit or append custom commentary directly in the text box above to override the automated summary text.</span>
             </div>
             
             <!-- Action Buttons -->
-            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 0.5rem;">
                 <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
-                    Excel Summary (.xlsx)
+                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&database_select={{ selected_db }}" style="color: #64748b; font-size: 0.72rem; text-decoration: underline; font-weight: 600; font-family: inherit;" download onclick="closeExportModal()">
+                    Export raw Excel summary instead
                 </a>
                 
-                <div style="display: flex; gap: 0.65rem;">
-                    <button type="button" onclick="closeExportModal()" style="padding: 0.48rem 0.95rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f8fafc'">Cancel</button>
-                    <button type="submit" style="padding: 0.48rem 1.15rem; border: none; border-radius: 6px; background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; font-family: inherit; box-shadow: 0 2px 4px rgba(0, 32, 91, 0.2); transition: all 0.15s;" onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="12" y1="18" x2="12" y2="12"></line>
-                            <line x1="9" y1="15" x2="12" y2="18"></line>
-                            <line x1="15" y1="15" x2="12" y2="18"></line>
-                        </svg>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" onclick="closeExportModal()" style="padding: 0.5rem 1rem; border: 1px solid #cbd5e1; border-radius: 4px; background-color: #ffffff; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='#ffffff'">Cancel</button>
+                    <button type="submit" style="padding: 0.5rem 1rem; border: none; border-radius: 4px; background-color: var(--primary-green); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-family: inherit;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                         Generate PDF Report
                     </button>
                 </div>
@@ -1304,251 +843,23 @@
         </form>
     </div>
 </div>
-{% endif %}
-
-{% if can_view_infra_dashboard %}
-<!-- Export Node Performance Report Preview Modal -->
-<div id="exportNodeReportModal" style="display: none; position: fixed; inset: 0; background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08); max-width: 540px; width: 100%; overflow: hidden; display: flex; flex-direction: column; animation: modalSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
-        <!-- Modal Header -->
-        <div style="background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); padding: 1.15rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 38px; height: 38px; border-radius: 9px; background: rgba(255, 255, 255, 0.12); display: flex; align-items: center; justify-content: center; color: #ffffff; flex-shrink: 0;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                        <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                        <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                    </svg>
-                </div>
-                <div>
-                    <h3 style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25;">Generate Node Performance &amp; SLA Report</h3>
-                    <p style="margin: 0.2rem 0 0 0; color: rgba(255, 255, 255, 0.75); font-size: 0.75rem; font-weight: 400;">Monthly telemetry publication, SLAs &amp; hypervisor metrics</p>
-                </div>
-            </div>
-            <button type="button" onclick="closeNodeExportModal()" aria-label="Close" style="background: rgba(255, 255, 255, 0.12); border: none; color: #ffffff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; line-height: 1; padding: 0; transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='rgba(255, 255, 255, 0.25)'" onmouseout="this.style.backgroundColor='rgba(255, 255, 255, 0.12)'">&times;</button>
-        </div>
-
-        <!-- Modal Form -->
-        <form action="{% url 'dashboard_node_print' %}" method="POST" target="_blank" onsubmit="setTimeout(closeNodeExportModal, 500)" style="margin: 0; padding: 1.35rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;">
-            {% csrf_token %}
-            <input type="hidden" name="download" value="true">
-            <input type="hidden" name="month" value="{{ reporting_month }}">
-            <input type="hidden" name="node_select" value="{{ selected_node }}">
-
-            <!-- Metadata Scope Badges -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem 1rem;">
-                <div>
-                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Reporting Period</span>
-                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        {{ reporting_month }}
-                    </div>
-                </div>
-                <div style="border-left: 1px solid #e2e8f0; padding-left: 0.85rem;">
-                    <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 0.25rem;">Node Scope</span>
-                    <div style="font-size: 0.92rem; font-weight: 700; color: #00205B; display: flex; align-items: center; gap: 0.4rem;">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A7B9C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
-                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
-                        </svg>
-                        {{ selected_node }}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Report Contents Checklist -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.85rem 1rem;">
-                <div style="margin-bottom: 0.6rem;">
-                    <span style="font-size: 0.7rem; font-weight: 700; color: #00205B; text-transform: uppercase; letter-spacing: 0.05em;">Included Sections</span>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.76rem; color: #334155;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Node infrastructure summary &amp; editorial narrative</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Node uptime SLA &amp; compute/memory/storage KPI deck</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Capacity &amp; performance records across OLKVM and Proxmox</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>6-month node uptime trend and active status alerts</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="14" height="14" viewBox="0 0 20 20" fill="#16a34a" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        <span>Formal multi-tier sign-off and approval block</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Narrative Summary (Editable) -->
-            <div style="display: flex; flex-direction: column; gap: 0.4rem;">
-                <div>
-                    <label for="node_summary_narrative" style="font-size: 0.72rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Summary Narrative</label>
-                </div>
-                <textarea id="node_summary_narrative" name="summary_narrative" rows="4" style="padding: 0.65rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; font-family: inherit; line-height: 1.5; resize: vertical; color: #0f172a; width: 100%; box-sizing: border-box; background: #ffffff; transition: border-color 0.15s, box-shadow 0.15s;" onfocus="this.style.borderColor='#00205B'; this.style.boxShadow='0 0 0 3px rgba(0, 32, 91, 0.1)';" onblur="this.style.borderColor='#cbd5e1'; this.style.boxShadow='none';" placeholder="Add custom narrative context...">{{ default_node_lede_text }}</textarea>
-                <div style="font-size: 0.71rem; color: #64748b; display: flex; align-items: center; gap: 0.35rem; line-height: 1.35;">
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill="#94a3b8" style="flex-shrink: 0;"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
-                    <span>Edit or append custom notes to tailor the summary text included in the publication.</span>
-                </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
-                <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_node_excel' %}?month={{ reporting_month }}&node_select={{ selected_node }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeNodeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
-                    Excel Summary (.xlsx)
-                </a>
-
-                <div style="display: flex; gap: 0.65rem;">
-                    <button type="button" onclick="closeNodeExportModal()" style="padding: 0.48rem 0.95rem; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #f8fafc; color: #475569; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s;" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f8fafc'">Cancel</button>
-                    <button type="submit" style="padding: 0.48rem 1.15rem; border: none; border-radius: 6px; background: linear-gradient(135deg, #00205B 0%, #0d3882 100%); color: #ffffff; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; font-family: inherit; box-shadow: 0 2px 4px rgba(0, 32, 91, 0.2); transition: all 0.15s;" onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="12" y1="18" x2="12" y2="12"></line>
-                            <line x1="9" y1="15" x2="12" y2="18"></line>
-                            <line x1="15" y1="15" x2="12" y2="18"></line>
-                        </svg>
-                        Generate PDF Report
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
 
 <script>
     function openExportModal() {
         const modal = document.getElementById('exportReportModal');
-        if (modal) {
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
     function closeExportModal() {
         const modal = document.getElementById('exportReportModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-    }
-    function openNodeExportModal() {
-        const modal = document.getElementById('exportNodeReportModal');
-        if (modal) {
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-    }
-    function closeNodeExportModal() {
-        const modal = document.getElementById('exportNodeReportModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
     }
     // Close modal on escape key
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape') {
             closeExportModal();
-            closeNodeExportModal();
         }
     });
-
-    // Close modal on backdrop click outside dialog
-    document.getElementById('exportReportModal')?.addEventListener('click', function(e) {
-        if (e.target === this) closeExportModal();
-    });
-    document.getElementById('exportNodeReportModal')?.addEventListener('click', function(e) {
-        if (e.target === this) closeNodeExportModal();
-    });
-
-    // Node Scope and Database Filter Navigation
-    function submitNodeScopeFilter(selectEl) {
-        try {
-            sessionStorage.setItem('restore_node_infra_scroll', 'true');
-        } catch (e) {}
-
-        const form = selectEl.form;
-        const url = new URL(window.location.href);
-        url.searchParams.set('node_select', selectEl.value);
-
-        const dbInput = form.querySelector('input[name="database_select"]');
-        if (dbInput && dbInput.value) {
-            url.searchParams.set('database_select', dbInput.value);
-        }
-        const monthInput = form.querySelector('input[name="month"]');
-        if (monthInput && monthInput.value) {
-            url.searchParams.set('month', monthInput.value);
-        }
-        url.hash = 'node-infrastructure';
-        window.location.href = url.pathname + '?' + url.searchParams.toString() + '#node-infrastructure';
-    }
-
-    function submitDbFilter(inputEl) {
-        try {
-            sessionStorage.removeItem('restore_node_infra_scroll');
-        } catch (e) {}
-
-        const form = inputEl.form;
-        const url = new URL(window.location.href);
-        if (inputEl.name === 'database_select') {
-            url.searchParams.set('database_select', inputEl.value);
-        } else if (inputEl.name === 'month') {
-            url.searchParams.set('month', inputEl.value);
-        }
-        const nodeInput = form.querySelector('input[name="node_select"]');
-        if (nodeInput && nodeInput.value) {
-            url.searchParams.set('node_select', nodeInput.value);
-        }
-        url.hash = '';
-        window.location.href = url.pathname + '?' + url.searchParams.toString();
-    }
-
-    // Scroll restoration for Node Infrastructure section
-    (function() {
-        function checkAndScroll() {
-            let shouldScroll = false;
-            try {
-                if (sessionStorage.getItem('restore_node_infra_scroll') === 'true') {
-                    shouldScroll = true;
-                    sessionStorage.removeItem('restore_node_infra_scroll');
-                }
-            } catch (e) {}
-
-            if (window.location.hash === '#node-infrastructure') {
-                shouldScroll = true;
-            }
-
-            if (shouldScroll) {
-                const el = document.getElementById('node-infrastructure');
-                if (el) {
-                    requestAnimationFrame(function() {
-                        el.scrollIntoView({ behavior: 'auto', block: 'start' });
-                    });
-                }
-            }
-        }
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', checkAndScroll);
-        } else {
-            checkAndScroll();
-        }
-    })();
 </script>
 {% endblock %}

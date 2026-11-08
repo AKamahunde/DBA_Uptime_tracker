@@ -7,46 +7,12 @@
     <div style="margin-bottom: 1.5rem;">
         <h2>Incident Staging Area</h2>
         <p style="color: #64748b; font-size: 0.9rem; margin-top: 0.25rem;">
-            {% if is_sysadmin %}
-            Review incoming automated infrastructure and host node alerts from Prometheus. Establish whether each alert was an unplanned <strong>Incident</strong>, a planned <strong>Maintenance activity</strong>, or transient <strong>network intermittence</strong>.
-            {% else %}
-            Review incoming automated server restart, database outage, and host node alerts. Establish whether each alert was an unplanned <strong>Incident</strong> or a planned <strong>Maintenance activity</strong> to route them to their respective operational registers.
-            {% endif %}
+            Review incoming automated server restart and database outage alerts. Establish whether each alert was a real <strong>Incident</strong> or a planned <strong>Maintenance activity</strong> to route them to their respective logs.
         </p>
-    </div>
-
-    <!-- Category Tabs -->
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.65rem; flex-wrap: wrap;">
-        {% if is_sysadmin %}
-        <span style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background: var(--primary-navy); color: #fff;">
-            Infrastructure Alerts (Prometheus) ({{ infra_awaiting_count }})
-        </span>
-        {% else %}
-        <a href="?category=" 
-           style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-                  {% if not current_category %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-            All Alerts ({{ total_awaiting_count }})
-        </a>
-        <a href="?category=Database" 
-           style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-                  {% if current_category == 'Database' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-            Database Alerts ({{ db_awaiting_count }})
-        </a>
-        <a href="?category=Infrastructure" 
-           style="padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; text-decoration: none; border-radius: 6px; transition: all 0.2s;
-                  {% if current_category == 'Infrastructure' %}background: var(--primary-navy); color: #fff;{% else %}background: #f1f5f9; color: #475569;{% endif %}">
-            Infrastructure Alerts ({{ infra_awaiting_count }})
-        </a>
-        {% endif %}
     </div>
 
     <!-- Filter Bar -->
     <form method="get" style="display: flex; gap: 1rem; margin-bottom: 1.5rem; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0; align-items: center; flex-wrap: wrap;">
-        {% if current_category %}
-        <input type="hidden" name="category" value="{{ current_category }}">
-        {% endif %}
-
-        {% if not is_sysadmin and current_category != 'Infrastructure' %}
         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
             <label for="database" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Database</label>
             <select id="database" name="database" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 150px;">
@@ -54,28 +20,13 @@
                 <option value="MySQL" {% if current_db == 'MySQL' %}selected{% endif %}>MySQL</option>
                 <option value="Oracle" {% if current_db == 'Oracle' %}selected{% endif %}>Oracle</option>
                 <option value="MS SQL Server" {% if current_db == 'MS SQL Server' %}selected{% endif %}>MS SQL Server</option>
-                <option value="PostgreSQL" {% if current_db == 'PostgreSQL' %}selected{% endif %}>PostgreSQL (CCIS)</option>
             </select>
         </div>
-        {% endif %}
 
-        {% if current_category != 'Database' %}
-        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label for="node" style="font-size: 0.8rem; font-weight: 600; color: #475569;">Filter by Infrastructure Node</label>
-            <select id="node" name="node" style="padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; min-width: 180px;">
-                <option value="">All Nodes</option>
-                <option value="OLKVM" {% if current_node == 'OLKVM' or current_node == 'nmsinfra' or current_node == 'nmsebs' %}selected{% endif %}>OLKVM (Oracle DB & EBS)</option>
-                <option value="pvenode1" {% if current_node == 'pvenode1' %}selected{% endif %}>Proxmox — pvenode1 (tomcatvm)</option>
-                <option value="pvenode2" {% if current_node == 'pvenode2' %}selected{% endif %}>Proxmox — pvenode2 (jumphost & monitoring)</option>
-                <option value="pvenode3" {% if current_node == 'pvenode3' %}selected{% endif %}>Proxmox — pvenode3 (databasevm / Pentana)</option>
-                <option value="Proxmox" {% if current_node == 'Proxmox' %}selected{% endif %}>Proxmox Cluster (All)</option>
-            </select>
-        </div>
-        {% endif %}
 
         <div style="display: flex; gap: 0.5rem; align-items: flex-end; height: 100%; padding-top: 1.25rem;">
             <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
-            <a href="?{% if current_category %}category={{ current_category }}{% endif %}" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
+            <a href="?" class="btn btn-secondary" style="padding: 0.5rem 1rem; background: #e2e8f0; color: #475569; border: none;">Clear</a>
         </div>
     </form>
 
@@ -83,10 +34,10 @@
         <table style="width: 100%; table-layout: auto;">
             <thead>
                 <tr>
-                    <th>Scope / Target</th>
-                    <th>System / Host</th>
+                    <th>Database</th>
+                    <th>System</th>
                     <th>Timestamp</th>
-                    <th style="text-align: center;" title="Operational SLA business-hours downtime, plus total elapsed outage if occurred off-hours">Duration</th>
+                    <th>Duration (hrs)</th>
                     <th>Root Cause (Alert Log)</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -95,27 +46,8 @@
             <tbody>
                 {% for item in page_obj %}
                 <tr {% if item.status == 'Awaiting Review' %}style="background-color: #fefce8;"{% endif %}>
-                    <td>
-                        {% if item.category == 'Infrastructure' or item.database == 'Infrastructure' %}
-                            <div>
-                                <div style="color: #6d28d9; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Infrastructure</div>
-                                <strong style="color: #00205B; font-size: 0.88rem;">{{ item.node_name|default:item.system|default:"Host Node" }}</strong>
-                            </div>
-                        {% else %}
-                            <div>
-                                <div style="color: #475569; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;">Database</div>
-                                <strong style="color: #00205B; font-size: 0.88rem;">{{ item.database }}</strong>
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td style="white-space: nowrap;">
-                        {% if item.category == 'Infrastructure' or item.database == 'Infrastructure' %}
-                            <span style="font-weight: 600; color: #334155;">{{ item.system|default:item.node_name }}</span>
-                            <div style="font-size: 0.72rem; color: #64748b;">Host Node (24/7 SLA)</div>
-                        {% else %}
-                            <span style="font-weight: 600; color: #334155;">{{ item.system }}</span>
-                        {% endif %}
-                    </td>
+                    <td><strong>{{ item.database }}</strong></td>
+                    <td style="white-space: nowrap;">{{ item.system }}</td>
                     <td style="white-space: nowrap;">
                         {{ item.start|date:"d/m/Y H:i" }}
                         {% if item.end %}
@@ -125,42 +57,29 @@
                             Waiting: <span style="color: #d97706; font-weight: 700;">{{ item.waiting_duration }}</span>
                         </div>
                     </td>
-                    <td style="text-align: center; vertical-align: middle;">
-                        <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; line-height: 1.2;">
-                            {{ item.human_duration }}
-                        </div>
-                        {% if item.duration_hrs < 0.25 %}
-                            <div style="font-size: 0.72rem; font-weight: 600; color: #b45309; margin-top: 0.25rem; white-space: nowrap;" title="Duration under 15 minutes. May indicate transient network intermittence or scrape timeout.">
-                                Intermittence (&lt; 15m)
-                            </div>
-                        {% endif %}
-                    </td>
+                    <td>{{ item.duration_hrs }}</td>
                     <td style="font-family: monospace; font-size: 0.85em; color: #475569; max-width: 300px; word-wrap: break-word; white-space: normal;">
                         {{ item.root_cause|linebreaksbr }}
                     </td>
                     <td>
                         {% if item.status == 'Awaiting Review' %}
-                            <span style="font-size:0.75rem; font-weight:700; color:#d97706; text-transform:uppercase; white-space: nowrap;">Awaiting Review</span>
+                            <span style="display:inline-block; background:#f59e0b; color:white; font-size:0.75rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:3px; white-space: nowrap;">Awaiting Review</span>
                         {% elif item.status == 'Promoted to Incident' %}
-                            <span style="font-size:0.75rem; font-weight:700; color:#dc2626; text-transform:uppercase; white-space: nowrap;">Incident Logged</span>
+                            <span style="display:inline-block; background:#ef4444; color:white; font-size:0.75rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:3px; white-space: nowrap;">Incident Logged</span>
                         {% elif item.status == 'Promoted to Maintenance' %}
-                            <span style="font-size:0.75rem; font-weight:700; color:#16a34a; text-transform:uppercase; white-space: nowrap;">Maintenance Logged</span>
+                            <span style="display:inline-block; background:#10b981; color:white; font-size:0.75rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:3px; white-space: nowrap;">Maintenance Logged</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if item.status == 'Awaiting Review' %}
                             <div style="display: flex; flex-direction: column; gap: 0.35rem; min-width: 140px;">
                                 <a href="{% url 'staging_promote_incident' item.pk %}" class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; text-decoration: none; background-color: #ef4444; border-color: #ef4444;">
-                                    {% if item.category == 'Infrastructure' or item.database == 'Infrastructure' %}
-                                        Log Incident (SysAdmin)
-                                    {% else %}
-                                        Log Incident (DBA)
-                                    {% endif %}
+                                    Log Incident
                                 </a>
                                 <a href="{% url 'staging_promote_maintenance' item.pk %}" class="btn btn-success" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; text-decoration: none; background-color: #10b981; border-color: #10b981;">
                                     Log Maintenance
                                 </a>
-                                {% if request.user.is_admin or perms.api.delete_incidentregister or perms.api.delete_incidentstaging or is_sysadmin %}
+                                {% if request.user.is_admin or perms.api.delete_incidentregister or perms.api.delete_incidentstaging %}
                                 <form method="post" action="{% url 'staging_delete' item.pk %}" style="margin: 0;" onsubmit="return confirm('Are you sure you want to dismiss/delete this staged alert?');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.75rem; text-align: center; background-color: #64748b; color: white; border: none; font-family: inherit; font-weight: 600; cursor: pointer; transition: background-color 0.2s;">
@@ -191,16 +110,16 @@
         </div>
         <div style="display: flex; gap: 0.5rem;">
             {% if page_obj.has_previous %}
-                <a href="?page=1{% if current_category %}&category={{ current_category }}{% endif %}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_node %}&node={{ current_node }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
-                <a href="?page={{ page_obj.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_node %}&node={{ current_node }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
+                <a href="?page=1{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">&laquo; First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-secondary" style="padding: 0.35rem 0.75rem;">Previous</a>
             {% else %}
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">&laquo; First</span>
                 <span class="btn btn-secondary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed;">Previous</span>
             {% endif %}
 
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_node %}&node={{ current_node }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_db %}&database={{ current_db }}{% endif %}{% if current_node %}&node={{ current_node }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
+                <a href="?page={{ page_obj.next_page_number }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if current_db %}&database={{ current_db }}{% endif %}" class="btn btn-primary" style="padding: 0.35rem 0.75rem;">Last &raquo;</a>
             {% else %}
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Next</span>
                 <span class="btn btn-primary" style="padding: 0.35rem 0.75rem; opacity: 0.5; cursor: not-allowed; background: #cbd5e1;">Last &raquo;</span>

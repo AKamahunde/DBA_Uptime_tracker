@@ -163,38 +163,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:90',
     'http://0.0.0.0:90',
     'http://192.168.35.38:90',
-    'http://localhost:91',
-    'http://127.0.0.1:91',
-    'http://0.0.0.0:91',
-    'http://192.168.35.38:91',
-    'http://192.168.35.38:8080',
     'http://192.168.35.38',
     'http://nms360.nms.go.ug:90',
-    'http://nms360.nms.go.ug:91',
     'http://nms360.nms.go.ug',
     'https://nms360.nms.go.ug',
 ]
-
-# Distinct cookie names so Port 90 (v1) and Port 91 (v2 Test) never collide in the same browser
-SESSION_COOKIE_NAME = os.environ.get('SESSION_COOKIE_NAME', 'dbtrac_v2_sessionid')
-CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'dbtrac_v2_csrftoken')
-
-# Support custom CSRF_TRUSTED_ORIGINS from environment variable as comma-separated list
-_env_csrf = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
-if _env_csrf:
-    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in _env_csrf.split(',') if origin.strip()])
-
-# Dynamically include any host specified in ALLOWED_HOSTS
-for _h in ALLOWED_HOSTS:
-    _h_clean = _h.strip()
-    if _h_clean and _h_clean != '*':
-        for _scheme in ('http', 'https'):
-            _orig = f"{_scheme}://{_h_clean}"
-            _orig_port90 = f"{_scheme}://{_h_clean}:90"
-            if _orig not in CSRF_TRUSTED_ORIGINS:
-                CSRF_TRUSTED_ORIGINS.append(_orig)
-            if _orig_port90 not in CSRF_TRUSTED_ORIGINS:
-                CSRF_TRUSTED_ORIGINS.append(_orig_port90)
 CSRF_COOKIE_SAMESITE = 'Lax'
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = False

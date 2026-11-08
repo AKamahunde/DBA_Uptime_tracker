@@ -4,26 +4,7 @@ from .models import (
     MaintenanceRegister, CapacityPlanning, SLAConfig, UgandaHoliday
 )
 
-INFRASTRUCTURE_NODE_CHOICES = [
-    ('', '— Select Infrastructure Node —'),
-    ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
-    ('pvenode1', 'Proxmox — pvenode1 (tomcatvm & Internal Systems)'),
-    ('pvenode2', 'Proxmox — pvenode2 (jumphostvm & monitoringvm)'),
-    ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
-    ('Proxmox', 'Proxmox Cluster (General)'),
-]
-
 class IncidentRegisterForm(forms.ModelForm):
-    ticket = forms.CharField(
-        max_length=50,
-        required=False,
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Auto-generated (e.g., INC-261021-0904)',
-            'autocomplete': 'off',
-        }),
-        label="Ticket",
-        help_text="Leave blank to auto-generate standard notation."
-    )
     change_comment = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status or assignee changes)'}),
         required=False,
@@ -32,7 +13,7 @@ class IncidentRegisterForm(forms.ModelForm):
 
     class Meta:
         model = IncidentRegister
-        exclude = ['duration_hrs', 'created_by', 'planned']
+        exclude = ['duration_hrs', 'created_by']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'start': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
@@ -41,103 +22,17 @@ class IncidentRegisterForm(forms.ModelForm):
             'business_impact': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, can_add_db=True, can_add_infra=True, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not can_add_infra and can_add_db:
-            if 'category' in self.fields:
-                self.fields['category'].choices = [('Database', 'Database')]
-                self.fields['category'].initial = 'Database'
-        elif not can_add_db and can_add_infra:
-            if 'category' in self.fields:
-                self.fields['category'].choices = [('Infrastructure', 'Infrastructure')]
-                self.fields['category'].initial = 'Infrastructure'
-
-        if not self.instance.pk:
-            from .models import generate_incident_ticket
-            from django.utils import timezone
-            cat = self.initial.get('category') or (self.data.get('category') if self.data else ('Infrastructure' if can_add_infra and not can_add_db else 'Database'))
-            if not self.initial.get('ticket') and (not self.data or not self.data.get('ticket')):
-                self.initial['ticket'] = generate_incident_ticket(category=cat)
-            now = timezone.now()
-            if not self.initial.get('date'):
-                self.initial['date'] = now.date().strftime('%Y-%m-%d')
-            if not self.initial.get('start'):
-                self.initial['start'] = now.strftime('%Y-%m-%dT%H:%M')
-            if not self.initial.get('status'):
-                self.initial['status'] = 'Open'
-            if not self.initial.get('severity'):
-                self.initial['severity'] = 'Medium'
-
-        if 'system' in self.fields:
-            self.fields['system'].required = False
-        if 'node_name' in self.fields:
-            self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
-            self.fields['node_name'].required = False
-        if 'database' in self.fields:
-            self.fields['database'].required = False
         iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
         if 'start' in self.fields:
             self.fields['start'].input_formats = iso_formats
         if 'end' in self.fields:
             self.fields['end'].input_formats = iso_formats
 
-    def clean_ticket(self):
-        ticket = self.cleaned_data.get('ticket', '').strip()
-        if not ticket:
-            from .models import generate_incident_ticket
-            cat = self.cleaned_data.get('category') or 'Database'
-            start = self.cleaned_data.get('start')
-            ticket = generate_incident_ticket(category=cat, dt=start)
-        return ticket
-
     def clean(self):
         cleaned_data = super().clean()
         
-        cat = cleaned_data.get('category') or 'Database'
-        cleaned_data['category'] = cat
-        node = cleaned_data.get('node_name')
-        db = cleaned_data.get('database')
-        
-        if not cleaned_data.get('date'):
-            start_val = cleaned_data.get('start')
-            from django.utils import timezone
-            cleaned_data['date'] = start_val.date() if start_val else timezone.now().date()
-        
-        if cat == 'Infrastructure':
-            if not node:
-                self.add_error('node_name', forms.ValidationError(
-                    "Please select the target Infrastructure Node for an infrastructure-level incident."
-                ))
-            else:
-                if node in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster'] or any(k in str(node).lower() for k in ['infra', 'ebs', 'olkvm']):
-                    cleaned_data['node_name'] = 'OLKVM'
-                    node = 'OLKVM'
-                if not cleaned_data.get('system'):
-                    cleaned_data['system'] = 'OLKVM' if node == 'OLKVM' else str(node)
-            cleaned_data['database'] = 'Infrastructure'
-        elif cat == 'Database':
-            if not db or db == 'Infrastructure':
-                self.add_error('database', forms.ValidationError(
-                    "Please select the database platform (Oracle, MySQL, MS SQL Server, or PostgreSQL)."
-                ))
-            if not cleaned_data.get('system'):
-                cleaned_data['system'] = db or 'Database'
-
-        # Chronological validation with 24-hour cross-midnight intelligence
-        start = cleaned_data.get('start')
-        end = cleaned_data.get('end')
-        if start and end:
-            if end < start:
-                if start.date() == end.date() and end.time() < start.time():
-                    self.add_error('end', forms.ValidationError(
-                        f"End time ({end.strftime('%H:%M')}) is earlier than start time ({start.strftime('%H:%M')}) on the same date. "
-                        f"If this event crossed midnight into the next morning, please set the End Date to the following day."
-                    ))
-                else:
-                    self.add_error('end', forms.ValidationError(
-                        f"End datetime ({end.strftime('%d/%m/%Y %H:%M')}) cannot be earlier than start datetime ({start.strftime('%d/%m/%Y %H:%M')})."
-                    ))
-
         # Only enforce on editing existing records
         if self.instance and self.instance.pk:
             old_status = self.instance.status
@@ -201,42 +96,19 @@ class ServerHealthForm(forms.ModelForm):
     class Meta:
         model = ServerHealth
         fields = [
-            'date', 'node_name', 'hosted_systems', 'server', 'database', 'entered_by',
-            'uptime_percent', 'uptime_days', 'cpu_percent', 'memory_percent',
-            'memory_total_gb', 'memory_used_gb', 'disk_percent',
-            'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
-            'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
-            'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
-            'tablespace_percent', 'connections', 'slow_queries', 'threads', 'status'
+            'date', 'entered_by', 'server', 'cpu_percent', 'memory_percent', 
+            'disk_percent', 'tablespace_percent', 'connections', 'slow_queries', 
+            'threads', 'status', 'database'
         ]
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        optional_fields = [
-            'node_name', 'hosted_systems', 'uptime_percent', 'uptime_days',
-            'memory_total_gb', 'memory_used_gb',
-            'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
-            'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
-            'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
-            'tablespace_percent', 'connections', 'slow_queries', 'threads'
-        ]
-        for fname in optional_fields:
-            if fname in self.fields:
-                self.fields[fname].required = False
 
 class MaintenanceRegisterForm(forms.ModelForm):
     change_id = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={'placeholder': 'Auto-generated (e.g., CHG2108)'}),
         label="Change ID"
-    )
-    change_comment = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for change (Required if status changes)'}),
-        required=False,
-        label="Change Comment / Reason"
     )
 
     class Meta:
@@ -250,99 +122,22 @@ class MaintenanceRegisterForm(forms.ModelForm):
             'rollback_plan': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, can_add_db=True, can_add_infra=True, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not can_add_infra and can_add_db:
-            if 'category' in self.fields:
-                self.fields['category'].choices = [('Database', 'Database')]
-                self.fields['category'].initial = 'Database'
-        elif not can_add_db and can_add_infra:
-            if 'category' in self.fields:
-                self.fields['category'].choices = [('Infrastructure', 'Infrastructure')]
-                self.fields['category'].initial = 'Infrastructure'
-
         if 'duration_hrs' in self.fields:
             self.fields['duration_hrs'].required = False
         if 'rollback_plan' in self.fields:
             self.fields['rollback_plan'].required = False
         if 'status' in self.fields and not self.fields['status'].initial:
             self.fields['status'].initial = 'Scheduled'
-        if 'system' in self.fields:
-            self.fields['system'].required = False
-        if 'node_name' in self.fields:
-            self.fields['node_name'].widget = forms.Select(choices=INFRASTRUCTURE_NODE_CHOICES)
-            self.fields['node_name'].required = False
-        if 'database' in self.fields:
-            self.fields['database'].required = False
         iso_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M']
         if 'start' in self.fields:
             self.fields['start'].input_formats = iso_formats
         if 'end' in self.fields:
             self.fields['end'].input_formats = iso_formats
 
-    def clean(self):
-        cleaned_data = super().clean()
-        cat = cleaned_data.get('category') or 'Database'
-        cleaned_data['category'] = cat
-        node = cleaned_data.get('node_name')
-        db = cleaned_data.get('database')
-
-        if not cleaned_data.get('date'):
-            start_val = cleaned_data.get('start')
-            from django.utils import timezone
-            cleaned_data['date'] = start_val.date() if start_val else timezone.now().date()
-
-        if cat == 'Infrastructure':
-            if not node:
-                self.add_error('node_name', forms.ValidationError(
-                    "Please select the target Infrastructure Node for an infrastructure maintenance activity."
-                ))
-            else:
-                if node in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster'] or any(k in str(node).lower() for k in ['infra', 'ebs', 'olkvm']):
-                    cleaned_data['node_name'] = 'OLKVM'
-                    node = 'OLKVM'
-                if not cleaned_data.get('system'):
-                    cleaned_data['system'] = 'OLKVM' if node == 'OLKVM' else str(node)
-            cleaned_data['database'] = 'Infrastructure'
-        elif cat == 'Database':
-            if not db or db == 'Infrastructure':
-                self.add_error('database', forms.ValidationError(
-                    "Please select the database platform (Oracle, MySQL, MS SQL Server, or PostgreSQL)."
-                ))
-            if not cleaned_data.get('system'):
-                cleaned_data['system'] = db or 'Database'
-
-        start = cleaned_data.get('start')
-        end = cleaned_data.get('end')
-        if start and end:
-            if end < start:
-                if start.date() == end.date() and end.time() < start.time():
-                    self.add_error('end', forms.ValidationError(
-                        f"End time ({end.strftime('%H:%M')}) is earlier than start time ({start.strftime('%H:%M')}) on the same date. "
-                        f"If this maintenance crossed midnight into the next morning, please set the End Date to the following day."
-                    ))
-                else:
-                    self.add_error('end', forms.ValidationError(
-                        f"End datetime ({end.strftime('%d/%m/%Y %H:%M')}) cannot be earlier than start datetime ({start.strftime('%d/%m/%Y %H:%M')})."
-                    ))
-
-        if self.instance and self.instance.pk:
-            old_status = self.instance.status
-            new_status = cleaned_data.get('status')
-            comment = cleaned_data.get('change_comment', '').strip()
-            if old_status != new_status and not comment:
-                self.add_error('change_comment', forms.ValidationError(
-                    "A change-reason comment is required whenever you change the maintenance status."
-                ))
-        return cleaned_data
-
 class CapacityPlanningForm(forms.ModelForm):
     month = forms.CharField(widget=forms.TextInput(attrs={'type': 'month'}))
-    change_comment = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for capacity update / note'}),
-        required=False,
-        label="Change Comment / Reason"
-    )
 
     class Meta:
         model = CapacityPlanning
@@ -361,7 +156,6 @@ class CapacityPlanningForm(forms.ModelForm):
             ('MySQL', 'MySQL'),
             ('Oracle', 'Oracle (nmsinfra)'),
             ('MS SQL Server', 'MS SQL Server'),
-            ('PostgreSQL', 'PostgreSQL (ccisprod_db)'),
         ]
         if self.instance and self.instance.pk and self.instance.month:
             self.fields['month'].initial = self.instance.month.strftime('%Y-%m')
@@ -383,7 +177,6 @@ class SLAConfigForm(forms.ModelForm):
         ('MySQL', 'MySQL'),
         ('Oracle', 'Oracle'),
         ('MS SQL Server', 'MS SQL Server'),
-        ('PostgreSQL', 'PostgreSQL'),
     ])
     target_hours = forms.DecimalField(
         required=False,

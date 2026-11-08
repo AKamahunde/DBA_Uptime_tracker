@@ -3,7 +3,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 import json
 import os
 from django.contrib.auth.decorators import login_required
@@ -15,7 +15,7 @@ from decimal import Decimal
 from .models import (
     IncidentRegister, ReplicationMonitor, BackupRecovery, ServerHealth,
     MaintenanceRegister, CapacityPlanning, SLAConfig, IncidentChangeLog, UgandaHoliday,
-    IncidentStaging, MaintenanceChangeLog, CapacityChangeLog
+    IncidentStaging
 )
 from .forms import (
     IncidentRegisterForm, ReplicationMonitorForm, BackupRecoveryForm,
@@ -23,14 +23,8 @@ from .forms import (
     SLAConfigForm, UgandaHolidayForm
 )
 from users.models import User
-from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models import Sum, Count, Avg
 from .sla_utils import calculate_operational_downtime
-from .context_processors import is_sysadmin_user
-
-try:
-    from etl.services.rest_client import consolidate_olkvm_incidents
-except ImportError:
-    consolidate_olkvm_incidents = None
 
 def about(request):
     return render(request, 'about.html')
@@ -79,11 +73,8 @@ def auto_update_maintenance_statuses():
 def autopopulate_fixed_holidays():
     from datetime import date
     current_year = date.today().year
-    # Fast exit if current year is already seeded
-    if UgandaHoliday.objects.filter(holiday_date__year=current_year).exists():
-        return
-
     years_to_check = [current_year, current_year + 1]
+    
     fixed_holidays = [
         ((1, 1), 'New Year'),
         ((1, 26), 'NRM Liberation'),
@@ -105,8 +96,37 @@ def autopopulate_fixed_holidays():
                     holiday_date=h_date,
                     defaults={'name': name}
                 )
-            except Exception:
+            except Exception as e:
                 pass
+
+@login_required
+def dashboard(request):
+    autopopulate_fixed_holidays()
+    auto_close_incidents()
+    
+    # Run all counts in a single DB round-trip by using lazy evaluation
+    from django.db import connection
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM incident_register),
+                (SELECT COUNT(*) FROM replication_monitor),
+                (SELECT COUNT(*) FROM backup_recovery),
+                (SELECT COUNT(*) FROM server_health),
+                (SELECT COUNT(*) FROM maintenance_register),
+                (SELECT COUNT(*) FROM capacity_planning)
+        """)
+        row = cursor.fetchone()
+
+    # Get reporting month
+    month_str = request.GET.get('month', '')
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
+        except ValueError:
+            reporting_month = timezone.now().date().replace(day=1)
+    else:
+        reporting_month = timezone.now().date().replace(day=1)
 
 def get_status(current, target_val, operator, warning_val=None):
     if current == 'No Data' or current is None or current == 'N/A':
@@ -136,12 +156,7 @@ def get_status(current, target_val, operator, warning_val=None):
     return 'N/A'
 
 def _get_dashboard_data(reporting_month):
-    from datetime import date as _date
     db_types = ['Oracle', 'MySQL', 'MS SQL Server']
-    if (reporting_month.year, reporting_month.month) >= (2026, 11) or SLAConfig.objects.filter(
-        database__iexact='PostgreSQL', month__year=reporting_month.year, month__month=reporting_month.month
-    ).exists():
-        db_types.append('PostgreSQL')
 
     dashboard_data = []
 
@@ -158,15 +173,9 @@ def _get_dashboard_data(reporting_month):
         )
         total_incidents = incidents.count()
 
-        # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI.
-        # Events under 5 minutes (< 0.0833 hrs) are classified as transient alerts / intermittent network blips
-        # and do not contribute to SLA downtime or MTTR calculations.
+        # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI
         unplanned_incidents = incidents.filter(planned=False)
-        qualifying_unplanned = [
-            inc for inc in unplanned_incidents
-            if not inc.duration_hrs or float(inc.duration_hrs) >= (5.0 / 60.0)
-        ]
-        total_unplanned = len(qualifying_unplanned)
+        total_unplanned = unplanned_incidents.count()
 
         # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
         SLA_RESOLUTION_TARGETS = {
@@ -179,11 +188,10 @@ def _get_dashboard_data(reporting_month):
         unplanned = 0
         sla_breach_count = 0
         now = timezone.now()
-        for inc in qualifying_unplanned:
+        for inc in unplanned_incidents:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 active_downtime = calculate_operational_downtime(inc.start, now, inc.database)
-                if float(active_downtime) >= (5.0 / 60.0):
-                    unplanned += float(active_downtime)
+                unplanned += float(active_downtime)
             elif inc.duration_hrs:
                 unplanned += float(inc.duration_hrs)
                 target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
@@ -200,39 +208,6 @@ def _get_dashboard_data(reporting_month):
         
         sla_exists = (sla_config_record is not None)
         th = sla_config_record.target_hours if sla_exists else 0
-
-        # Auto-ensure default target hours and SLA target if not manually configured
-        if not sla_exists or not th:
-            import calendar
-            from datetime import date
-            yr = reporting_month.year
-            mo = reporting_month.month
-            holidays = set(UgandaHoliday.objects.filter(
-                holiday_date__year=yr, holiday_date__month=mo
-            ).values_list('holiday_date', flat=True))
-            _, num_days = calendar.monthrange(yr, mo)
-            calc_th = 0
-            for day in range(1, num_days + 1):
-                d = date(yr, mo, day)
-                if d not in holidays:
-                    if db_type == 'Oracle':
-                        calc_th += 18
-                    elif d.weekday() < 5:
-                        calc_th += 9
-            if calc_th > 0:
-                try:
-                    target_pct_default = 99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95)
-                    first_of_month = reporting_month.replace(day=1)
-                    sla_config_record, _ = SLAConfig.objects.get_or_create(
-                        database=db_type,
-                        month=first_of_month,
-                        defaults={'target_hours': calc_th, 'sla_percent': target_pct_default}
-                    )
-                    sla_exists = True
-                    th = sla_config_record.target_hours
-                except Exception:
-                    th = calc_th
-                    sla_exists = True
 
         if th and th > 0:
             avail = ((float(th) - float(unplanned)) / float(th)) * 100
@@ -263,7 +238,7 @@ def _get_dashboard_data(reporting_month):
         ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
         
-        if db_type in ['MS SQL Server', 'PostgreSQL']:
+        if db_type in ['MS SQL Server']:
             rep_status = 'N/A'
 
         # Health status calculation
@@ -320,7 +295,7 @@ def _get_dashboard_data(reporting_month):
         if last_backup:
             last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
 
-        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95))
+        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else 99.95)
 
         dashboard_data.append({
             'database': db_type,
@@ -357,12 +332,8 @@ def _get_dashboard_data(reporting_month):
     return dashboard_data, db_types
 
 def _get_database_detail(selected_db, reporting_month, dashboard_data):
-    if selected_db in ['MKInsight', 'Pentana']:
-        selected_db = 'MS SQL Server'
-    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
-        selected_db = 'PostgreSQL'
     database_detail = None
-    db_types = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
+    db_types = ['Oracle', 'MySQL', 'MS SQL Server']
     if selected_db in db_types:
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
@@ -406,12 +377,11 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
             else:
                 rep_lag_str = "No Data"
                 
-            if selected_db in ['MS SQL Server', 'PostgreSQL']:
+            if selected_db in ['MS SQL Server']:
                 rep_lag_str = 'N/A'
 
             # Calculate Statuses
-            target_avail_sla = float(row_data.get('target_sla_val', 99.95))
-            avail_status = get_status(row_data['availability'], target_avail_sla, '>=', round(target_avail_sla - 0.05, 2)) if selected_sla_exists else 'N/A'
+            avail_status = get_status(row_data['availability'], 99.95, '>=', 99.90) if selected_sla_exists else 'N/A'
             planned_status = get_status(row_data['planned_downtime'], 48.0, '<=', 40.0) if selected_sla_exists else 'N/A'
             unplanned_status = get_status(row_data['unplanned_downtime'], 2.0, '<=', 1.5) if selected_sla_exists else 'N/A'
             incidents_status = get_status(row_data['total_incidents'], 4, '<=', 3) if selected_sla_exists else 'N/A'
@@ -499,28 +469,10 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
 
 @login_required
 def dashboard(request):
-    can_view_db_dashboard = (
-        request.user.is_admin
-        or request.user.is_superuser
-        or request.user.has_perm('api.view_databasedashboard')
-    )
-    can_view_infra_dashboard = (
-        request.user.is_admin
-        or request.user.is_superuser
-        or request.user.has_perm('api.view_infrastructuredashboard')
-    )
-
-    if not can_view_db_dashboard and not can_view_infra_dashboard:
-        # Route users without dashboard permissions directly to their operational workspace
-        if request.user.has_perm('api.view_serverhealth'):
-            return redirect('server_health_list')
-        elif request.user.has_perm('api.view_infrastructureincident') or is_sysadmin_user(request.user):
-            return redirect('incident_list')
-        elif request.user.has_perm('api.view_infrastructuremaintenance'):
-            return redirect('maintenance_list')
-        elif request.user.has_perm('api.view_infrastructurecapacity'):
-            return redirect('capacity_list')
-
+    autopopulate_fixed_holidays()
+    auto_close_incidents()
+    auto_update_maintenance_statuses()
+    
     # Run all counts in a single DB round-trip by using lazy evaluation
     from django.db import connection
     with connection.cursor() as cursor:
@@ -546,10 +498,6 @@ def dashboard(request):
         reporting_month = timezone.now().date().replace(day=1)
 
     selected_db = request.GET.get('database_select', 'All Databases')
-    if selected_db in ['MKInsight', 'Pentana']:
-        selected_db = 'MS SQL Server'
-    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
-        selected_db = 'PostgreSQL'
     dashboard_data, db_types = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
 
@@ -706,8 +654,6 @@ def dashboard(request):
             target_sla_val = float(sla_conf.sla_percent)
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
-        elif selected_db.lower() == 'postgresql':
-            target_sla_val = 99.90
 
     valid_trend_vals = [m['value'] for m in trend_months if m['value'] > 0.0]
     trend_recent_avg = round(sum(valid_trend_vals) / len(valid_trend_vals), 2) if valid_trend_vals else 100.0
@@ -748,11 +694,8 @@ def dashboard(request):
     
     # 7. Attention Required Alerts
     attention_items = []
-    # Staging review alert (Database scope only)
-    staging_reviews_qs = IncidentStaging.objects.filter(
-        status='Awaiting Review',
-        category='Database'
-    ).exclude(database='Infrastructure')
+    # Staging review alert
+    staging_reviews_qs = IncidentStaging.objects.filter(status='Awaiting Review')
     if selected_db != 'All Databases':
         staging_reviews_qs = staging_reviews_qs.filter(database__iexact=selected_db)
     staging_reviews = staging_reviews_qs.count()
@@ -773,11 +716,8 @@ def dashboard(request):
             'type': 'danger',
             'message': f"Backups: {recent_failed_backups} backup failure(s) detected this month."
         })
-    # Open incidents (Database scope only)
-    active_incidents = IncidentRegister.objects.filter(
-        status__in=['Open', 'In Progress'],
-        category='Database'
-    ).exclude(database='Infrastructure').order_by('-created_at')
+    # Open incidents
+    active_incidents = IncidentRegister.objects.filter(status__in=['Open', 'In Progress']).order_by('-created_at')
     if selected_db != 'All Databases':
         active_incidents = active_incidents.filter(database__iexact=selected_db)
     for inc in active_incidents:
@@ -804,10 +744,8 @@ def dashboard(request):
             'status': r.outcome,
             'status_class': 'success' if r.outcome == 'Success' else 'danger'
         })
-    # Incidents (Database scope only)
-    recent_incidents = IncidentRegister.objects.filter(
-        category='Database'
-    ).exclude(database='Infrastructure').order_by('-created_at')
+    # Incidents
+    recent_incidents = IncidentRegister.objects.all().order_by('-created_at')
     if selected_db != 'All Databases':
         recent_incidents = recent_incidents.filter(database__iexact=selected_db)
     recent_incidents = recent_incidents[:8]
@@ -879,9 +817,8 @@ def dashboard(request):
         else:
             lede_suffix = "No incidents or service interruptions were logged during this period."
     else:
-        db_count_word = 'four' if len(filtered_dashboard_data) == 4 else ('three' if len(filtered_dashboard_data) == 3 else str(len(filtered_dashboard_data)))
         if all_within_sla_dashboard:
-            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
         else:
             lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
 
@@ -897,17 +834,6 @@ def dashboard(request):
             
     default_lede_text = f"{lede_prefix} {lede_suffix}"
 
-    can_view_db_dashboard = (
-        request.user.is_admin
-        or request.user.is_superuser
-        or request.user.has_perm('api.view_databasedashboard')
-    )
-    can_view_infra_dashboard = (
-        request.user.is_admin
-        or request.user.is_superuser
-        or request.user.has_perm('api.view_infrastructuredashboard')
-    )
-
     context = {
         'incident_count': row[0],
         'replication_count': row[1],
@@ -916,8 +842,6 @@ def dashboard(request):
         'maintenance_count': row[4],
         'capacity_count': row[5],
         'is_admin': request.user.is_admin,
-        'can_view_db_dashboard': can_view_db_dashboard,
-        'can_view_infra_dashboard': can_view_infra_dashboard,
         'dashboard_data': dashboard_data,
         'database_detail': database_detail,
         'selected_db': selected_db,
@@ -944,16 +868,10 @@ def dashboard(request):
         'attention_items': attention_items,
         'recent_activity': recent_activity,
     }
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    context.update(_build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month))
     return render(request, 'dashboard.html', context)
 
 @login_required
 def dashboard_print(request):
-    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_databasedashboard')):
-        messages.error(request, 'You do not have permission to view or export the Database Operations report.')
-        return redirect('dashboard')
-
     if request.method == 'POST':
         month_str = request.POST.get('month', '')
         selected_db = request.POST.get('database_select', 'All Databases')
@@ -964,11 +882,6 @@ def dashboard_print(request):
         selected_db = request.GET.get('database_select', 'All Databases')
         summary_narrative = request.GET.get('summary_narrative', '').strip()
         download_mode = request.GET.get('download', 'false')
-
-    if selected_db in ['MKInsight', 'Pentana']:
-        selected_db = 'MS SQL Server'
-    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
-        selected_db = 'PostgreSQL'
 
     if month_str:
         try:
@@ -996,8 +909,6 @@ def dashboard_print(request):
             target_sla_val = float(sla_conf.sla_percent)
         elif selected_db.lower() == 'mysql':
             target_sla_val = 99.50
-        elif selected_db.lower() == 'postgresql':
-            target_sla_val = 99.90
     
     user_display = request.user.get_full_name()
     if not user_display:
@@ -1058,12 +969,12 @@ def dashboard_print(request):
         target_val = item.get('target_sla_val', 99.95)
         target_scaled = round((target_val - 99.0) * 100.0, 2) if target_val >= 99.0 else 0.0
 
-        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else ('Cold Chain Information System (CCIS / ODK-X)' if db_type == 'PostgreSQL' else ('OLKVM & Proxmox Virtualization Fleet' if db_type == 'Infrastructure' else 'MKInsight Audit Framework')))
-        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else ('ccisprod_db (PostgreSQL 17 + PostGIS 3.5 on Docker Swarm)' if db_type == 'PostgreSQL' else ('OLKVM, pvenode1, pvenode2, pvenode3' if db_type == 'Infrastructure' else 'Windows Server Host (Standalone)')))
+        role_desc = 'Core Enterprise ERP Suite' if db_type == 'Oracle' else ('NMS360, DMT and other in-house applications' if db_type == 'MySQL' else 'MKInsight Audit Framework')
+        host_desc = 'nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App)' if db_type == 'Oracle' else ('nickledbnew (Replicated to nickledbdr for DR)' if db_type == 'MySQL' else 'Windows Server Host (Standalone)')
 
         formatted_data.append({
             'database': db_type,
-            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else ('ccisprod_db' if db_type == 'PostgreSQL' else ('OLKVM & Proxmox' if db_type == 'Infrastructure' else 'Pentana'))),
+            'code_name': 'nmsinfra / nmsebs' if db_type == 'Oracle' else ('nickledbnew' if db_type == 'MySQL' else 'Pentana'),
             'role_desc': role_desc,
             'host_desc': host_desc,
             'availability': avail_str,
@@ -1103,9 +1014,8 @@ def dashboard_print(request):
         else:
             lede_suffix = "No incidents or service interruptions were logged during this period."
     else:
-        db_count_word = 'four' if len(dashboard_data) == 4 else ('three' if len(dashboard_data) == 3 else str(len(dashboard_data)))
         if all_within_sla:
-            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All three production databases held within SLA in {reporting_month.strftime('%B %Y')}."
         else:
             lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
 
@@ -1156,10 +1066,6 @@ def dashboard_print(request):
 
 @login_required
 def dashboard_excel(request):
-    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_databasedashboard')):
-        messages.error(request, 'You do not have permission to export the Database Operations report.')
-        return redirect('dashboard')
-
     month_str = request.GET.get('month', '')
     if month_str:
         try:
@@ -1170,10 +1076,6 @@ def dashboard_excel(request):
         reporting_month = timezone.now().date().replace(day=1)
 
     selected_db = request.GET.get('database_select', 'All Databases')
-    if selected_db in ['MKInsight', 'Pentana']:
-        selected_db = 'MS SQL Server'
-    elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
-        selected_db = 'PostgreSQL'
     dashboard_data, _ = _get_dashboard_data(reporting_month)
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
     month_display = reporting_month.strftime('%B %Y')
@@ -1387,13 +1289,11 @@ def dashboard_excel(request):
         ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite supporting finance, procurement, stores, and order management.").font = font_body
         ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, DMT, and other in-house applications.").font = font_body
         ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.").font = font_body
-        ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform.").font = font_body
         
         # Adjust Column Widths
         for col in ws.columns:
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col[0].column)
             for cell in col:
                 if cell.row == 1 or cell.row > legend_start:
                     continue
@@ -1409,6 +1309,7 @@ def dashboard_excel(request):
         
     except Exception:
         import csv
+        from django.http import HttpResponse
         filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.csv"'
@@ -1499,103 +1400,22 @@ def dashboard_excel(request):
         writer.writerow(["Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite supporting finance, procurement, stores, and order management."])
         writer.writerow(["MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, DMT, and other in-house applications."])
         writer.writerow(["MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors."])
-        writer.writerow(["PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform."])
         return response
 
 @login_required
 def incident_list(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_view_db_incident = is_admin_or_super or request.user.has_perm('api.view_databaseincident') or request.user.has_perm('api.view_incidentregister')
-    can_view_infra_incident = is_admin_or_super or request.user.has_perm('api.view_infrastructureincident') or request.user.has_perm('api.view_incidentregister')
-    can_view_all_incidents = is_admin_or_super or (can_view_db_incident and can_view_infra_incident) or request.user.has_perm('api.view_incidentregister')
-
-    if not can_view_db_incident and not can_view_infra_incident:
+    auto_close_incidents()
+    
+    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
-        
-    from django.db.models import Sum, Q
+    queryset = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
     
-    base_qs = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
-    
-    # Tabs: 'all', 'database', 'infrastructure' with granular permissions enforcement
-    requested_tab = request.GET.get('tab', '').lower()
-    if requested_tab == 'infrastructure':
-        if not can_view_infra_incident:
-            messages.warning(request, 'You do not have permission to view Infrastructure Incidents.')
-            return redirect('/incidents/?tab=database')
-        current_tab = 'infrastructure'
-    elif requested_tab == 'database':
-        if not can_view_db_incident:
-            messages.warning(request, 'You do not have permission to view Database Incidents.')
-            return redirect('/incidents/?tab=infrastructure')
-        current_tab = 'database'
-    elif requested_tab == 'all':
-        if not can_view_all_incidents:
-            current_tab = 'database' if can_view_db_incident else 'infrastructure'
-        else:
-            current_tab = 'all'
-    else:
-        if can_view_all_incidents:
-            current_tab = 'all'
-        elif can_view_db_incident:
-            current_tab = 'database'
-        else:
-            current_tab = 'infrastructure'
-
-    # Target filter: single db or single node
-    current_target = request.GET.get('target', '').strip()
-    if not current_target and request.GET.get('database'):
-        current_target = request.GET.get('database').strip()
-        
+    current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-
-    # Tab counts for headers
-    total_all_count = IncidentRegister.objects.count()
-    total_db_count = IncidentRegister.objects.filter(
-        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
-    ).exclude(category='Infrastructure').count()
-    total_infra_count = IncidentRegister.objects.filter(
-        Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
-    ).count()
-
-    queryset = base_qs
-
-    # 1. Filter by category tab and normalize cross-tab target filters
-    if current_tab == 'database':
-        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            current_target = ''
-        queryset = queryset.filter(
-            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
-        ).exclude(category='Infrastructure')
-    elif current_tab == 'infrastructure':
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            current_target = ''
-        queryset = queryset.filter(
-            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(node_name='OLKVM')
-        )
-
-    # 2. Filter by single target (specific DB or specific Node)
-    if current_target:
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            queryset = queryset.filter(database=current_target)
-        elif current_target == 'Infrastructure':
-            queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
-        elif current_target == 'OLKVM' or current_target in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']:
-            queryset = queryset.filter(
-                Q(node_name__iexact='OLKVM') |
-                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
-                Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs')
-            )
-        else:
-            queryset = queryset.filter(
-                Q(node_name__icontains=current_target) | 
-                Q(system__icontains=current_target) |
-                Q(database__icontains=current_target)
-            )
-
+    if current_db:
+        queryset = queryset.filter(database=current_db)
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
@@ -1605,71 +1425,43 @@ def incident_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    # Calculate KPIs based on the filtered queryset
-    kpi_active_outages = queryset.filter(status__in=['Open', 'In Progress']).count()
-    kpi_resolved_count = queryset.filter(status__in=['Resolved', 'Closed']).count()
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = IncidentRegister.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+
+    kpi_active_outages = kpi_queryset.filter(status__in=['Open', 'In Progress']).count()
+    kpi_resolved_count = kpi_queryset.filter(status__in=['Resolved', 'Closed']).count()
     
-    # Exclude intermittent network alerts under 5 minutes (< 0.0833h)
-    kpi_downtime_hours = queryset.filter(planned=False, duration_hrs__gte=0.0833).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
+    from django.db.models import Sum
+    kpi_downtime_hours = kpi_queryset.filter(planned=False).aggregate(total=Sum('duration_hrs'))['total'] or 0.0
     kpi_downtime_hours = round(float(kpi_downtime_hours), 1)
-
-    node_choices = [
-        ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
-        ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
-        ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
-        ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
-        ('Proxmox', 'Proxmox Cluster (General)'),
-    ]
-
-    can_add_incident = (
-        is_admin_or_super or 
-        request.user.has_perm('api.add_incidentregister') or 
-        (can_view_db_incident and request.user.has_perm('api.add_databaseincident')) or
-        (can_view_infra_incident and request.user.has_perm('api.add_infrastructureincident'))
-    )
-
+    
     return render(request, 'incidents/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'can_view_all_incidents': can_view_all_incidents,
-        'can_view_db_incident': can_view_db_incident,
-        'can_view_infra_incident': can_view_infra_incident,
-        'can_add_incident': can_add_incident,
-        'current_tab': current_tab,
-        'current_target': current_target,
-        'current_db': current_target,
+        'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
-        'total_all_count': total_all_count,
-        'total_db_count': total_db_count,
-        'total_infra_count': total_infra_count,
         'kpi_active_outages': kpi_active_outages,
         'kpi_resolved_count': kpi_resolved_count,
-        'kpi_downtime_hours': kpi_downtime_hours,
-        'node_choices': node_choices,
+        'kpi_downtime_hours': kpi_downtime_hours
     })
 
 @login_required
 def incident_create(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_add_db = is_admin_or_super or request.user.has_perm('api.add_databaseincident') or request.user.has_perm('api.add_incidentregister')
-    can_add_infra = is_admin_or_super or request.user.has_perm('api.add_infrastructureincident') or request.user.has_perm('api.add_incidentregister')
-
-    if not can_add_db and not can_add_infra:
+    if not (request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
         messages.error(request, 'You do not have permission to create incident records.')
         return redirect('incident_list')
         
     if request.method == 'POST':
-        form = IncidentRegisterForm(request.POST, can_add_db=can_add_db, can_add_infra=can_add_infra)
+        form = IncidentRegisterForm(request.POST)
         if form.is_valid():
             incident = form.save(commit=False)
-            if incident.category == 'Infrastructure' and not can_add_infra:
-                messages.error(request, 'You do not have permission to create Infrastructure Incidents.')
-                return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
-            if incident.category == 'Database' and not can_add_db:
-                messages.error(request, 'You do not have permission to create Database Incidents.')
-                return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
-
             incident.created_by = request.user
             incident.save()
             action_text = 'Created'
@@ -1684,33 +1476,17 @@ def incident_create(request):
                 assigned_to=incident.assigned_to,
                 comment=form.cleaned_data.get('change_comment', '')
             )
-            messages.success(request, f'Incident {incident.ticket} created successfully.')
-            redirect_tab = 'infrastructure' if incident.category == 'Infrastructure' else 'database'
-            return redirect(f'/incidents/?tab={redirect_tab}')
-        else:
-            messages.error(request, 'Failed to save incident. Please review the highlighted errors below.')
+            messages.success(request, 'Incident created successfully.')
+            return redirect('incident_list')
     else:
-        form = IncidentRegisterForm(can_add_db=can_add_db, can_add_infra=can_add_infra)
-    return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+        form = IncidentRegisterForm()
+    return render(request, 'incidents/form.html', {'form': form, 'title': 'Create Incident'})
 
 @login_required
 def incident_edit(request, pk):
     incident = get_object_or_404(IncidentRegister, pk=pk)
-
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_view_db = is_admin_or_super or request.user.has_perm('api.view_databaseincident') or request.user.has_perm('api.view_incidentregister')
-    can_view_infra = is_admin_or_super or request.user.has_perm('api.view_infrastructureincident') or request.user.has_perm('api.view_incidentregister')
-
-    if (incident.category == 'Database' and not can_view_db) or (incident.category == 'Infrastructure' and not can_view_infra):
-        messages.error(request, 'You do not have permission to view or edit this incident.')
-        return redirect('incident_list')
     
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_incidentregister')
-    )
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (incident.created_by == request.user) and ((timezone.now() - incident.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -1721,7 +1497,7 @@ def incident_edit(request, pk):
         old_status = incident.status
         old_assigned = incident.assigned_to
         
-        form = IncidentRegisterForm(request.POST, instance=incident, can_add_db=can_view_db, can_add_infra=can_view_infra)
+        form = IncidentRegisterForm(request.POST, instance=incident)
         if form.is_valid():
             incident = form.save()
             
@@ -1754,117 +1530,15 @@ def incident_edit(request, pk):
             messages.success(request, 'Incident updated successfully.')
             return redirect('incident_list')
     else:
-        form = IncidentRegisterForm(instance=incident, can_add_db=can_view_db, can_add_infra=can_view_infra)
+        form = IncidentRegisterForm(instance=incident)
     
     return render(request, 'incidents/form.html', {
         'form': form, 
         'title': 'Edit Incident',
         'can_edit': True,
         'incident': incident,
-        'change_logs': incident.change_logs.all(),
-        'can_add_db': can_view_db,
-        'can_add_infra': can_view_infra
+        'change_logs': incident.change_logs.all()
     })
-
-
-@login_required
-@require_POST
-def incident_reclassify_maintenance(request, pk):
-    incident = get_object_or_404(IncidentRegister, pk=pk)
-    
-    can_reclassify = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_incidentregister') or 
-        request.user.has_perm('api.add_maintenanceregister') or
-        (incident.created_by == request.user)
-    )
-    if not can_reclassify:
-        messages.error(request, 'You do not have permission to reclassify this incident.')
-        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
-
-    ticket_ref = incident.ticket
-    maint_date = incident.start.date() if incident.start else incident.date
-    maint_start = incident.start if incident.start else timezone.now()
-    maint_end = incident.end if incident.end else maint_start
-
-    # Create/update the MaintenanceRegister entry
-    maint, created = MaintenanceRegister.objects.update_or_create(
-        change_id=ticket_ref,
-        defaults={
-            'database': incident.database,
-            'system': incident.system,
-            'date': maint_date,
-            'activity': f"Scheduled Maintenance (Transferred from Incident {ticket_ref}): {incident.root_cause or 'Approved RFC'}",
-            'start': maint_start,
-            'end': maint_end,
-            'risk': 'Medium',
-            'rollback_plan': 'Awaiting DBA input.',
-            'approved_by': '',
-            'success': True if incident.status in ['Resolved', 'Closed'] else False,
-            'created_by': request.user
-        }
-    )
-
-    MaintenanceChangeLog.objects.create(
-        maintenance=maint,
-        changed_by=request.user,
-        action='Transferred from Incident Register',
-        comment=f"Reclassified and transferred from Incident {ticket_ref} by {request.user.username}."
-    )
-
-    # Re-point any staged alert records
-    IncidentStaging.objects.filter(incident_record=incident).update(
-        status='Promoted to Maintenance',
-        maintenance_record=maint,
-        incident_record=None,
-        processed_at=timezone.now()
-    )
-
-    # Cleanly remove the incident record so it never duplicates across registers
-    IncidentChangeLog.objects.filter(incident=incident).delete()
-    incident.delete()
-
-    messages.success(request, f"Incident {ticket_ref} successfully reclassified and moved to the Maintenance Register as {maint.change_id}. It no longer appears under Incidents or penalizes SLA availability.")
-    return redirect('maintenance_list')
-
-
-@login_required
-@require_POST
-def incident_reclassify_unplanned(request, pk):
-    incident = get_object_or_404(IncidentRegister, pk=pk)
-    
-    can_reclassify = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_incidentregister') or 
-        request.user.has_perm('api.add_maintenanceregister') or
-        (incident.created_by == request.user)
-    )
-    if not can_reclassify:
-        messages.error(request, 'You do not have permission to reclassify this incident.')
-        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
-
-    if not incident.planned:
-        messages.info(request, f"Incident {incident.ticket} is already an unplanned incident.")
-        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
-
-    incident.planned = False
-    incident.save()  # Automatically removes linked MaintenanceRegister entry via IncidentRegister.save()
-
-    IncidentChangeLog.objects.create(
-        incident=incident,
-        changed_by=request.user,
-        action='Reclassified as Unplanned Incident',
-        new_status=incident.status,
-        comment='Reclassified back to an unplanned incident.'
-    )
-
-    messages.warning(request, f"Incident {incident.ticket} reverted to Unplanned Incident. It will now count towards SLA availability metrics.")
-    return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
-
 
 @login_required
 def replication_list(request):
@@ -1944,12 +1618,7 @@ def replication_create(request):
 def replication_edit(request, pk):
     replication = get_object_or_404(ReplicationMonitor, pk=pk)
     
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_replicationmonitor')
-    )
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (replication.created_by == request.user) and ((timezone.now() - replication.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -2041,12 +1710,7 @@ def backup_create(request):
 def backup_edit(request, pk):
     backup = get_object_or_404(BackupRecovery, pk=pk)
     
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_backuprecovery')
-    )
+    can_edit_always = request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.change_backuprecovery')
     is_creator_within_time = (backup.created_by == request.user) and ((timezone.now() - backup.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -2070,2255 +1734,53 @@ def backup_edit(request, pk):
     })
 
 @login_required
-@require_POST
-def server_health_sync_prometheus(request):
-    if not (request.user.is_admin or request.user.has_perm('api.add_serverhealth')):
-        messages.error(request, 'You do not have permission to sync Prometheus node metrics.')
-        return redirect('server_health_list')
-
-    prom_url = request.POST.get('prometheus_url', '').strip() or None
-    from etl.services.rest_client import sync_all_nodes_from_prometheus, PROMETHEUS_URL
-    synced, errors = sync_all_nodes_from_prometheus(prometheus_url=prom_url)
-
-    if synced and not errors:
-        messages.success(
-            request,
-            f"Successfully synced live Prometheus metrics for {', '.join(f'{r.server} ({r.node_name})' for r in synced)}."
-        )
-    elif synced and errors:
-        messages.warning(
-            request,
-            f"Synced {', '.join(r.server for r in synced)}, but encountered errors on: {'; '.join(errors)}"
-        )
-    else:
-        target_url = prom_url or PROMETHEUS_URL
-        messages.error(
-            request,
-            f"Could not reach Prometheus API at {target_url}. Verify PROMETHEUS_URL or push via prometheus_node_agent.py. ({'; '.join(errors)})"
-        )
-    return redirect('server_health_list')
-
-
-def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None, include_ccis=False):
-    """
-    Summarizes Guest Virtual Machine health across the hypervisor fleet
-    (OLKVM and Proxmox) into a consolidated single-pane-of-glass status matrix.
-    Inherits parent host hypervisor unplanned outages and factors in direct VM incidents.
-    """
-    from django.db.models import Q
-    today_dt = timezone.now().date()
-    target_date = target_month_dt if target_month_dt else today_dt
-    start_of_month = target_date.replace(day=1)
-    if target_date.month == 12:
-        next_month = target_date.replace(year=target_date.year + 1, month=1, day=1)
-    else:
-        next_month = target_date.replace(month=target_date.month + 1, day=1)
-    total_month_hours = (next_month - start_of_month).total_seconds() / 3600.0
-
-    month_inc_filter = Q(start__gte=start_of_month, start__lt=next_month) | Q(start__lt=start_of_month, end__gte=start_of_month) | Q(start__lt=start_of_month, end__isnull=True)
-    now_dt = timezone.now()
-
-    canonical_vms = [
-        {
-            'vm_key': 'nmsinfra',
-            'display_name': 'nmsinfra.nms.go.ug',
-            'short_name': 'nmsinfra',
-            'host_node': 'OLKVM Host Cluster',
-            'parent_node_key': 'OLKVM',
-            'cluster': 'OLKVM',
-            'role': 'Oracle ERP Database (Production)',
-            'database': 'Oracle',
-            'ip_address': '192.168.30.26',
-            'vmid': 'N/A (OLKVM)',
-            'filter_q': Q(server__icontains='infra') | Q(hosted_systems__icontains='nmsinfra'),
-            'default_cores': 64,
-            'default_ram_gb': 128.0,
-        },
-        {
-            'vm_key': 'nmsebs',
-            'display_name': 'nmsebs.nms.go.ug',
-            'short_name': 'nmsebs',
-            'host_node': 'OLKVM Host Cluster',
-            'parent_node_key': 'OLKVM',
-            'cluster': 'OLKVM',
-            'role': 'Oracle EBS Applications (Production)',
-            'database': 'Oracle',
-            'ip_address': '192.168.30.25',
-            'vmid': 'N/A (OLKVM)',
-            'filter_q': Q(server__icontains='ebs') | Q(hosted_systems__icontains='nmsebs'),
-            'default_cores': 16,
-            'default_ram_gb': 32.0,
-        },
-        {
-            'vm_key': 'databasevm',
-            'display_name': 'databasevm (nickledbnew)',
-            'short_name': 'databasevm',
-            'host_node': 'pvenode3',
-            'parent_node_key': 'pvenode3',
-            'cluster': 'Proxmox',
-            'role': 'MySQL Database / Pentana Audit Server',
-            'database': 'MySQL & MS SQL Server',
-            'ip_address': '10.10.17.34',
-            'vmid': 'qemu/103',
-            'filter_q': Q(server__icontains='databasevm') | Q(server__icontains='nickledb') | Q(hosted_systems__icontains='databasevm'),
-            'fallback_host_q': Q(server__iexact='pvenode3'),
-            'default_cores': 8,
-            'default_ram_gb': 16.0,
-        },
-        {
-            'vm_key': 'tomcatvm',
-            'display_name': 'tomcatvm',
-            'short_name': 'tomcatvm',
-            'host_node': 'pvenode1',
-            'parent_node_key': 'pvenode1',
-            'cluster': 'Proxmox',
-            'role': 'Internal Web Applications & Services',
-            'database': 'Internal Apps',
-            'ip_address': '10.10.17.34',
-            'vmid': 'qemu/102',
-            'filter_q': Q(server__icontains='tomcat') | Q(hosted_systems__icontains='tomcat'),
-            'fallback_host_q': Q(server__iexact='pvenode1'),
-            'default_cores': 4,
-            'default_ram_gb': 8.0,
-        },
-        {
-            'vm_key': 'jumphostvm',
-            'display_name': 'jumphostvm',
-            'short_name': 'jumphostvm',
-            'host_node': 'pvenode2',
-            'parent_node_key': 'pvenode2',
-            'cluster': 'Proxmox',
-            'role': 'Secure Bastion & Gateway Access',
-            'database': 'Infrastructure',
-            'ip_address': '10.10.17.34',
-            'vmid': 'qemu/100',
-            'filter_q': Q(server__icontains='jumphost') | Q(hosted_systems__icontains='jumphost'),
-            'fallback_host_q': Q(server__iexact='pvenode2'),
-            'default_cores': 2,
-            'default_ram_gb': 4.0,
-        },
-        {
-            'vm_key': 'monitoringvm',
-            'display_name': 'monitoringvm',
-            'short_name': 'monitoringvm',
-            'host_node': 'pvenode2',
-            'parent_node_key': 'pvenode2',
-            'cluster': 'Proxmox',
-            'role': 'Prometheus, Grafana & Ops Telemetry',
-            'database': 'Monitoring',
-            'ip_address': '10.10.17.34',
-            'vmid': 'qemu/101',
-            'filter_q': Q(server__icontains='monitoring') | Q(hosted_systems__icontains='monitoring'),
-            'fallback_host_q': Q(server__iexact='pvenode2'),
-            'default_cores': 4,
-            'default_ram_gb': 8.0,
-        },
-    ]
-
-    fleet_vms = []
-    seen_canonical_servers = set()
-    for defn in canonical_vms:
-        rec = ServerHealth.objects.filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
-        is_fallback = False
-        if not rec and defn.get('fallback_host_q'):
-            rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
-            is_fallback = True
-
-        # Determine any unplanned outages affecting this VM directly or via its host hypervisor
-        parent_k = defn.get('parent_node_key', '')
-        short_k = defn.get('short_name', '')
-
-        if parent_k == 'OLKVM':
-            vm_inc_q = (
-                Q(node_name__iexact='OLKVM') |
-                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']) |
-                Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs') |
-                (Q(database__iexact='Oracle') & (Q(category__iexact='Infrastructure') | Q(category__iexact='Database')))
-            )
-        else:
-            vm_inc_q = (
-                Q(node_name__iexact=parent_k) |
-                Q(node_name__icontains=short_k) |
-                Q(system__icontains=short_k)
-            )
-
-        vm_inc_qs = IncidentRegister.objects.filter(month_inc_filter, planned=False).filter(vm_inc_q)
-        vm_unplanned_hrs = 0.0
-        for inc in vm_inc_qs:
-            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
-            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
-                continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    vm_unplanned_hrs += float(active_dt)
-            elif inc.duration_hrs:
-                vm_unplanned_hrs += float(inc.duration_hrs)
-        vm_unplanned_hrs = round(vm_unplanned_hrs, 2)
-
-        if rec:
-            if not is_fallback:
-                seen_canonical_servers.add((rec.server or '').lower())
-            up_pct = float(rec.uptime_percent if rec.uptime_percent is not None else 100.0)
-            cpu_pct = float(rec.cpu_percent or 0.0)
-            mem_pct = float(rec.memory_percent or 0.0)
-            mem_tot = float(rec.memory_total_gb or defn['default_ram_gb'])
-            mem_used = float(rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
-            if mem_used == 0.0 and mem_tot > 0 and mem_pct > 0:
-                mem_used = round(mem_tot * mem_pct / 100.0, 2)
-
-            disk_pct = float(rec.disk_3_percent or rec.disk_percent or 0.0)
-            disk_sz = float(rec.disk_3_size_gb or 0.0)
-            disk_us = float(rec.disk_3_used_gb or (disk_sz * disk_pct / 100.0 if disk_sz > 0 else 0.0))
-            if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
-                disk_us = round(disk_sz * disk_pct / 100.0, 2)
-
-            last_date = rec.date
-            last_updated = rec.updated_at
-            source = rec.entered_by or ('Prometheus' if is_fallback else 'System')
-            has_data = True
-        else:
-            up_pct = 100.00
-            cpu_pct = 0.0
-            mem_pct = 0.0
-            mem_tot = defn['default_ram_gb']
-            mem_used = 0.0
-            disk_pct = 0.0
-            disk_sz = 0.0
-            disk_us = 0.0
-            last_date = today_dt
-            last_updated = None
-            source = 'Baseline'
-            has_data = False
-
-        # Factor in host node unplanned downtime into guest VM Uptime SLA
-        if vm_unplanned_hrs > 0 and total_month_hours > 0:
-            sla_vm_up_pct = round(max(0.0, (total_month_hours - vm_unplanned_hrs) / total_month_hours * 100.0), 2)
-            up_pct = min(up_pct, sla_vm_up_pct)
-
-        active_vm_inc = vm_inc_qs.filter(status__in=['Open', 'In Progress']).count()
-        if active_vm_inc > 0:
-            status = 'Outage'
-        elif up_pct < 99.0:
-            status = 'Below SLA'
-        elif vm_unplanned_hrs > 0 or up_pct < 99.90:
-            status = 'Warning'
-        elif rec:
-            status = rec.status or 'Healthy'
-        else:
-            status = 'Healthy'
-
-        fleet_vms.append({
-            'pk': rec.pk if rec else None,
-            'vm_key': defn['vm_key'],
-            'display_name': defn['display_name'],
-            'short_name': defn['short_name'],
-            'host_node': defn['host_node'],
-            'parent_node_key': defn['parent_node_key'],
-            'cluster': defn['cluster'],
-            'role': defn['role'],
-            'database': defn['database'],
-            'ip_address': defn['ip_address'],
-            'vmid': defn['vmid'],
-            'logical_cpus': int(rec.logical_cpus or defn['default_cores']) if rec else defn['default_cores'],
-            'uptime_percent': round(up_pct, 2),
-            'uptime_str': f"{round(up_pct, 2)}%",
-            'unplanned_down_hrs': vm_unplanned_hrs,
-            'incident_count': vm_inc_qs.count(),
-            'cpu_percent': round(cpu_pct, 2),
-            'memory_percent': round(mem_pct, 2),
-            'memory_total_gb': round(mem_tot, 2),
-            'memory_used_gb': round(mem_used, 2),
-            'disk_percent': round(disk_pct, 2),
-            'disk_size_gb': round(disk_sz, 2),
-            'disk_used_gb': round(disk_us, 2),
-            'status': status,
-            'has_data': has_data,
-            'is_fallback': is_fallback,
-            'last_date': last_date,
-            'last_updated': last_updated,
-            'entered_by': source,
-        })
-
-    # Discover any additional unique guest VMs recorded in ServerHealth
-    dynamic_vm_recs = (
-        ServerHealth.objects.filter(Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)'))
-        .order_by('-date', '-updated_at', '-id')
-    )
-    seen_dynamic = set()
-    for d_rec in dynamic_vm_recs:
-        s_low = (d_rec.server or '').lower()
-        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight']
-        if any(c in s_low for c in skip_keys):
-            continue
-        if s_low in seen_dynamic:
-            continue
-        seen_dynamic.add(s_low)
-
-        up_pct = float(d_rec.uptime_percent if d_rec.uptime_percent is not None else 100.0)
-        cpu_pct = float(d_rec.cpu_percent or 0.0)
-        mem_pct = float(d_rec.memory_percent or 0.0)
-        mem_tot = float(d_rec.memory_total_gb or 0.0)
-        mem_used = float(d_rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
-        if mem_used == 0.0 and mem_tot > 0 and mem_pct > 0:
-            mem_used = round(mem_tot * mem_pct / 100.0, 2)
-        disk_pct = float(d_rec.disk_3_percent or d_rec.disk_percent or 0.0)
-        disk_sz = float(d_rec.disk_3_size_gb or 0.0)
-        disk_us = float(d_rec.disk_3_used_gb or (disk_sz * disk_pct / 100.0 if disk_sz > 0 else 0.0))
-        if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
-            disk_us = round(disk_sz * disk_pct / 100.0, 2)
-
-        is_container = 'ccisprod_db' in s_low or 'container' in (d_rec.hosted_systems or '').lower()
-        is_ccis_vm = 'ccis-vm' in s_low or 'ccisuganda' in s_low
-
-        fleet_vms.append({
-            'pk': d_rec.pk,
-            'vm_key': d_rec.server,
-            'display_name': d_rec.server,
-            'short_name': d_rec.server,
-            'host_node': 'ccis-vm' if is_container else (d_rec.node_name or 'Proxmox'),
-            'parent_node_key': d_rec.node_name or 'Proxmox',
-            'cluster': 'Docker Swarm' if is_container else (d_rec.node_name or 'Proxmox'),
-            'role': d_rec.clean_hosted_systems or 'Guest Virtual Machine',
-            'database': d_rec.database or 'System',
-            'ip_address': 'DHCP / Static',
-            'vmid': 'docker / postgis:17-3.5' if is_container else ('Linux Host VM (LVM)' if is_ccis_vm else 'qemu'),
-            'logical_cpus': int(d_rec.logical_cpus or 4),
-            'uptime_percent': round(up_pct, 2),
-            'uptime_str': f"{round(up_pct, 2)}%",
-            'cpu_percent': round(cpu_pct, 2),
-            'memory_percent': round(mem_pct, 2),
-            'memory_total_gb': round(mem_tot, 2),
-            'memory_used_gb': round(mem_used, 2),
-            'disk_percent': round(disk_pct, 2),
-            'disk_size_gb': round(disk_sz, 2),
-            'disk_used_gb': round(disk_us, 2),
-            'status': d_rec.status or 'Healthy',
-            'has_data': True,
-            'is_fallback': False,
-            'last_date': d_rec.date,
-            'last_updated': d_rec.updated_at,
-            'entered_by': d_rec.entered_by or 'Script',
-        })
-
-    # Apply Node Scope and VM selection filter
-    filtered_fleet = fleet_vms
-    if selected_node == 'OLKVM':
-        filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'OLKVM']
-    elif selected_node == 'Proxmox':
-        filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'Proxmox']
-    elif selected_node != 'All Nodes':
-        sel_low = selected_node.lower()
-        filtered_fleet = [
-            v for v in fleet_vms
-            if sel_low in v['parent_node_key'].lower() or sel_low in v['host_node'].lower() or sel_low in v['vm_key'].lower()
-        ]
-
-    if selected_vm:
-        vm_low = selected_vm.lower()
-        filtered_fleet = [v for v in filtered_fleet if vm_low in v['vm_key'].lower() or vm_low in v['display_name'].lower()]
-
-    total_count = len(filtered_fleet)
-    healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
-    outage_count = sum(1 for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline'])
-    online_count = total_count - outage_count
-    below_sla_count = sum(1 for v in filtered_fleet if v['status'] == 'Below SLA')
-    warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
-    critical_count = outage_count
-
-    if total_count == 0:
-        vms_healthy_display = "0 Virtual Machines"
-        vms_status_color = "#64748b"
-    elif outage_count > 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({outage_count} Outage)"
-        vms_status_color = "#dc2626"
-    elif warning_count > 0 and healthy_count > 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({healthy_count} Healthy, {warning_count} Warning)"
-        vms_status_color = "#d97706"
-    elif warning_count > 0 and healthy_count == 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({warning_count} Warning)"
-        vms_status_color = "#d97706"
-    elif below_sla_count > 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({below_sla_count} Below SLA)"
-        vms_status_color = "#dc2626"
-    else:
-        vms_healthy_display = f"{online_count}/{total_count} Online & Healthy"
-        vms_status_color = "#16a34a"
-
-    active_data_vms = [v for v in filtered_fleet if v['has_data']]
-    avg_up = round(sum(v['uptime_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 100.00
-    avg_cpu = round(sum(v['cpu_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
-    avg_mem = round(sum(v['memory_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
-    avg_disk = round(sum(v['disk_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
-
-    kpis = {
-        'total_vms_count': total_count,
-        'vms_healthy_count': healthy_count,
-        'vms_online_count': online_count,
-        'vms_outage_count': outage_count,
-        'vms_healthy_display': vms_healthy_display,
-        'vms_status_color': vms_status_color,
-        'vms_warning_count': warning_count,
-        'vms_critical_count': critical_count,
-        'fleet_avg_uptime': f"{avg_up}%",
-        'fleet_avg_cpu': f"{avg_cpu}%",
-        'fleet_avg_mem': f"{avg_mem}%",
-        'fleet_avg_disk': f"{avg_disk}%",
-    }
-
-    return {
-        'vms': filtered_fleet,
-        'kpis': kpis,
-    }
-
-
-def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=None):
-    from django.db.models import Avg, Q
-    import math
-    from etl.services.rest_client import PROMETHEUS_URL, sync_all_nodes_from_prometheus
-
-    today_dt = timezone.now().date()
-    if not reporting_month:
-        target_month_dt = today_dt.replace(day=1)
-    elif isinstance(reporting_month, str):
-        try:
-            target_month_dt = datetime.strptime(reporting_month[:7], '%Y-%m').date().replace(day=1)
-        except ValueError:
-            target_month_dt = today_dt.replace(day=1)
-    elif hasattr(reporting_month, 'year'):
-        target_month_dt = reporting_month.replace(day=1)
-    else:
-        target_month_dt = today_dt.replace(day=1)
-
-    start_of_month = target_month_dt
-    target_node_sla = 99.90
-    if start_of_month.month == 12:
-        next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
-    else:
-        next_month = start_of_month.replace(month=start_of_month.month + 1, day=1)
-
-    node_definitions = [
-        {
-            'node_key': 'nmsinfra.nms.go.ug',
-            'node_name': 'OLKVM',
-            'display_name': 'nmsinfra.nms.go.ug',
-            'role_title': 'OLKVM — Oracle Database Node',
-            'hosted_systems': 'Oracle DB (nmsinfra)',
-            'primary_db': 'Oracle',
-            'filter_q': Q(server__icontains='infra'),
-            'default_disks': [
-                '/nmsddbkp (Shared NFS)',
-                '/u01 (Oracle Data)',
-                '/ (OS Root)',
-            ],
-        },
-        {
-            'node_key': 'nmsebs.nms.go.ug',
-            'node_name': 'OLKVM',
-            'display_name': 'nmsebs.nms.go.ug',
-            'role_title': 'OLKVM — Oracle EBS App Node',
-            'hosted_systems': 'Oracle EBS App (nmsebs)',
-            'primary_db': 'Oracle',
-            'filter_q': Q(server__icontains='ebs'),
-            'default_disks': [
-                '/nmsddbkp (Shared NFS)',
-                '/stagearea (LVM XFS)',
-                '/ (OS Root)',
-            ],
-        },
-        {
-            'node_key': 'pvenode1',
-            'node_name': 'Proxmox',
-            'display_name': 'pvenode1',
-            'role_title': 'Proxmox Cluster Node 1',
-            'hosted_systems': 'tomcatvm & Internal Systems',
-            'primary_db': 'MySQL / Internal',
-            'filter_q': Q(server__iexact='pvenode1'),
-            'default_disks': [
-                'VMSAN (Shared)',
-                'local-lvm (LVM-Thin)',
-                'local (Root / ISO)',
-            ],
-        },
-        {
-            'node_key': 'pvenode2',
-            'node_name': 'Proxmox',
-            'display_name': 'pvenode2',
-            'role_title': 'Proxmox Cluster Node 2',
-            'hosted_systems': 'jumphostvm & monitoringvm',
-            'primary_db': 'Monitoring / Ops',
-            'filter_q': Q(server__iexact='pvenode2'),
-            'default_disks': [
-                'VMSAN (Shared)',
-                'local-lvm (LVM-Thin)',
-                'local (Root / ISO)',
-            ],
-        },
-        {
-            'node_key': 'pvenode3',
-            'node_name': 'Proxmox',
-            'display_name': 'pvenode3',
-            'role_title': 'Proxmox Cluster Node 3',
-            'hosted_systems': 'databasevm (MySQL / Pentana)',
-            'primary_db': 'MySQL / MS SQL Server',
-            'filter_q': Q(server__iexact='pvenode3'),
-            'default_disks': [
-                'VMSAN (Shared)',
-                'local-lvm (LVM-Thin)',
-                'local (Root / ISO)',
-            ],
-        },
-    ]
-
-    def _disk_status(pct):
-        if pct > 90:
-            return 'Critical'
-        elif pct > 80:
-            return 'Warning'
-        return 'Healthy'
-
-    def _clean_disk_label(raw_label, default_label):
-        lbl = (raw_label or default_label or '').strip()
-        if lbl.startswith('storage/'):
-            parts = lbl.split('/')
-            lbl = parts[-1] if len(parts) >= 3 else lbl
-        low = lbl.lower()
-        if 'vmsan' in low:
-            return 'VMSAN (Shared)'
-        if 'local-lvm' in low:
-            return 'local-lvm (LVM-Thin)'
-        if low == 'local' or 'local (' in low:
-            return 'local (Root / ISO)'
-        if 'nmsddbkp' in low:
-            return '/nmsddbkp (Shared NFS)'
-        if '/u01' in low:
-            return '/u01 (Oracle Data)'
-        if 'root' in low or lbl == '/':
-            return '/ (OS Root)'
-        return lbl
-
-    def _calculate_runway(free_gb, daily_burn_gb, used_pct=0.0):
-        if daily_burn_gb is None:
-            if free_gb is not None and float(free_gb or 0.0) <= 0.0:
-                return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
-            return {'days': None, 'text': '—', 'badge': 'neutral'}
-
-        free_gb = float(free_gb or 0.0)
-        daily_burn_gb = float(daily_burn_gb or 0.0)
-        used_pct = float(used_pct or 0.0)
-
-        # 1. Truly exhausted / 0 bytes free
-        if free_gb <= 0.0:
-            return {'days': 0, 'text': 'Exhausted (0d)', 'badge': 'critical'}
-
-        # 2. Critical utilization boundary (>= 95% full)
-        if used_pct >= 95.0:
-            return {'days': 3, 'text': '< 7 days (Critical)', 'badge': 'critical'}
-
-        # 3. Non-positive or negligible daily growth (stable or shrinking)
-        if daily_burn_gb <= 0.05:
-            return {'days': 9999, 'text': '> 1 Year', 'badge': 'stable'}
-
-        # 4. Compute projected days until storage exhaustion
-        days = max(1, int(free_gb / daily_burn_gb))
-
-        # 5. Sanity guard against temporary delta bursts on healthy disks:
-        # A 24h burst (backup dump, archivelog surge, index rebuild) on a healthy disk (<75% used, >100GB free)
-        # must NOT falsely trigger "0 days" or "< 7 days" panic alarms.
-        if used_pct < 75.0 and free_gb >= 100.0:
-            if days < 60:
-                return {'days': 365, 'text': '> 1 Year (Stable)', 'badge': 'stable'}
-        elif used_pct < 85.0 and free_gb >= 50.0:
-            if days < 14:
-                return {'days': 90, 'text': '> 3 mos (Spike)', 'badge': 'healthy'}
-
-        # 6. Standard threshold categorization
-        if days <= 7:
-            return {'days': days, 'text': f"{days} days", 'badge': 'critical'}
-        elif days <= 30:
-            return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-        elif days <= 90:
-            return {'days': days, 'text': f"{days} days", 'badge': 'warning'}
-        elif days <= 365:
-            mos = round(days / 30.4, 1)
-            return {'days': days, 'text': f"{mos} mos ({days}d)", 'badge': 'healthy'}
-        else:
-            return {'days': days, 'text': '> 1 Year', 'badge': 'stable'}
-
-    node_overview_data = []
-    for nd in node_definitions:
-        # Prefer telemetry record within target month (from start of the month), fallback to latest overall
-        month_scoped_qs = (
-            ServerHealth.objects.filter(nd['filter_q'], date__gte=start_of_month, date__lt=next_month)
-            .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
-            .order_by('-date', '-updated_at')
-        )
-        latest_rec = month_scoped_qs.first()
-        if not latest_rec:
-            latest_rec = ServerHealth.objects.filter(nd['filter_q'], date__gte=start_of_month, date__lt=next_month).order_by('-date', '-updated_at').first()
-        if not latest_rec:
-            latest_rec = (
-                ServerHealth.objects.filter(nd['filter_q'])
-                .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
-                .order_by('-date', '-updated_at')
-                .first()
-            )
-        if not latest_rec:
-            latest_rec = ServerHealth.objects.filter(nd['filter_q']).order_by('-date', '-updated_at').first()
-
-        # Monthly average uptime for this specific node across the period starting from the start of the month
-        month_node_qs = ServerHealth.objects.filter(
-            nd['filter_q'],
-            date__gte=start_of_month,
-            date__lt=next_month,
-        ).exclude(uptime_percent__isnull=True)
-
-        month_up_agg = month_node_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
-
-        import calendar
-        _, num_days = calendar.monthrange(target_month_dt.year, target_month_dt.month)
-        total_month_hours = num_days * 24.0
-
-        # Query unplanned incidents for this node in the reporting month (matching by date or start)
-        month_inc_filter = (
-            Q(date__year=target_month_dt.year, date__month=target_month_dt.month) |
-            Q(start__year=target_month_dt.year, start__month=target_month_dt.month)
-        )
-        if nd['node_name'] == 'OLKVM':
-            node_inc_qs = IncidentRegister.objects.filter(
-                month_inc_filter,
-                planned=False
-            ).filter(
-                Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure') | Q(database__iexact='Oracle')
-            ).filter(
-                Q(node_name__iexact='OLKVM') |
-                Q(node_name__iexact=nd['node_key']) |
-                Q(node_name__iexact=nd['display_name']) |
-                Q(system__icontains=nd['node_key']) |
-                Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs') |
-                (Q(node_name__icontains='infra') if 'infra' in nd['node_key'] else Q(node_name__icontains='ebs'))
-            )
-        else:
-            pve_key = (nd['node_key'] or '').lower()
-            pve_vm_q = Q()
-            if 'pvenode1' in pve_key:
-                pve_vm_q = Q(system__icontains='tomcat') | Q(node_name__icontains='tomcat') | Q(node_name__icontains='pvenode1')
-            elif 'pvenode2' in pve_key:
-                pve_vm_q = Q(system__icontains='jumphost') | Q(system__icontains='monitoring') | Q(node_name__icontains='pvenode2') | Q(node_name__icontains='jumphost') | Q(node_name__icontains='monitoring')
-            elif 'pvenode3' in pve_key:
-                pve_vm_q = Q(system__icontains='databasevm') | Q(system__icontains='pentana') | Q(node_name__icontains='pvenode3') | Q(node_name__icontains='databasevm')
-
-            node_inc_qs = IncidentRegister.objects.filter(
-                month_inc_filter,
-                planned=False
-            ).filter(
-                Q(node_name__iexact=nd['node_key']) |
-                Q(node_name__iexact=nd['display_name']) |
-                Q(node_name__icontains='Proxmox') |
-                Q(system__icontains=nd['node_key']) |
-                Q(system__icontains='proxmox') |
-                pve_vm_q
-            )
-
-        node_unplanned_hrs = 0.0
-        now_dt = timezone.now()
-        for inc in node_inc_qs:
-            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
-            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
-                continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    node_unplanned_hrs += float(active_dt)
-            elif inc.duration_hrs:
-                node_unplanned_hrs += float(inc.duration_hrs)
-
-        node_unplanned_hrs = round(node_unplanned_hrs, 2)
-        node_inc_count = node_inc_qs.count()
-
-        if latest_rec:
-            if month_up_agg is not None:
-                up_pct = round(float(month_up_agg), 2)
-            else:
-                up_pct = float(latest_rec.uptime_percent if latest_rec.uptime_percent is not None else 100.0)
-
-            # Deduct unplanned outage downtime from SLA uptime percentage
-            if node_unplanned_hrs > 0:
-                sla_node_up_pct = round(max(0.0, (total_month_hours - node_unplanned_hrs) / total_month_hours * 100.0), 2)
-                up_pct = min(up_pct, sla_node_up_pct)
-
-            active_node_inc = node_inc_qs.filter(status__in=['Open', 'In Progress']).count()
-            if active_node_inc > 0:
-                node_status_str = 'Outage'
-            elif up_pct < target_node_sla:
-                node_status_str = 'Below SLA'
-            elif node_unplanned_hrs > 0:
-                node_status_str = 'Warning'
-            else:
-                node_status_str = latest_rec.status if (latest_rec and latest_rec.status) else 'Healthy'
-            up_days = float(latest_rec.uptime_days or 0.0)
-            logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)))
-            cpu_val = float(latest_rec.cpu_percent or 0.0)
-            mem_val = float(latest_rec.memory_percent or 0.0)
-            mem_tot = float(latest_rec.memory_total_gb or 0.0)
-            mem_used = float(latest_rec.memory_used_gb or (mem_tot * mem_val / 100.0 if mem_tot > 0 else 0.0))
-            if mem_used == 0.0 and mem_tot > 0 and mem_val > 0:
-                mem_used = round(mem_tot * mem_val / 100.0, 2)
-            growth_gb = float(getattr(latest_rec, 'storage_growth_gb', 0.0) or 0.0)
-            growth_pct = float(latest_rec.storage_growth_pct or 0.0)
-
-            d1_pct = float(latest_rec.disk_1_percent or 0.0)
-            d1_size = float(latest_rec.disk_1_size_gb or 0.0)
-            d1_used = float(latest_rec.disk_1_used_gb or (d1_size * d1_pct / 100.0 if d1_size > 0 else 0.0))
-            if d1_used == 0.0 and d1_size > 0 and d1_pct > 0:
-                d1_used = round(d1_size * d1_pct / 100.0, 2)
-            if d1_pct == 0.0 and d1_size == 0.0 and float(latest_rec.disk_percent or 0.0) > 0:
-                d1_pct = float(latest_rec.disk_percent)
-
-            d2_pct = float(latest_rec.disk_2_percent or 0.0)
-            d2_size = float(latest_rec.disk_2_size_gb or 0.0)
-            d2_used = float(latest_rec.disk_2_used_gb or (d2_size * d2_pct / 100.0 if d2_size > 0 else 0.0))
-            if d2_used == 0.0 and d2_size > 0 and d2_pct > 0:
-                d2_used = round(d2_size * d2_pct / 100.0, 2)
-
-            d3_pct = float(latest_rec.disk_3_percent or 0.0)
-            d3_size = float(latest_rec.disk_3_size_gb or 0.0)
-            d3_used = float(latest_rec.disk_3_used_gb or (d3_size * d3_pct / 100.0 if d3_size > 0 else 0.0))
-            if d3_used == 0.0 and d3_size > 0 and d3_pct > 0:
-                d3_used = round(d3_size * d3_pct / 100.0, 2)
-
-            # Baseline confirmed telemetry starts from October 1, 2026
-            # Daily 24h Delta: compare against yesterday's run (most recent prior run with valid telemetry)
-            oct_baseline_date = datetime(2026, 10, 1).date()
-            prev_run_rec = None
-            if latest_rec.date > oct_baseline_date:
-                prev_run_rec = (
-                    ServerHealth.objects.filter(nd['filter_q'], date__lt=latest_rec.date, date__gte=oct_baseline_date)
-                    .filter(Q(entered_by='Prometheus') | Q(disk_1_size_gb__gt=0) | Q(disk_2_size_gb__gt=0))
-                    .order_by('-date', '-updated_at')
-                    .first()
-                )
-
-            if prev_run_rec:
-                prev_d1_sz = float(prev_run_rec.disk_1_size_gb or 0.0)
-                prev_d1_pct = float(prev_run_rec.disk_1_percent or 0.0)
-                prev_d1_used = float(prev_run_rec.disk_1_used_gb or (prev_d1_sz * prev_d1_pct / 100.0 if prev_d1_sz > 0 else 0.0))
-                if prev_d1_used == 0.0 and prev_d1_sz > 0 and prev_d1_pct > 0:
-                    prev_d1_used = round(prev_d1_sz * prev_d1_pct / 100.0, 2)
-
-                prev_d2_sz = float(prev_run_rec.disk_2_size_gb or 0.0)
-                prev_d2_pct = float(prev_run_rec.disk_2_percent or 0.0)
-                prev_d2_used = float(prev_run_rec.disk_2_used_gb or (prev_d2_sz * prev_d2_pct / 100.0 if prev_d2_sz > 0 else 0.0))
-                if prev_d2_used == 0.0 and prev_d2_sz > 0 and prev_d2_pct > 0:
-                    prev_d2_used = round(prev_d2_sz * prev_d2_pct / 100.0, 2)
-
-                prev_d3_sz = float(prev_run_rec.disk_3_size_gb or 0.0)
-                prev_d3_pct = float(prev_run_rec.disk_3_percent or 0.0)
-                prev_d3_used = float(prev_run_rec.disk_3_used_gb or (prev_d3_sz * prev_d3_pct / 100.0 if prev_d3_sz > 0 else 0.0))
-                if prev_d3_used == 0.0 and prev_d3_sz > 0 and prev_d3_pct > 0:
-                    prev_d3_used = round(prev_d3_sz * prev_d3_pct / 100.0, 2)
-
-                prev_local_used = prev_d2_used + prev_d3_used
-                curr_local_used = d2_used + d3_used
-
-                # Safe delta calculation: only compute if previous run had positive usage
-                d1_delta_gb = round(d1_used - prev_d1_used, 2) if (prev_d1_used > 0 and d1_used > 0) else None
-                # Guard against delta anomalies (>25% disk size jump or baseline shift)
-                if d1_delta_gb is not None and d1_size > 0 and abs(d1_delta_gb) > (d1_size * 0.25):
-                    d1_delta_gb = None
-                d1_delta_pct = round((d1_delta_gb / prev_d1_used) * 100.0, 2) if (d1_delta_gb is not None and prev_d1_used > 0) else None
-
-                d2_delta_gb = round(d2_used - prev_d2_used, 2) if (prev_d2_used > 0 and d2_used > 0) else None
-                if d2_delta_gb is not None and d2_size > 0 and abs(d2_delta_gb) > (d2_size * 0.25):
-                    d2_delta_gb = None
-                d2_delta_pct = round((d2_delta_gb / prev_d2_used) * 100.0, 2) if (d2_delta_gb is not None and prev_d2_used > 0) else None
-
-                d3_delta_gb = round(d3_used - prev_d3_used, 2) if (prev_d3_used > 0 and d3_used > 0) else None
-                if d3_delta_gb is not None and d3_size > 0 and abs(d3_delta_gb) > (d3_size * 0.25):
-                    d3_delta_gb = None
-                d3_delta_pct = round((d3_delta_gb / prev_d3_used) * 100.0, 2) if (d3_delta_gb is not None and prev_d3_used > 0) else None
-
-                local_delta_gb = round(curr_local_used - prev_local_used, 2) if (prev_local_used > 0 and curr_local_used > 0) else None
-                local_cap_est = d2_size + d3_size
-                if local_delta_gb is not None and local_cap_est > 0 and abs(local_delta_gb) > (local_cap_est * 0.25):
-                    local_delta_gb = None
-                local_delta_pct = round((local_delta_gb / prev_local_used) * 100.0, 2) if (local_delta_gb is not None and prev_local_used > 0) else None
-            else:
-                d1_delta_gb = None
-                d1_delta_pct = None
-                d2_delta_gb = None
-                d2_delta_pct = None
-                d3_delta_gb = None
-                d3_delta_pct = None
-                local_delta_gb = None
-                local_delta_pct = None
-
-            d1_runway = _calculate_runway(max(0.0, d1_size - d1_used), d1_delta_gb, d1_pct)
-            d2_runway = _calculate_runway(max(0.0, d2_size - d2_used), d2_delta_gb, d2_pct)
-            d3_runway = _calculate_runway(max(0.0, d3_size - d3_used), d3_delta_gb, d3_pct)
-
-            disks = [
-                {
-                    'slot': 1,
-                    'type': _clean_disk_label(latest_rec.disk_1_type, nd['default_disks'][0]),
-                    'size_gb': round(d1_size, 2),
-                    'used_gb': round(d1_used, 2),
-                    'free_gb': round(max(0.0, d1_size - d1_used), 2),
-                    'percent': round(d1_pct, 2),
-                    'status': _disk_status(d1_pct),
-                    'is_shared': True,
-                    'delta_24h_gb': d1_delta_gb,
-                    'delta_24h_pct': d1_delta_pct,
-                    'runway_days': d1_runway['days'],
-                    'runway_text': d1_runway['text'],
-                    'runway_badge': d1_runway['badge'],
-                },
-                {
-                    'slot': 2,
-                    'type': _clean_disk_label(latest_rec.disk_2_type, nd['default_disks'][1]),
-                    'size_gb': round(d2_size, 2),
-                    'used_gb': round(d2_used, 2),
-                    'free_gb': round(max(0.0, d2_size - d2_used), 2),
-                    'percent': round(d2_pct, 2),
-                    'status': _disk_status(d2_pct),
-                    'is_shared': False,
-                    'delta_24h_gb': d2_delta_gb,
-                    'delta_24h_pct': d2_delta_pct,
-                    'runway_days': d2_runway['days'],
-                    'runway_text': d2_runway['text'],
-                    'runway_badge': d2_runway['badge'],
-                },
-                {
-                    'slot': 3,
-                    'type': _clean_disk_label(latest_rec.disk_3_type, nd['default_disks'][2]),
-                    'size_gb': round(d3_size, 2),
-                    'used_gb': round(d3_used, 2),
-                    'free_gb': round(max(0.0, d3_size - d3_used), 2),
-                    'percent': round(d3_pct, 2),
-                    'status': _disk_status(d3_pct),
-                    'is_shared': False,
-                    'delta_24h_gb': d3_delta_gb,
-                    'delta_24h_pct': d3_delta_pct,
-                    'runway_days': d3_runway['days'],
-                    'runway_text': d3_runway['text'],
-                    'runway_badge': d3_runway['badge'],
-                },
-            ]
-
-            tot_cap = round(sum(d['size_gb'] for d in disks), 2)
-            tot_used = round(sum(d['used_gb'] for d in disks), 2)
-            tot_free = round(max(0.0, tot_cap - tot_used), 2)
-            local_cap = round(sum(d['size_gb'] for d in disks if not d['is_shared']), 2)
-            local_used = round(sum(d['used_gb'] for d in disks if not d['is_shared']), 2)
-            local_free = round(max(0.0, local_cap - local_used), 2)
-            local_util_pct = round((local_used / local_cap) * 100.0, 2) if local_cap > 0 else 0.0
-            peak_disk = round(max([float(latest_rec.disk_percent or 0.0)] + [d['percent'] for d in disks]), 2)
-
-            node_runway = _calculate_runway(local_free, local_delta_gb, local_util_pct)
-
-            clean_hosted = latest_rec.hosted_systems or nd['hosted_systems']
-            import re
-            clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', clean_hosted)
-            clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
-            if 'infra' in clean_hosted and 'nmsinfra' not in clean_hosted:
-                clean_hosted = clean_hosted.replace('infra', 'nmsinfra')
-            if 'ebs' in clean_hosted and 'nmsebs' not in clean_hosted:
-                clean_hosted = clean_hosted.replace('ebs', 'nmsebs')
-            clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()') or nd['hosted_systems']
-
-            srv_clean = latest_rec.server or nd['display_name']
-            if srv_clean.startswith('infra'):
-                srv_clean = 'nms' + srv_clean
-            elif srv_clean.startswith('ebs'):
-                srv_clean = 'nms' + srv_clean
-
-            node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
-            node_overview_data.append({
-                'node_key': nd['node_key'],
-                'node_name': nd['node_name'],
-                'display_name': nd['display_name'],
-                'full_node_label': node_lbl,
-                'role_title': nd['role_title'],
-                'hosted_systems': clean_hosted,
-                'primary_db': nd['primary_db'],
-                'server': srv_clean,
-                'has_data': True,
-                'uptime_percent': round(up_pct, 2),
-                'uptime_str': f"{round(up_pct, 2)}%",
-                'uptime_days': round(up_days, 1),
-                'uptime_status': 'Meets SLA' if up_pct >= 99.90 else ('Warning' if up_pct >= 99.0 else 'Below SLA'),
-                'unplanned_down_hrs': node_unplanned_hrs,
-                'incident_count': node_inc_count,
-                'logical_cpus': logical_cpus,
-                'cpu_percent': round(cpu_val, 2),
-                'memory_percent': round(mem_val, 2),
-                'memory_total_gb': round(mem_tot, 2),
-                'memory_used_gb': round(mem_used, 2),
-                'disk_percent': peak_disk,
-                'storage_growth_gb': round(local_delta_gb, 2) if local_delta_gb is not None else None,
-                'storage_growth_pct': round(local_delta_pct, 2) if local_delta_pct is not None else None,
-                'delta_24h_gb': round(local_delta_gb, 2) if local_delta_gb is not None else None,
-                'delta_24h_pct': round(local_delta_pct, 2) if local_delta_pct is not None else None,
-                'runway_days': node_runway['days'],
-                'runway_text': node_runway['text'],
-                'runway_badge': node_runway['badge'],
-                'disks': disks,
-                'disk_1': disks[0],
-                'disk_2': disks[1],
-                'disk_3': disks[2],
-                'total_disk_capacity_gb': tot_cap,
-                'total_disk_used_gb': tot_used,
-                'total_disk_free_gb': tot_free,
-                'local_disk_capacity_gb': local_cap,
-                'local_disk_used_gb': local_used,
-                'local_disk_free_gb': local_free,
-                'local_disk_util_pct': local_util_pct,
-                'total_disk_used_pct': round((tot_used / tot_cap * 100.0), 1) if tot_cap > 0 else peak_disk,
-                'connections': latest_rec.connections,
-                'threads': latest_rec.threads,
-                'slow_queries': latest_rec.slow_queries,
-                'status': node_status_str,
-                'entered_by': latest_rec.entered_by,
-                'updated_at': latest_rec.updated_at,
-                'date': latest_rec.date,
-            })
-        else:
-            empty_disks = [
-                {'slot': i + 1, 'type': _clean_disk_label(nd['default_disks'][i], nd['default_disks'][i]), 'size_gb': 0.0, 'used_gb': 0.0, 'free_gb': 0.0, 'percent': 0.0, 'status': 'No Data', 'is_shared': i == 0}
-                for i in range(3)
-            ]
-            node_lbl = "OLKVM" if nd['node_name'] == 'OLKVM' else f"{nd['node_name']} — {nd['display_name']}"
-            has_node_inc = (node_inc_count > 0 or node_unplanned_hrs > 0)
-            fallback_up_pct = round(max(0.0, (total_month_hours - node_unplanned_hrs) / total_month_hours * 100.0), 2) if total_month_hours > 0 else 100.0
-            fallback_status = 'Outage' if node_inc_qs.filter(status__in=['Open', 'In Progress']).exists() else ('Below SLA' if fallback_up_pct < target_node_sla else 'Healthy')
-
-            node_overview_data.append({
-                'node_key': nd['node_key'],
-                'node_name': nd['node_name'],
-                'display_name': nd['display_name'],
-                'full_node_label': node_lbl,
-                'role_title': nd['role_title'],
-                'hosted_systems': nd['hosted_systems'],
-                'primary_db': nd['primary_db'],
-                'server': nd['display_name'],
-                'has_data': has_node_inc,
-                'uptime_percent': fallback_up_pct if has_node_inc else 0.0,
-                'uptime_str': f"{fallback_up_pct}%" if has_node_inc else 'No Data',
-                'uptime_days': 0.0,
-                'uptime_status': ('Meets SLA' if fallback_up_pct >= 99.90 else ('Warning' if fallback_up_pct >= 99.0 else 'Below SLA')) if has_node_inc else 'N/A',
-                'unplanned_down_hrs': node_unplanned_hrs,
-                'incident_count': node_inc_count,
-                'logical_cpus': 48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16),
-                'cpu_percent': 0.0,
-                'memory_percent': 0.0,
-                'memory_total_gb': 0.0,
-                'memory_used_gb': 0.0,
-                'disk_percent': 0.0,
-                'storage_growth_gb': None,
-                'storage_growth_pct': None,
-                'delta_24h_gb': None,
-                'delta_24h_pct': None,
-                'runway_days': None,
-                'runway_text': '—',
-                'runway_badge': 'neutral',
-                'disks': empty_disks,
-                'disk_1': empty_disks[0],
-                'disk_2': empty_disks[1],
-                'disk_3': empty_disks[2],
-                'total_disk_capacity_gb': 0.0,
-                'total_disk_used_gb': 0.0,
-                'total_disk_free_gb': 0.0,
-                'local_disk_capacity_gb': 0.0,
-                'local_disk_used_gb': 0.0,
-                'local_disk_free_gb': 0.0,
-                'local_disk_util_pct': 0.0,
-                'total_disk_used_pct': 0.0,
-                'connections': 0,
-                'threads': 0,
-                'slow_queries': 0,
-                'status': fallback_status if has_node_inc else 'No Data',
-                'entered_by': 'Prometheus',
-                'updated_at': None,
-                'date': None,
-            })
-
-    # Consolidate OLKVM workloads (nmsinfra and nmsebs) into a single Node-level record
-    olkvm_workloads = [n for n in node_overview_data if n['node_name'] == 'OLKVM']
-    proxmox_nodes = [n for n in node_overview_data if n['node_name'] == 'Proxmox']
-
-    # Map hosted VMs / Workloads for Proxmox physical nodes
-    for p_node in proxmox_nodes:
-        pkey = (p_node.get('node_key') or '').lower()
-        if 'pvenode1' in pkey:
-            p_node['hosted_vms'] = [{'name': 'tomcatvm', 'label': 'tomcatvm (qemu/102)', 'role': 'Internal Web'}]
-        elif 'pvenode2' in pkey:
-            p_node['hosted_vms'] = [
-                {'name': 'jumphostvm', 'label': 'jumphostvm (qemu/100)', 'role': 'Secure Access'},
-                {'name': 'monitoringvm', 'label': 'monitoringvm (qemu/101)', 'role': 'Prometheus & Ops'}
-            ]
-        elif 'pvenode3' in pkey:
-            p_node['hosted_vms'] = [{'name': 'databasevm', 'label': 'databasevm (qemu/103)', 'role': 'MySQL / Pentana'}]
-        else:
-            p_node['hosted_vms'] = [{'name': p_node.get('display_name', 'VM'), 'label': p_node.get('hosted_systems', ''), 'role': ''}]
-
-    consolidated_node_overview = []
-    if olkvm_workloads:
-        infra_w = next((w for w in olkvm_workloads if 'infra' in w['node_key'].lower()), olkvm_workloads[0])
-        ebs_w = next((w for w in olkvm_workloads if 'ebs' in w['node_key'].lower()), None)
-        olkvm_has_data = any(w['has_data'] for w in olkvm_workloads)
-
-        # Query single deduplicated incident count and downtime for OLKVM host
-        olkvm_inc_qs = IncidentRegister.objects.filter(
-            month_inc_filter,
-            planned=False
-        ).filter(
-            Q(category__iexact='Infrastructure') | Q(database__iexact='Infrastructure')
-        ).filter(
-            Q(node_name__iexact='OLKVM') |
-            Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']) |
-            Q(system__icontains='olkvm') |
-            Q(system__icontains='nmsinfra') |
-            Q(system__icontains='nmsebs')
-        )
-        olkvm_unplanned_hrs = 0.0
-        for inc in olkvm_inc_qs:
-            # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
-            if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
-                continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    olkvm_unplanned_hrs += float(active_dt)
-            elif inc.duration_hrs:
-                olkvm_unplanned_hrs += float(inc.duration_hrs)
-        olkvm_unplanned_hrs = round(olkvm_unplanned_hrs, 2)
-        olkvm_inc_count = olkvm_inc_qs.count()
-
-        olkvm_telemetry_ups = [w['uptime_percent'] for w in olkvm_workloads if w['has_data'] and w['uptime_percent'] > 0]
-        base_olkvm_up = (sum(olkvm_telemetry_ups) / len(olkvm_telemetry_ups)) if olkvm_telemetry_ups else 100.0
-        if olkvm_unplanned_hrs > 0 and total_month_hours > 0:
-            sla_olkvm_up = round(max(0.0, (total_month_hours - olkvm_unplanned_hrs) / total_month_hours * 100.0), 2)
-            olkvm_up_pct = min(base_olkvm_up, sla_olkvm_up)
-        else:
-            olkvm_up_pct = base_olkvm_up
-        olkvm_up_pct = round(olkvm_up_pct, 2)
-
-        olkvm_cpus = sum(w['logical_cpus'] for w in olkvm_workloads)
-        olkvm_mem_tot = round(sum(w['memory_total_gb'] for w in olkvm_workloads), 2)
-        olkvm_mem_used = round(sum(w['memory_used_gb'] for w in olkvm_workloads), 2)
-        olkvm_mem_pct = round((olkvm_mem_used / olkvm_mem_tot * 100.0), 2) if olkvm_mem_tot > 0 else 0.0
-
-        tot_cpu_weight = sum(w['cpu_percent'] * w['logical_cpus'] for w in olkvm_workloads)
-        olkvm_cpu_pct = round(tot_cpu_weight / olkvm_cpus, 2) if olkvm_cpus > 0 else 0.0
-
-        olkvm_local_cap = round(sum(w['local_disk_capacity_gb'] for w in olkvm_workloads), 2)
-        olkvm_local_used = round(sum(w['local_disk_used_gb'] for w in olkvm_workloads), 2)
-        olkvm_local_free = round(max(0.0, olkvm_local_cap - olkvm_local_used), 2)
-        olkvm_local_pct = round((olkvm_local_used / olkvm_local_cap * 100.0), 2) if olkvm_local_cap > 0 else 0.0
-
-        olkvm_growth_vals = [w['storage_growth_gb'] for w in olkvm_workloads if w.get('storage_growth_gb') is not None]
-        olkvm_storage_growth = round(sum(olkvm_growth_vals), 2) if olkvm_growth_vals else None
-        olkvm_delta_vals = [w['delta_24h_gb'] for w in olkvm_workloads if w.get('delta_24h_gb') is not None]
-        olkvm_delta_24h = round(sum(olkvm_delta_vals), 2) if olkvm_delta_vals else None
-        olkvm_runway = _calculate_runway(olkvm_local_free, olkvm_delta_24h, olkvm_local_pct)
-
-        active_olkvm_inc = olkvm_inc_qs.filter(status__in=['Open', 'In Progress']).count()
-        if active_olkvm_inc > 0:
-            olkvm_status = 'Outage'
-        elif olkvm_up_pct < target_node_sla:
-            olkvm_status = 'Below SLA'
-        elif olkvm_unplanned_hrs > 0:
-            olkvm_status = 'Warning'
-        else:
-            olkvm_status = 'Healthy'
-
-        hosted_vms = [
-            {
-                'name': 'nmsinfra',
-                'label': 'Oracle DB (nmsinfra)',
-                'role': 'Oracle Database',
-                'storage_used': infra_w['local_disk_used_gb'],
-                'storage_cap': infra_w['local_disk_capacity_gb'],
-                'storage_pct': infra_w['local_disk_util_pct'],
-                'cpus': infra_w['logical_cpus'],
-                'ram_gb': infra_w['memory_total_gb'],
-            }
-        ]
-        storage_breakdown = f"nmsinfra: {round(infra_w['local_disk_used_gb']/1024.0, 2)}TB"
-        if ebs_w:
-            hosted_vms.append({
-                'name': 'nmsebs',
-                'label': 'Oracle EBS App (nmsebs)',
-                'role': 'Oracle EBS App',
-                'storage_used': ebs_w['local_disk_used_gb'],
-                'storage_cap': ebs_w['local_disk_capacity_gb'],
-                'storage_pct': ebs_w['local_disk_util_pct'],
-                'cpus': ebs_w['logical_cpus'],
-                'ram_gb': ebs_w['memory_total_gb'],
-            })
-            storage_breakdown += f" · nmsebs: {round(ebs_w['local_disk_used_gb']/1024.0, 2)}TB"
-
-        olkvm_disks = [
-            infra_w['disk_1'],
-            infra_w['disk_2'],
-        ]
-        if ebs_w:
-            olkvm_disks.append(ebs_w['disk_2'])
-        else:
-            olkvm_disks.append(infra_w['disk_3'])
-
-        consolidated_olkvm = {
-            'node_key': 'OLKVM',
-            'node_name': 'OLKVM',
-            'display_name': 'OLKVM',
-            'full_node_label': 'OLKVM',
-            'role_title': 'Oracle Linux KVM (OLKVM) Host Cluster',
-            'hosted_systems': 'Oracle DB (nmsinfra), Oracle EBS App (nmsebs)',
-            'hosted_vms': hosted_vms,
-            'storage_breakdown': storage_breakdown,
-            'primary_db': 'Oracle',
-            'server': 'OLKVM',
-            'has_data': olkvm_has_data,
-            'uptime_percent': olkvm_up_pct,
-            'uptime_str': f"{olkvm_up_pct}%" if olkvm_has_data else 'No Data',
-            'uptime_days': max(w['uptime_days'] for w in olkvm_workloads),
-            'uptime_status': 'Meets SLA' if olkvm_up_pct >= 99.90 else ('Warning' if olkvm_up_pct >= 99.0 else 'Below SLA'),
-            'unplanned_down_hrs': olkvm_unplanned_hrs,
-            'incident_count': olkvm_inc_count,
-            'logical_cpus': olkvm_cpus,
-            'cpu_percent': olkvm_cpu_pct,
-            'memory_percent': olkvm_mem_pct,
-            'memory_total_gb': olkvm_mem_tot,
-            'memory_used_gb': olkvm_mem_used,
-            'disk_percent': max(w['disk_percent'] for w in olkvm_workloads),
-            'storage_growth_gb': olkvm_storage_growth,
-            'storage_growth_pct': round((olkvm_storage_growth / olkvm_local_used * 100.0), 2) if (olkvm_storage_growth is not None and olkvm_local_used > 0) else None,
-            'delta_24h_gb': olkvm_delta_24h,
-            'delta_24h_pct': round((olkvm_delta_24h / olkvm_local_used * 100.0), 2) if (olkvm_delta_24h is not None and olkvm_local_used > 0) else None,
-            'runway_days': olkvm_runway['days'],
-            'runway_text': olkvm_runway['text'],
-            'runway_badge': olkvm_runway['badge'],
-            'disks': olkvm_disks,
-            'disk_1': olkvm_disks[0],
-            'disk_2': olkvm_disks[1],
-            'disk_3': olkvm_disks[2] if len(olkvm_disks) > 2 else olkvm_disks[1],
-            'total_disk_capacity_gb': round(infra_w['disk_1']['size_gb'] + olkvm_local_cap, 2),
-            'total_disk_used_gb': round(infra_w['disk_1']['used_gb'] + olkvm_local_used, 2),
-            'total_disk_free_gb': round(infra_w['disk_1']['free_gb'] + olkvm_local_free, 2),
-            'local_disk_capacity_gb': olkvm_local_cap,
-            'local_disk_used_gb': olkvm_local_used,
-            'local_disk_free_gb': olkvm_local_free,
-            'local_disk_util_pct': olkvm_local_pct,
-            'total_disk_used_pct': round(((infra_w['disk_1']['used_gb'] + olkvm_local_used) / (infra_w['disk_1']['size_gb'] + olkvm_local_cap) * 100.0), 1) if (infra_w['disk_1']['size_gb'] + olkvm_local_cap) > 0 else olkvm_local_pct,
-            'connections': sum(w['connections'] for w in olkvm_workloads),
-            'threads': sum(w['threads'] for w in olkvm_workloads),
-            'slow_queries': sum(w['slow_queries'] for w in olkvm_workloads),
-            'status': olkvm_status,
-            'entered_by': 'Prometheus',
-            'updated_at': infra_w['updated_at'],
-            'date': infra_w['date'],
-        }
-        consolidated_node_overview.append(consolidated_olkvm)
-
-    consolidated_node_overview.extend(proxmox_nodes)
-    node_overview_data = consolidated_node_overview
-
-    if selected_node == 'All Nodes':
-        filtered_nodes = node_overview_data
-    elif selected_node in ('OLKVM', 'Proxmox'):
-        filtered_nodes = [n for n in node_overview_data if n['node_name'].lower() == selected_node.lower()]
-    else:
-        filtered_nodes = [n for n in node_overview_data if n['node_key'].lower() == selected_node.lower()]
-
-    scoped_node_detail = filtered_nodes[0] if (len(filtered_nodes) == 1) else None
-
-    shared_storage_records = []
-    seen_shared = set()
-    for n in filtered_nodes:
-        if not n['has_data'] or n['node_name'] in seen_shared:
-            continue
-        seen_shared.add(n['node_name'])
-        d1 = n['disk_1']
-        if d1['size_gb'] > 0:
-            shared_storage_records.append({
-                'cluster': n['node_name'],
-                'storage_id': 'VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp',
-                'type_label': d1['type'],
-                'total_gb': d1['size_gb'],
-                'total_tb': round(d1['size_gb'] / 1024.0, 2),
-                'used_gb': d1['used_gb'],
-                'free_gb': d1['free_gb'],
-                'percent': d1['percent'],
-                'growth_gb': d1.get('delta_24h_gb', 0.0),
-                'growth_pct': d1.get('delta_24h_pct', 0.0),
-                'delta_24h_gb': d1.get('delta_24h_gb', 0.0),
-                'delta_24h_pct': d1.get('delta_24h_pct', 0.0),
-                'runway_days': d1.get('runway_days', 9999),
-                'runway_text': d1.get('runway_text', 'Stable'),
-                'runway_badge': d1.get('runway_badge', 'stable'),
-                'status': d1['status'],
-                'date': n['date'] or today_dt,
-                'updated_at': n.get('updated_at'),
-            })
-
-    # Build clean grouped capacity records (Option B: 7-Row Consolidated Storage Architecture)
-    node_capacity_records = []
-
-    # Reference dates for the report
-    latest_date = today_dt
-    latest_updated = None
-    for n in filtered_nodes:
-        if n.get('date') and (latest_date is None or n['date'] > latest_date):
-            latest_date = n['date']
-        if n.get('updated_at') and (latest_updated is None or n['updated_at'] > latest_updated):
-            latest_updated = n['updated_at']
-
-    # 1. Proxmox Shared SAN pool (VMSAN)
-    pve_shared_src = next((p for p in proxmox_nodes if p.get('has_data') and p['disk_1']['size_gb'] > 0), proxmox_nodes[0] if proxmox_nodes else None)
-    vmsan_rec = None
-    if pve_shared_src:
-        d1 = pve_shared_src['disk_1']
-        vmsan_rec = {
-            'month': pve_shared_src.get('date') or latest_date,
-            'date': pve_shared_src.get('date') or latest_date,
-            'updated_at': pve_shared_src.get('updated_at') or latest_updated,
-            'node_key': 'Proxmox',
-            'node_name': 'Proxmox',
-            'display_name': 'Proxmox Shared SAN',
-            'hosted_systems': 'VMSAN',
-            'storage_tier': 'VMSAN (Shared SAN)',
-            'capacity_gb': d1['size_gb'],
-            'used_gb': d1['used_gb'],
-            'free_gb': d1['free_gb'],
-            'used_percent': d1['percent'],
-            'growth_gb': d1.get('delta_24h_gb'),
-            'growth_percent': d1.get('delta_24h_pct'),
-            'delta_24h_gb': d1.get('delta_24h_gb'),
-            'delta_24h_percent': d1.get('delta_24h_pct'),
-            'runway_days': d1.get('runway_days', 9999),
-            'runway_text': d1.get('runway_text', 'Stable'),
-            'runway_badge': d1.get('runway_badge', 'stable'),
-            'has_data': pve_shared_src.get('has_data', False),
-            'is_shared': True,
-        }
-
-    # 2. OLKVM Shared NFS pool (/nmsddbkp)
-    olkvm_shared_src = infra_w if infra_w else (ebs_w if ebs_w else None)
-    nmsddbkp_rec = None
-    if olkvm_shared_src:
-        d1 = olkvm_shared_src['disk_1']
-        nmsddbkp_rec = {
-            'month': olkvm_shared_src.get('date') or latest_date,
-            'date': olkvm_shared_src.get('date') or latest_date,
-            'updated_at': olkvm_shared_src.get('updated_at') or latest_updated,
-            'node_key': 'OLKVM',
-            'node_name': 'OLKVM',
-            'display_name': 'OLKVM Shared NFS',
-            'hosted_systems': '/nmsddbkp',
-            'storage_tier': '/nmsddbkp (Shared NFS)',
-            'capacity_gb': d1['size_gb'],
-            'used_gb': d1['used_gb'],
-            'free_gb': d1['free_gb'],
-            'used_percent': d1['percent'],
-            'growth_gb': d1.get('delta_24h_gb'),
-            'growth_percent': d1.get('delta_24h_pct'),
-            'delta_24h_gb': d1.get('delta_24h_gb'),
-            'delta_24h_percent': d1.get('delta_24h_pct'),
-            'runway_days': d1.get('runway_days', 9999),
-            'runway_text': d1.get('runway_text', 'Stable'),
-            'runway_badge': d1.get('runway_badge', 'stable'),
-            'has_data': olkvm_shared_src.get('has_data', False),
-            'is_shared': True,
-        }
-
-    # 3. Oracle Data volume (/u01) - nmsinfra
-    u01_rec = None
-    if infra_w:
-        d2 = infra_w['disk_2']
-        u01_rec = {
-            'month': infra_w.get('date') or latest_date,
-            'date': infra_w.get('date') or latest_date,
-            'updated_at': infra_w.get('updated_at') or latest_updated,
-            'node_key': 'nmsinfra',
-            'node_name': 'OLKVM',
-            'display_name': 'Oracle DB (nmsinfra)',
-            'hosted_systems': 'nmsinfra',
-            'storage_tier': d2['type'] or '/u01 (Oracle Data)',
-            'capacity_gb': d2['size_gb'],
-            'used_gb': d2['used_gb'],
-            'free_gb': d2['free_gb'],
-            'used_percent': d2['percent'],
-            'growth_gb': d2.get('delta_24h_gb'),
-            'growth_percent': d2.get('delta_24h_pct'),
-            'delta_24h_gb': d2.get('delta_24h_gb'),
-            'delta_24h_percent': d2.get('delta_24h_pct'),
-            'runway_days': d2.get('runway_days', 9999),
-            'runway_text': d2.get('runway_text', 'Stable'),
-            'runway_badge': d2.get('runway_badge', 'stable'),
-            'has_data': infra_w.get('has_data', False),
-            'is_shared': False,
-        }
-
-    # 4. Oracle Fast Recovery Area (/fra) - nmsinfra
-    fra_rec = None
-    if infra_w:
-        d3 = infra_w['disk_3']
-        fra_rec = {
-            'month': infra_w.get('date') or latest_date,
-            'date': infra_w.get('date') or latest_date,
-            'updated_at': infra_w.get('updated_at') or latest_updated,
-            'node_key': 'nmsinfra',
-            'node_name': 'OLKVM',
-            'display_name': 'Oracle DB (nmsinfra)',
-            'hosted_systems': 'nmsinfra',
-            'storage_tier': d3['type'] or '/fra (Recovery Area)',
-            'capacity_gb': d3['size_gb'],
-            'used_gb': d3['used_gb'],
-            'free_gb': d3['free_gb'],
-            'used_percent': d3['percent'],
-            'growth_gb': d3.get('delta_24h_gb'),
-            'growth_percent': d3.get('delta_24h_pct'),
-            'delta_24h_gb': d3.get('delta_24h_gb'),
-            'delta_24h_percent': d3.get('delta_24h_pct'),
-            'runway_days': d3.get('runway_days', 9999),
-            'runway_text': d3.get('runway_text', 'Stable'),
-            'runway_badge': d3.get('runway_badge', 'stable'),
-            'has_data': infra_w.get('has_data', False),
-            'is_shared': False,
-        }
-
-    # 5. Oracle Staging volume (/stagearea) - nmsebs
-    stage_rec = None
-    if ebs_w:
-        d2 = ebs_w['disk_2']
-        stage_rec = {
-            'month': ebs_w.get('date') or latest_date,
-            'date': ebs_w.get('date') or latest_date,
-            'updated_at': ebs_w.get('updated_at') or latest_updated,
-            'node_key': 'nmsebs',
-            'node_name': 'OLKVM',
-            'display_name': 'Oracle EBS App (nmsebs)',
-            'hosted_systems': 'nmsebs',
-            'storage_tier': d2['type'] or '/stagearea (Staging)',
-            'capacity_gb': d2['size_gb'],
-            'used_gb': d2['used_gb'],
-            'free_gb': d2['free_gb'],
-            'used_percent': d2['percent'],
-            'growth_gb': d2.get('delta_24h_gb'),
-            'growth_percent': d2.get('delta_24h_pct'),
-            'delta_24h_gb': d2.get('delta_24h_gb'),
-            'delta_24h_percent': d2.get('delta_24h_pct'),
-            'runway_days': d2.get('runway_days', 9999),
-            'runway_text': d2.get('runway_text', 'Stable'),
-            'runway_badge': d2.get('runway_badge', 'stable'),
-            'has_data': ebs_w.get('has_data', False),
-            'is_shared': False,
-        }
-
-    # 6. Oracle EBS Middleware & OS volume (/fmw, /) - nmsebs
-    fmw_rec = None
-    if ebs_w:
-        d3 = ebs_w['disk_3']
-        fmw_rec = {
-            'month': ebs_w.get('date') or latest_date,
-            'date': ebs_w.get('date') or latest_date,
-            'updated_at': ebs_w.get('updated_at') or latest_updated,
-            'node_key': 'nmsebs',
-            'node_name': 'OLKVM',
-            'display_name': 'Oracle EBS App (nmsebs)',
-            'hosted_systems': 'nmsebs',
-            'storage_tier': d3['type'] or '/fmw, / (Middleware & OS)',
-            'capacity_gb': d3['size_gb'],
-            'used_gb': d3['used_gb'],
-            'free_gb': d3['free_gb'],
-            'used_percent': d3['percent'],
-            'growth_gb': d3.get('delta_24h_gb'),
-            'growth_percent': d3.get('delta_24h_pct'),
-            'delta_24h_gb': d3.get('delta_24h_gb'),
-            'delta_24h_percent': d3.get('delta_24h_pct'),
-            'runway_days': d3.get('runway_days', 9999),
-            'runway_text': d3.get('runway_text', 'Stable'),
-            'runway_badge': d3.get('runway_badge', 'stable'),
-            'has_data': ebs_w.get('has_data', False),
-            'is_shared': False,
-        }
-
-    # 7. Proxmox Host Local Pools summary (pvenode1, pvenode2, pvenode3 local-lvm & root)
-    pve_local_summary_rec = None
-    if proxmox_nodes:
-        tot_pve_local_cap = round(sum(p['disk_2']['size_gb'] + p['disk_3']['size_gb'] for p in proxmox_nodes), 2)
-        tot_pve_local_used = round(sum(p['disk_2']['used_gb'] + p['disk_3']['used_gb'] for p in proxmox_nodes), 2)
-        tot_pve_local_free = round(max(0.0, tot_pve_local_cap - tot_pve_local_used), 2)
-        tot_pve_local_pct = round((tot_pve_local_used / tot_pve_local_cap * 100.0), 2) if tot_pve_local_cap > 0 else 0.0
-        pve_deltas = [p.get('delta_24h_gb') for p in proxmox_nodes if p.get('delta_24h_gb') is not None]
-        tot_pve_delta = round(sum(pve_deltas), 2) if pve_deltas else None
-        tot_pve_delta_pct = round((tot_pve_delta / tot_pve_local_used) * 100.0, 2) if (tot_pve_delta is not None and tot_pve_local_used > 0) else None
-        pve_rw = _calculate_runway(tot_pve_local_free, tot_pve_delta, tot_pve_local_pct)
-        pve_local_summary_rec = {
-            'month': proxmox_nodes[0].get('date') or latest_date,
-            'date': proxmox_nodes[0].get('date') or latest_date,
-            'updated_at': proxmox_nodes[0].get('updated_at') or latest_updated,
-            'node_key': 'Proxmox',
-            'node_name': 'Proxmox',
-            'display_name': 'Proxmox Nodes 1–3 (Local)',
-            'hosted_systems': 'pvenode1, pvenode2, pvenode3',
-            'storage_tier': 'Local Disks (root & lvm)',
-            'capacity_gb': tot_pve_local_cap,
-            'used_gb': tot_pve_local_used,
-            'free_gb': tot_pve_local_free,
-            'used_percent': tot_pve_local_pct,
-            'growth_gb': tot_pve_delta,
-            'growth_percent': tot_pve_delta_pct,
-            'delta_24h_gb': tot_pve_delta,
-            'delta_24h_percent': tot_pve_delta_pct,
-            'runway_days': pve_rw['days'],
-            'runway_text': pve_rw['text'],
-            'runway_badge': pve_rw['badge'],
-            'has_data': any(p.get('has_data') for p in proxmox_nodes),
-            'is_shared': False,
-        }
-
-    # Scope dispatch
-    if selected_node == 'All Nodes':
-        for r in [vmsan_rec, nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec, pve_local_summary_rec]:
-            if r:
-                node_capacity_records.append(r)
-    elif selected_node == 'OLKVM':
-        for r in [nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec]:
-            if r:
-                node_capacity_records.append(r)
-    elif selected_node == 'Proxmox':
-        for r in [vmsan_rec, pve_local_summary_rec]:
-            if r:
-                node_capacity_records.append(r)
-    elif 'infra' in selected_node.lower():
-        for r in [nmsddbkp_rec, u01_rec, fra_rec]:
-            if r:
-                node_capacity_records.append(r)
-    elif 'ebs' in selected_node.lower():
-        for r in [nmsddbkp_rec, stage_rec, fmw_rec]:
-            if r:
-                node_capacity_records.append(r)
-    else:
-        # Specific individual node (e.g. pvenode1, pvenode2, pvenode3)
-        matched_pve = next((p for p in proxmox_nodes if p['node_key'].lower() == selected_node.lower() or selected_node.lower() in p['node_key'].lower()), None)
-        if matched_pve:
-            if vmsan_rec:
-                node_capacity_records.append(vmsan_rec)
-            for d in (matched_pve['disk_2'], matched_pve['disk_3']):
-                node_capacity_records.append({
-                    'month': matched_pve.get('date') or latest_date,
-                    'date': matched_pve.get('date') or latest_date,
-                    'updated_at': matched_pve.get('updated_at') or latest_updated,
-                    'node_key': matched_pve['node_key'],
-                    'node_name': matched_pve['node_name'],
-                    'display_name': matched_pve['display_name'],
-                    'hosted_systems': matched_pve['hosted_systems'],
-                    'storage_tier': d['type'],
-                    'capacity_gb': d['size_gb'],
-                    'used_gb': d['used_gb'],
-                    'free_gb': d['free_gb'],
-                    'used_percent': d['percent'],
-                    'growth_gb': d.get('delta_24h_gb'),
-                    'growth_percent': d.get('delta_24h_pct'),
-                    'delta_24h_gb': d.get('delta_24h_gb'),
-                    'delta_24h_percent': d.get('delta_24h_pct'),
-                    'runway_days': d.get('runway_days', 9999),
-                    'runway_text': d.get('runway_text', 'Stable'),
-                    'runway_badge': d.get('runway_badge', 'stable'),
-                    'has_data': matched_pve.get('has_data', False),
-                    'is_shared': False,
-                })
-
-    active_nodes = [n for n in filtered_nodes if n['has_data']]
-    if active_nodes:
-        avg_node_up = round(sum(n['uptime_percent'] for n in active_nodes) / len(active_nodes), 2)
-        kpi_node_uptime = f"{avg_node_up}%"
-        healthy_nodes = sum(1 for n in active_nodes if n['status'] == 'Healthy')
-        kpi_nodes_healthy = f"{healthy_nodes}/{len(filtered_nodes)} Healthy"
-    else:
-        kpi_node_uptime = "No Data"
-        kpi_nodes_healthy = f"0/{len(filtered_nodes)} Synced"
-
-    kpi_total_logical_cpus = sum(n['logical_cpus'] for n in filtered_nodes)
-    kpi_total_ram_gb = round(sum(n['memory_total_gb'] for n in filtered_nodes), 1)
-    kpi_used_ram_gb = round(sum(n['memory_used_gb'] for n in filtered_nodes), 1)
-
-    if selected_node == 'All Nodes':
-        kpi_compute_subtext = "OLKVM & Proxmox compute"
-    elif selected_node == 'Proxmox':
-        kpi_compute_subtext = "Proxmox cluster compute"
-    elif selected_node == 'OLKVM':
-        kpi_compute_subtext = "OLKVM compute"
-    else:
-        kpi_compute_subtext = f"{selected_node} compute"
-
-    seen_shared_clusters = set()
-    dedup_total_gb = 0.0
-    dedup_used_gb = 0.0
-    for n in filtered_nodes:
-        if not n['has_data']:
-            continue
-        dedup_total_gb += n['disk_2']['size_gb'] + n['disk_3']['size_gb']
-        dedup_used_gb += n['disk_2']['used_gb'] + n['disk_3']['used_gb']
-        if n['node_name'] not in seen_shared_clusters:
-            seen_shared_clusters.add(n['node_name'])
-            dedup_total_gb += n['disk_1']['size_gb']
-            dedup_used_gb += n['disk_1']['used_gb']
-
-    kpi_total_storage_gb = round(dedup_total_gb, 1)
-    kpi_used_storage_gb = round(dedup_used_gb, 1)
-    kpi_free_storage_gb = round(max(0.0, kpi_total_storage_gb - kpi_used_storage_gb), 1)
-    kpi_storage_used_pct = (
-        round((kpi_used_storage_gb / kpi_total_storage_gb) * 100.0, 1)
-        if kpi_total_storage_gb > 0
-        else (round(sum(n['disk_percent'] for n in active_nodes) / len(active_nodes), 1) if active_nodes else 0.0)
-    )
-
-    today_date = timezone.now().date().replace(day=1)
-    target_node_sla = 99.90
-    node_trend_months = []
-
-    for i in range(5, -1, -1):
-        m_year = today_date.year
-        m_month = today_date.month - i
-        while m_month <= 0:
-            m_month += 12
-            m_year -= 1
-        t_month = today_date.replace(year=m_year, month=m_month)
-
-        month_qs = ServerHealth.objects.filter(date__year=t_month.year, date__month=t_month.month)
-        if selected_node == 'OLKVM':
-            month_qs = month_qs.filter(
-                Q(node_name__iexact='OLKVM')
-                | Q(server__icontains='infra')
-                | Q(server__icontains='ebs')
-                | Q(server__icontains='nmsinfra')
-                | Q(server__icontains='nmsebs')
-            )
-        elif selected_node == 'Proxmox':
-            month_qs = month_qs.filter(Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
-        elif selected_node != 'All Nodes':
-            month_qs = month_qs.filter(server__iexact=selected_node)
-
-        if t_month == target_month_dt and active_nodes:
-            val = avg_node_up
-            has_m_data = True
-        elif t_month.year < 2026 or (t_month.year == 2026 and t_month.month < 10):
-            # Prior to October 2026, no confirmed telemetry was commissioned
-            val = 0.0
-            has_m_data = False
-        elif month_qs.exists():
-            prom_qs = month_qs.filter(entered_by='Prometheus')
-            eff_qs = prom_qs if prom_qs.exists() else month_qs
-            avg_up = eff_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
-            val = round(float(avg_up), 2) if avg_up is not None else 100.0
-            has_m_data = True
-        else:
-            val = 0.0
-            has_m_data = False
-
-        node_trend_months.append({
-            'name': t_month.strftime('%b'),
-            'value': val,
-            'has_data': has_m_data,
-        })
-
-    valid_vals = [m['value'] for m in node_trend_months if m['has_data'] and m['value'] > 0.0]
-    node_trend_recent_avg = round(sum(valid_vals) / len(valid_vals), 2) if valid_vals else 100.0
-
-    min_v = min((valid_vals or [100.0]) + [target_node_sla])
-    y_min = math.floor(min_v - 0.2) if min_v < 98.0 else 98.0
-    y_max = 100.0
-    y_range = max(0.1, y_max - y_min)
-
-    pts = []
-    for idx, m in enumerate(node_trend_months):
-        x = 42 + idx * 63
-        m['x'] = x
-        if m['has_data'] and m['value'] > 0.0:
-            y = 22 + (100.0 - m['value']) * 96 / y_range
-            pts.append(f"{x},{y}")
-            m['y'] = y
-            m['text_y'] = y - 7
-        else:
-            m['y'] = 118
-            m['text_y'] = 110
-
-    node_trend_polyline_points = " ".join(pts) if len(pts) > 1 else ""
-    node_trend_area_points = ""
-    if len(pts) > 1:
-        first_pt = pts[0].split(',')
-        last_pt = pts[-1].split(',')
-        node_trend_area_points = f"{first_pt[0]},118 {node_trend_polyline_points} {last_pt[0]},118"
-    node_sla_y_coord = 22 + (100.0 - target_node_sla) * 96 / y_range
-
-    node_attention_items = []
-
-    # 1. Staging review alerts (Infrastructure scope)
-    infra_staging_qs = IncidentStaging.objects.filter(
-        status='Awaiting Review'
-    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
-    if selected_node != 'All Nodes':
-        infra_staging_qs = infra_staging_qs.filter(
-            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node)
-        )
-    infra_staging_count = infra_staging_qs.count()
-    if infra_staging_count > 0:
-        node_attention_items.append({
-            'type': 'warning',
-            'message': f"Staging Area: {infra_staging_count} infrastructure alert(s) awaiting SysAdmin review."
-        })
-
-    # 2. Open / In Progress Incidents (Infrastructure scope)
-    infra_active_incidents = IncidentRegister.objects.filter(
-        status__in=['Open', 'In Progress']
-    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure')).order_by('-created_at')
-    if selected_node != 'All Nodes':
-        infra_active_incidents = infra_active_incidents.filter(
-            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node)
-        )
-    for inc in infra_active_incidents:
-        inc_target = inc.node_name or inc.system or 'Infrastructure'
-        node_attention_items.append({
-            'type': 'danger',
-            'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc_target}) &mdash; {inc.severity} priority."
-        })
-
-    # 3. Resolved Outages this month (Infrastructure scope)
-    infra_resolved_incidents = IncidentRegister.objects.filter(
-        date__year=target_month_dt.year,
-        date__month=target_month_dt.month,
-        status__in=['Resolved', 'Closed'],
-        planned=False
-    ).filter(Q(category='Infrastructure') | Q(database='Infrastructure')).order_by('-date', '-created_at')
-    if selected_node != 'All Nodes':
-        infra_resolved_incidents = infra_resolved_incidents.filter(
-            Q(node_name__iexact=selected_node) | Q(system__icontains=selected_node) |
-            (Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM']) if selected_node == 'OLKVM' else Q())
-        )
-    for inc in infra_resolved_incidents:
-        inc_target = inc.node_name or inc.system or 'Infrastructure'
-        node_attention_items.append({
-            'type': 'warning',
-            'message': f"Resolved Outage: <strong>{inc.ticket or 'INC-'+str(inc.id)} ({inc_target})</strong> &mdash; {inc.duration_hrs or 0} hrs downtime on {inc.date.strftime('%d %b %Y')}."
-        })
-    for n in filtered_nodes:
-        display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else f"Proxmox ({n['display_name']})"
-        if not n['has_data']:
-            node_attention_items.append({
-                'type': 'warning',
-                'message': f"<strong>{display_label}:</strong> No Prometheus telemetry synced yet."
-            })
-            continue
-
-        if n['uptime_percent'] < target_node_sla:
-            node_attention_items.append({
-                'type': 'danger',
-                'message': f"<strong>{display_label} Uptime:</strong> Node availability ({n['uptime_percent']}%) is below the {target_node_sla}% SLA target."
-            })
-
-        if n['cpu_percent'] > 90:
-            node_attention_items.append({
-                'type': 'danger',
-                'message': f"<strong>{display_label} CPU Critical:</strong> CPU utilisation is at {n['cpu_percent']}% (&gt; 90% threshold)."
-            })
-        elif n['cpu_percent'] > 75:
-            node_attention_items.append({
-                'type': 'warning',
-                'message': f"<strong>{display_label} CPU Warning:</strong> Elevated CPU utilisation at {n['cpu_percent']}%."
-            })
-
-        if n['memory_percent'] > 90:
-            node_attention_items.append({
-                'type': 'danger',
-                'message': f"<strong>{display_label} Memory Critical:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
-            })
-        elif n['memory_percent'] > 80:
-            node_attention_items.append({
-                'type': 'warning',
-                'message': f"<strong>{display_label} Memory Warning:</strong> RAM usage is at {n['memory_percent']}% ({n['memory_used_gb']}/{n['memory_total_gb']} GB)."
-            })
-
-        for d in n['disks']:
-            disk_lbl = f"{display_label} — {d['type']}"
-            if d['percent'] > 90:
-                node_attention_items.append({
-                    'type': 'danger',
-                    'message': f"<strong>{disk_lbl}:</strong> Critical disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
-                })
-            elif d['percent'] > 80:
-                node_attention_items.append({
-                    'type': 'warning',
-                    'message': f"<strong>{disk_lbl}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
-                })
-
-    all_nodes_healthy = all(n['status'] == 'Healthy' for n in active_nodes) if active_nodes else True
-    scope_label = "all monitored OLKVM and Proxmox nodes" if selected_node == 'All Nodes' else f"the {selected_node} node scope"
-    if all_nodes_healthy:
-        default_node_lede_text = (
-            f"Infrastructure telemetry across {scope_label} held within the {target_node_sla}% availability SLA target ({kpi_node_uptime} average uptime). "
-            f"Compute and storage capacity across {kpi_total_logical_cpus} logical CPUs, {kpi_total_ram_gb} GB RAM, and {kpi_total_storage_gb} GB provisioned storage ({kpi_storage_used_pct}% utilized) remain within normal operational thresholds."
-        )
-    else:
-        default_node_lede_text = (
-            f"Infrastructure telemetry for {scope_label} recorded {kpi_nodes_healthy} with an average availability of {kpi_node_uptime}. "
-            f"Total provisioned storage stands at {kpi_total_storage_gb} GB ({kpi_used_storage_gb} GB used, {kpi_storage_used_pct}%)."
-        )
-
-    # Build Guest Virtual Machine Fleet status summary
-    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt)
-    guest_vms_summary = vm_fleet_info['vms']
-    guest_vm_kpis = vm_fleet_info['kpis']
-
-    return {
-        'selected_node': selected_node,
-        'prometheus_url': PROMETHEUS_URL,
-        'node_overview_data': node_overview_data,
-        'filtered_nodes': filtered_nodes,
-        'scoped_node_detail': scoped_node_detail,
-        'guest_vms_summary': guest_vms_summary,
-        'guest_vm_kpis': guest_vm_kpis,
-        'shared_storage_records': shared_storage_records,
-        'node_capacity_records': node_capacity_records,
-        'kpi_node_uptime': kpi_node_uptime,
-        'kpi_node_uptime_val': avg_node_up,
-        'kpi_nodes_healthy': kpi_nodes_healthy,
-        'kpi_total_logical_cpus': kpi_total_logical_cpus,
-        'kpi_compute_subtext': kpi_compute_subtext,
-        'kpi_total_ram_gb': kpi_total_ram_gb,
-        'kpi_used_ram_gb': kpi_used_ram_gb,
-        'kpi_total_storage_gb': kpi_total_storage_gb,
-        'kpi_used_storage_gb': kpi_used_storage_gb,
-        'kpi_free_storage_gb': kpi_free_storage_gb,
-        'kpi_storage_used_pct': kpi_storage_used_pct,
-        'target_node_sla': target_node_sla,
-        'node_trend_months': node_trend_months,
-        'node_trend_recent_avg': node_trend_recent_avg,
-        'node_trend_polyline_points': node_trend_polyline_points,
-        'node_trend_area_points': node_trend_area_points,
-        'node_sla_y_coord': node_sla_y_coord,
-        'node_attention_items': node_attention_items,
-        'default_node_lede_text': default_node_lede_text,
-        'node_reporting_month_display': target_month_dt.strftime('%B %Y'),
-    }
-
-
-@login_required
-def dashboard_node_print(request):
-    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_infrastructuredashboard')):
-        messages.error(request, 'You do not have permission to view or export the Node Infrastructure report.')
-        return redirect('dashboard')
-
-    if request.method == 'POST':
-        month_str = request.POST.get('month', '')
-        selected_node = request.POST.get('node_select', 'All Nodes')
-        summary_narrative = request.POST.get('summary_narrative', '').strip()
-    else:
-        month_str = request.GET.get('month', '')
-        selected_node = request.GET.get('node_select', 'All Nodes')
-        summary_narrative = request.GET.get('summary_narrative', '').strip()
-
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
-
-    user_display = request.user.get_full_name()
-    if not user_display:
-        user_display = request.user.username.replace('.', ' ').title()
-
-    lede_text = summary_narrative if summary_narrative else node_ctx['default_node_lede_text']
-
-    ctx = {
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
-        'extracted_by': user_display,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
-        'lede_text': lede_text,
-    }
-    ctx.update(node_ctx)
-    return render(request, 'dashboard_node_print.html', ctx)
-
-
-@login_required
-def dashboard_node_excel(request):
-    if not (request.user.is_admin or request.user.is_superuser or request.user.has_perm('api.view_infrastructuredashboard')):
-        messages.error(request, 'You do not have permission to export the Node Infrastructure report.')
-        return redirect('dashboard')
-
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
-    filtered_nodes = node_ctx['filtered_nodes']
-    node_capacity_records = node_ctx['node_capacity_records']
-    month_display = reporting_month.strftime('%B %Y')
-
-    user_display = request.user.get_full_name()
-    if not user_display:
-        user_display = request.user.username.replace('.', ' ').title()
-
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Node Performance & SLA"
-
-        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
-        font_section = Font(name='Segoe UI', size=11, bold=True, color='002569')
-        font_header = Font(name='Segoe UI', size=10, bold=True, color='FFFFFF')
-        font_body = Font(name='Segoe UI', size=10)
-
-        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
-        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
-
-        align_center = Alignment(horizontal='center', vertical='center')
-        align_left = Alignment(horizontal='left', vertical='center')
-
-        border_thin = Border(
-            left=Side(style='thin', color='D1D7E0'),
-            right=Side(style='thin', color='D1D7E0'),
-            top=Side(style='thin', color='D1D7E0'),
-            bottom=Side(style='thin', color='D1D7E0')
-        )
-
-        ws.merge_cells('A1:I1')
-        ws['A1'] = f"Node Infrastructure Performance & SLA Summary ({selected_node}) - {month_display}"
-        ws['A1'].font = font_title
-        ws['A1'].alignment = align_left
-        ws.row_dimensions[1].height = 30
-
-        ws.append([])
-        row_num = 3
-
-        headers = [
-            "Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Unplanned Down (Hrs)", "Incidents", "Local Storage (Used / Total GB)",
-            "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"
-        ]
-        ws.append(headers)
-        ws.row_dimensions[row_num].height = 24
-        for col_num in range(1, len(headers) + 1):
-            c = ws.cell(row=row_num, column=col_num)
-            c.font = font_header
-            c.fill = fill_header
-            c.alignment = align_center
-            c.border = border_thin
-        row_num += 1
-
-        for n in filtered_nodes:
-            node_lbl = "OLKVM" if n['node_name'] == 'OLKVM' else n['display_name']
-            r_data = [
-                node_lbl,
-                n['node_name'],
-                n['hosted_systems'],
-                f"{n['uptime_percent']}%" if n['has_data'] else "No Data",
-                f"{n.get('unplanned_down_hrs', 0.0)} hrs",
-                n.get('incident_count', 0),
-                f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}" if n['has_data'] else "No Data",
-                f"{n['local_disk_util_pct']}%" if n['has_data'] else "No Data",
-                f"{n['memory_used_gb']} / {n['memory_total_gb']}" if n['has_data'] else "No Data",
-                f"{n['memory_percent']}%" if n['has_data'] else "No Data",
-                n['logical_cpus'],
-                f"{n['cpu_percent']}%" if n['has_data'] else "No Data",
-                n['status'],
-            ]
-            ws.append(r_data)
-            ws.row_dimensions[row_num].height = 20
-            for col_num in range(1, len(headers) + 1):
-                c = ws.cell(row=row_num, column=col_num)
-                c.font = font_body
-                c.border = border_thin
-                if row_num % 2 == 0:
-                    c.fill = fill_even
-                c.alignment = align_left if col_num in (1, 2, 3) else align_center
-            row_num += 1
-
-        guest_vms_summary = node_ctx.get('guest_vms_summary', [])
-
-        ws.append([])
-        row_num += 1
-        ws.cell(row=row_num, column=1, value="Guest Virtual Machine Status").font = font_section
-        row_num += 1
-
-        vm_headers = [
-            "Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"
-        ]
-        ws.append(vm_headers)
-        ws.row_dimensions[row_num].height = 24
-        for col_num in range(1, len(vm_headers) + 1):
-            c = ws.cell(row=row_num, column=col_num)
-            c.font = font_header
-            c.fill = fill_header
-            c.alignment = align_center
-            c.border = border_thin
-        row_num += 1
-
-        for vm in guest_vms_summary:
-            vm_data = [
-                vm['display_name'],
-                vm['host_node'],
-                vm['cluster'],
-                vm['role'],
-                vm['database'],
-                f"{vm['uptime_percent']}%",
-                f"{vm.get('unplanned_down_hrs', 0.0)} hrs" if vm.get('unplanned_down_hrs', 0.0) > 0 else "0.00 hrs",
-                f"{vm['cpu_percent']}%",
-                f"{vm['memory_used_gb']} / {vm['memory_total_gb']} GB" if vm.get('memory_total_gb', 0) > 0 else "—",
-                f"{vm['memory_percent']}%",
-                vm['status'],
-            ]
-            ws.append(vm_data)
-            ws.row_dimensions[row_num].height = 20
-            for col_num in range(1, len(vm_headers) + 1):
-                c = ws.cell(row=row_num, column=col_num)
-                c.font = font_body
-                c.border = border_thin
-                if row_num % 2 == 0:
-                    c.fill = fill_even
-                c.alignment = align_left if col_num in (1, 2, 3, 4) else align_center
-            row_num += 1
-
-        ws.append([])
-        row_num += 1
-        ws.cell(row=row_num, column=1, value=f"Extracted by {user_display} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}").font = Font(name='Segoe UI', size=9, italic=True)
-
-        for col in ws.columns:
-            max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
-            for cell in col:
-                if cell.row == 1 or cell.row >= row_num:
-                    continue
-                if cell.value is not None:
-                    max_len = max(max_len, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        safe_scope = selected_node.replace(' ', '_').replace('.', '_')
-        filename = f"Node_Performance_SLA_{safe_scope}_{reporting_month.strftime('%Y_%m')}.xlsx"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
-        return response
-    except Exception:
-        import csv
-        response = HttpResponse(content_type='text/csv')
-        safe_scope = selected_node.replace(' ', '_').replace('.', '_')
-        filename = f"Node_Performance_SLA_{safe_scope}_{reporting_month.strftime('%Y_%m')}.csv"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        writer = csv.writer(response)
-        writer.writerow([f"Node Infrastructure Performance & SLA Summary ({selected_node}) - {month_display}"])
-        writer.writerow([])
-        writer.writerow(["Node", "Hypervisor", "Workloads", "Monthly Avg Uptime (%)", "Local Storage (Used / Total GB)", "Storage Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Logical CPUs", "CPU Util (%)", "Status"])
-        for n in filtered_nodes:
-            node_lbl = "OLKVM" if n['node_name'] == 'OLKVM' else n['display_name']
-            writer.writerow([
-                node_lbl, n['node_name'], n['hosted_systems'],
-                f"{n['uptime_percent']}%", f"{n['local_disk_used_gb']} / {n['local_disk_capacity_gb']}",
-                f"{n['local_disk_util_pct']}%", f"{n['memory_used_gb']} / {n['memory_total_gb']}",
-                f"{n['memory_percent']}%", n['logical_cpus'], f"{n['cpu_percent']}%", n['status']
-            ])
-
-        writer.writerow([])
-        writer.writerow(["Guest Virtual Machine Status"])
-        writer.writerow(["Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"])
-        for vm in node_ctx.get('guest_vms_summary', []):
-            writer.writerow([
-                vm['display_name'], vm['host_node'], vm['cluster'], vm['role'],
-                vm['database'], f"{vm['uptime_percent']}%", f"{vm.get('unplanned_down_hrs', 0.0)} hrs",
-                f"{vm['cpu_percent']}%", f"{vm['memory_used_gb']} / {vm['memory_total_gb']} GB",
-                f"{vm['memory_percent']}%", vm['status']
-            ])
-        writer.writerow(["Timestamp", "Node", "Hypervisor", "Storage Tier", "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Headroom"])
-        for cap in node_capacity_records:
-            cap_node_lbl = "OLKVM" if cap['node_name'] == 'OLKVM' else cap['display_name']
-            cap_ts = ""
-            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
-                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
-            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
-                cap_ts = cap['date'].strftime('%d %b %Y')
-            elif hasattr(cap.get('month'), 'strftime'):
-                cap_ts = cap['month'].strftime('%d %b %Y')
-            else:
-                cap_ts = str(cap.get('date') or cap.get('month') or "")
-            writer.writerow([
-                cap_ts, cap_node_lbl, cap['node_name'], cap['storage_tier'],
-                cap['capacity_gb'], cap['used_gb'], cap['free_gb'],
-                f"{cap['used_percent']}%", cap['delta_24h_gb'], f"{cap['delta_24h_percent']}%",
-                cap['runway_text']
-            ])
-        return response
-
-
-
-@login_required
 def server_health_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_serverhealth')):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
-
-    from django.db.models import Avg, Q
-
-    current_tab = request.GET.get('tab', 'nodes').lower()
-    if current_tab not in ['nodes', 'vms']:
-        current_tab = 'nodes'
-
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    selected_vm = request.GET.get('vm_select', '').strip()
-    current_db = request.GET.get('database', '').strip()
+    queryset = ServerHealth.objects.all().order_by('-date', '-updated_at')
+    
+    current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-
-    # Distinct tab badge counts
-    total_node_health_count = ServerHealth.objects.filter(
-        Q(entered_by='Prometheus') | Q(entered_by='User')
-    ).count()
-    total_vm_health_count = ServerHealth.objects.filter(
-        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
-    ).count()
-
-    # Distinct VM server names for filter dropdown
-    vm_choices = list(ServerHealth.objects.filter(
-        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
-    ).values_list('server', flat=True).distinct().order_by('server'))
-
-    if current_tab == 'nodes':
-        base_qs = ServerHealth.objects.filter(
-            Q(entered_by='Prometheus') | Q(entered_by='User')
-        ).order_by('-date', '-updated_at', '-id')
-
-        if current_db:
-            base_qs = base_qs.filter(database=current_db)
-        if start_date:
-            base_qs = base_qs.filter(date__gte=start_date)
-        if end_date:
-            base_qs = base_qs.filter(date__lte=end_date)
-
-        from collections import defaultdict
-        grouped_by_date = defaultdict(list)
-        for r in base_qs:
-            grouped_by_date[r.date].append(r)
-
-        consolidated_nodes = []
-        for d, recs in grouped_by_date.items():
-            # 1. Check for OLKVM workloads on this date
-            olkvm_recs = [
-                r for r in recs 
-                if (r.node_name or '').upper() == 'OLKVM' or any(k in (r.server or '').lower() for k in ['infra', 'ebs', 'olkvm'])
-            ]
-            proxmox_recs = [r for r in recs if r not in olkvm_recs]
-
-            if olkvm_recs and (selected_node in ['All Nodes', 'OLKVM']):
-                infra_r = next((r for r in olkvm_recs if 'infra' in (r.server or '').lower()), olkvm_recs[0])
-                ebs_r = next((r for r in olkvm_recs if 'ebs' in (r.server or '').lower()), None)
-
-                # Weighted CPU (64 logical cores for nmsinfra, 16 for nmsebs)
-                tot_c = sum(64 if 'infra' in (r.server or '').lower() else 16 for r in olkvm_recs)
-                c_weight = sum((float(r.cpu_percent or 0.0)) * (64 if 'infra' in (r.server or '').lower() else 16) for r in olkvm_recs)
-                olkvm_cpu = round(c_weight / tot_c, 2) if tot_c > 0 else float(olkvm_recs[0].cpu_percent or 0.0)
-
-                # Combined memory
-                mem_tot = round(sum(float(r.memory_total_gb or 0.0) for r in olkvm_recs), 2)
-                mem_used = round(sum(float(r.memory_used_gb or ((float(r.memory_total_gb or 0.0) * float(r.memory_percent or 0.0) / 100.0) if float(r.memory_total_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
-                mem_pct = round((mem_used / mem_tot * 100.0), 2) if mem_tot > 0 else round(sum(float(r.memory_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
-
-                # Storage tiers
-                d1_type = infra_r.disk_1_type or '/nmsddbkp (Shared NFS)'
-                d1_size = float(infra_r.disk_1_size_gb or 0.0)
-                d1_pct = float(infra_r.disk_1_percent or 0.0)
-                d1_used = float(infra_r.disk_1_used_gb or (d1_size * d1_pct / 100.0 if d1_size > 0 else 0.0))
-
-                d2_size = round(sum(float(r.disk_2_size_gb or 0.0) for r in olkvm_recs), 2)
-                d2_used = round(sum(float(r.disk_2_used_gb or ((float(r.disk_2_size_gb or 0.0) * float(r.disk_2_percent or 0.0) / 100.0) if float(r.disk_2_size_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
-                d2_pct = round((d2_used / d2_size * 100.0), 2) if d2_size > 0 else round(sum(float(r.disk_2_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
-                d2_type = '/u01 (nmsinfra) + /stagearea (nmsebs)'
-
-                d3_size = round(sum(float(r.disk_3_size_gb or 0.0) for r in olkvm_recs), 2)
-                d3_used = round(sum(float(r.disk_3_used_gb or ((float(r.disk_3_size_gb or 0.0) * float(r.disk_3_percent or 0.0) / 100.0) if float(r.disk_3_size_gb or 0.0) > 0 else 0.0)) for r in olkvm_recs), 2)
-                d3_pct = round((d3_used / d3_size * 100.0), 2) if d3_size > 0 else round(sum(float(r.disk_3_percent or 0.0) for r in olkvm_recs)/len(olkvm_recs), 2)
-                d3_type = 'OS Root (nmsinfra + nmsebs)'
-
-                storage_breakdown = ""
-                if infra_r and ebs_r and infra_r.disk_3_used_gb and ebs_r.disk_3_used_gb:
-                    storage_breakdown = f"nmsinfra: {round(float(infra_r.disk_3_used_gb)/1024.0, 2)} TB · nmsebs: {round(float(ebs_r.disk_3_used_gb)/1024.0, 2)} TB"
-
-                if any(r.status == 'Critical' for r in olkvm_recs):
-                    olkvm_status = 'Critical'
-                elif any(r.status == 'Warning' for r in olkvm_recs):
-                    olkvm_status = 'Warning'
-                else:
-                    olkvm_status = 'Healthy'
-
-                uptime_avg = round(sum(float(r.uptime_percent or 100.0) for r in olkvm_recs) / len(olkvm_recs), 2)
-                latest_up = max(r.updated_at for r in olkvm_recs if r.updated_at)
-
-                hosted_vms = [
-                    {'name': 'nmsinfra', 'label': 'Oracle DB (nmsinfra)', 'role': 'Oracle Database'},
-                ]
-                if ebs_r:
-                    hosted_vms.append({'name': 'nmsebs', 'label': 'Oracle EBS App (nmsebs)', 'role': 'Oracle EBS App'})
-
-                consolidated_nodes.append({
-                    'pk': infra_r.pk,
-                    'date': d,
-                    'updated_at': latest_up,
-                    'node_name': 'OLKVM',
-                    'display_node_label': 'OLKVM',
-                    'server': 'OLKVM',
-                    'clean_hosted_systems': 'Oracle DB (nmsinfra) & Oracle EBS App (nmsebs)',
-                    'hosted_vms': hosted_vms,
-                    'uptime_percent': uptime_avg,
-                    'cpu_percent': olkvm_cpu,
-                    'memory_percent': mem_pct,
-                    'memory_used_gb': mem_used,
-                    'memory_total_gb': mem_tot,
-                    'disk_1_type': d1_type,
-                    'disk_1_size_gb': d1_size,
-                    'disk_1_used_gb': d1_used,
-                    'disk_1_percent': d1_pct,
-                    'disk_2_type': d2_type,
-                    'disk_2_size_gb': d2_size,
-                    'disk_2_used_gb': d2_used,
-                    'disk_2_percent': d2_pct,
-                    'disk_3_type': d3_type,
-                    'disk_3_size_gb': d3_size,
-                    'disk_3_used_gb': d3_used,
-                    'disk_3_percent': d3_pct,
-                    'storage_breakdown': storage_breakdown,
-                    'status': olkvm_status,
-                    'entered_by': 'Prometheus',
-                    'created_by': None,
-                })
-
-            # 2. Add Proxmox nodes
-            if selected_node in ['All Nodes', 'Proxmox'] or selected_node.startswith('pvenode'):
-                for p_rec in proxmox_recs:
-                    pserver = (p_rec.server or '').lower()
-                    if selected_node.startswith('pvenode') and selected_node.lower() not in pserver:
-                        continue
-
-                    if 'pvenode1' in pserver:
-                        p_vms = [{'name': 'tomcatvm', 'label': 'tomcatvm (qemu/102)', 'role': 'Internal Web'}]
-                    elif 'pvenode2' in pserver:
-                        p_vms = [
-                            {'name': 'jumphostvm', 'label': 'jumphostvm (qemu/100)', 'role': 'Secure Access'},
-                            {'name': 'monitoringvm', 'label': 'monitoringvm (qemu/101)', 'role': 'Prometheus & Ops'}
-                        ]
-                    elif 'pvenode3' in pserver:
-                        p_vms = [{'name': 'databasevm', 'label': 'databasevm (qemu/103)', 'role': 'MySQL / Pentana'}]
-                    else:
-                        p_vms = [{'name': p_rec.server, 'label': p_rec.clean_hosted_systems, 'role': ''}]
-
-                    consolidated_nodes.append({
-                        'pk': p_rec.pk,
-                        'date': p_rec.date,
-                        'updated_at': p_rec.updated_at,
-                        'node_name': p_rec.node_name or 'Proxmox',
-                        'display_node_label': p_rec.display_node_label,
-                        'server': p_rec.server,
-                        'clean_hosted_systems': p_rec.clean_hosted_systems,
-                        'hosted_vms': p_vms,
-                        'uptime_percent': float(p_rec.uptime_percent if p_rec.uptime_percent is not None else 100.0),
-                        'cpu_percent': float(p_rec.cpu_percent or 0.0),
-                        'memory_percent': float(p_rec.memory_percent or 0.0),
-                        'memory_used_gb': round(float(p_rec.memory_used_gb or ((float(p_rec.memory_total_gb or 0.0) * float(p_rec.memory_percent or 0.0) / 100.0) if float(p_rec.memory_total_gb or 0.0) > 0 else 0.0)), 2),
-                        'memory_total_gb': float(p_rec.memory_total_gb or 0.0),
-                        'disk_1_type': p_rec.disk_1_type,
-                        'disk_1_size_gb': float(p_rec.disk_1_size_gb or 0.0),
-                        'disk_1_used_gb': round(float(p_rec.disk_1_used_gb or ((float(p_rec.disk_1_size_gb or 0.0) * float(p_rec.disk_1_percent or 0.0) / 100.0) if float(p_rec.disk_1_size_gb or 0.0) > 0 else 0.0)), 2),
-                        'disk_1_percent': float(p_rec.disk_1_percent or 0.0),
-                        'disk_2_type': p_rec.disk_2_type,
-                        'disk_2_size_gb': float(p_rec.disk_2_size_gb or 0.0),
-                        'disk_2_used_gb': round(float(p_rec.disk_2_used_gb or ((float(p_rec.disk_2_size_gb or 0.0) * float(p_rec.disk_2_percent or 0.0) / 100.0) if float(p_rec.disk_2_size_gb or 0.0) > 0 else 0.0)), 2),
-                        'disk_2_percent': float(p_rec.disk_2_percent or 0.0),
-                        'disk_3_type': p_rec.disk_3_type,
-                        'disk_3_size_gb': float(p_rec.disk_3_size_gb or 0.0),
-                        'disk_3_used_gb': round(float(p_rec.disk_3_used_gb or ((float(p_rec.disk_3_size_gb or 0.0) * float(p_rec.disk_3_percent or 0.0) / 100.0) if float(p_rec.disk_3_size_gb or 0.0) > 0 else 0.0)), 2),
-                        'disk_3_percent': float(p_rec.disk_3_percent or 0.0),
-                        'storage_breakdown': '',
-                        'status': p_rec.status or 'Healthy',
-                        'entered_by': p_rec.entered_by or 'Prometheus',
-                        'created_by': p_rec.created_by,
-                    })
-
-        total_node_health_count = len(consolidated_nodes)
-        paginator = Paginator(consolidated_nodes, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-
-        kpi_unhealthy_count = sum(1 for n in consolidated_nodes if n['status'] in ['Critical', 'Warning'])
-        avg_cpu = sum(n['cpu_percent'] for n in consolidated_nodes) / len(consolidated_nodes) if consolidated_nodes else 0.0
-        avg_mem = sum(n['memory_percent'] for n in consolidated_nodes) / len(consolidated_nodes) if consolidated_nodes else 0.0
-        kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if consolidated_nodes else 'N/A'
-        kpi_avg_mem = f"{round(avg_mem, 1)}%" if consolidated_nodes else 'N/A'
-    else:
-        # Virtual Machines (VM-level)
-        queryset = ServerHealth.objects.filter(
-            Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
-        ).order_by('-date', '-updated_at')
-
-        if selected_vm:
-            queryset = queryset.filter(server__iexact=selected_vm)
-
-        if current_db:
-            queryset = queryset.filter(database=current_db)
-        if start_date:
-            queryset = queryset.filter(date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(date__lte=end_date)
-
-        paginator = Paginator(queryset, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-
-        kpi_unhealthy_count = queryset.filter(status__in=['Critical', 'Warning']).count()
-        avg_cpu = queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
-        avg_mem = queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
-        kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
-        kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
-
-    # Build deduplicated single-pane-of-glass current VM fleet status
-    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node='All Nodes', selected_vm=selected_vm, include_ccis=True)
-    current_vm_fleet = vm_fleet_info['vms']
-    vm_fleet_kpis = vm_fleet_info['kpis']
-
-    ctx = {
-        'page_obj': page_obj,
-        'current_vm_fleet': current_vm_fleet,
-        'vm_fleet_kpis': vm_fleet_kpis,
+    if current_db:
+        queryset = queryset.filter(database=current_db)
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
+        
+    paginator = Paginator(queryset, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Calculate KPIs based on filtered scope/dates
+    kpi_queryset = ServerHealth.objects.all()
+    if current_db:
+        kpi_queryset = kpi_queryset.filter(database=current_db)
+    if start_date:
+        kpi_queryset = kpi_queryset.filter(date__gte=start_date)
+    if end_date:
+        kpi_queryset = kpi_queryset.filter(date__lte=end_date)
+        
+    kpi_unhealthy_count = kpi_queryset.filter(status__in=['Critical', 'Warning']).count()
+    
+    from django.db.models import Avg
+    avg_cpu = kpi_queryset.aggregate(Avg('cpu_percent'))['cpu_percent__avg']
+    avg_mem = kpi_queryset.aggregate(Avg('memory_percent'))['memory_percent__avg']
+    kpi_avg_cpu = f"{round(avg_cpu, 1)}%" if avg_cpu is not None else 'N/A'
+    kpi_avg_mem = f"{round(avg_mem, 1)}%" if avg_mem is not None else 'N/A'
+    
+    return render(request, 'server_health/list.html', {
+        'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'current_tab': current_tab,
-        'selected_node': selected_node,
-        'selected_vm': selected_vm,
-        'vm_choices': vm_choices,
-        'total_node_health_count': total_node_health_count,
-        'total_vm_health_count': total_vm_health_count,
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
         'kpi_unhealthy_count': kpi_unhealthy_count,
         'kpi_avg_cpu': kpi_avg_cpu,
-        'kpi_avg_mem': kpi_avg_mem,
-    }
-    return render(request, 'server_health/list.html', ctx)
+        'kpi_avg_mem': kpi_avg_mem
+    })
 
 @login_required
 def server_health_create(request):
@@ -4342,16 +1804,11 @@ def server_health_create(request):
 def server_health_edit(request, pk):
     health = get_object_or_404(ServerHealth, pk=pk)
     
-    if health.entered_by in ['Script', 'Prometheus']:
-        messages.error(request, 'Server health records generated by automated scripts or Prometheus cannot be edited.')
+    if health.entered_by == 'Script':
+        messages.error(request, 'Server health records generated by automated scripts cannot be edited.')
         return redirect('server_health_list')
         
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_incidentregister')
-    )
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (health.created_by == request.user) and ((timezone.now() - health.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -4376,213 +1833,73 @@ def server_health_edit(request, pk):
 
 @login_required
 def maintenance_list(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_view_db_maint = is_admin_or_super or request.user.has_perm('api.view_databasemaintenance') or request.user.has_perm('api.view_maintenanceregister')
-    can_view_infra_maint = is_admin_or_super or request.user.has_perm('api.view_infrastructuremaintenance') or request.user.has_perm('api.view_maintenanceregister')
-    can_view_all_maint = is_admin_or_super or (can_view_db_maint and can_view_infra_maint) or request.user.has_perm('api.view_maintenanceregister')
-
-    if not can_view_db_maint and not can_view_infra_maint:
+    if not (request.user.is_admin or request.user.has_perm('api.view_maintenanceregister')):
         messages.error(request, 'You do not have permission to view maintenance records.')
         return redirect('dashboard')
-
-    from django.db.models import Sum, Q
-
-    base_qs = MaintenanceRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-created_at')
-
-    # Tabs: 'all', 'database', 'infrastructure' with granular permissions enforcement
-    requested_tab = request.GET.get('tab', '').lower()
-    if requested_tab == 'infrastructure':
-        if not can_view_infra_maint:
-            messages.warning(request, 'You do not have permission to view Infrastructure Maintenance.')
-            return redirect('/maintenance/?tab=database')
-        current_tab = 'infrastructure'
-    elif requested_tab == 'database':
-        if not can_view_db_maint:
-            messages.warning(request, 'You do not have permission to view Database Maintenance.')
-            return redirect('/maintenance/?tab=infrastructure')
-        current_tab = 'database'
-    elif requested_tab == 'all':
-        if not can_view_all_maint:
-            current_tab = 'database' if can_view_db_maint else 'infrastructure'
-        else:
-            current_tab = 'all'
-    else:
-        if can_view_all_maint:
-            current_tab = 'all'
-        elif can_view_db_maint:
-            current_tab = 'database'
-        else:
-            current_tab = 'infrastructure'
-
-    # Target filter: single db or single node
-    current_target = request.GET.get('target', '').strip()
-    if not current_target and request.GET.get('database'):
-        current_target = request.GET.get('database').strip()
-
+    queryset = MaintenanceRegister.objects.all().order_by('-date', '-created_at')
+    
+    # Auto-update maintenance statuses (Scheduled -> In Progress -> Completed)
+    auto_update_maintenance_statuses()
+            
+    current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
-
-    # Tab counts for headers
-    total_all_count = MaintenanceRegister.objects.count()
-    total_db_count = MaintenanceRegister.objects.filter(
-        Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
-    ).exclude(category='Infrastructure').count()
-    total_infra_count = MaintenanceRegister.objects.filter(
-        Q(category='Infrastructure') | Q(database='Infrastructure')
-    ).count()
-
-    queryset = base_qs
-
-    # Filter by tab
-    if current_tab == 'database':
-        if current_target and current_target not in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            current_target = ''
-        queryset = queryset.filter(
-            Q(category='Database') | Q(database__in=['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL'])
-        ).exclude(category='Infrastructure')
-    elif current_tab == 'infrastructure':
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            current_target = ''
-        queryset = queryset.filter(
-            Q(category='Infrastructure') | Q(database='Infrastructure')
-        )
-
-    # Filter by specific target
-    if current_target:
-        if current_target in ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']:
-            queryset = queryset.filter(database=current_target)
-        elif current_target == 'Infrastructure':
-            queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure'))
-        elif current_target == 'OLKVM' or current_target in ['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']:
-            queryset = queryset.filter(
-                Q(node_name__iexact='OLKVM') |
-                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
-                Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs')
-            )
-        else:
-            queryset = queryset.filter(
-                Q(node_name__icontains=current_target) |
-                Q(system__icontains=current_target) |
-                Q(database__icontains=current_target)
-            )
-
+    if current_db:
+        queryset = queryset.filter(database=current_db)
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
     if end_date:
         queryset = queryset.filter(date__lte=end_date)
-
+        
     # Calculate KPIs based on the active query filters
     kpis = {
         'scheduled': queryset.filter(status__in=['Scheduled', 'In Progress']).count(),
         'completed': queryset.filter(status='Completed').count(),
         'downtime': round(sum(float(r.duration_hrs) for r in queryset.filter(status__in=['Completed', 'Failed'])), 1),
     }
-
+    
     completed_failed_count = queryset.filter(status__in=['Completed', 'Failed']).count()
     if completed_failed_count > 0:
         kpis['success_rate'] = round((kpis['completed'] / completed_failed_count * 100.0), 1)
     else:
         kpis['success_rate'] = 100.0
-
+        
     paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-
-    node_choices = [
-        ('OLKVM', 'OLKVM (Oracle DB & EBS)'),
-        ('pvenode1', 'Proxmox — pvenode1 (tomcatvm)'),
-        ('pvenode2', 'Proxmox — pvenode2 (jumphost & monitoring)'),
-        ('pvenode3', 'Proxmox — pvenode3 (databasevm / Pentana)'),
-        ('Proxmox', 'Proxmox Cluster (General)'),
-    ]
-
-    can_add_maint = (
-        is_admin_or_super or 
-        request.user.has_perm('api.add_maintenanceregister') or 
-        (can_view_db_maint and request.user.has_perm('api.add_databasemaintenance')) or
-        (can_view_infra_maint and request.user.has_perm('api.add_infrastructuremaintenance'))
-    )
-
+    
     return render(request, 'maintenance/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'can_view_all_maint': can_view_all_maint,
-        'can_view_db_maint': can_view_db_maint,
-        'can_view_infra_maint': can_view_infra_maint,
-        'can_add_maint': can_add_maint,
-        'current_tab': current_tab,
-        'current_target': current_target,
-        'current_db': current_target,
+        'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
-        'total_all_count': total_all_count,
-        'total_db_count': total_db_count,
-        'total_infra_count': total_infra_count,
-        'node_choices': node_choices,
         'kpis': kpis
     })
 
 @login_required
 def maintenance_create(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_add_db = is_admin_or_super or request.user.has_perm('api.add_databasemaintenance') or request.user.has_perm('api.add_maintenanceregister')
-    can_add_infra = is_admin_or_super or request.user.has_perm('api.add_infrastructuremaintenance') or request.user.has_perm('api.add_maintenanceregister')
-
-    if not can_add_db and not can_add_infra:
+    if not (request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
         messages.error(request, 'You do not have permission to create maintenance records.')
         return redirect('maintenance_list')
 
     if request.method == 'POST':
-        form = MaintenanceRegisterForm(request.POST, can_add_db=can_add_db, can_add_infra=can_add_infra)
+        form = MaintenanceRegisterForm(request.POST)
         if form.is_valid():
             maintenance = form.save(commit=False)
-            if maintenance.category == 'Infrastructure' and not can_add_infra:
-                messages.error(request, 'You do not have permission to create Infrastructure Maintenance records.')
-                return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
-            if maintenance.category == 'Database' and not can_add_db:
-                messages.error(request, 'You do not have permission to create Database Maintenance records.')
-                return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
-
             maintenance.created_by = request.user
             maintenance.save()
-
-            MaintenanceChangeLog.objects.create(
-                maintenance=maintenance,
-                changed_by=request.user,
-                action='Created',
-                new_status=maintenance.status,
-                comment=form.cleaned_data.get('change_comment', '') or 'Initial change window registration'
-            )
-
-            messages.success(request, f'Maintenance record {maintenance.change_id} created successfully.')
-            redirect_tab = 'infrastructure' if maintenance.category == 'Infrastructure' else 'database'
-            return redirect(f'/maintenance/?tab={redirect_tab}')
-        else:
-            messages.error(request, 'Failed to save maintenance record. Please review the highlighted errors below.')
+            messages.success(request, 'Maintenance record created successfully.')
+            return redirect('maintenance_list')
     else:
-        form = MaintenanceRegisterForm(can_add_db=can_add_db, can_add_infra=can_add_infra)
-    return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record', 'can_add_db': can_add_db, 'can_add_infra': can_add_infra})
+        form = MaintenanceRegisterForm()
+    return render(request, 'maintenance/form.html', {'form': form, 'title': 'Create Maintenance Record'})
 
 @login_required
 def maintenance_edit(request, pk):
     maintenance = get_object_or_404(MaintenanceRegister, pk=pk)
-
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_view_db = is_admin_or_super or request.user.has_perm('api.view_databasemaintenance') or request.user.has_perm('api.view_maintenanceregister')
-    can_view_infra = is_admin_or_super or request.user.has_perm('api.view_infrastructuremaintenance') or request.user.has_perm('api.view_maintenanceregister')
-
-    if (maintenance.category == 'Database' and not can_view_db) or (maintenance.category == 'Infrastructure' and not can_view_infra):
-        messages.error(request, 'You do not have permission to view or edit this maintenance record.')
-        return redirect('maintenance_list')
     
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_maintenanceregister')
-    )
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (maintenance.created_by == request.user) and ((timezone.now() - maintenance.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -4590,99 +1907,26 @@ def maintenance_edit(request, pk):
         return redirect('maintenance_list')
     
     if request.method == 'POST':
-        old_status = maintenance.status
-        form = MaintenanceRegisterForm(request.POST, instance=maintenance, can_add_db=can_view_db, can_add_infra=can_view_infra)
+        form = MaintenanceRegisterForm(request.POST, instance=maintenance)
         if form.is_valid():
-            maint = form.save()
-            comment = form.cleaned_data.get('change_comment', '').strip()
-            MaintenanceChangeLog.objects.create(
-                maintenance=maint,
-                changed_by=request.user,
-                action='Updated',
-                old_status=old_status,
-                new_status=maint.status,
-                comment=comment or f'Status updated to {maint.status}'
-            )
-            messages.success(request, f'Maintenance record {maint.change_id} updated successfully.')
-            redirect_tab = 'infrastructure' if maint.category == 'Infrastructure' else 'database'
-            return redirect(f'/maintenance/?tab={redirect_tab}')
-        else:
-            messages.error(request, 'Failed to update maintenance record. Please review the errors below.')
+            form.save()
+            messages.success(request, 'Maintenance record updated successfully.')
+            return redirect('maintenance_list')
     else:
-        form = MaintenanceRegisterForm(instance=maintenance, can_add_db=can_view_db, can_add_infra=can_view_infra)
-    
-    change_logs = maintenance.change_logs.all().select_related('changed_by')
+        form = MaintenanceRegisterForm(instance=maintenance)
     
     return render(request, 'maintenance/form.html', {
         'form': form, 
         'title': 'Edit Maintenance Record',
         'can_edit': True,
-        'maintenance': maintenance,
-        'change_logs': change_logs,
-        'can_add_db': can_view_db,
-        'can_add_infra': can_view_infra
+        'maintenance': maintenance
     })
-
-def _annotate_cumulative_growth(queryset):
-    """
-    Annotates each CapacityPlanning record in a queryset/list with:
-    - cumulative_growth_gb: net growth from the earliest record of that database in the filtered period
-    - cumulative_growth_percent: percentage growth relative to that earliest baseline record
-    - baseline_month_label: formatted month of the baseline record (e.g., 'Jul 2026')
-    """
-    records = list(queryset)
-    baselines = {}
-    for rec in reversed(records):
-        db = rec.database
-        if db not in baselines:
-            baselines[db] = rec
-
-    for rec in records:
-        base_rec = baselines.get(rec.database)
-        if base_rec and base_rec.database_size_gb and float(base_rec.database_size_gb) > 0:
-            base_size = float(base_rec.database_size_gb)
-            curr_size = float(rec.database_size_gb or 0.0)
-            cum_gb = round(curr_size - base_size, 2)
-            cum_pct = round((cum_gb / base_size) * 100.0, 2)
-            rec.cumulative_growth_gb = Decimal(f"{cum_gb:.2f}")
-            rec.cumulative_growth_percent = Decimal(f"{cum_pct:.2f}")
-            rec.baseline_month_label = base_rec.month.strftime('%b %Y')
-            rec.is_baseline_month = (rec.pk == base_rec.pk)
-        else:
-            rec.cumulative_growth_gb = Decimal('0.00')
-            rec.cumulative_growth_percent = Decimal('0.00')
-            rec.baseline_month_label = ''
-            rec.is_baseline_month = True
-    return records
-
 
 @login_required
 def capacity_list(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_view_db_capacity = is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')
-    can_view_infra_capacity = is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity')
-
-    if not can_view_db_capacity and not can_view_infra_capacity:
-        messages.error(request, 'You do not have permission to view Database or Infrastructure Capacity records.')
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to view capacity planning records.')
         return redirect('dashboard')
-
-    requested_tab = request.GET.get('tab', '').lower()
-    if requested_tab == 'infrastructure':
-        if not can_view_infra_capacity:
-            messages.warning(request, 'You do not have permission to view Infrastructure Capacity.')
-            return redirect('capacity_list')
-        current_tab = 'infrastructure'
-    elif requested_tab == 'database':
-        if not can_view_db_capacity:
-            messages.warning(request, 'You do not have permission to view Database Capacity.')
-            return redirect('/capacity/?tab=infrastructure')
-        current_tab = 'database'
-    else:
-        current_tab = 'database' if can_view_db_capacity else 'infrastructure'
-
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node)
-
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
     
     current_db = request.GET.get('database', '')
@@ -4694,14 +1938,13 @@ def capacity_list(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
-
-    annotated_records = _annotate_cumulative_growth(queryset)
-    paginator = Paginator(annotated_records, 10)
+        
+    paginator = Paginator(queryset, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
     # Capacity Redesign calculations
-    dbs = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
+    dbs = ['Oracle', 'MySQL', 'MS SQL Server']
     latest_records = {}
     for db in dbs:
         rec = CapacityPlanning.objects.filter(database=db).order_by('-month', '-updated_at').first()
@@ -4780,37 +2023,20 @@ def capacity_list(request):
             })
             
     # Build growth trend chart data (SVG coordinates)
-    if current_db:
-        trend_db = current_db
-        trend_recs = CapacityPlanning.objects.filter(database=trend_db).order_by('month')
-        trend_months_list = [
-            {'month': r.month, 'size_gb': float(r.database_size_gb)}
-            for r in list(trend_recs)[-6:]
-        ]
-    else:
-        trend_db = "All Databases"
-        # Group by month and sum database_size_gb across all databases
-        unique_months = (
-            CapacityPlanning.objects.order_by('month')
-            .values_list('month', flat=True)
-            .distinct()
-        )
-        unique_months = list(unique_months)[-6:]
-        trend_months_list = []
-        for m in unique_months:
-            m_size = CapacityPlanning.objects.filter(month=m).aggregate(Sum('database_size_gb'))['database_size_gb__sum'] or 0.0
-            trend_months_list.append({'month': m, 'size_gb': float(m_size)})
+    trend_db = current_db if current_db else 'Oracle'
+    trend_recs = CapacityPlanning.objects.filter(database=trend_db).order_by('month')
+    trend_months_list = list(trend_recs)[-6:]
     
     trend_polyline_points = ""
     trend_data_points = []
     if trend_months_list:
-        max_gb = float(max(r['size_gb'] for r in trend_months_list))
-        min_gb = float(min(r['size_gb'] for r in trend_months_list))
+        max_gb = float(max(r.database_size_gb for r in trend_months_list))
+        min_gb = float(min(r.database_size_gb for r in trend_months_list))
         gb_range = max(1.0, max_gb - min_gb)
         
         svg_points = []
         for idx, r in enumerate(trend_months_list):
-            m_val = float(r['size_gb'])
+            m_val = float(r.database_size_gb)
             x = 40 + idx * 64
             y = 20 + (max_gb - m_val) * 80 / gb_range
             svg_points.append(f"{x},{y}")
@@ -4819,21 +2045,19 @@ def capacity_list(request):
                 'x': x,
                 'y': y,
                 'text_y': y - 8,
-                'name': r['month'].strftime('%b'),
+                'name': r.month.strftime('%b'),
                 'value': round(m_val, 1)
             })
         trend_polyline_points = " ".join(svg_points)
         
-    # Build Forecast Block (Linear projection aligned with capacity log metrics)
+    # Build Forecast Block (Linear projection based on last 3 months)
     forecast_info = {}
     if current_db:
         # Specific database scope
         db_recs = CapacityPlanning.objects.filter(database=current_db).order_by('-month', '-updated_at')[:3]
         if db_recs.exists():
             latest = db_recs[0]
-            # Use the latest verified runway and consumption metrics for consistent alignment with the log table
-            runway_data = latest.runway_info
-            growth_val = float(latest.growth_gb or 0.0)
+            avg_growth = sum(float(r.growth_gb) for r in db_recs) / len(db_recs)
             
             cap = float(latest.disk_capacity_gb)
             used_pct = float(latest.disk_used_percent)
@@ -4848,15 +2072,14 @@ def capacity_list(request):
             current_used_gb = cap * used_pct / 100.0
             space_left_gb = warning_used_gb - current_used_gb
             
-            if growth_val > 0.01:
-                headroom_months = space_left_gb / growth_val
-                daily_burn = round(growth_val / 30.4, 2)
+            if avg_growth > 0:
+                headroom_months = space_left_gb / avg_growth
                 if headroom_months < 0:
                     headroom_str = "Exceeded threshold"
-                    est_date_str = "Exceeded (>=80%)"
+                    est_date_str = "Exceeded"
                 elif headroom_months > 60:
                     headroom_str = "> 5 years"
-                    est_date_str = "Safe (> 5 yrs)"
+                    est_date_str = "Safe"
                 else:
                     headroom_str = f"{round(headroom_months, 1)} months"
                     est_days = headroom_months * 30.44
@@ -4865,19 +2088,13 @@ def capacity_list(request):
             else:
                 headroom_str = "Infinite"
                 est_date_str = "Safe"
-                daily_burn = 0.0
-
+                
             forecast_info = {
                 'database': current_db,
                 'current_used_pct': round(used_pct, 1),
-                'monthly_burn': round(growth_val, 2),
-                'daily_burn': daily_burn,
-                'avg_growth': round(growth_val, 2),
+                'avg_growth': round(avg_growth, 2),
                 'headroom_months': headroom_str,
-                'est_date': est_date_str,
-                'runway_days': runway_data['days'],
-                'runway_text': runway_data['text'],
-                'runway_badge': runway_data['badge'],
+                'est_date': est_date_str
             }
     else:
         # Fleet-wide scope (All Databases combined)
@@ -4889,7 +2106,6 @@ def capacity_list(request):
                 total_cap = 0.0
                 total_used = 0.0
                 total_growth = 0.0
-                total_free = 0.0
                 
                 for r in month_recs:
                     cap = float(r.disk_capacity_gb)
@@ -4899,44 +2115,37 @@ def capacity_list(request):
                     
                     if cap == 0.0 and free == 0.0 and used_pct > 0:
                         cap = size * 5.0 if used_pct == 20 else size / (used_pct/100.0)
-                        free = cap - size
                         
                     total_cap += cap
                     total_used += (cap * used_pct / 100.0)
                     total_growth += float(r.growth_gb)
-                    total_free += free
                     
                 fleet_months.append({
                     'month': month,
                     'capacity_gb': total_cap,
                     'used_gb': total_used,
-                    'growth_gb': total_growth,
-                    'free_gb': total_free
+                    'growth_gb': total_growth
                 })
                 
             if fleet_months:
                 latest = fleet_months[0]
-                growth_val = latest['growth_gb']
+                avg_growth = sum(m['growth_gb'] for m in fleet_months) / len(fleet_months)
+                
                 cap = latest['capacity_gb']
                 used_pct = (latest['used_gb'] / cap * 100.0) if cap > 0 else 0.0
-                fleet_free = latest['free_gb'] if latest['free_gb'] > 0 else max(0.0, cap - latest['used_gb'])
                 
                 warning_used_gb = cap * 0.8
                 current_used_gb = latest['used_gb']
                 space_left_gb = warning_used_gb - current_used_gb
                 
-                if growth_val > 0.01 and fleet_free > 0:
-                    daily_burn = round(growth_val / 30.4, 2)
-                    runway_days = max(1, int(fleet_free / (growth_val / 30.4))) if (growth_val / 30.4) > 0 else 9999
-                    if used_pct < 75.0 and fleet_free >= 50.0 and runway_days < 60:
-                        runway_days = 9999
-                    headroom_months = space_left_gb / growth_val
+                if avg_growth > 0:
+                    headroom_months = space_left_gb / avg_growth
                     if headroom_months < 0:
                         headroom_str = "Exceeded threshold"
-                        est_date_str = "Exceeded (>=80%)"
+                        est_date_str = "Exceeded"
                     elif headroom_months > 60:
                         headroom_str = "> 5 years"
-                        est_date_str = "Safe (> 5 yrs)"
+                        est_date_str = "Safe"
                     else:
                         headroom_str = f"{round(headroom_months, 1)} months"
                         est_days = headroom_months * 30.44
@@ -4945,58 +2154,18 @@ def capacity_list(request):
                 else:
                     headroom_str = "Infinite"
                     est_date_str = "Safe"
-                    daily_burn = 0.0
-                    runway_days = 9999
-
-                if used_pct >= 95.0:
-                    runway_text = "< 7 days (Critical)"
-                    runway_badge = 'critical'
-                elif runway_days <= 7:
-                    runway_text = f"{runway_days} days"
-                    runway_badge = 'critical'
-                elif runway_days <= 30:
-                    runway_text = f"{runway_days} days"
-                    runway_badge = 'warning'
-                elif runway_days <= 90:
-                    runway_text = f"{runway_days} days"
-                    runway_badge = 'warning'
-                elif runway_days <= 365:
-                    mos = round(runway_days / 30.4, 1)
-                    runway_text = f"{mos} mos ({runway_days}d)"
-                    runway_badge = 'healthy'
-                else:
-                    runway_text = "> 1 Year"
-                    runway_badge = 'stable'
                     
                 forecast_info = {
                     'database': 'All Databases',
                     'current_used_pct': round(used_pct, 1),
-                    'monthly_burn': round(growth_val, 2),
-                    'daily_burn': daily_burn,
-                    'avg_growth': round(growth_val, 2),
+                    'avg_growth': round(avg_growth, 2),
                     'headroom_months': headroom_str,
-                    'est_date': est_date_str,
-                    'runway_days': runway_days,
-                    'runway_text': runway_text,
-                    'runway_badge': runway_badge,
+                    'est_date': est_date_str
                 }
     
-    raw_node_capacity = node_ctx.get('node_capacity_records', [])
-    total_infra_capacity = len(raw_node_capacity)
-    infra_page = request.GET.get('page') if current_tab == 'infrastructure' else request.GET.get('infra_page')
-    infra_paginator = Paginator(raw_node_capacity, 10)
-    node_cap_page_obj = infra_paginator.get_page(infra_page)
-
-    ctx = {
+    return render(request, 'capacity/list.html', {
         'page_obj': page_obj, 
         'is_admin': request.user.is_admin,
-        'can_view_db_capacity': can_view_db_capacity,
-        'can_view_infra_capacity': can_view_infra_capacity,
-        'current_tab': current_tab,
-        'selected_node': selected_node,
-        'total_db_capacity_count': CapacityPlanning.objects.count(),
-        'total_infra_capacity_count': total_infra_capacity,
-        'node_cap_page_obj': node_cap_page_obj,
         'current_db': current_db,
         'start_date': start_date,
         'end_date': end_date,
@@ -5013,18 +2182,12 @@ def capacity_list(request):
         'trend_polyline_points': trend_polyline_points,
         'trend_data_points': trend_data_points,
         'forecast_info': forecast_info
-    }
-    ctx.update(node_ctx)
-    ctx['node_capacity_records'] = node_cap_page_obj
-    ctx['node_cap_page_obj'] = node_cap_page_obj
-    ctx['total_infra_capacity_count'] = total_infra_capacity
-    return render(request, 'capacity/list.html', ctx)
+    })
 
 @login_required
 def capacity_print(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    if not (is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to print database capacity reports.')
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to print capacity planning records.')
         return redirect('capacity_list')
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
     
@@ -5037,7 +2200,6 @@ def capacity_print(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
-    queryset = _annotate_cumulative_growth(queryset)
 
     # Format user extracted name
     user = request.user
@@ -5063,9 +2225,8 @@ def capacity_print(request):
 
 @login_required
 def capacity_excel(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    if not (is_admin_or_super or request.user.has_perm('api.view_databasecapacity') or request.user.has_perm('api.view_capacityplanning')):
-        messages.error(request, 'You do not have permission to export database capacity records.')
+    if not (request.user.is_admin or request.user.has_perm('api.view_capacityplanning')):
+        messages.error(request, 'You do not have permission to export capacity planning records.')
         return redirect('capacity_list')
     
     queryset = CapacityPlanning.objects.all().order_by('-month', '-updated_at')
@@ -5078,7 +2239,6 @@ def capacity_excel(request):
         queryset = queryset.filter(month__gte=start_date)
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
-    queryset = _annotate_cumulative_growth(queryset)
 
     db_display = current_db if current_db else "All Databases"
     period_display = f"{start_date}_to_{end_date}" if (start_date or end_date) else "All_Time"
@@ -5132,8 +2292,7 @@ def capacity_excel(request):
         
         # Headers
         headers = [
-            "Month", "Database", "Database Size (GB)", "Monthly Growth (GB)", "Monthly Growth (%)",
-            "Cumulative Growth (GB)", "Cumulative Growth (%)",
+            "Month", "Database", "Database Size (GB)", "Growth (GB)", "Growth (%)",
             "Total Disk Capacity (GB)", "Disk Used %", "Tablespace Used %", "Free Disk Space (GB)", "Largest Table"
         ]
         ws.append(headers)
@@ -5158,8 +2317,6 @@ def capacity_excel(request):
                 float(item.database_size_gb),
                 float(item.growth_gb),
                 growth_pct,
-                float(getattr(item, 'cumulative_growth_gb', 0.0)),
-                f"{getattr(item, 'cumulative_growth_percent', 0.0)}%",
                 float(disk_cap),
                 float(item.disk_used_percent),
                 tablespace_val if tablespace_val == 'N/A' else float(item.tablespace_used_percent),
@@ -5169,14 +2326,14 @@ def capacity_excel(request):
             ws.append(row_data)
             ws.row_dimensions[row_num].height = 20
             
-            for col_num in range(1, 13):
+            for col_num in range(1, 11):
                 cell = ws.cell(row=row_num, column=col_num)
                 cell.font = font_body
                 cell.border = border_thin
                 if row_num % 2 == 0:
                     cell.fill = fill_even
                 
-                if col_num in [1, 2, 12]:
+                if col_num in [1, 2, 10]:
                     cell.alignment = align_left
                 else:
                     cell.alignment = align_center
@@ -5190,8 +2347,7 @@ def capacity_excel(request):
         # Adjust Column Widths
         for col in ws.columns:
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col[0].column)
             for cell in col:
                 if cell.row == 1 or cell.row > row_num:
                     continue
@@ -5207,6 +2363,7 @@ def capacity_excel(request):
         
     except Exception:
         import csv
+        from django.http import HttpResponse
         response = HttpResponse(content_type='text/csv')
         filename = f"Capacity_Report_{db_display.replace(' ', '_')}_{period_display}.csv"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -5237,310 +2394,6 @@ def capacity_excel(request):
         writer.writerow([f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}"])
         return response
 
-
-@login_required
-def capacity_infra_print(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    if not (is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity') or request.user.has_perm('api.view_infrastructuredashboard')):
-        messages.error(request, 'You do not have permission to print Infrastructure Capacity reports.')
-        return redirect('capacity_list')
-
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
-    month_str = request.GET.get('month', '')
-
-    reporting_month = None
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = None
-    if not reporting_month and start_date:
-        try:
-            reporting_month = datetime.strptime(start_date, '%Y-%m-%d').date().replace(day=1)
-        except ValueError:
-            reporting_month = None
-    if not reporting_month:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
-
-    user = request.user
-    full_name = f"{user.first_name} {user.last_name}".strip()
-    if not full_name:
-        username = user.username
-        if '.' in username:
-            parts = username.split('.')
-            full_name = " ".join([p.capitalize() for p in parts])
-        else:
-            full_name = username.capitalize()
-
-    reporting_period_str = f"{start_date} to {end_date}" if (start_date and end_date) else reporting_month.strftime('%B %Y')
-
-    context = {
-        'selected_node': selected_node,
-        'start_date': start_date,
-        'end_date': end_date,
-        'reporting_period_str': reporting_period_str,
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
-        'extracted_by': full_name,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
-        'node_capacity_records': node_ctx['node_capacity_records'],
-        'filtered_nodes': node_ctx['filtered_nodes'],
-        'kpi_total_storage_gb': node_ctx['kpi_total_storage_gb'],
-        'kpi_used_storage_gb': node_ctx['kpi_used_storage_gb'],
-        'kpi_free_storage_gb': node_ctx['kpi_free_storage_gb'],
-        'kpi_storage_used_pct': node_ctx['kpi_storage_used_pct'],
-    }
-    return render(request, 'capacity/infra_print.html', context)
-
-
-@login_required
-def capacity_infra_excel(request):
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    if not (is_admin_or_super or request.user.has_perm('api.view_infrastructurecapacity') or request.user.has_perm('api.view_infrastructuredashboard')):
-        messages.error(request, 'You do not have permission to export Infrastructure Capacity records.')
-        return redirect('capacity_list')
-
-    selected_node = request.GET.get('node_select', 'All Nodes')
-    start_date = request.GET.get('start_date', '')
-    end_date = request.GET.get('end_date', '')
-    month_str = request.GET.get('month', '')
-
-    reporting_month = None
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = None
-    if not reporting_month and start_date:
-        try:
-            reporting_month = datetime.strptime(start_date, '%Y-%m-%d').date().replace(day=1)
-        except ValueError:
-            reporting_month = None
-    if not reporting_month:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
-    node_capacity_records = node_ctx['node_capacity_records']
-
-    user = request.user
-    full_name = f"{user.first_name} {user.last_name}".strip()
-    if not full_name:
-        username = user.username
-        if '.' in username:
-            parts = username.split('.')
-            full_name = " ".join([p.capitalize() for p in parts])
-        else:
-            full_name = username.capitalize()
-
-    reporting_period_str = f"{start_date} to {end_date}" if (start_date and end_date) else reporting_month.strftime('%B %Y')
-    node_scope_display = selected_node if selected_node else "All Nodes"
-
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        from openpyxl.utils import get_column_letter
-
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Infra Storage Capacity"
-
-        font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
-        font_header = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
-        font_body = Font(name='Segoe UI', size=10)
-        font_kpi_label = Font(name='Segoe UI', size=9, bold=True, color='64748B')
-        font_kpi_val = Font(name='Segoe UI', size=12, bold=True, color='002569')
-
-        fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
-        fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
-        fill_kpi = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
-
-        align_center = Alignment(horizontal='center', vertical='center')
-        align_left = Alignment(horizontal='left', vertical='center')
-        align_right = Alignment(horizontal='right', vertical='center')
-
-        border_thin = Border(
-            left=Side(style='thin', color='D1D7E0'),
-            right=Side(style='thin', color='D1D7E0'),
-            top=Side(style='thin', color='D1D7E0'),
-            bottom=Side(style='thin', color='D1D7E0')
-        )
-
-        # Title Block
-        ws.merge_cells('A1:J1')
-        ws['A1'] = f"Infrastructure Storage Capacity Tracking Report — {node_scope_display} ({reporting_period_str})"
-        ws['A1'].font = font_title
-        ws['A1'].alignment = align_left
-        ws.row_dimensions[1].height = 30
-
-        # KPI Summary Cards Block
-        ws.merge_cells('A3:B3')
-        ws['A3'] = "TOTAL PROVISIONED STORAGE"
-        ws['A3'].font = font_kpi_label
-        ws['A3'].alignment = align_center
-
-        ws.merge_cells('A4:B4')
-        ws['A4'] = f"{node_ctx['kpi_total_storage_gb']} GB"
-        ws['A4'].font = font_kpi_val
-        ws['A4'].alignment = align_center
-
-        ws.merge_cells('C3:D3')
-        ws['C3'] = "USED STORAGE"
-        ws['C3'].font = font_kpi_label
-        ws['C3'].alignment = align_center
-
-        ws.merge_cells('C4:D4')
-        ws['C4'] = f"{node_ctx['kpi_used_storage_gb']} GB ({node_ctx['kpi_storage_used_pct']}%)"
-        ws['C4'].font = font_kpi_val
-        ws['C4'].alignment = align_center
-
-        ws.merge_cells('E3:F3')
-        ws['E3'] = "FREE HEADROOM"
-        ws['E3'].font = font_kpi_label
-        ws['E3'].alignment = align_center
-
-        ws.merge_cells('E4:F4')
-        ws['E4'] = f"{node_ctx['kpi_free_storage_gb']} GB"
-        ws['E4'].font = font_kpi_val
-        ws['E4'].alignment = align_center
-
-        ws.merge_cells('G3:H3')
-        ws['G3'] = "MONITORED STORAGE POOLS"
-        ws['G3'].font = font_kpi_label
-        ws['G3'].alignment = align_center
-
-        ws.merge_cells('G4:H4')
-        ws['G4'] = f"{len(node_capacity_records)} Storage Tiers"
-        ws['G4'].font = font_kpi_val
-        ws['G4'].alignment = align_center
-
-        for r_k in (3, 4):
-            for col_k in range(1, 9):
-                c_k = ws.cell(row=r_k, column=col_k)
-                c_k.fill = fill_kpi
-                c_k.border = border_thin
-
-        ws.append([]) # Row 5 empty
-
-        # Headers
-        headers = [
-            "Timestamp", "Cluster / Node", "Host / Workload", "Storage Tier",
-            "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Operational Runway"
-        ]
-        ws.append(headers)
-        row_num = 6
-        ws.row_dimensions[row_num].height = 25
-
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=row_num, column=col_num)
-            cell.font = font_header
-            cell.fill = fill_header
-            cell.alignment = align_center
-            cell.border = border_thin
-
-        row_num = 7
-        for cap in node_capacity_records:
-            cap_ts = ""
-            if cap.get('updated_at') and hasattr(cap['updated_at'], 'strftime'):
-                cap_ts = cap['updated_at'].strftime('%d %b %Y %H:%M')
-            elif cap.get('date') and hasattr(cap['date'], 'strftime'):
-                cap_ts = cap['date'].strftime('%d %b %Y')
-            elif hasattr(cap.get('month'), 'strftime'):
-                cap_ts = cap['month'].strftime('%d %b %Y')
-            else:
-                cap_ts = str(cap.get('date') or cap.get('month') or "")
-
-            delta_gb_val = f"+{cap['delta_24h_gb']} GB" if (cap.get('delta_24h_gb') is not None and cap['delta_24h_gb'] > 0) else (f"{cap['delta_24h_gb']} GB" if cap.get('delta_24h_gb') is not None else "—")
-            delta_pct_val = f"+{cap['delta_24h_percent']}%" if (cap.get('delta_24h_percent') is not None and cap['delta_24h_percent'] > 0) else (f"{cap['delta_24h_percent']}%" if cap.get('delta_24h_percent') is not None else "—")
-
-            row_data = [
-                cap_ts,
-                cap['node_name'],
-                cap.get('hosted_systems', ''),
-                cap['storage_tier'],
-                float(cap['capacity_gb']),
-                float(cap['used_gb']),
-                float(cap['free_gb']),
-                f"{cap['used_percent']}%",
-                delta_gb_val,
-                delta_pct_val,
-                cap.get('runway_text', 'Stable'),
-            ]
-            ws.append(row_data)
-            ws.row_dimensions[row_num].height = 20
-
-            for col_num in range(1, len(headers) + 1):
-                cell = ws.cell(row=row_num, column=col_num)
-                cell.font = font_body
-                cell.border = border_thin
-                if row_num % 2 == 0:
-                    cell.fill = fill_even
-                if col_num in [1, 2, 3, 4]:
-                    cell.alignment = align_left
-                elif col_num in [5, 6, 7]:
-                    cell.alignment = align_right
-                else:
-                    cell.alignment = align_center
-            row_num += 1
-
-        # Metadata footer
-        ws.append([])
-        row_num += 1
-        ws.cell(row=row_num, column=1, value=f"Extracted by {full_name} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')} EAT").font = Font(name='Segoe UI', size=9, italic=True)
-
-        for col in ws.columns:
-            max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
-            for cell in col:
-                if cell.row in (1, 3, 4) or cell.row > row_num:
-                    continue
-                if cell.value:
-                    max_len = max(max_len, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        clean_scope = node_scope_display.replace(' ', '_')
-        filename = f"Infra_Storage_Capacity_Tracking_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
-        return response
-
-    except Exception:
-        import csv
-        response = HttpResponse(content_type='text/csv')
-        clean_scope = node_scope_display.replace(' ', '_')
-        filename = f"Infra_Storage_Capacity_Tracking_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.csv"
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-
-        writer = csv.writer(response)
-        writer.writerow([f"Infrastructure Storage Capacity Tracking Report - {node_scope_display} ({reporting_period_str})"])
-        writer.writerow([])
-        writer.writerow([
-            "Timestamp", "Cluster / Node", "Host / Workload", "Storage Tier",
-            "Capacity (GB)", "Used (GB)", "Free (GB)", "Utilisation (%)", "24h Delta (GB)", "24h Delta (%)", "Operational Runway"
-        ])
-        for cap in node_capacity_records:
-            writer.writerow([
-                str(cap.get('date') or cap.get('month') or ''),
-                cap['node_name'],
-                cap.get('hosted_systems', ''),
-                cap['storage_tier'],
-                cap['capacity_gb'],
-                cap['used_gb'],
-                cap['free_gb'],
-                f"{cap['used_percent']}%",
-                cap.get('delta_24h_gb', ''),
-                cap.get('delta_24h_percent', ''),
-                cap.get('runway_text', 'Stable'),
-            ])
-        writer.writerow([])
-        writer.writerow([f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}"])
-        return response
-
-
 @login_required
 def capacity_create(request):
     if not (request.user.is_admin or request.user.has_perm('api.add_capacityplanning')):
@@ -5557,8 +2410,6 @@ def capacity_create(request):
                 month__year=capacity.month.year,
                 month__month=capacity.month.month
             ).first()
-            target_record = None
-            action_type = 'Created'
             if existing_record:
                 # Update existing record
                 existing_record.database_size_gb = capacity.database_size_gb
@@ -5569,23 +2420,11 @@ def capacity_create(request):
                 existing_record.growth_gb = capacity.growth_gb
                 existing_record.created_by = request.user
                 existing_record.save()
-                target_record = existing_record
-                action_type = 'Updated'
                 messages.success(request, f"Updated existing capacity planning record for {capacity.database} in {capacity.month.strftime('%B %Y')}.")
             else:
                 capacity.created_by = request.user
                 capacity.save()
-                target_record = capacity
-                action_type = 'Created'
                 messages.success(request, 'Capacity planning record created successfully.')
-
-            comment = form.cleaned_data.get('change_comment', '').strip()
-            CapacityChangeLog.objects.create(
-                capacity=target_record,
-                changed_by=request.user,
-                action=action_type,
-                comment=comment or f"{action_type} capacity record for {target_record.database} ({target_record.month.strftime('%b %Y')})"
-            )
             return redirect('capacity_list')
     else:
         form = CapacityPlanningForm()
@@ -5595,12 +2434,7 @@ def capacity_create(request):
 def capacity_edit(request, pk):
     capacity = get_object_or_404(CapacityPlanning, pk=pk)
     
-    can_edit_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.change_capacityplanning')
-    )
+    can_edit_always = request.user.is_admin
     is_creator_within_time = (capacity.created_by == request.user) and ((timezone.now() - capacity.created_at).total_seconds() < 300)
     
     if not (can_edit_always or is_creator_within_time):
@@ -5610,27 +2444,17 @@ def capacity_edit(request, pk):
     if request.method == 'POST':
         form = CapacityPlanningForm(request.POST, instance=capacity)
         if form.is_valid():
-            cap = form.save()
-            comment = form.cleaned_data.get('change_comment', '').strip()
-            CapacityChangeLog.objects.create(
-                capacity=cap,
-                changed_by=request.user,
-                action='Updated',
-                comment=comment or f"Updated capacity figures for {cap.database} ({cap.month.strftime('%b %Y')})"
-            )
+            form.save()
             messages.success(request, 'Capacity planning record updated successfully.')
             return redirect('capacity_list')
     else:
         form = CapacityPlanningForm(instance=capacity)
     
-    change_logs = capacity.change_logs.all().select_related('changed_by')
-
     return render(request, 'capacity/form.html', {
         'form': form, 
         'title': 'Edit Capacity Planning Record',
         'can_edit': True,
-        'capacity': capacity,
-        'change_logs': change_logs
+        'capacity': capacity
     })
 
 # --- DELETE VIEWS ---
@@ -5640,20 +2464,8 @@ def incident_delete(request, pk):
     if request.method != 'POST':
         return redirect('incident_list')
     obj = get_object_or_404(IncidentRegister, pk=pk)
-
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_delete_db = is_admin_or_super or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.view_databaseincident')
-    can_delete_infra = is_admin_or_super or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.view_infrastructureincident')
-    if (obj.category == 'Database' and not can_delete_db) or (obj.category == 'Infrastructure' and not can_delete_infra):
-        messages.error(request, 'You do not have permission to delete this incident.')
-        return redirect(request.META.get('HTTP_REFERER', 'incident_list'))
     
-    can_delete_always = (
-        request.user.is_admin or 
-        request.user.is_superuser or 
-        request.user.is_staff or 
-        request.user.has_perm('api.delete_incidentregister')
-    )
+    can_delete_always = request.user.is_admin
     is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
     
     if not (can_delete_always or is_creator_within_time):
@@ -5724,13 +2536,6 @@ def maintenance_delete(request, pk):
     if request.method != 'POST':
         return redirect('maintenance_list')
     obj = get_object_or_404(MaintenanceRegister, pk=pk)
-
-    is_admin_or_super = request.user.is_admin or request.user.is_superuser
-    can_delete_db = is_admin_or_super or request.user.has_perm('api.delete_maintenanceregister') or request.user.has_perm('api.view_databasemaintenance')
-    can_delete_infra = is_admin_or_super or request.user.has_perm('api.delete_maintenanceregister') or request.user.has_perm('api.view_infrastructuremaintenance')
-    if (obj.category == 'Database' and not can_delete_db) or (obj.category == 'Infrastructure' and not can_delete_infra):
-        messages.error(request, 'You do not have permission to delete this maintenance record.')
-        return redirect(request.META.get('HTTP_REFERER', 'maintenance_list'))
     
     can_delete_always = request.user.is_admin
     is_creator_within_time = (obj.created_by == request.user) and ((timezone.now() - obj.created_at).total_seconds() < 300)
@@ -5870,106 +2675,59 @@ def server_health_ingest(request):
     try:
         data = json.loads(request.body)
         
+        # Calculate status based on thresholds
         cpu = float(data.get('cpu_percent', 0))
         memory = float(data.get('memory_percent', 0))
-        d1_pct = float(data.get('disk_1_percent', 0))
-        d2_pct = float(data.get('disk_2_percent', 0))
-        d3_pct = float(data.get('disk_3_percent', 0))
-        disk = max(float(data.get('disk_percent', 0)), d1_pct, d2_pct, d3_pct)
-        uptime_pct = float(data.get('uptime_percent', 100.0))
+        disk = float(data.get('disk_percent', 0))
         
         status = 'Healthy'
-        if cpu > 90 or memory > 90 or disk > 90 or uptime_pct < 99.0:
+        if cpu > 90 or memory > 90 or disk > 90:
             status = 'Critical'
-        elif cpu > 75 or memory > 80 or disk > 80 or uptime_pct < 99.9:
+        elif cpu > 75 or memory > 80 or disk > 80:
             status = 'Warning'
             
         # Check for optional custom date override (for backfilling)
         date_str = data.get('date')
         if date_str:
             health_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+          
         else:
             health_date = datetime.now().date()
-
-        node_name = data.get('node_name', '')
-        server_name = data.get('server', 'Unknown')
-        db_name = data.get('database', 'MySQL')
-        if not node_name:
-            if db_name == 'Oracle' or any(k in server_name.lower() for k in ['olkvm', 'kvm', 'nmsinfra', 'nmsebs']):
-                node_name = 'OLKVM'
-            else:
-                node_name = 'Proxmox'
-
-        source = data.get('entered_by', 'Prometheus' if ('disk_1_type' in data or 'node_name' in data) else 'Script')
-
-        if server_name.startswith('infra'):
-            server_name = 'nms' + server_name
-        elif server_name.startswith('ebs'):
-            server_name = 'nms' + server_name
-
-        raw_hosted = data.get('hosted_systems', '')
-        import re
-        clean_hosted = re.sub(r'\s*-\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', '', raw_hosted)
-        clean_hosted = re.sub(r'\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '', clean_hosted)
-        clean_hosted = clean_hosted.replace('Oracle DB (infra)', 'Oracle DB (nmsinfra)').replace('Oracle EBS App (ebs)', 'Oracle EBS App (nmsebs)')
-        if 'infra' in clean_hosted and 'nmsinfra' not in clean_hosted:
-            clean_hosted = clean_hosted.replace('infra', 'nmsinfra')
-        if 'ebs' in clean_hosted and 'nmsebs' not in clean_hosted:
-            clean_hosted = clean_hosted.replace('ebs', 'nmsebs')
-        clean_hosted = re.sub(r'\(\s*\)', '', clean_hosted).strip(' -()')
-
-        # Find existing entry for this server/node/date combination
+            
+        # Find the first existing entry for this server/date combination (handles pre-existing duplicate logs cleanly)
         health = ServerHealth.objects.filter(
             date=health_date,
-            server=server_name,
-            database=db_name
+            server=data.get('server', 'Unknown'),
+            database=data.get('database', 'MySQL')
         ).first()
-
-        fields_map = {
-            'node_name': node_name,
-            'hosted_systems': clean_hosted,
-            'entered_by': source,
-            'uptime_percent': uptime_pct,
-            'uptime_days': float(data.get('uptime_days', 0)),
-            'logical_cpus': int(data.get('logical_cpus', data.get('threads', 0))),
-            'cpu_percent': cpu,
-            'memory_percent': memory,
-            'memory_total_gb': float(data.get('memory_total_gb', 0)),
-            'memory_used_gb': float(data.get('memory_used_gb', 0)),
-            'disk_percent': disk,
-            'storage_growth_gb': float(data.get('storage_growth_gb', 0)),
-            'storage_growth_pct': float(data.get('storage_growth_pct', 0)),
-            'disk_1_type': data.get('disk_1_type', 'Disk 1 (SSD / OS)'),
-            'disk_1_size_gb': float(data.get('disk_1_size_gb', 0)),
-            'disk_1_used_gb': float(data.get('disk_1_used_gb', 0)),
-            'disk_1_percent': d1_pct if d1_pct > 0 else disk,
-            'disk_2_type': data.get('disk_2_type', 'Disk 2 (SAS / Data)'),
-            'disk_2_size_gb': float(data.get('disk_2_size_gb', 0)),
-            'disk_2_used_gb': float(data.get('disk_2_used_gb', 0)),
-            'disk_2_percent': d2_pct,
-            'disk_3_type': data.get('disk_3_type', 'Disk 3 (SAN / Backup)'),
-            'disk_3_size_gb': float(data.get('disk_3_size_gb', 0)),
-            'disk_3_used_gb': float(data.get('disk_3_used_gb', 0)),
-            'disk_3_percent': d3_pct,
-            'tablespace_percent': float(data.get('tablespace_percent', disk)),
-            'connections': int(data.get('connections', 0)),
-            'slow_queries': int(data.get('slow_queries', 0)),
-            'threads': int(data.get('threads', 0)),
-            'status': status,
-        }
-
+        
         if health:
-            for k, v in fields_map.items():
-                setattr(health, k, v)
+            health.entered_by = 'Script'
+            health.cpu_percent = cpu
+            health.memory_percent = memory
+            health.disk_percent = disk
+            health.tablespace_percent = float(data.get('tablespace_percent', 0))
+            health.connections = int(data.get('connections', 0))
+            health.slow_queries = int(data.get('slow_queries', 0))
+            health.threads = int(data.get('threads', 0))
+            health.status = status
             health.save()
         else:
             health = ServerHealth.objects.create(
                 date=health_date,
-                server=server_name,
-                database=db_name,
-                **fields_map
+                server=data.get('server', 'Unknown'),
+                database=data.get('database', 'MySQL'),
+                entered_by='Script',
+                cpu_percent=cpu,
+                memory_percent=memory,
+                disk_percent=disk,
+                tablespace_percent=float(data.get('tablespace_percent', 0)),
+                connections=int(data.get('connections', 0)),
+                slow_queries=int(data.get('slow_queries', 0)),
+                threads=int(data.get('threads', 0)),
+                status=status
             )
-        return JsonResponse({'status': 'success', 'id': health.id, 'node_name': health.node_name})
+        return JsonResponse({'status': 'success', 'id': health.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
  
@@ -5987,11 +2745,6 @@ def capacity_ingest(request):
         
         database_instance = data.get('database', 'MySQL')
         incoming_size = Decimal(str(data.get('database_size_gb', 0)))
-        avail_gb = Decimal(str(data.get('available_capacity_gb', 0)))
-        ts_pct = Decimal(str(data.get('tablespace_percent', 0)))
-        if database_instance == 'Oracle' and incoming_size > avail_gb and avail_gb > 0 and ts_pct > 0:
-            if abs(float((incoming_size - avail_gb) / incoming_size * 100) - float(ts_pct)) < 1.0:
-                incoming_size = round(incoming_size - avail_gb, 2)
         
         # Get client IP address for debugging
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -6063,36 +2816,10 @@ def incident_ingest(request):
     try:
         data = json.loads(request.body)
         
-        category = data.get('category', 'Database')
-        node_name = data.get('node_name', '')
-        raw_db = data.get('database', '')
-        
-        if str(category).lower() == 'infrastructure' or raw_db.strip().lower() in ['infrastructure', 'node', 'infra', 'olkvm', 'proxmox'] or node_name:
-            category = 'Infrastructure'
-            db_type = 'Infrastructure'
-            raw_node = node_name or data.get('server') or data.get('node') or ''
-            raw_sys = data.get('system') or ''
-            if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']) or any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']):
-                node_name = 'OLKVM'
-                system = 'OLKVM Host Node (Oracle DB & EBS)'
-            else:
-                node_name = raw_node or 'Infrastructure Node'
-                system = raw_sys or node_name or 'Host Node'
-        elif raw_db.strip().lower() in ['mkinsight', 'pentana', 'mssql', 'ms sql', 'ms sql server']:
-            category = 'Database'
-            db_type = 'MS SQL Server'
-            system = data.get('system') or 'MKInsight (Pentana)'
-        elif raw_db.strip().lower() in ['postgresql', 'postgres', 'ccis', 'odkx', 'odk-x', 'ccisprod', 'ccisprod_db']:
-            category = 'Database'
-            db_type = 'PostgreSQL'
-            system = data.get('system') or 'CCIS (ODK-X)'
-        else:
-            category = 'Database'
-            db_type = raw_db or 'MySQL'
-            system = data.get('system', f"{db_type} Instance")
-        
+        db_type = data.get('database', 'MySQL')
         start_str = data.get('start')
         end_str = data.get('end')
+        system = data.get('system', 'MySQL Instance')
         
         if not start_str or not end_str:
             return JsonResponse({'error': 'start and end timestamps are required'}, status=400)
@@ -6102,10 +2829,13 @@ def incident_ingest(request):
                 dt_str_clean = dt_str.replace(' ', 'T')
                 if dt_str_clean.endswith('Z'):
                     dt_str_clean = dt_str_clean[:-1] + '+00:00'
+                # If there are milliseconds, strip them or handle them cleanly
                 if '.' in dt_str_clean:
                     parts = dt_str_clean.split('.')
+                    # Reconstruct without sub-seconds but keep timezone
                     time_part = parts[0]
                     tz_part = ''
+                    # Find timezone offset suffix in the second part if present
                     second_part = parts[1]
                     for suffix in ['+', '-']:
                         if suffix in second_part:
@@ -6120,59 +2850,24 @@ def incident_ingest(request):
         start_dt = parse_dt(start_str)
         end_dt = parse_dt(end_str)
         
-        if category == 'Infrastructure':
-            # Infrastructure host nodes operate 24/7 (24 hours/day, 7 days/week)
-            duration_hrs = round(max(0.0, (end_dt - start_dt).total_seconds()) / 3600.0, 2)
-        else:
-            duration_hrs = calculate_operational_downtime(start_dt, end_dt, db_type)
+        duration_hrs = calculate_operational_downtime(start_dt, end_dt, db_type)
         
         # De-duplication check: avoid double registering the same outage in staging or active register
-        if category == 'Infrastructure':
-            window_start = start_dt - timedelta(minutes=15)
-            window_end = start_dt + timedelta(minutes=15)
-            target_nodes = ['OLKVM', 'nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug'] if node_name == 'OLKVM' else [node_name]
-            if IncidentStaging.objects.filter(category='Infrastructure', node_name__in=target_nodes, start__range=(window_start, window_end)).exists():
-                return JsonResponse({'status': 'ignored', 'message': f'Outage already staged for node {node_name}'}, status=200)
-            if IncidentRegister.objects.filter(category='Infrastructure', node_name__in=target_nodes, start__range=(window_start, window_end)).exists():
-                return JsonResponse({'status': 'ignored', 'message': f'Outage already registered as an active incident for node {node_name}'}, status=200)
-        else:
-            if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
-                return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
-            if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
-                return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
+        if IncidentStaging.objects.filter(database=db_type, start=start_dt).exists():
+            return JsonResponse({'status': 'ignored', 'message': 'Outage already staged'}, status=200)
             
-        # Check if this incident occurred within a registered maintenance window
-        maint_query = Q(start__lte=start_dt, end__gte=end_dt)
-        if category == 'Infrastructure':
-            maintenance = MaintenanceRegister.objects.filter(
-                maint_query & (
-                    Q(database='Infrastructure') |
-                    Q(system__icontains=node_name) |
-                    Q(system__icontains=system) |
-                    Q(activity__icontains=node_name) |
-                    Q(system__icontains='OLKVM') |
-                    Q(activity__icontains='OLKVM')
-                )
-            ).first()
-        else:
-            maintenance = MaintenanceRegister.objects.filter(
-                maint_query & Q(database=db_type)
-            ).first()
+        if IncidentRegister.objects.filter(database=db_type, start=start_dt).exists():
+            return JsonResponse({'status': 'ignored', 'message': 'Outage already registered as an active incident'}, status=200)
+            
+        # Check if this incident occurred within a registered maintenance window for the same database
+        maintenance = MaintenanceRegister.objects.filter(
+            database=db_type,
+            start__lte=start_dt,
+            end__gte=end_dt
+        ).first()
         
         maint_ticket = None
-        is_infra = (category == 'Infrastructure' or bool(node_name) or str(raw_db).lower() in ['infrastructure', 'node', 'infra', 'olkvm', 'proxmox'])
-        default_rc = (
-            'AUTO-LOGGED: Outage detected on infrastructure node. Awaiting SysAdmin review.'
-            if is_infra else
-            'AUTO-LOGGED: Outage detected. Awaiting DBA review.'
-        )
-        default_impact = (
-            'Awaiting SysAdmin business impact assessment.'
-            if is_infra else
-            'Awaiting DBA business impact assessment.'
-        )
-        root_cause = data.get('root_cause', default_rc)
-        business_impact = data.get('business_impact', default_impact)
+        root_cause = data.get('root_cause', 'AUTO-LOGGED: Outage detected. Awaiting DBA review.')
         status = 'Awaiting Review'
         maint_record = None
         processed_at = None
@@ -6190,42 +2885,8 @@ def incident_ingest(request):
                 "DBA Summary: [UNPLANNED MAINTENANCE - CLEAN RESTART]\n"
                 "WARNING: This graceful restart occurred OUTSIDE of a scheduled maintenance window."
             )
-
-        if is_infra and not maintenance:
-            # Infrastructure events outside maintenance windows route to IncidentStaging for SysAdmin review.
-            # Events under 15 minutes (< 0.25h) are flagged as potential network intermittence.
-            is_intermittent = (duration_hrs < 0.25)
-            rc_final = root_cause
-            if is_intermittent and not root_cause.startswith("[POTENTIAL NETWORK INTERMITTENCE"):
-                rc_final = f"[POTENTIAL NETWORK INTERMITTENCE (< 15m)] {root_cause}"
-                if not data.get('business_impact'):
-                    business_impact = f"Duration {round(duration_hrs * 60, 1)}m under 15-minute threshold; potential network/scrape intermittence under SysAdmin review."
-
-            staging = IncidentStaging.objects.create(
-                category='Infrastructure',
-                node_name=node_name or ('OLKVM' if any(k in str(system).lower() for k in ['infra', 'ebs', 'olkvm']) else None),
-                database='Infrastructure',
-                system=system,
-                start=start_dt,
-                end=end_dt,
-                duration_hrs=duration_hrs,
-                root_cause=rc_final,
-                status='Awaiting Review',
-                incident_record=None,
-                maintenance_record=None,
-                processed_at=None
-            )
-            return JsonResponse({
-                'status': 'success',
-                'id': staging.id,
-                'staged': True,
-                'intermittence_risk': is_intermittent,
-                'maint_linked': False
-            })
             
         staging = IncidentStaging.objects.create(
-            category=category,
-            node_name=node_name,
             database=db_type,
             system=system,
             start=start_dt,
@@ -6388,115 +3049,35 @@ def holiday_delete(request, pk):
 
 @login_required
 def incident_staging_list(request):
-    is_sysadmin = is_sysadmin_user(request.user)
-    can_view = (
-        request.user.is_superuser or
-        request.user.is_staff or
-        getattr(request.user, 'is_admin', False) or
-        request.user.has_perm('api.view_incidentregister') or
-        request.user.has_perm('api.view_incidentstaging') or
-        request.user.has_perm('api.view_databaseincident') or
-        request.user.has_perm('api.view_infrastructureincident') or
-        is_sysadmin
-    )
-    if not can_view:
+    if not (request.user.is_admin or request.user.has_perm('api.view_incidentregister')):
         messages.error(request, 'You do not have permission to view incident staging records.')
         return redirect('dashboard')
         
-    current_category = request.GET.get('category', '').strip()
-    current_db = request.GET.get('database', '').strip()
-    current_node = request.GET.get('node', '').strip()
-
-    if is_sysadmin:
-        # SysAdmins can ONLY view Prometheus / Infrastructure alerts
-        current_category = 'Infrastructure'
-        current_db = ''
+    current_db = request.GET.get('database', '')
     
-    # Consolidate any legacy VM records into single OLKVM host node records
-    if consolidate_olkvm_incidents:
-        try:
-            consolidate_olkvm_incidents()
-        except Exception:
-            pass
-
     # Auto-resolve/sync any staging records that were manually logged or resolved in registers
     awaiting_records = IncidentStaging.objects.filter(status='Awaiting Review')
-    if is_sysadmin:
-        awaiting_records = awaiting_records.filter(
-            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus')
-        )
-
     for record in awaiting_records:
-        is_infra = (record.category == 'Infrastructure' or record.database == 'Infrastructure')
-        if is_infra:
-            incident = IncidentRegister.objects.filter(
-                Q(category='Infrastructure') | Q(database='Infrastructure'),
-                start=record.start
-            ).first()
-            if incident:
-                record.status = 'Promoted to Incident'
-                record.incident_record = incident
-                record.processed_at = timezone.now()
-                record.save()
-                continue
-                
-            maintenance = MaintenanceRegister.objects.filter(
-                Q(database='Infrastructure') | Q(system__icontains=record.node_name or record.system),
-                start=record.start
-            ).first()
-            if maintenance:
-                record.status = 'Promoted to Maintenance'
-                record.maintenance_record = maintenance
-                record.processed_at = timezone.now()
-                record.save()
-                continue
-        else:
-            incident = IncidentRegister.objects.filter(database=record.database, start=record.start).first()
-            if incident:
-                record.status = 'Promoted to Incident'
-                record.incident_record = incident
-                record.processed_at = timezone.now()
-                record.save()
-                continue
-                
-            maintenance = MaintenanceRegister.objects.filter(database=record.database, start=record.start).first()
-            if maintenance:
-                record.status = 'Promoted to Maintenance'
-                record.maintenance_record = maintenance
-                record.processed_at = timezone.now()
-                record.save()
-                continue
+        incident = IncidentRegister.objects.filter(database=record.database, start=record.start).first()
+        if incident:
+            record.status = 'Promoted to Incident'
+            record.incident_record = incident
+            record.processed_at = datetime.now()
+            record.save()
+            continue
             
-    base_qs = IncidentStaging.objects.filter(status='Awaiting Review')
-    if is_sysadmin:
-        base_qs = base_qs.filter(
-            Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus')
-        )
-    total_awaiting_count = base_qs.count()
-    db_awaiting_count = 0 if is_sysadmin else base_qs.filter(category='Database').exclude(database='Infrastructure').count()
-    infra_awaiting_count = total_awaiting_count if is_sysadmin else base_qs.filter(Q(category='Infrastructure') | Q(database='Infrastructure')).count()
-
-    queryset = base_qs.order_by('-start')
+        maintenance = MaintenanceRegister.objects.filter(database=record.database, start=record.start).first()
+        if maintenance:
+            record.status = 'Promoted to Maintenance'
+            record.maintenance_record = maintenance
+            record.processed_at = datetime.now()
+            record.save()
+            continue
+            
+    queryset = IncidentStaging.objects.filter(status='Awaiting Review').order_by('-start')
     
-    if current_category == 'Database' and not is_sysadmin:
-        queryset = queryset.filter(category='Database').exclude(database='Infrastructure')
-    elif current_category == 'Infrastructure' or is_sysadmin:
-        queryset = queryset.filter(Q(category='Infrastructure') | Q(database='Infrastructure') | Q(root_cause__icontains='Prometheus'))
-
-    if current_db and not is_sysadmin:
+    if current_db:
         queryset = queryset.filter(database=current_db)
-        
-    if current_node:
-        if current_node.upper() == 'OLKVM' or current_node in ['nmsinfra', 'nmsebs']:
-            queryset = queryset.filter(
-                Q(node_name__iexact='OLKVM') |
-                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug']) |
-                Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs')
-            )
-        else:
-            queryset = queryset.filter(Q(node_name__iexact=current_node) | Q(system__icontains=current_node))
         
     paginator = Paginator(queryset, 20)
     page_number = request.GET.get('page')
@@ -6519,59 +3100,24 @@ def incident_staging_list(request):
             
     context = {
         'page_obj': page_obj,
-        'current_category': current_category,
         'current_db': current_db,
-        'current_node': current_node,
-        'total_awaiting_count': total_awaiting_count,
-        'db_awaiting_count': db_awaiting_count,
-        'infra_awaiting_count': infra_awaiting_count,
-        'is_sysadmin': is_sysadmin,
     }
     return render(request, 'incidents/staging_list.html', context)
 
 
 @login_required
 def staging_promote_incident(request, pk):
-    is_sysadmin = is_sysadmin_user(request.user)
-    can_promote = (
-        request.user.is_superuser or
-        request.user.is_staff or
-        getattr(request.user, 'is_admin', False) or
-        request.user.has_perm('api.add_incidentregister') or
-        is_sysadmin
-    )
-    if not can_promote:
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_incidentregister')):
         messages.error(request, 'You do not have permission to create incidents.')
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
-    rc_upper = (staging_item.root_cause or '').upper()
-    is_infra = (
-        staging_item.category == 'Infrastructure' or
-        staging_item.database == 'Infrastructure' or
-        'PROMETHEUS' in rc_upper or
-        bool(staging_item.node_name)
-    )
-
-    if is_sysadmin and not is_infra:
-        messages.error(request, 'SysAdmins are only permitted to review and promote Prometheus/Infrastructure alerts.')
-        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         form = IncidentRegisterForm(request.POST)
         if form.is_valid():
             incident = form.save(commit=False)
             incident.created_by = request.user
-            if is_infra:
-                incident.category = 'Infrastructure'
-                incident.database = 'Infrastructure'
-                raw_node = incident.node_name or staging_item.node_name or 'OLKVM'
-                if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']):
-                    incident.node_name = 'OLKVM'
-                    if not incident.system or any(k in incident.system.lower() for k in ['nmsinfra', 'nmsebs', 'olkvm', 'host node']):
-                        incident.system = 'OLKVM Host Node (Oracle DB & EBS)'
-                else:
-                    incident.node_name = raw_node
             incident.save()
             
             # Link/process the staging record
@@ -6586,6 +3132,7 @@ def staging_promote_incident(request, pk):
     else:
         # Determine appropriate severity default from alert text
         severity = 'Medium'
+        rc_upper = (staging_item.root_cause or '').upper()
         if 'CRITICAL' in rc_upper:
             severity = 'Critical'
         elif 'HIGH' in rc_upper:
@@ -6593,79 +3140,38 @@ def staging_promote_incident(request, pk):
         elif 'LOW' in rc_upper:
             severity = 'Low'
 
-        if is_infra:
-            ticket_id = f"INC-PROM-{staging_item.start.strftime('%y%m%d-%H%M')}"
-            default_impact = 'Awaiting SysAdmin business impact assessment.'
-            resolved_by = 'Prometheus / System'
-            db_val = 'Infrastructure'
-            raw_node = staging_item.node_name or staging_item.system or 'OLKVM'
-            if any(k in raw_node.lower() for k in ['infra', 'ebs', 'olkvm']):
-                target_node = 'OLKVM'
-                target_system = 'OLKVM Host Node (Oracle DB & EBS)'
-            else:
-                target_node = raw_node
-                target_system = staging_item.system
-        else:
-            ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
-            default_impact = 'Awaiting DBA business impact assessment.'
-            resolved_by = 'System'
-            db_val = staging_item.database
-            target_node = ''
-            target_system = staging_item.system
-
+        ticket_id = f"AUTO-SELF-HEAL-{staging_item.start.strftime('%y%m%d-%H%M')}"
         initial = {
             'ticket': ticket_id,
-            'category': 'Infrastructure' if is_infra else 'Database',
-            'node_name': target_node,
             'date': staging_item.start.date(),
             'start': staging_item.start,
             'end': staging_item.end,
             'severity': severity,
-            'system': target_system,
-            'database': db_val,
+            'system': staging_item.system,
+            'database': staging_item.database,
             'root_cause': staging_item.root_cause,
-            'resolved_by': resolved_by,
+            'resolved_by': 'System',
             'status': 'Resolved',
-            'business_impact': default_impact,
+            'business_impact': 'Awaiting DBA business impact assessment.',
             'assigned_to': request.user.username if request.user.is_authenticated else ''
         }
         form = IncidentRegisterForm(initial=initial)
         
     context = {
         'form': form,
-        'title': 'Promote Staging to Incident (SysAdmin)' if is_infra else 'Promote Staging to Incident (DBA)',
-        'staging_item': staging_item,
-        'is_infra': is_infra,
+        'title': 'Promote Staging to Incident',
+        'staging_item': staging_item
     }
     return render(request, 'incidents/staging_promote_incident.html', context)
 
 
 @login_required
 def staging_promote_maintenance(request, pk):
-    is_sysadmin = is_sysadmin_user(request.user)
-    can_maint = (
-        request.user.is_superuser or
-        request.user.is_staff or
-        getattr(request.user, 'is_admin', False) or
-        request.user.has_perm('api.add_maintenanceregister') or
-        is_sysadmin
-    )
-    if not can_maint:
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.add_maintenanceregister')):
         messages.error(request, 'You do not have permission to log maintenance activities.')
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
-    rc_upper = (staging_item.root_cause or '').upper()
-    is_infra = (
-        staging_item.category == 'Infrastructure' or
-        staging_item.database == 'Infrastructure' or
-        'PROMETHEUS' in rc_upper or
-        bool(staging_item.node_name)
-    )
-
-    if is_infra:
-        messages.error(request, 'Infrastructure alerts are at the host node level and cannot be logged as Database Maintenance. Please promote to an Incident instead.')
-        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         form = MaintenanceRegisterForm(request.POST)
@@ -6685,16 +3191,10 @@ def staging_promote_maintenance(request, pk):
             return redirect('incident_staging_list')
     else:
         # Pre-populate fields from staging record
-        if is_infra:
-            raw_sys = staging_item.node_name or staging_item.system or 'OLKVM'
-            target_sys = 'OLKVM Host Node (Oracle DB & EBS)' if any(k in raw_sys.lower() for k in ['infra', 'ebs', 'olkvm']) else raw_sys
-        else:
-            target_sys = staging_item.system
-
         initial = {
             'date': staging_item.start.date(),
-            'database': 'Infrastructure' if is_infra else staging_item.database,
-            'system': target_sys,
+            'database': staging_item.database,
+            'system': staging_item.system,
             'start': staging_item.start,
             'end': staging_item.end,
             'duration_hrs': staging_item.duration_hrs,
@@ -6710,39 +3210,19 @@ def staging_promote_maintenance(request, pk):
     context = {
         'form': form,
         'title': 'Promote Staging to Maintenance',
-        'staging_item': staging_item,
-        'is_infra': is_infra,
+        'staging_item': staging_item
     }
     return render(request, 'incidents/staging_promote_maintenance.html', context)
 
 
 @login_required
 def staging_delete(request, pk):
-    is_sysadmin = is_sysadmin_user(request.user)
-    can_delete = (
-        request.user.is_superuser or
-        request.user.is_staff or
-        getattr(request.user, 'is_admin', False) or
-        request.user.has_perm('api.delete_incidentregister') or
-        request.user.has_perm('api.delete_incidentstaging') or
-        is_sysadmin
-    )
-    if not can_delete:
+    # Check permissions (admins or users with delete rights)
+    if not (request.user.is_superuser or request.user.is_staff or request.user.is_admin or request.user.has_perm('api.delete_incidentregister') or request.user.has_perm('api.delete_incidentstaging')):
         messages.error(request, 'You do not have permission to delete staging records.')
         return redirect('incident_staging_list')
         
     staging_item = get_object_or_404(IncidentStaging, pk=pk, status='Awaiting Review')
-    rc_upper = (staging_item.root_cause or '').upper()
-    is_infra = (
-        staging_item.category == 'Infrastructure' or
-        staging_item.database == 'Infrastructure' or
-        'PROMETHEUS' in rc_upper or
-        bool(staging_item.node_name)
-    )
-
-    if is_sysadmin and not is_infra:
-        messages.error(request, 'SysAdmins are only permitted to dismiss Prometheus/Infrastructure alerts.')
-        return redirect('incident_staging_list')
     
     if request.method == 'POST':
         staging_item.delete()
@@ -6780,10 +3260,7 @@ def password_change_required(request):
 
 from django.contrib.auth import views as auth_views
 from django.contrib.auth import login as auth_login
-from django.views.decorators.csrf import ensure_csrf_cookie
-from django.utils.decorators import method_decorator
 
-@method_decorator(ensure_csrf_cookie, name='dispatch')
 class CustomLoginView(auth_views.LoginView):
     template_name = 'login.html'
 
@@ -6792,18 +3269,7 @@ class CustomLoginView(auth_views.LoginView):
         user = form.get_user()
         if getattr(user, 'must_change_password', False):
             return redirect('password_change_required')
-        # Route users without dashboard permissions directly to their operational workspace
-        can_view_db = user.is_admin or user.is_superuser or user.has_perm('api.view_databasedashboard')
-        can_view_infra = user.is_admin or user.is_superuser or user.has_perm('api.view_infrastructuredashboard')
-        if not can_view_db and not can_view_infra:
-            if user.has_perm('api.view_serverhealth'):
-                return redirect('server_health_list')
-            elif user.has_perm('api.view_infrastructureincident') or is_sysadmin_user(user):
-                return redirect('incident_list')
-            elif user.has_perm('api.view_infrastructuremaintenance'):
-                return redirect('maintenance_list')
-            elif user.has_perm('api.view_infrastructurecapacity'):
-                return redirect('capacity_list')
         return redirect(self.get_success_url())
+
 
 

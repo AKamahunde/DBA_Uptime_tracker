@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}DBTRAC - Database Tracking for Reliability, Administration and Compliance{% endblock %}</title>
-    <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico?v=3">
-    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=3">
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=3">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=3">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=3">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=3">
+    <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico?v=2">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico?v=2">
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=2">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=2">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=2">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -208,60 +208,6 @@
         .nav-dropdown:hover .nav-dropdown-content,
         .nav-dropdown.open .nav-dropdown-content {
             display: block;
-        }
-
-        /* ── Export Dropdown ── */
-        .export-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-        .export-dropdown-content {
-            display: none;
-            position: absolute;
-            right: 0;
-            background-color: #ffffff;
-            min-width: 160px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            z-index: 1000;
-            margin-top: 4px;
-            overflow: visible;
-        }
-        .export-dropdown-content::before {
-            content: '';
-            position: absolute;
-            top: -12px;
-            left: -15px;
-            right: -15px;
-            height: 16px;
-            background: transparent;
-        }
-        .export-dropdown:hover .export-dropdown-content,
-        .export-dropdown.open .export-dropdown-content {
-            display: block !important;
-        }
-        .export-dropdown-content a {
-            color: #334155;
-            padding: 0.55rem 0.85rem;
-            text-decoration: none;
-            display: block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: background-color 0.15s;
-            text-align: left;
-        }
-        .export-dropdown-content a:first-child {
-            border-top-left-radius: 5px;
-            border-top-right-radius: 5px;
-        }
-        .export-dropdown-content a:last-child {
-            border-bottom-left-radius: 5px;
-            border-bottom-right-radius: 5px;
-        }
-        .export-dropdown-content a:hover {
-            background-color: #f1f5f9;
-            color: var(--primary-navy);
         }
 
         /* ── Container & Card ── */
@@ -492,23 +438,15 @@
             </a>
             <div class="nav-links">
                 {% if user.is_authenticated %}
-                    {% if user.is_admin or perms.api.view_databasedashboard or perms.api.view_infrastructuredashboard %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
-                    {% endif %}
-                    {% if user.is_admin or user.is_superuser or perms.api.view_incidentregister or perms.api.view_databaseincident or perms.api.view_infrastructureincident %}
-                        {% if not perms.api.view_databaseincident and not perms.api.view_incidentregister and not user.is_admin and not user.is_superuser and perms.api.view_infrastructureincident %}
-                        <a href="{% url 'incident_list' %}?tab=infrastructure">Incidents</a>
-                        {% else %}
-                        <a href="{% url 'incident_list' %}">Incidents</a>
-                        {% endif %}
-                    {% endif %}
+                    {% if user.is_admin or perms.api.view_incidentregister %}
+                    <a href="{% url 'incident_list' %}">Incidents</a>
                     {% if pending_staging_count > 0 %}
-                        {% if user.is_admin or user.is_superuser or perms.api.view_incidentregister or perms.api.view_incidentstaging or perms.api.view_databaseincident or perms.api.view_infrastructureincident or is_sysadmin_user or perms.api.view_infrastructuredashboard %}
                     <a href="{% url 'incident_staging_list' %}" style="display: inline-flex; align-items: center;">
                         Staging
                         <span style="background-color: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 9999px; margin-left: 0.35rem; line-height: 1; display: inline-block;">{{ pending_staging_count }}</span>
                     </a>
-                        {% endif %}
+                    {% endif %}
                     {% endif %}
                     {% if user.is_admin or perms.api.view_replicationmonitor %}
                     <a href="{% url 'replication_list' %}">Replication</a>
@@ -519,19 +457,11 @@
                     {% if user.is_admin or perms.api.view_serverhealth %}
                     <a href="{% url 'server_health_list' %}">Health</a>
                     {% endif %}
-                    {% if user.is_admin or user.is_superuser or perms.api.view_maintenanceregister or perms.api.view_databasemaintenance or perms.api.view_infrastructuremaintenance %}
-                        {% if not perms.api.view_databasemaintenance and not perms.api.view_maintenanceregister and not user.is_admin and not user.is_superuser and perms.api.view_infrastructuremaintenance %}
-                        <a href="{% url 'maintenance_list' %}?tab=infrastructure">Maintenance</a>
-                        {% else %}
-                        <a href="{% url 'maintenance_list' %}">Maintenance</a>
-                        {% endif %}
+                    {% if user.is_admin or perms.api.view_maintenanceregister %}
+                    <a href="{% url 'maintenance_list' %}">Maintenance</a>
                     {% endif %}
-                    {% if user.is_admin or user.is_superuser or perms.api.view_capacityplanning or perms.api.view_databasecapacity or perms.api.view_infrastructurecapacity %}
-                        {% if not perms.api.view_databasecapacity and not perms.api.view_capacityplanning and not user.is_admin and not user.is_superuser and perms.api.view_infrastructurecapacity %}
-                        <a href="{% url 'capacity_list' %}?tab=infrastructure">Capacity</a>
-                        {% else %}
-                        <a href="{% url 'capacity_list' %}">Capacity</a>
-                        {% endif %}
+                    {% if user.is_admin or perms.api.view_capacityplanning %}
+                    <a href="{% url 'capacity_list' %}">Capacity</a>
                     {% endif %}
                     {% if user.is_admin %}
                     <div class="nav-dropdown">
@@ -722,35 +652,6 @@
             });
             document.addEventListener('click', () => {
                 document.querySelectorAll('.nav-dropdown.open').forEach(d => d.classList.remove('open'));
-            });
-
-            // Toggle export dropdowns on click and close on click outside
-            document.querySelectorAll('.export-dropdown').forEach(dropdown => {
-                const btn = dropdown.querySelector('button');
-                if (btn) {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const isOpen = dropdown.classList.contains('open');
-                        document.querySelectorAll('.export-dropdown.open').forEach(d => {
-                            if (d !== dropdown) d.classList.remove('open');
-                        });
-                        if (!isOpen) {
-                            dropdown.classList.add('open');
-                        } else {
-                            dropdown.classList.remove('open');
-                        }
-                    });
-                }
-                dropdown.querySelectorAll('.export-dropdown-content a').forEach(item => {
-                    item.addEventListener('click', () => {
-                        dropdown.classList.remove('open');
-                    });
-                });
-            });
-            document.addEventListener('click', (e) => {
-                document.querySelectorAll('.export-dropdown.open').forEach(d => {
-                    if (!d.contains(e.target)) d.classList.remove('open');
-                });
             });
         });
     </script>

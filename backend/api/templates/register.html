@@ -2,159 +2,30 @@
 
 {% block title %}Register - DBTRAC{% endblock %}
 
-{% block navbar %}{% endblock %}
-
 {% block content %}
-<style>
-    .register-wrapper {
-        min-height: calc(100vh - 80px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 2rem 1rem;
-        position: relative;
-        overflow: hidden;
-    }
-    .register-wrapper::before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 600px;
-        height: 600px;
-        background: url('/static/logo.jpg') no-repeat center center;
-        background-size: contain;
-        opacity: 0.04;
-        mix-blend-mode: multiply;
-        pointer-events: none;
-        z-index: 0;
-    }
-    .register-card {
-        position: relative;
-        z-index: 1;
-        width: 100%;
-        max-width: 420px;
-        background: #ffffff;
-        border-radius: 14px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
-        padding: 2.25rem 2rem;
-        box-sizing: border-box;
-    }
-    .register-card-logo {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 1.25rem;
-    }
-    .register-card-logo img {
-        height: 52px;
-        width: auto;
-        object-fit: contain;
-    }
-    .register-title {
-        font-size: 2rem;
-        font-weight: 900;
-        letter-spacing: 1.5px;
-        color: #00205B;
-        margin: 0;
-        text-align: center;
-    }
-    .register-subtitle {
-        text-align: center;
-        color: #64748b;
-        font-size: 0.78rem;
-        font-weight: 500;
-        margin: 0.4rem 0 1.75rem 0;
-        line-height: 1.4;
-    }
-    .form-group-custom {
-        margin-bottom: 1.15rem;
-        text-align: left;
-    }
-    .form-group-custom label {
-        display: block;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #475569;
-        margin-bottom: 0.35rem;
-    }
-    .form-group-custom input {
-        width: 100%;
-        padding: 0.65rem 0.85rem;
-        font-size: 0.9rem;
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        box-sizing: border-box;
-        color: #0f172a;
-        transition: all 0.2s ease;
-    }
-    .form-group-custom input:focus {
-        outline: none;
-        border-color: #00205B;
-        background: #ffffff;
-        box-shadow: 0 0 0 3px rgba(0, 32, 91, 0.12);
-    }
-    .btn-register {
-        width: 100%;
-        padding: 0.7rem;
-        background: #00205B;
-        color: #ffffff;
-        font-size: 0.92rem;
-        font-weight: 600;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        box-shadow: 0 4px 6px -1px rgba(0, 32, 91, 0.2);
-        transition: all 0.2s ease;
-        margin-top: 0.5rem;
-    }
-    .btn-register:hover {
-        background: #001742;
-        box-shadow: 0 6px 12px -2px rgba(0, 32, 91, 0.3);
-    }
-    .register-footer-tag {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        text-align: center;
-        margin-top: 1.25rem;
-        letter-spacing: 0.02em;
-    }
-</style>
-
-<div class="register-wrapper">
-    <!-- Modern Enterprise Card with Integrated NMS Logo -->
-    <div class="register-card">
-        <div class="register-card-logo">
-            <img src="/static/logo.jpg" alt="National Medical Stores Logo">
-        </div>
-        <h1 class="register-title">DBTRAC</h1>
-        <p class="register-subtitle">Create your account</p>
-
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group-custom">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Choose username" autocomplete="username" required>
-            </div>
-            <div class="form-group-custom">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="new-password" required>
-            </div>
-            <div class="form-group-custom">
-                <label for="password_confirm">Confirm Password</label>
-                <input type="password" id="password_confirm" name="password_confirm" placeholder="••••••••" autocomplete="new-password" required>
-            </div>
-            <button type="submit" class="btn-register">Create Account</button>
-        </form>
-        <p style="text-align: center; margin-top: 1.25rem; font-size: 0.82rem; color: #64748b;">
-            Already have an account? <a href="{% url 'login' %}" style="font-weight: 600; color: #00205B; text-decoration: none;">Sign In</a>
-        </p>
+<div class="card" style="max-width: 400px; margin: 2rem auto; text-align: center;">
+    <div style="margin-bottom: 1.5rem;">
+        <img src="/static/logo.jpg" alt="DBTRAC Logo" style="max-width: 150px; height: auto;">
     </div>
+    <h2 style="margin-bottom: 1.5rem;">Register</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group">
+            <label for="password_confirm">Confirm Password:</label>
+            <input type="password" id="password_confirm" name="password_confirm" required>
+        </div>
+        <button type="submit" class="btn btn-success" style="width: 100%;">Register</button>
+    </form>
+    <p style="text-align: center; margin-top: 1rem;">
+        Already have an account? <a href="{% url 'login' %}">Login</a>
+    </p>
 </div>
 {% endblock %}
