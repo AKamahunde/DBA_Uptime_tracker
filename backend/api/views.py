@@ -135,38 +135,133 @@ def get_status(current, target_val, operator, warning_val=None):
         return 'N/A'
     return 'N/A'
 
-def _get_dashboard_data(reporting_month):
+def _resolve_reporting_period(params):
+    import calendar
     from datetime import date as _date
+    today_dt = timezone.now().date()
+    period_mode = (params.get('period_mode') or '').strip().lower()
+    month_str = (params.get('month') or '').strip()
+    start_str = (params.get('start_date') or '').strip()
+    end_str = (params.get('end_date') or '').strip()
+
+    if not period_mode:
+        if start_str or end_str:
+            period_mode = 'custom'
+        else:
+            period_mode = 'month'
+
+    if month_str:
+        try:
+            reporting_month = datetime.strptime(month_str[:7], '%Y-%m').date().replace(day=1)
+        except ValueError:
+            reporting_month = today_dt.replace(day=1)
+    else:
+        reporting_month = today_dt.replace(day=1)
+
+    is_custom_period = (period_mode != 'month')
+
+    if period_mode == 'last_7d':
+        end_date = today_dt
+        start_date = today_dt - timedelta(days=6)
+        period_display = f"{start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} (Last 7 Days)"
+        reporting_month = end_date.replace(day=1)
+    elif period_mode == 'last_30d':
+        end_date = today_dt
+        start_date = today_dt - timedelta(days=29)
+        period_display = f"{start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} (Last 30 Days)"
+        reporting_month = end_date.replace(day=1)
+    elif period_mode == 'this_quarter':
+        q_idx = (today_dt.month - 1) // 3
+        q_start_month = q_idx * 3 + 1
+        start_date = _date(today_dt.year, q_start_month, 1)
+        end_date = today_dt
+        period_display = f"Q{q_idx + 1} {today_dt.year} ({start_date.strftime('%d %b')} – {end_date.strftime('%d %b %Y')})"
+        reporting_month = end_date.replace(day=1)
+    elif period_mode == 'ytd':
+        start_date = _date(today_dt.year, 1, 1)
+        end_date = today_dt
+        period_display = f"YTD {today_dt.year} ({start_date.strftime('%d %b')} – {end_date.strftime('%d %b %Y')})"
+        reporting_month = end_date.replace(day=1)
+    elif period_mode == 'custom':
+        try:
+            start_date = datetime.strptime(start_str[:10], '%Y-%m-%d').date() if start_str else reporting_month
+        except ValueError:
+            start_date = reporting_month
+        try:
+            _, m_days = calendar.monthrange(reporting_month.year, reporting_month.month)
+            default_end = reporting_month.replace(day=m_days)
+            end_date = datetime.strptime(end_str[:10], '%Y-%m-%d').date() if end_str else default_end
+        except ValueError:
+            _, m_days = calendar.monthrange(start_date.year, start_date.month)
+            end_date = start_date.replace(day=m_days)
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        period_display = f"{start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}"
+        reporting_month = end_date.replace(day=1)
+    else:
+        period_mode = 'month'
+        is_custom_period = False
+        start_date = reporting_month.replace(day=1)
+        _, last_day = calendar.monthrange(reporting_month.year, reporting_month.month)
+        end_date = reporting_month.replace(day=last_day)
+        period_display = reporting_month.strftime('%B %Y')
+
+    return {
+        'period_mode': period_mode,
+        'reporting_month': reporting_month,
+        'start_date': start_date,
+        'end_date': end_date,
+        'is_custom_period': is_custom_period,
+        'period_display': period_display,
+    }
+
+
+def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
+    import calendar
+    from datetime import date as _date
+    if start_date is None or end_date is None:
+        start_date = reporting_month.replace(day=1)
+        _, last_day = calendar.monthrange(reporting_month.year, reporting_month.month)
+        end_date = reporting_month.replace(day=last_day)
+
+    is_full_single_month = (
+        start_date.year == end_date.year
+        and start_date.month == end_date.month
+        and start_date.day == 1
+        and end_date.day == calendar.monthrange(start_date.year, start_date.month)[1]
+    )
+
     db_types = ['Oracle', 'MySQL', 'MS SQL Server']
-    if (reporting_month.year, reporting_month.month) >= (2026, 11) or SLAConfig.objects.filter(
-        database__iexact='PostgreSQL', month__year=reporting_month.year, month__month=reporting_month.month
+    if (end_date.year, end_date.month) >= (2026, 11) or SLAConfig.objects.filter(
+        database__iexact='PostgreSQL', month__year=end_date.year, month__month=end_date.month
     ).exists():
         db_types.append('PostgreSQL')
 
     dashboard_data = []
+    tz = timezone.get_current_timezone()
+    period_start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), tz)
+    period_end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()), tz)
 
     for db_type in db_types:
         # Planned Downtime
         planned = MaintenanceRegister.objects.filter(
-            database__iexact=db_type, success=True, date__year=reporting_month.year, date__month=reporting_month.month
+            database__iexact=db_type, success=True, date__range=(start_date, end_date)
         ).aggregate(Sum('duration_hrs'))['duration_hrs__sum'] or 0
 
-        # Unplanned Downtime & MTTR & Incidents
-        # ALL incidents for the month
+        # Unplanned Downtime & MTTR & Incidents across the selected period
         incidents = IncidentRegister.objects.filter(
-            database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
-        )
+            database__iexact=db_type
+        ).filter(
+            Q(date__range=(start_date, end_date)) |
+            Q(start__date__range=(start_date, end_date)) |
+            (Q(start__lt=period_start_dt) & (Q(end__gte=period_start_dt) | Q(end__isnull=True)))
+        ).distinct()
         total_incidents = incidents.count()
 
         # Only UNPLANNED incidents affect availability, MTTR and the incident volume KPI.
         # Events under 5 minutes (< 0.0833 hrs) are classified as transient alerts / intermittent network blips
         # and do not contribute to SLA downtime or MTTR calculations.
         unplanned_incidents = incidents.filter(planned=False)
-        qualifying_unplanned = [
-            inc for inc in unplanned_incidents
-            if not inc.duration_hrs or float(inc.duration_hrs) >= (5.0 / 60.0)
-        ]
-        total_unplanned = len(qualifying_unplanned)
 
         # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
         SLA_RESOLUTION_TARGETS = {
@@ -176,19 +271,31 @@ def _get_dashboard_data(reporting_month):
             'Low': 180,       # 4 weeks
         }
 
-        unplanned = 0
+        unplanned = 0.0
+        total_unplanned = 0
         sla_breach_count = 0
         now = timezone.now()
-        for inc in qualifying_unplanned:
+        for inc in unplanned_incidents:
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_downtime = calculate_operational_downtime(inc.start, now, inc.database)
-                if float(active_downtime) >= (5.0 / 60.0):
-                    unplanned += float(active_downtime)
-            elif inc.duration_hrs:
-                unplanned += float(inc.duration_hrs)
-                target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
-                if float(inc.duration_hrs) > target_hrs:
-                    sla_breach_count += 1
+                eff_start = max(inc.start, period_start_dt)
+                eff_end = min(now, period_end_dt)
+                inc_dt = float(calculate_operational_downtime(eff_start, eff_end, inc.database)) if eff_end > eff_start else 0.0
+                if inc_dt >= (5.0 / 60.0):
+                    unplanned += inc_dt
+                    total_unplanned += 1
+            else:
+                if inc.start and inc.end and (inc.start < period_start_dt or inc.end > period_end_dt):
+                    eff_start = max(inc.start, period_start_dt)
+                    eff_end = min(inc.end, period_end_dt)
+                    inc_dt = float(calculate_operational_downtime(eff_start, eff_end, inc.database)) if eff_end > eff_start else 0.0
+                else:
+                    inc_dt = float(inc.duration_hrs or 0.0)
+                if inc_dt >= (5.0 / 60.0):
+                    unplanned += inc_dt
+                    total_unplanned += 1
+                    target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
+                    if inc_dt > target_hrs:
+                        sla_breach_count += 1
 
         mttr_hrs = (unplanned / total_unplanned) if total_unplanned > 0 else 0
         mttr_mins = round(mttr_hrs * 60, 2)
@@ -197,52 +304,69 @@ def _get_dashboard_data(reporting_month):
         sla_config_record = SLAConfig.objects.filter(
             database__iexact=db_type, month__year=reporting_month.year, month__month=reporting_month.month
         ).first()
-        
-        sla_exists = (sla_config_record is not None)
-        th = sla_config_record.target_hours if sla_exists else 0
 
-        # Auto-ensure default target hours and SLA target if not manually configured
-        if not sla_exists or not th:
-            import calendar
-            from datetime import date
-            yr = reporting_month.year
-            mo = reporting_month.month
+        if is_full_single_month:
+            sla_exists = (sla_config_record is not None)
+            th = sla_config_record.target_hours if sla_exists else 0
+
+            # Auto-ensure default target hours and SLA target if not manually configured
+            if not sla_exists or not th:
+                yr = reporting_month.year
+                mo = reporting_month.month
+                holidays = set(UgandaHoliday.objects.filter(
+                    holiday_date__year=yr, holiday_date__month=mo
+                ).values_list('holiday_date', flat=True))
+                _, num_days = calendar.monthrange(yr, mo)
+                calc_th = 0
+                for day in range(1, num_days + 1):
+                    d = _date(yr, mo, day)
+                    if d not in holidays:
+                        if db_type == 'Oracle':
+                            calc_th += 18
+                        elif d.weekday() < 5:
+                            calc_th += 9
+                if calc_th > 0:
+                    try:
+                        target_pct_default = 99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95)
+                        first_of_month = reporting_month.replace(day=1)
+                        sla_config_record, _ = SLAConfig.objects.get_or_create(
+                            database=db_type,
+                            month=first_of_month,
+                            defaults={'target_hours': calc_th, 'sla_percent': target_pct_default}
+                        )
+                        sla_exists = True
+                        th = sla_config_record.target_hours
+                    except Exception:
+                        th = calc_th
+                        sla_exists = True
+        else:
+            # Dynamic period target operational hours across [start_date, end_date]
             holidays = set(UgandaHoliday.objects.filter(
-                holiday_date__year=yr, holiday_date__month=mo
+                holiday_date__range=(start_date, end_date)
             ).values_list('holiday_date', flat=True))
-            _, num_days = calendar.monthrange(yr, mo)
             calc_th = 0
-            for day in range(1, num_days + 1):
-                d = date(yr, mo, day)
-                if d not in holidays:
+            cur_d = start_date
+            while cur_d <= end_date:
+                if cur_d not in holidays:
                     if db_type == 'Oracle':
                         calc_th += 18
-                    elif d.weekday() < 5:
+                    elif cur_d.weekday() < 5:
                         calc_th += 9
-            if calc_th > 0:
-                try:
-                    target_pct_default = 99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95)
-                    first_of_month = reporting_month.replace(day=1)
-                    sla_config_record, _ = SLAConfig.objects.get_or_create(
-                        database=db_type,
-                        month=first_of_month,
-                        defaults={'target_hours': calc_th, 'sla_percent': target_pct_default}
-                    )
-                    sla_exists = True
-                    th = sla_config_record.target_hours
-                except Exception:
-                    th = calc_th
-                    sla_exists = True
+                cur_d += timedelta(days=1)
+            th = calc_th
+            sla_exists = True
 
         if th and th > 0:
-            avail = ((float(th) - float(unplanned)) / float(th)) * 100
+            avail = max(0.0, ((float(th) - float(unplanned)) / float(th)) * 100.0)
             avail_str = f"{round(avail, 2)}%"
+        elif not is_full_single_month and end_date >= start_date:
+            avail_str = "100.0%" if unplanned == 0 else "0.0%"
         else:
             avail_str = 'No Data'
 
         # Backups
         backups = BackupRecovery.objects.filter(
-            database__iexact=db_type, record_type='Backup', date__year=reporting_month.year, date__month=reporting_month.month
+            database__iexact=db_type, record_type='Backup', date__range=(start_date, end_date)
         )
         total_backups = backups.count()
         success_backups = backups.filter(outcome='Success').count()
@@ -251,7 +375,7 @@ def _get_dashboard_data(reporting_month):
 
         # Restores
         restores = BackupRecovery.objects.filter(
-            database__iexact=db_type, record_type='Recovery', date__year=reporting_month.year, date__month=reporting_month.month
+            database__iexact=db_type, record_type='Recovery', date__range=(start_date, end_date)
         )
         total_restores = restores.count()
         success_restores = restores.filter(outcome='Success').count()
@@ -259,8 +383,12 @@ def _get_dashboard_data(reporting_month):
 
         # Replication Status
         latest_rep = ReplicationMonitor.objects.filter(
-            database__iexact=db_type, date__year=reporting_month.year, date__month=reporting_month.month
+            database__iexact=db_type, date__range=(start_date, end_date)
         ).order_by('-date', '-created_at').first()
+        if not latest_rep and not is_full_single_month:
+            latest_rep = ReplicationMonitor.objects.filter(
+                database__iexact=db_type, date__lte=end_date
+            ).order_by('-date', '-created_at').first()
         rep_status = latest_rep.status if latest_rep else 'No Data'
         
         if db_type in ['MS SQL Server', 'PostgreSQL']:
@@ -276,8 +404,7 @@ def _get_dashboard_data(reporting_month):
             database__iexact=db_type,
             record_type='Backup',
             outcome='Failed',
-            date__year=reporting_month.year,
-            date__month=reporting_month.month
+            date__range=(start_date, end_date)
         ).count()
         
         replication_issues = False
@@ -291,9 +418,8 @@ def _get_dashboard_data(reporting_month):
         high_disk_usage = False
         capacity_record = CapacityPlanning.objects.filter(
             database__iexact=db_type,
-            month__year=reporting_month.year,
-            month__month=reporting_month.month
-        ).order_by('-updated_at').first()
+            month__range=(start_date.replace(day=1), end_date.replace(day=1))
+        ).order_by('-month', '-updated_at').first()
         
         if not capacity_record:
             capacity_record = CapacityPlanning.objects.filter(
@@ -320,7 +446,7 @@ def _get_dashboard_data(reporting_month):
         if last_backup:
             last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
 
-        target_pct = float(sla_config_record.sla_percent) if (sla_exists and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95))
+        target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95))
 
         dashboard_data.append({
             'database': db_type,
@@ -356,7 +482,19 @@ def _get_dashboard_data(reporting_month):
         })
     return dashboard_data, db_types
 
-def _get_database_detail(selected_db, reporting_month, dashboard_data):
+def _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=None, end_date=None):
+    import calendar
+    if start_date is None or end_date is None:
+        start_date = reporting_month.replace(day=1)
+        _, last_day = calendar.monthrange(reporting_month.year, reporting_month.month)
+        end_date = reporting_month.replace(day=last_day)
+    _, m_last = calendar.monthrange(reporting_month.year, reporting_month.month)
+    is_full_single_month = (
+        start_date.year == end_date.year
+        and start_date.month == end_date.month
+        and start_date.day == 1
+        and end_date.day == m_last
+    )
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
     elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
@@ -367,7 +505,7 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
         row_data = next((item for item in dashboard_data if item['database'] == selected_db), None)
         if row_data:
             # Query if SLA Config exists for the selected database
-            selected_sla_exists = SLAConfig.objects.filter(
+            selected_sla_exists = (not is_full_single_month) or SLAConfig.objects.filter(
                 database__iexact=selected_db, month__year=reporting_month.year, month__month=reporting_month.month
             ).exists()
             # Query additional details for SLA table
@@ -391,13 +529,17 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data):
             
             # Failed Restore Tests
             failed_restores = BackupRecovery.objects.filter(
-                database__iexact=selected_db, record_type='Recovery', date__year=reporting_month.year, date__month=reporting_month.month, outcome='Failed'
+                database__iexact=selected_db, record_type='Recovery', date__range=(start_date, end_date), outcome='Failed'
             ).count()
             
             # Replication Lag
             latest_rep_detail = ReplicationMonitor.objects.filter(
-                database__iexact=selected_db, date__year=reporting_month.year, date__month=reporting_month.month
+                database__iexact=selected_db, date__range=(start_date, end_date)
             ).order_by('-date', '-created_at').first()
+            if not latest_rep_detail and not is_full_single_month:
+                latest_rep_detail = ReplicationMonitor.objects.filter(
+                    database__iexact=selected_db, date__lte=end_date
+                ).order_by('-date', '-created_at').first()
             
             rep_lag = latest_rep_detail.seconds_behind if latest_rep_detail and latest_rep_detail.seconds_behind is not None else 'No Data'
             if rep_lag != 'No Data':
@@ -535,23 +677,22 @@ def dashboard(request):
         """)
         row = cursor.fetchone()
 
-    # Get reporting month
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
+    # Resolve reporting period (single month, preset window, or custom date range)
+    period_info = _resolve_reporting_period(request.GET)
+    reporting_month = period_info['reporting_month']
+    start_date = period_info['start_date']
+    end_date = period_info['end_date']
+    period_mode = period_info['period_mode']
+    is_custom_period = period_info['is_custom_period']
+    period_display = period_info['period_display']
 
     selected_db = request.GET.get('database_select', 'All Databases')
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
     elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
         selected_db = 'PostgreSQL'
-    dashboard_data, db_types = _get_dashboard_data(reporting_month)
-    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
+    dashboard_data, db_types = _get_dashboard_data(reporting_month, start_date=start_date, end_date=end_date)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
 
     # KPI Calculations for Dashboard Redesign
     import math
@@ -610,7 +751,7 @@ def dashboard(request):
     met_count = 0
     total_count = 0
     for item in filtered_dashboard_data:
-        sla_configured = SLAConfig.objects.filter(
+        sla_configured = is_custom_period or SLAConfig.objects.filter(
             database__iexact=item['database'], month__year=reporting_month.year, month__month=reporting_month.month
         ).exists()
         if sla_configured:
@@ -621,7 +762,7 @@ def dashboard(request):
     
     # 3. Incidents
     incidents_qs = IncidentRegister.objects.filter(
-        date__year=reporting_month.year, date__month=reporting_month.month
+        date__range=(start_date, end_date)
     )
     open_incidents_qs = IncidentRegister.objects.filter(
         status__in=['Open', 'In Progress']
@@ -635,7 +776,7 @@ def dashboard(request):
     
     # 4. Backups
     month_backups = BackupRecovery.objects.filter(
-        record_type='Backup', date__year=reporting_month.year, date__month=reporting_month.month
+        record_type='Backup', date__range=(start_date, end_date)
     )
     if selected_db != 'All Databases':
         month_backups = month_backups.filter(database__iexact=selected_db)
@@ -654,8 +795,12 @@ def dashboard(request):
     total_rep_streams = 0
     for db in rep_streams:
         latest_rep = ReplicationMonitor.objects.filter(
-            database__iexact=db, date__year=reporting_month.year, date__month=reporting_month.month
+            database__iexact=db, date__range=(start_date, end_date)
         ).order_by('-date', '-created_at').first()
+        if not latest_rep and is_custom_period:
+            latest_rep = ReplicationMonitor.objects.filter(
+                database__iexact=db, date__lte=end_date
+            ).order_by('-date', '-created_at').first()
         if latest_rep:
             total_rep_streams += 1
             if latest_rep.severity != 'Critical' and latest_rep.io_thread == 'Yes' and latest_rep.sql_thread == 'Yes':
@@ -763,7 +908,7 @@ def dashboard(request):
         })
     # Failed backups
     recent_failed_backups_qs = BackupRecovery.objects.filter(
-        record_type='Backup', outcome='Failed', date__year=reporting_month.year, date__month=reporting_month.month
+        record_type='Backup', outcome='Failed', date__range=(start_date, end_date)
     )
     if selected_db != 'All Databases':
         recent_failed_backups_qs = recent_failed_backups_qs.filter(database__iexact=selected_db)
@@ -771,7 +916,7 @@ def dashboard(request):
     if recent_failed_backups > 0:
         attention_items.append({
             'type': 'danger',
-            'message': f"Backups: {recent_failed_backups} backup failure(s) detected this month."
+            'message': f"Backups: {recent_failed_backups} backup failure(s) detected in {period_display}."
         })
     # Open incidents (Database scope only)
     active_incidents = IncidentRegister.objects.filter(
@@ -791,9 +936,13 @@ def dashboard(request):
     for r_db in rep_alert_dbs:
         latest_rep_alert = ReplicationMonitor.objects.filter(
             database__iexact=r_db,
-            date__year=reporting_month.year,
-            date__month=reporting_month.month
+            date__range=(start_date, end_date)
         ).order_by('-date', '-created_at').first()
+        if not latest_rep_alert and is_custom_period:
+            latest_rep_alert = ReplicationMonitor.objects.filter(
+                database__iexact=r_db,
+                date__lte=end_date
+            ).order_by('-date', '-created_at').first()
         if latest_rep_alert and (latest_rep_alert.status != 'Healthy' or latest_rep_alert.severity in ['Critical', 'High']):
             lag_txt = f"{latest_rep_alert.seconds_behind}s lag" if latest_rep_alert.seconds_behind is not None else "NULL lag"
             err_snippet = ""
@@ -891,9 +1040,9 @@ def dashboard(request):
 
     if selected_db != 'All Databases':
         if all_within_sla_dashboard:
-            lede_prefix = f"The {selected_db} production database held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"The {selected_db} production database held within SLA during {period_display}."
         else:
-            lede_prefix = f"The {selected_db} production database did not meet the SLA target in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"The {selected_db} production database did not meet the SLA target during {period_display}."
 
         if total_incidents_all_dashboard > 0:
             lede_suffix = f"A total of {total_incidents_all_dashboard} incident(s) were logged, with a mean time to resolution of {avg_mttr_dashboard}."
@@ -902,9 +1051,9 @@ def dashboard(request):
     else:
         db_count_word = 'four' if len(filtered_dashboard_data) == 4 else ('three' if len(filtered_dashboard_data) == 3 else str(len(filtered_dashboard_data)))
         if all_within_sla_dashboard:
-            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All {db_count_word} production databases held within SLA during {period_display}."
         else:
-            lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"Not all production databases met the SLA target during {period_display}."
 
         if max_incidents_db_dashboard and max_incidents_val_dashboard > 0:
             others_combined = total_incidents_all_dashboard - max_incidents_val_dashboard
@@ -943,6 +1092,11 @@ def dashboard(request):
         'database_detail': database_detail,
         'selected_db': selected_db,
         'reporting_month': reporting_month.strftime('%Y-%m'),
+        'period_mode': period_mode,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d'),
+        'is_custom_period': is_custom_period,
+        'period_display': period_display,
         'default_lede_text': default_lede_text,
         'target_sla_val': target_sla_val,
         
@@ -966,7 +1120,7 @@ def dashboard(request):
         'recent_activity': recent_activity,
     }
     selected_node = request.GET.get('node_select', 'All Nodes')
-    context.update(_build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month))
+    context.update(_build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month, start_date=start_date, end_date=end_date, period_display=period_display))
     return render(request, 'dashboard.html', context)
 
 @login_required
@@ -975,37 +1129,29 @@ def dashboard_print(request):
         messages.error(request, 'You do not have permission to view or export the Database Operations report.')
         return redirect('dashboard')
 
-    if request.method == 'POST':
-        month_str = request.POST.get('month', '')
-        selected_db = request.POST.get('database_select', 'All Databases')
-        summary_narrative = request.POST.get('summary_narrative', '').strip()
-        download_mode = request.POST.get('download', 'false')
-    else:
-        month_str = request.GET.get('month', '')
-        selected_db = request.GET.get('database_select', 'All Databases')
-        summary_narrative = request.GET.get('summary_narrative', '').strip()
-        download_mode = request.GET.get('download', 'false')
+    params = request.POST if request.method == 'POST' else request.GET
+    period_info = _resolve_reporting_period(params)
+    reporting_month = period_info['reporting_month']
+    start_date = period_info['start_date']
+    end_date = period_info['end_date']
+    period_display = period_info['period_display']
+
+    selected_db = params.get('database_select', 'All Databases')
+    summary_narrative = params.get('summary_narrative', '').strip()
+    download_mode = params.get('download', 'false')
 
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
     elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
         selected_db = 'PostgreSQL'
 
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
-
-    dashboard_data, _ = _get_dashboard_data(reporting_month)
+    dashboard_data, _ = _get_dashboard_data(reporting_month, start_date=start_date, end_date=end_date)
     
     # Filter dashboard_data by selected_db if a specific database is selected
     if selected_db != 'All Databases':
         dashboard_data = [item for item in dashboard_data if item['database'].lower() == selected_db.lower()]
 
-    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
     
     # Calculate target SLA dynamically for print view
     target_sla_val = 99.95
@@ -1115,9 +1261,9 @@ def dashboard_print(request):
     # Build Lede Text
     if selected_db != 'All Databases':
         if all_within_sla:
-            lede_prefix = f"The {selected_db} production database held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"The {selected_db} production database held within SLA during {period_display}."
         else:
-            lede_prefix = f"The {selected_db} production database did not meet the SLA target in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"The {selected_db} production database did not meet the SLA target during {period_display}."
 
         if total_incidents_all > 0:
             lede_suffix = f"A total of {total_incidents_all} incident(s) were logged, with a mean time to resolution of {avg_mttr}."
@@ -1126,9 +1272,9 @@ def dashboard_print(request):
     else:
         db_count_word = 'four' if len(dashboard_data) == 4 else ('three' if len(dashboard_data) == 3 else str(len(dashboard_data)))
         if all_within_sla:
-            lede_prefix = f"All {db_count_word} production databases held within SLA in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"All {db_count_word} production databases held within SLA during {period_display}."
         else:
-            lede_prefix = f"Not all production databases met the SLA target in {reporting_month.strftime('%B %Y')}."
+            lede_prefix = f"Not all production databases met the SLA target during {period_display}."
 
         if max_incidents_db and max_incidents_val > 0:
             others_combined = total_incidents_all - max_incidents_val
@@ -1153,13 +1299,13 @@ def dashboard_print(request):
             watch_item_text = f"<strong>Watch item —</strong> No major watch items logged for {selected_db}. Performance is within baseline thresholds."
     else:
         if max_incidents_db and max_incidents_val > 0:
-            watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this month. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
+            watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this period. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
         else:
             watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
 
     context = {
         'dashboard_data': formatted_data,
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'reporting_month_str': period_display,
         'extracted_by': user_display,
         'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
         'database_detail': database_detail,
@@ -1181,23 +1327,21 @@ def dashboard_excel(request):
         messages.error(request, 'You do not have permission to export the Database Operations report.')
         return redirect('dashboard')
 
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
+    period_info = _resolve_reporting_period(request.GET)
+    reporting_month = period_info['reporting_month']
+    start_date = period_info['start_date']
+    end_date = period_info['end_date']
+    period_display = period_info['period_display']
+    month_str = f"{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}" if period_info['is_custom_period'] else reporting_month.strftime('%Y-%m')
 
     selected_db = request.GET.get('database_select', 'All Databases')
     if selected_db in ['MKInsight', 'Pentana']:
         selected_db = 'MS SQL Server'
     elif selected_db in ['CCIS', 'ODKX', 'ODK-X', 'ccisprod_db']:
         selected_db = 'PostgreSQL'
-    dashboard_data, _ = _get_dashboard_data(reporting_month)
-    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data)
-    month_display = reporting_month.strftime('%B %Y')
+    dashboard_data, _ = _get_dashboard_data(reporting_month, start_date=start_date, end_date=end_date)
+    database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
+    month_display = period_display
 
     try:
         import openpyxl
@@ -2120,7 +2264,7 @@ def server_health_sync_prometheus(request):
     return redirect('server_health_list')
 
 
-def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None, include_ccis=False):
+def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None, selected_vm=None, include_ccis=False, start_date=None, end_date=None):
     """
     Summarizes Guest Virtual Machine health across the hypervisor fleet
     (OLKVM and Proxmox) into a consolidated single-pane-of-glass status matrix.
@@ -2129,14 +2273,21 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     from django.db.models import Q
     today_dt = timezone.now().date()
     target_date = target_month_dt if target_month_dt else today_dt
-    start_of_month = target_date.replace(day=1)
-    if target_date.month == 12:
-        next_month = target_date.replace(year=target_date.year + 1, month=1, day=1)
+    if start_date is not None and end_date is not None:
+        start_of_month = start_date
+        next_month = end_date + timedelta(days=1)
+        total_month_hours = max(24.0, ((end_date - start_date).days + 1) * 24.0)
     else:
-        next_month = target_date.replace(month=target_date.month + 1, day=1)
-    total_month_hours = (next_month - start_of_month).total_seconds() / 3600.0
+        start_of_month = target_date.replace(day=1)
+        if target_date.month == 12:
+            next_month = target_date.replace(year=target_date.year + 1, month=1, day=1)
+        else:
+            next_month = target_date.replace(month=target_date.month + 1, day=1)
+        total_month_hours = (next_month - start_of_month).total_seconds() / 3600.0
 
-    month_inc_filter = Q(start__gte=start_of_month, start__lt=next_month) | Q(start__lt=start_of_month, end__gte=start_of_month) | Q(start__lt=start_of_month, end__isnull=True)
+    period_start_dt = timezone.make_aware(datetime.combine(start_of_month, datetime.min.time()))
+    period_end_dt = timezone.make_aware(datetime.combine(next_month - timedelta(days=1), datetime.max.time()))
+    month_inc_filter = Q(date__gte=start_of_month, date__lt=next_month) | Q(start__gte=period_start_dt, start__lte=period_end_dt) | Q(start__lt=period_start_dt, end__gte=period_start_dt) | Q(start__lt=period_start_dt, end__isnull=True)
     now_dt = timezone.now()
 
     canonical_vms = [
@@ -2271,10 +2422,13 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
             if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
                 continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    vm_unplanned_hrs += float(active_dt)
+            if inc.start:
+                eff_start = max(inc.start, period_start_dt)
+                eff_end = min(inc.end if inc.end else now_dt, period_end_dt)
+                if eff_end > eff_start:
+                    active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
+                    if float(active_dt) >= (5.0 / 60.0):
+                        vm_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 vm_unplanned_hrs += float(inc.duration_hrs)
         vm_unplanned_hrs = round(vm_unplanned_hrs, 2)
@@ -2495,7 +2649,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     }
 
 
-def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=None):
+def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=None, start_date=None, end_date=None, period_display=None):
     from django.db.models import Avg, Q
     import math
     from etl.services.rest_client import PROMETHEUS_URL, sync_all_nodes_from_prometheus
@@ -2513,12 +2667,23 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
     else:
         target_month_dt = today_dt.replace(day=1)
 
-    start_of_month = target_month_dt
     target_node_sla = 99.90
-    if start_of_month.month == 12:
-        next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
+    if start_date is not None and end_date is not None:
+        start_of_month = start_date
+        next_month = end_date + timedelta(days=1)
+        total_month_hours = max(24.0, ((end_date - start_date).days + 1) * 24.0)
     else:
-        next_month = start_of_month.replace(month=start_of_month.month + 1, day=1)
+        start_of_month = target_month_dt
+        if start_of_month.month == 12:
+            next_month = start_of_month.replace(year=start_of_month.year + 1, month=1, day=1)
+        else:
+            next_month = start_of_month.replace(month=start_of_month.month + 1, day=1)
+        import calendar
+        _, num_days = calendar.monthrange(target_month_dt.year, target_month_dt.month)
+        total_month_hours = num_days * 24.0
+
+    period_start_dt = timezone.make_aware(datetime.combine(start_of_month, datetime.min.time()))
+    period_end_dt = timezone.make_aware(datetime.combine(next_month - timedelta(days=1), datetime.max.time()))
 
     node_definitions = [
         {
@@ -2698,14 +2863,12 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
         month_up_agg = month_node_qs.aggregate(Avg('uptime_percent'))['uptime_percent__avg']
 
-        import calendar
-        _, num_days = calendar.monthrange(target_month_dt.year, target_month_dt.month)
-        total_month_hours = num_days * 24.0
-
-        # Query unplanned incidents for this node in the reporting month (matching by date or start)
+        # Query unplanned incidents for this node in the reporting period (matching by date or start/end overlap)
         month_inc_filter = (
-            Q(date__year=target_month_dt.year, date__month=target_month_dt.month) |
-            Q(start__year=target_month_dt.year, start__month=target_month_dt.month)
+            Q(date__gte=start_of_month, date__lt=next_month) |
+            Q(start__gte=period_start_dt, start__lte=period_end_dt) |
+            Q(start__lt=period_start_dt, end__gte=period_start_dt) |
+            Q(start__lt=period_start_dt, end__isnull=True, status__in=['Open', 'In Progress'])
         )
         if nd['node_name'] == 'OLKVM':
             node_inc_qs = IncidentRegister.objects.filter(
@@ -2751,10 +2914,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
             if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
                 continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    node_unplanned_hrs += float(active_dt)
+            if inc.start:
+                eff_start = max(inc.start, period_start_dt)
+                eff_end = min(inc.end if inc.end else now_dt, period_end_dt)
+                if eff_end > eff_start:
+                    active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
+                    if float(active_dt) >= (5.0 / 60.0):
+                        node_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 node_unplanned_hrs += float(inc.duration_hrs)
 
@@ -3110,10 +3276,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
             if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
                 continue
-            if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
-                active_dt = calculate_operational_downtime(inc.start, now_dt, 'Infrastructure')
-                if float(active_dt) >= (5.0 / 60.0):
-                    olkvm_unplanned_hrs += float(active_dt)
+            if inc.start:
+                eff_start = max(inc.start, period_start_dt)
+                eff_end = min(inc.end if inc.end else now_dt, period_end_dt)
+                if eff_end > eff_start:
+                    active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
+                    if float(active_dt) >= (5.0 / 60.0):
+                        olkvm_unplanned_hrs += float(active_dt)
             elif inc.duration_hrs:
                 olkvm_unplanned_hrs += float(inc.duration_hrs)
         olkvm_unplanned_hrs = round(olkvm_unplanned_hrs, 2)
@@ -3710,10 +3879,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc_target}) &mdash; {inc.severity} priority."
         })
 
-    # 3. Resolved Outages this month (Infrastructure scope)
+    # 3. Resolved Outages in selected period (Infrastructure scope)
     infra_resolved_incidents = IncidentRegister.objects.filter(
-        date__year=target_month_dt.year,
-        date__month=target_month_dt.month,
+        date__gte=start_of_month,
+        date__lt=next_month,
         status__in=['Resolved', 'Closed'],
         planned=False
     ).filter(Q(category='Infrastructure') | Q(database='Infrastructure')).order_by('-date', '-created_at')
@@ -3778,21 +3947,22 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                     'message': f"<strong>{disk_lbl}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
 
+    eff_period_display = period_display or target_month_dt.strftime('%B %Y')
     all_nodes_healthy = all(n['status'] == 'Healthy' for n in active_nodes) if active_nodes else True
     scope_label = "all monitored OLKVM and Proxmox nodes" if selected_node == 'All Nodes' else f"the {selected_node} node scope"
     if all_nodes_healthy:
         default_node_lede_text = (
-            f"Infrastructure telemetry across {scope_label} held within the {target_node_sla}% availability SLA target ({kpi_node_uptime} average uptime). "
+            f"Infrastructure telemetry across {scope_label} during {eff_period_display} held within the {target_node_sla}% availability SLA target ({kpi_node_uptime} average uptime). "
             f"Compute and storage capacity across {kpi_total_logical_cpus} logical CPUs, {kpi_total_ram_gb} GB RAM, and {kpi_total_storage_gb} GB provisioned storage ({kpi_storage_used_pct}% utilized) remain within normal operational thresholds."
         )
     else:
         default_node_lede_text = (
-            f"Infrastructure telemetry for {scope_label} recorded {kpi_nodes_healthy} with an average availability of {kpi_node_uptime}. "
+            f"Infrastructure telemetry for {scope_label} during {eff_period_display} recorded {kpi_nodes_healthy} with an average availability of {kpi_node_uptime}. "
             f"Total provisioned storage stands at {kpi_total_storage_gb} GB ({kpi_used_storage_gb} GB used, {kpi_storage_used_pct}%)."
         )
 
     # Build Guest Virtual Machine Fleet status summary
-    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt)
+    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt, start_date=start_date, end_date=end_date)
     guest_vms_summary = vm_fleet_info['vms']
     guest_vm_kpis = vm_fleet_info['kpis']
 
@@ -3825,7 +3995,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         'node_sla_y_coord': node_sla_y_coord,
         'node_attention_items': node_attention_items,
         'default_node_lede_text': default_node_lede_text,
-        'node_reporting_month_display': target_month_dt.strftime('%B %Y'),
+        'node_reporting_month_display': eff_period_display,
     }
 
 
@@ -3835,24 +4005,23 @@ def dashboard_node_print(request):
         messages.error(request, 'You do not have permission to view or export the Node Infrastructure report.')
         return redirect('dashboard')
 
-    if request.method == 'POST':
-        month_str = request.POST.get('month', '')
-        selected_node = request.POST.get('node_select', 'All Nodes')
-        summary_narrative = request.POST.get('summary_narrative', '').strip()
-    else:
-        month_str = request.GET.get('month', '')
-        selected_node = request.GET.get('node_select', 'All Nodes')
-        summary_narrative = request.GET.get('summary_narrative', '').strip()
+    params = request.POST if request.method == 'POST' else request.GET
+    period_info = _resolve_reporting_period(params)
+    reporting_month = period_info['reporting_month']
+    start_date = period_info['start_date']
+    end_date = period_info['end_date']
+    period_display = period_info['period_display']
 
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
+    selected_node = params.get('node_select', 'All Nodes')
+    summary_narrative = params.get('summary_narrative', '').strip()
 
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
+    node_ctx = _build_node_dashboard_context(
+        selected_node=selected_node,
+        reporting_month=reporting_month,
+        start_date=start_date,
+        end_date=end_date,
+        period_display=period_display,
+    )
 
     user_display = request.user.get_full_name()
     if not user_display:
@@ -3861,7 +4030,7 @@ def dashboard_node_print(request):
     lede_text = summary_narrative if summary_narrative else node_ctx['default_node_lede_text']
 
     ctx = {
-        'reporting_month_str': reporting_month.strftime('%B %Y'),
+        'reporting_month_str': period_display,
         'extracted_by': user_display,
         'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
         'lede_text': lede_text,
@@ -3876,20 +4045,23 @@ def dashboard_node_excel(request):
         messages.error(request, 'You do not have permission to export the Node Infrastructure report.')
         return redirect('dashboard')
 
-    month_str = request.GET.get('month', '')
-    if month_str:
-        try:
-            reporting_month = datetime.strptime(month_str, '%Y-%m').date()
-        except ValueError:
-            reporting_month = timezone.now().date().replace(day=1)
-    else:
-        reporting_month = timezone.now().date().replace(day=1)
+    period_info = _resolve_reporting_period(request.GET)
+    reporting_month = period_info['reporting_month']
+    start_date = period_info['start_date']
+    end_date = period_info['end_date']
+    period_display = period_info['period_display']
 
     selected_node = request.GET.get('node_select', 'All Nodes')
-    node_ctx = _build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month)
+    node_ctx = _build_node_dashboard_context(
+        selected_node=selected_node,
+        reporting_month=reporting_month,
+        start_date=start_date,
+        end_date=end_date,
+        period_display=period_display,
+    )
     filtered_nodes = node_ctx['filtered_nodes']
     node_capacity_records = node_ctx['node_capacity_records']
-    month_display = reporting_month.strftime('%B %Y')
+    month_display = period_display
 
     user_display = request.user.get_full_name()
     if not user_display:

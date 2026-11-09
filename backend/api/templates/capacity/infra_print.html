@@ -334,16 +334,18 @@
     .no-print { display: none !important; }
     @page {
       size: A4 portrait;
-      margin: 10mm 10mm 8mm 10mm;
+      margin: 0 !important;
     }
-    body {
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
       background: #ffffff !important;
       font-size: 8.5px !important;
     }
     .page {
       box-shadow: none !important;
       border: none !important;
-      padding: 0 !important;
+      padding: 10mm 10mm 8mm 10mm !important;
       margin: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
@@ -455,12 +457,12 @@
       <tr>
         <td>
           <div style="font-weight: 600;">{{ cap.date|date:"d M Y" }}</div>
-          <div style="font-size: 6.8pt; color: #64748b;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
+          <div style="font-size: 7.2px; color: #64748b;">{{ cap.updated_at|time:"H:i"|default:"00:00" }}</div>
         </td>
         <td class="text-left">
           <strong>{{ cap.node_name }}</strong>
           {% if cap.hosted_systems %}
-          <div style="font-size: 6.8pt; color: #64748b;">{{ cap.hosted_systems }}</div>
+          <div style="font-size: 7.2px; color: #64748b;">{{ cap.hosted_systems }}</div>
           {% endif %}
         </td>
         <td class="text-left" style="color: #334155; font-weight: 500;">
@@ -550,8 +552,12 @@
 </div>
 
 <script>
+  const _origTitle = document.title;
+  window.addEventListener('beforeprint', function() { document.title = '\u200B'; });
+  window.addEventListener('afterprint', function() { document.title = _origTitle; });
   window.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
+      document.title = '\u200B';
       window.print();
     }, 400);
   });

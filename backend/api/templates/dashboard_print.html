@@ -416,18 +416,21 @@
     }
     @page {
       size: A4 portrait;
-      margin: 10mm 10mm 8mm 10mm;
+      margin: 0 !important;
     }
-    body {
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
       background: #ffffff !important;
       font-size: 9.5px !important;
     }
     .page {
       box-shadow: none !important;
       border: none !important;
-      padding: 0 !important;
+      padding: 10mm 10mm 8mm 10mm !important;
       margin: 0 !important;
       max-width: 100% !important;
+      width: 100% !important;
     }
     table.report-table th, table.report-table td {
       padding: 4px 6px !important;
@@ -713,9 +716,13 @@
 </div>
 
 <script>
+  const _origTitle = document.title;
+  window.addEventListener('beforeprint', function() { document.title = '\u200B'; });
+  window.addEventListener('afterprint', function() { document.title = _origTitle; });
   window.addEventListener('DOMContentLoaded', function() {
     // Automatically trigger browser native print dialog for 100% vector PDF output
     setTimeout(function() {
+      document.title = '\u200B';
       window.print();
     }, 400);
   });
