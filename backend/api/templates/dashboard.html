@@ -198,7 +198,7 @@
     </div>
     
     <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
-        <form id="dbFilterForm" method="GET" action="." style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
+        <form id="dbFilterForm" method="GET" action="." onsubmit="window.location.href = buildFilterUrl(this, false); return false;" style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
             <input type="hidden" name="node_select" value="{{ selected_node }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Database Scope</label>
@@ -848,7 +848,7 @@
     </div>
 
     <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
-        <form id="nodeFilterForm" method="GET" action="#node-infrastructure" style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
+        <form id="nodeFilterForm" method="GET" action="#node-infrastructure" onsubmit="window.location.href = buildFilterUrl(this, true); return false;" style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin: 0;">
             <input type="hidden" name="database_select" value="{{ selected_db }}">
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                 <label style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Node Scope</label>
