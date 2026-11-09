@@ -2,354 +2,752 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>&nbsp;</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=3">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=3">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=3">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=3">
-    <style>
-        :root {
-            --primary-navy: #002569;
-            --primary-gold: #F1AB00;
-            --primary-green: #76B900;
-            --text-dark: #1e293b;
-            --text-soft: #64748b;
-            --border-mist: #e2e8f0;
-            --bg-cool: #f8fafc;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Storage Capacity Tracking Report — {{ reporting_period_str }}</title>
+<link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+<style>
+  :root {
+    --primary-navy: #002569;
+    --primary-gold: #f1ab00;
+    --primary-green: #76b900;
+    --border-mist: #e2e8f0;
+    --text-dark: #0f172a;
+    --text-soft: #64748b;
+    --bg-cool: #f8fafc;
+    --green-text: #16a34a;
+    --red-text: #dc2626;
+  }
 
-        @page {
-            size: portrait;
-            margin: 0 !important;
-        }
+  * { box-sizing: border-box; }
 
-        body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-            color: var(--text-dark);
-            margin: 0;
-            padding: 0;
-            line-height: 1.4;
-            font-size: 0.85rem;
-        }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    color: var(--text-dark);
+    background: #e2e8f0;
+    font-size: 8.5px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
-        .header-section {
-            border-bottom: 2px solid var(--primary-navy);
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
-        }
+  .screen-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-mist);
+    padding: 10px 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+  }
+  .toolbar-content {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .toolbar-title {
+    font-size: 13px;
+    color: var(--primary-navy);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toolbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-print {
+    background: var(--primary-navy);
+    color: #ffffff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-print:hover { background: #001a4d; }
+  .btn-close {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid var(--border-mist);
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-close:hover { background: #e2e8f0; }
 
-        .header-container {
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-        }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 12px auto;
+    background: #ffffff;
+    padding: 10mm 10mm 8mm 10mm;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
 
-        .logo-img {
-            height: 48px;
-            width: auto;
-            border-radius: 4px;
-            border: 1px solid var(--border-mist);
-        }
+  .masthead-center {
+    text-align: center;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--primary-navy);
+  }
+  .masthead-logo-wrap {
+    margin-bottom: 4px;
+  }
+  .masthead-logo {
+    height: 48px;
+    width: auto;
+    object-fit: contain;
+  }
+  .report-title {
+    margin: 0 0 2px 0;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--primary-navy);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .report-org-subtitle {
+    margin: 0 0 6px 0;
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-soft);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .report-meta-strip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: #f8fafc;
+    border: 1px solid var(--border-mist);
+    border-radius: 3px;
+    padding: 3px 12px;
+    font-size: 8px;
+    margin-top: 2px;
+  }
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .meta-label {
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+  .meta-value {
+    color: var(--primary-navy);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-divider {
+    color: #cbd5e1;
+    font-weight: bold;
+  }
 
-        h1 {
-            margin: 0;
-            font-size: 1.3rem;
-            color: var(--primary-navy);
-            font-weight: 700;
-        }
+  .summary-box {
+    margin: 0 0 8px 0;
+    padding: 6px 10px;
+    background: var(--bg-cool);
+    border-left: 3px solid var(--primary-navy);
+    border-radius: 2px;
+  }
+  .summary-box-label {
+    font-size: 7.5px;
+    font-weight: 700;
+    color: var(--primary-navy);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .summary-box-text {
+    margin: 0;
+    font-size: 8.4px;
+    color: #334155;
+    line-height: 1.42;
+  }
 
-        .subtitle {
-            font-size: 0.85rem;
-            color: var(--text-soft);
-            font-style: italic;
-            margin-top: 0.15rem;
-        }
+  .plain-metrics-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 0;
+    margin: 4px 0 9px 0;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1px solid var(--border-mist);
+  }
+  .plain-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 2px 0;
+    border-bottom: 1px dashed #e2e8f0;
+  }
+  .plain-metric:last-child {
+    border-bottom: none;
+  }
+  .plain-metric-label {
+    font-size: 7.8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-soft);
+    min-width: 175px;
+    margin: 0;
+  }
+  .plain-metric-value {
+    font-size: 10.5px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--primary-navy);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    min-width: 82px;
+  }
+  .plain-metric-value.green {
+    color: #15803d;
+  }
+  .plain-metric-subtext {
+    font-size: 7.5px;
+    color: #64748b;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
 
-        .description-card {
-            background-color: var(--bg-cool);
-            border-left: 4px solid var(--primary-navy);
-            padding: 0.8rem 1rem;
-            margin-bottom: 1.5rem;
-            border-radius: 4px;
-            font-size: 0.78rem;
-            line-height: 1.45;
-            text-align: justify;
-        }
+  body.pdf-exporting {
+    background: #ffffff !important;
+  }
+  body.pdf-exporting .page {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 6mm 7mm 5mm 7mm !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
 
-        .metadata-bar {
-            display: flex;
-            justify-content: space-between;
-            background-color: var(--bg-cool);
-            border: 1px solid var(--border-mist);
-            padding: 0.5rem 0.8rem;
-            border-radius: 4px;
-            margin-bottom: 1.5rem;
-            font-size: 0.76rem;
-            color: var(--text-dark);
-        }
+  .section-heading {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary-navy);
+    margin: 10px 0 5px 0;
+    padding-bottom: 2px;
+    border-bottom: 1.5px solid var(--border-mist);
+  }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 2rem;
-            font-size: 0.75rem;
-        }
+  table.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    font-size: 7.8px;
+    table-layout: fixed;
+  }
+  table.report-table th {
+    background: #f1f5f9;
+    color: var(--primary-navy);
+    font-weight: 700;
+    font-size: 6.8px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 4.5px 4px;
+    border-top: 1px solid var(--border-mist);
+    border-bottom: 1.5px solid var(--primary-navy);
+    text-align: center;
+    white-space: nowrap;
+  }
+  table.report-table th.text-left {
+    text-align: left;
+  }
+  table.report-table td {
+    padding: 4.5px 4px;
+    border-bottom: 1px solid var(--border-mist);
+    text-align: center;
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+  }
+  table.report-table td.text-left {
+    text-align: left;
+  }
+  table.report-table td.nowrap {
+    white-space: nowrap;
+  }
+  table.report-table tr:nth-child(even) {
+    background: #fbfcfe;
+  }
 
-        th, td {
-            padding: 0.5rem 0.4rem;
-            text-align: center;
-            border-bottom: 1px solid var(--border-mist);
-        }
+  .status-pill {
+    display: inline-block;
+    padding: 1.5px 6px;
+    border-radius: 3px;
+    font-size: 6.8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .status-pill.healthy {
+    background: #dcfce7;
+    color: #15803d;
+  }
+  .status-pill.warning {
+    background: #fef3c7;
+    color: #b45309;
+  }
+  .status-pill.critical {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
 
-        th {
-            background-color: var(--bg-cool);
-            color: var(--primary-navy);
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.68rem;
-            letter-spacing: 0.02em;
-            border-bottom: 2px solid var(--primary-navy);
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
+  .growth-positive {
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  .growth-neutral {
+    color: #15803d;
+    font-weight: 600;
+  }
 
-        tr:nth-child(even) {
-            background-color: #f8fafc;
-        }
+  .signoff-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .signoff-box {
+    border: 1px solid var(--border-mist);
+    border-radius: 4px;
+    padding: 7px 9px;
+    background: #ffffff;
+  }
+  .signoff-header {
+    font-size: 7.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--primary-navy);
+    border-bottom: 1.5px solid var(--primary-navy);
+    padding-bottom: 3px;
+    margin-bottom: 6px;
+  }
+  .signoff-sig-field {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 6px;
+    height: 24px;
+  }
+  .signoff-sig-label {
+    font-size: 7.5px;
+    color: #475569;
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .signoff-sig-line {
+    border-bottom: 1px solid #94a3b8;
+    flex-grow: 1;
+    height: 0;
+    margin-bottom: 2px;
+  }
+  .signoff-row {
+    display: flex;
+    align-items: baseline;
+    font-size: 7.5px;
+    color: #475569;
+    margin-bottom: 4px;
+  }
+  .signoff-row:last-child {
+    margin-bottom: 0;
+  }
+  .signoff-label {
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .signoff-line {
+    border-bottom: 1px dotted #cbd5e1;
+    flex-grow: 1;
+    margin-left: 2px;
+    height: 0;
+    margin-bottom: 2px;
+  }
+  .signoff-val {
+    font-size: 7.5px;
+    color: var(--primary-navy);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    margin-left: 2px;
+  }
 
-        .text-left {
-            text-align: left !important;
-        }
-
-        .growth-positive {
-            color: #c62828;
-            font-weight: 600;
-        }
-
-        .growth-neutral {
-            color: #2e7d32;
-            font-weight: 600;
-        }
-
-        .footer-print {
-            margin-top: 3rem;
-            border-top: 1px solid var(--border-mist);
-            padding-top: 0.75rem;
-            page-break-inside: avoid;
-        }
-
-        .footer-metadata {
-            font-size: 0.75rem;
-            color: var(--text-soft);
-            margin-bottom: 1.5rem;
-        }
-
-        .signature-section {
-            display: flex;
-            justify-content: space-between;
-            gap: 2rem;
-            margin-top: 1.5rem;
-        }
-
-        .sig-line {
-            flex: 1;
-            font-size: 0.78rem;
-            color: var(--text-dark);
-            border-top: 1px dashed var(--text-soft);
-            padding-top: 0.5rem;
-            line-height: 1.8;
-        }
-
-        @media print {
-            @page {
-                margin: 0;
-            }
-            body {
-                margin: 1.6cm;
-                background: white;
-            }
-            .no-print {
-                display: none;
-            }
-        }
-    </style>
+  @media print {
+    .no-print { display: none !important; }
+    @page {
+      size: A4 portrait;
+      margin: 0 !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      font-size: 8.5px !important;
+    }
+    .page {
+      box-shadow: none !important;
+      border: none !important;
+      padding: 10mm 9mm 8mm 9mm !important;
+      margin: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .signoff-grid {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+  }
+</style>
 </head>
 <body>
 
-    <div class="header-section">
-        <div class="header-container">
-            <img src="{% static 'logo.jpg' %}" alt="Logo" class="logo-img">
-            <div>
-                <h1>Capacity Tracking Report - 
-                    {% if current_db == 'Oracle' %}
-                        Oracle (nmsinfra)
-                    {% else %}
-                        {{ current_db }}
-                    {% endif %}
-                </h1>
-                <div class="subtitle">Operations &amp; Storage Planning Report</div>
-            </div>
-        </div>
+<div class="screen-toolbar no-print">
+  <div class="toolbar-content">
+    <div class="toolbar-title">
+      <strong>Report Ready:</strong> {{ reporting_period_str }} Database Storage Capacity Report ({{ current_db }})
+    </div>
+    <div class="toolbar-actions">
+      <button type="button" onclick="downloadPdfReport()" class="btn-print" id="btnDownloadPdf">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </button>
+      <button type="button" onclick="window.print()" class="btn-close">
+        Print
+      </button>
+      <button type="button" onclick="window.close()" class="btn-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="masthead-center">
+    <div class="masthead-logo-wrap">
+      <img src="{% static 'logo.jpg' %}" alt="National Medical Stores Logo" class="masthead-logo">
     </div>
 
-    <div class="description-card">
-        This report shows monthly storage allocations, database file growths, disk utilization, and tablespace status for 
-        {% if current_db == 'Oracle' %}
-            the Oracle (nmsinfra) database
-        {% elif current_db == 'MySQL' %}
-            the MySQL database
-        {% elif current_db == 'MS SQL Server' %}
-            the MS SQL Server database
-        {% elif current_db == 'PostgreSQL' %}
-            the PostgreSQL (ccisprod_db) database
-        {% else %}
-            databases
-        {% endif %}, reporting sizing metrics to assist database administrators in projecting storage needs.
+    <h1 class="report-title">
+      {% if current_db == 'All Databases' %}
+        DATABASE STORAGE CAPACITY &amp; GROWTH REPORT
+      {% else %}
+        {{ current_db|upper }} STORAGE CAPACITY &amp; GROWTH REPORT
+      {% endif %}
+    </h1>
+    <div class="report-org-subtitle">National Medical Stores • Database and Infrastructure Tracking for Reliability, Administration and Compliance (DBITRAC)</div>
+
+    <div class="report-meta-strip">
+      <div class="meta-item">
+        <span class="meta-label">Period:</span>
+        <span class="meta-value">{{ reporting_period_str }}</span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Scope:</span>
+        <span class="meta-value">
+          {% if current_db == 'Oracle' %}Oracle (nmsinfra){% elif current_db == 'PostgreSQL' %}PostgreSQL (ccisprod_db){% elif current_db == 'MS SQL Server' %}MS SQL Server (Pentana){% elif current_db == 'MySQL' %}MySQL (nickledbnew){% else %}{{ current_db }}{% endif %}
+        </span>
+      </div>
+      <div class="meta-divider">•</div>
+      <div class="meta-item">
+        <span class="meta-label">Extracted:</span>
+        <span class="meta-value">{{ extracted_at }} EAT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary-box">
+    <div class="summary-box-label">Executive Capacity &amp; Storage Summary</div>
+    <p class="summary-box-text">
+      Total provisioned database storage across <strong>{% if current_db == 'All Databases' %}all monitored enterprise database engines{% else %}the {{ current_db }} database environment{% endif %}</strong> stands at <strong>{{ kpi_capacity }} GB</strong>, with <strong>{{ kpi_used }} GB</strong> utilized (<strong>{{ kpi_used_percent }}%</strong> aggregate disk consumption), an active database footprint of <strong>{{ kpi_size }} GB</strong>, and <strong>{{ kpi_free }} GB</strong> of available free headroom. Net latest monthly data growth across the scoped environment is <strong>{% if kpi_growth > 0 %}+{% endif %}{{ kpi_growth }} GB</strong> ({{ kpi_growth_percent }}% of total capacity).
+    </p>
+  </div>
+
+  <div class="plain-metrics-strip">
+    <div class="plain-metric">
+      <div class="plain-metric-label">Total Database Footprint</div>
+      <div class="plain-metric-value">{{ kpi_size }} GB</div>
+      <div class="plain-metric-subtext">Active datafiles, tablespaces &amp; indexes across latest snapshot</div>
+    </div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Provisioned Disk Capacity</div>
+      <div class="plain-metric-value">{{ kpi_capacity }} GB</div>
+      <div class="plain-metric-subtext">{{ kpi_used }} GB used ({{ kpi_used_percent }}% aggregate disk utilisation)</div>
+    </div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Available Free Headroom</div>
+      <div class="plain-metric-value green">{{ kpi_free }} GB</div>
+      <div class="plain-metric-subtext">Unallocated &amp; usable database volume capacity</div>
+    </div>
+    <div class="plain-metric">
+      <div class="plain-metric-label">Latest Monthly Growth</div>
+      <div class="plain-metric-value">{% if kpi_growth > 0 %}+{% endif %}{{ kpi_growth }} GB</div>
+      <div class="plain-metric-subtext">{{ kpi_growth_percent }}% monthly burn rate relative to provisioned storage</div>
+    </div>
+  </div>
+
+  {% if health_panels and current_db == 'All Databases' %}
+  <div class="section-heading">Current Database Engine Storage Posture (Latest Snapshot)</div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 18%;">Database Engine</th>
+        <th style="width: 9%;">Snapshot</th>
+        <th style="width: 10%;">DB Size</th>
+        <th style="width: 10%;">Capacity</th>
+        <th style="width: 10%;">Disk Used</th>
+        <th style="width: 10%;">Free Space</th>
+        <th style="width: 8%;">Disk %</th>
+        <th style="width: 9%;">Tablespace %</th>
+        <th style="width: 8%;">Status</th>
+        <th class="text-left" style="width: 8%;">Top Object</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in health_panels %}
+      <tr>
+        <td class="text-left nowrap">
+          <strong>{{ p.database }}</strong>
+          <span style="color: #64748b; font-size: 7px;">({{ p.host }})</span>
+        </td>
+        <td class="nowrap" style="color: #475569; font-weight: 600;">{{ p.month_str }}</td>
+        <td class="nowrap"><strong>{{ p.database_size_gb }} GB</strong></td>
+        <td class="nowrap">{{ p.disk_capacity_gb }} GB</td>
+        <td class="nowrap">{{ p.disk_used_gb }} GB</td>
+        <td class="nowrap" style="color: #15803d; font-weight: 600;">{{ p.available_capacity_gb }} GB</td>
+        <td class="nowrap" style="font-weight: 700; color: {% if p.disk_used_percent >= 85 %}#b91c1c{% elif p.disk_used_percent >= 70 %}#b45309{% else %}var(--primary-navy){% endif %};">
+          {{ p.disk_used_percent }}%
+        </td>
+        <td class="nowrap" style="color: #475569;">{{ p.tablespace_used_percent }}</td>
+        <td class="nowrap">
+          <span class="status-pill {{ p.status_class }}">{{ p.status }}</span>
+        </td>
+        <td class="text-left" style="font-size: 6.8px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          {{ p.largest_table|default:"—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="section-heading">Monthly Database Capacity, Growth &amp; Utilisation Ledger</div>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 9%;">Month</th>
+        <th class="text-left" style="width: 16%;">Database Engine</th>
+        <th style="width: 9%;">DB Size</th>
+        <th style="width: 9.5%;">Capacity</th>
+        <th style="width: 9%;">Used</th>
+        <th style="width: 9%;">Free</th>
+        <th style="width: 7.5%;">Util %</th>
+        <th style="width: 11%;">Monthly Growth</th>
+        <th style="width: 12%;">Cumulative Growth</th>
+        <th class="text-left" style="width: 8%;">Largest Table</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in queryset %}
+      <tr>
+        <td class="text-left nowrap" style="font-weight: 600; color: #1e293b;">{{ item.month|date:"M Y" }}</td>
+        <td class="text-left nowrap">
+          <strong>
+            {% if item.database == 'Oracle' %}
+              Oracle <span style="font-weight: 500; color: #64748b; font-size: 7px;">(nmsinfra)</span>
+            {% elif item.database == 'MS SQL Server' %}
+              MS SQL <span style="font-weight: 500; color: #64748b; font-size: 7px;">(Pentana)</span>
+            {% elif item.database == 'PostgreSQL' %}
+              PostgreSQL <span style="font-weight: 500; color: #64748b; font-size: 7px;">(ccisprod_db)</span>
+            {% elif item.database == 'MySQL' %}
+              MySQL <span style="font-weight: 500; color: #64748b; font-size: 7px;">(nickledbnew)</span>
+            {% else %}
+              {{ item.database }}
+            {% endif %}
+          </strong>
+        </td>
+        <td class="nowrap">{{ item.database_size_gb }} GB</td>
+        <td class="nowrap">
+          {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
+            372.50 GB
+          {% else %}
+            {{ item.disk_capacity_gb }} GB
+          {% endif %}
+        </td>
+        <td class="nowrap">
+          {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
+            74.50 GB
+          {% else %}
+            {{ item.disk_used_gb }} GB
+          {% endif %}
+        </td>
+        <td class="nowrap">
+          {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
+            298.00 GB
+          {% else %}
+            {{ item.available_capacity_gb|default:"0.00" }} GB
+          {% endif %}
+        </td>
+        <td class="nowrap" style="font-weight: 700; color: {% if item.disk_used_percent >= 85 %}#b91c1c{% elif item.disk_used_percent >= 70 %}#b45309{% else %}var(--primary-navy){% endif %};">
+          {{ item.disk_used_percent }}%
+        </td>
+        <td class="nowrap">
+          {% if item.growth_gb > 0 %}
+            <span class="growth-positive">+{{ item.growth_gb }} GB</span>
+            <span style="color: #64748b; font-size: 7px;">({{ item.growth_percent }}%)</span>
+          {% else %}
+            <span class="growth-neutral">{{ item.growth_gb }} GB</span>
+            <span style="color: #64748b; font-size: 7px;">({{ item.growth_percent }}%)</span>
+          {% endif %}
+        </td>
+        <td class="nowrap">
+          {% if item.is_baseline_month %}
+            <span style="color: #64748b;">Baseline (0.00%)</span>
+          {% elif item.cumulative_growth_gb > 0 %}
+            <strong>+{{ item.cumulative_growth_percent }}%</strong> <span style="color: #475569; font-size: 7px;">(+{{ item.cumulative_growth_gb }} GB)</span>
+          {% elif item.cumulative_growth_gb < 0 %}
+            <strong>{{ item.cumulative_growth_percent }}%</strong> <span style="color: #475569; font-size: 7px;">({{ item.cumulative_growth_gb }} GB)</span>
+          {% else %}
+            0.00% <span style="color: #64748b; font-size: 7px;">(0.00 GB)</span>
+          {% endif %}
+        </td>
+        <td class="text-left" style="font-size: 6.9px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ item.largest_table }}">
+          {{ item.largest_table|default:"—" }}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="10" style="text-align: center; padding: 12px; color: var(--text-soft); font-style: italic;">No database capacity records match the selected filters.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="section-heading">Formal Review &amp; Sign-Off</div>
+  <div class="signoff-grid">
+    <div class="signoff-box">
+      <div class="signoff-header">Prepared / Extracted By</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <span class="signoff-val">{{ extracted_by }}</span>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <span class="signoff-val">{{ extracted_at }}</span>
+      </div>
     </div>
 
-    <div class="metadata-bar" style="justify-content: center;">
-        <div><strong>Reporting Period:</strong> {{ reporting_period_str }}</div>
+    <div class="signoff-box">
+      <div class="signoff-header">Reviewed By (SDBA / SSA)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
+      </div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th class="text-left" style="width: 12%;">Month</th>
-                <th class="text-left" style="width: 12%;">Database</th>
-                <th>DB Size</th>
-                <th>Capacity</th>
-                <th>Used</th>
-                <th>Free</th>
-                <th>Utilisation %</th>
-                <th>Growth</th>
-                <th>Growth %</th>
-                <th>Cumulative Growth</th>
-                <th class="text-left" style="width: 18%;">Largest Table</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in queryset %}
-            <tr>
-                <td class="text-left" style="font-weight: 600;">{{ item.month|date:"F Y" }}</td>
-                <td class="text-left">
-                    <strong>
-                    {% if item.database == 'Oracle' %}
-                        Oracle (nmsinfra)
-                    {% elif item.database == 'MS SQL Server' %}
-                        MS SQL (Pentana)
-                    {% elif item.database == 'PostgreSQL' %}
-                        PostgreSQL (ccisprod_db)
-                    {% else %}
-                        {{ item.database }}
-                    {% endif %}
-                    </strong>
-                </td>
-                <td>{{ item.database_size_gb }} GB</td>
-                <td>
-                    {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
-                        372.50 GB
-                    {% else %}
-                        {{ item.disk_capacity_gb }} GB
-                    {% endif %}
-                </td>
-                <td>
-                    {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
-                        74.50 GB
-                    {% else %}
-                        {{ item.disk_used_gb }} GB
-                    {% endif %}
-                </td>
-                <td>
-                    {% if item.database == 'MySQL' and item.available_capacity_gb == 0 and item.disk_used_percent == 20 %}
-                        298.00 GB
-                    {% else %}
-                        {{ item.available_capacity_gb|default:"0.00" }} GB
-                    {% endif %}
-                </td>
-                <td style="font-weight: bold; color: var(--primary-navy);">{{ item.disk_used_percent }}%</td>
-                <td>
-                    {% if item.growth_gb > 0 %}
-                        <span class="growth-positive">+{{ item.growth_gb }} GB</span>
-                    {% else %}
-                        <span class="growth-neutral">{{ item.growth_gb }} GB</span>
-                    {% endif %}
-                </td>
-                <td>{{ item.growth_percent }}%</td>
-                <td>
-                    {% if item.is_baseline_month %}
-                        Baseline (0.00%)
-                    {% elif item.cumulative_growth_gb > 0 %}
-                        <strong>+{{ item.cumulative_growth_percent }}%</strong> (+{{ item.cumulative_growth_gb }} GB)
-                    {% elif item.cumulative_growth_gb < 0 %}
-                        <strong>{{ item.cumulative_growth_percent }}%</strong> ({{ item.cumulative_growth_gb }} GB)
-                    {% else %}
-                        0.00% (0.00 GB)
-                    {% endif %}
-                </td>
-                <td class="text-left" style="font-size: 0.7rem; color: #475569; max-width: 180px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ item.largest_table }}">{{ item.largest_table }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="9" style="text-align: center; padding: 2rem;">No capacity tracking records match the current filters.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <div class="footer-print">
-        <div class="footer-metadata">
-            <strong>Date Run:</strong> {{ extracted_at }} EAT
-        </div>
-
-        <div class="signature-section">
-            <div class="sig-line">
-                <strong>Extracted By:</strong> {{ extracted_by }}<br>
-                Signature: __________________________________<br>
-                Date: _______________________________________
-            </div>
-            <div class="sig-line">
-                <strong>Reviewed By:</strong><br>
-                Signature: __________________________________<br>
-                Date: _______________________________________
-            </div>
-            <div class="sig-line">
-                <strong>Approved By:</strong><br>
-                Signature: __________________________________<br>
-                Date: _______________________________________
-            </div>
-        </div>
+    <div class="signoff-box">
+      <div class="signoff-header">Approved By (CICTO)</div>
+      <div class="signoff-sig-field">
+        <span class="signoff-sig-label">Signature:</span>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Name:</span>
+        <div class="signoff-line"></div>
+      </div>
+      <div class="signoff-row">
+        <span class="signoff-label">Date:</span>
+        <div class="signoff-line"></div>
+      </div>
     </div>
+  </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script>
-        window.onload = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const downloadMode = urlParams.get('download') === 'true';
-            
-            if (downloadMode) {
-                const element = document.body;
-                const opt = {
-                    margin:       [25, 15, 15, 15], // top, left, bottom, right in mm
-                    filename:     'Capacity_Tracking_Report_{{ current_db|slugify }}.pdf',
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-                
-                // Generate and download PDF, then close tab
-                html2pdf().set(opt).from(element).save().then(() => {
-                    setTimeout(function() {
-                        window.close();
-                    }, 1000);
-                }).catch(err => {
-                    console.error('PDF generation error:', err);
-                    window.print(); // Fallback to standard print if jsPDF fails
-                });
-            } else {
-                window.print();
-            }
-        }
-    </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  const _origTitle = document.title;
+  window.addEventListener('beforeprint', function() { document.title = '\u200B'; });
+  window.addEventListener('afterprint', function() { document.title = _origTitle; });
+
+  function downloadPdfReport() {
+    const pageEl = document.querySelector('.page');
+    if (!pageEl || typeof html2pdf === 'undefined') {
+      window.print();
+      return;
+    }
+    const btn = document.getElementById('btnDownloadPdf');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Generating PDF...';
+    }
+    document.body.classList.add('pdf-exporting');
+
+    const rawScope = "{{ current_db|escapejs }}".replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const rawPeriod = "{{ reporting_period_str|escapejs }}".replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const filename = `NMS_Database_Capacity_Report_${rawScope}_${rawPeriod}.pdf`;
+
+    const opt = {
+      margin:       [4, 4, 4, 4],
+      filename:     filename,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    html2pdf().set(opt).from(pageEl).save().then(function() {
+      document.body.classList.remove('pdf-exporting');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+    }).catch(function(err) {
+      console.error('PDF generation failed:', err);
+      document.body.classList.remove('pdf-exporting');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
+      window.print();
+    });
+  }
+
+  window.addEventListener('load', function() {
+    const params = new URLSearchParams(window.location.search);
+    const shouldDownload = {% if download_mode %}true{% else %}false{% endif %} || params.get('download') === 'true';
+    if (shouldDownload) {
+      setTimeout(downloadPdfReport, 350);
+    }
+  });
+</script>
 </body>
 </html>

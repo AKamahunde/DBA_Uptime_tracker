@@ -1431,6 +1431,39 @@ def dashboard_excel(request):
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
     month_display = period_display
 
+    scoped_data = [d for d in dashboard_data if d['database'] == selected_db] if (selected_db and selected_db != 'All Databases') else dashboard_data
+    uptimes = []
+    mttr_vals = []
+    total_inc = 0
+    total_breaches = 0
+    compliant_count = 0
+    for item in scoped_data:
+        av = item.get('availability', '')
+        if av and av != 'No Data':
+            try:
+                uptimes.append(float(av.replace('%', '')))
+            except ValueError:
+                pass
+        if item.get('availability_status') == 'Meets SLA':
+            compliant_count += 1
+        if isinstance(item.get('total_incidents'), int):
+            total_inc += item['total_incidents']
+        if isinstance(item.get('sla_breach_count'), int):
+            total_breaches += item['sla_breach_count']
+        if isinstance(item.get('mttr_mins'), (int, float)):
+            mttr_vals.append(item['mttr_mins'])
+
+    avg_uptime_str = f"{round(sum(uptimes)/len(uptimes), 2)}%" if uptimes else "No Data"
+    avg_mttr_str = f"{round(sum(mttr_vals)/len(mttr_vals), 1)} mins ({round((sum(mttr_vals)/len(mttr_vals))/60.0, 2)} hrs)" if mttr_vals else "0 mins"
+    sla_comp_str = f"{compliant_count} / {len(scoped_data)} Engines Meeting SLA"
+    auto_lede_text, watch_item_text, _ = _build_db_summary_narrative(
+        dashboard_data, selected_db, period_display, start_date, end_date
+    )
+
+    user_display = request.user.get_full_name()
+    if not user_display:
+        user_display = request.user.username.replace('.', ' ').title()
+
     try:
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -1442,12 +1475,18 @@ def dashboard_excel(request):
         
         # Style Definitions
         font_title = Font(name='Segoe UI', size=14, bold=True, color='002569')
-        font_header = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+        font_section = Font(name='Segoe UI', size=11, bold=True, color='002569')
+        font_header = Font(name='Segoe UI', size=10, bold=True, color='FFFFFF')
         font_body = Font(name='Segoe UI', size=10)
         font_bold = Font(name='Segoe UI', size=10, bold=True)
+        font_meets = Font(name='Segoe UI', size=10, color='2E7D32', bold=True)
+        font_below = Font(name='Segoe UI', size=10, color='C62828', bold=True)
         
         fill_header = PatternFill(start_color='002569', end_color='002569', fill_type='solid')
         fill_even = PatternFill(start_color='F4F7FC', end_color='F4F7FC', fill_type='solid')
+        fill_kpi_label = PatternFill(start_color='EEF2F6', end_color='EEF2F6', fill_type='solid')
+        fill_meets = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
+        fill_below = PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid')
         
         align_center = Alignment(horizontal='center', vertical='center')
         align_left = Alignment(horizontal='left', vertical='center')
@@ -1459,188 +1498,182 @@ def dashboard_excel(request):
             bottom=Side(style='thin', color='D1D7E0')
         )
         
-        # Add Title
-        ws.merge_cells('A1:P1')
+        # Title Block
+        ws.merge_cells('A1:N1')
         if selected_db and selected_db != 'All Databases':
-            ws['A1'] = f"Summary of Database Performance for {selected_db} - {month_display}"
+            ws['A1'] = f"Database Operations & SLA Performance Report ({selected_db}) - {month_display}"
         else:
-            ws['A1'] = f"Summary of Database Performance - {month_display}"
+            ws['A1'] = f"Database Operations & SLA Performance Report (All Databases) - {month_display}"
         ws['A1'].font = font_title
         ws['A1'].alignment = align_left
-        ws.row_dimensions[1].height = 30
-        
-        ws.append([]) # Empty row
-        row_num = 3
+        ws.row_dimensions[1].height = 28
 
-        if selected_db == 'All Databases':
-            # Add Headers
-            headers = [
-                "Database", "SLA Uptime", "Planned Downtime (Hrs)", "Unplanned Downtime (Hrs)",
-                "Total Incidents", "SLA Breaches", "MTTR (Mins)", 
-                "Backup Success %", "Restore Success %", "Replication Status"
+        # Executive Summary Narrative
+        ws.merge_cells('A2:N2')
+        ws['A2'] = f"Executive Summary: {auto_lede_text}" + (f" | Watch Item: {watch_item_text}" if watch_item_text else "")
+        ws['A2'].font = Font(name='Segoe UI', size=9.5, italic=True, color='334155')
+        ws['A2'].alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        ws.row_dimensions[2].height = 28
+
+        ws.append([])
+        row_num = 4
+
+        # Section 1: Executive KPI Strip
+        ws.cell(row=row_num, column=1, value="1. Executive KPI Summary").font = font_section
+        ws.row_dimensions[row_num].height = 22
+        row_num += 1
+
+        kpi_rows = [
+            ("Reporting Period", month_display, "Database Scope", selected_db),
+            ("Average Uptime SLA", avg_uptime_str, "SLA Compliance", sla_comp_str),
+            ("Total Incidents", total_inc, "SLA Breaches", total_breaches),
+            ("Average MTTR", avg_mttr_str, "Target Availability SLA", ">= 99.95%"),
+        ]
+        for k1, v1, k2, v2 in kpi_rows:
+            c_k1 = ws.cell(row=row_num, column=1, value=k1)
+            c_v1 = ws.cell(row=row_num, column=2, value=v1)
+            c_k2 = ws.cell(row=row_num, column=3, value=k2)
+            c_v2 = ws.cell(row=row_num, column=4, value=v2)
+            for c_lbl in (c_k1, c_k2):
+                c_lbl.font = font_bold
+                c_lbl.fill = fill_kpi_label
+                c_lbl.alignment = align_left
+                c_lbl.border = border_thin
+            for c_val in (c_v1, c_v2):
+                c_val.font = font_body
+                c_val.alignment = align_center
+                c_val.border = border_thin
+            ws.row_dimensions[row_num].height = 20
+            row_num += 1
+
+        ws.append([])
+        row_num += 1
+
+        # Section 2: Database SLA & Operational Performance Summary
+        ws.cell(row=row_num, column=1, value="2. Database SLA, Availability, Backup & Replication Performance").font = font_section
+        ws.row_dimensions[row_num].height = 22
+        row_num += 1
+
+        headers = [
+            "Database Engine", "Host / Workload", "Target SLA", "Actual Uptime", "SLA Status",
+            "Planned Down (Hrs)", "Unplanned Down (Hrs)", "Total Incidents", "SLA Breaches",
+            "MTTR (Mins)", "Backup Success %", "Restore Success %", "Replication Status"
+        ]
+        ws.append(headers)
+        ws.row_dimensions[row_num].height = 24
+        for col_num in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_thin
+        row_num += 1
+
+        for item in scoped_data:
+            db_name = item['database']
+            host_lbl = 'nmsinfra / nmsebs (ERP)' if db_name == 'Oracle' else ('nickledbnew -> nickeldbdr (NMS360/DMT)' if db_name == 'MySQL' else ('ccisprod_db (CCIS / ODK-X)' if db_name == 'PostgreSQL' else 'Pentana (MKInsight Audit)'))
+            target_sla = f">= {item.get('target_sla_val', 99.95)}%"
+            row_data = [
+                db_name,
+                host_lbl,
+                target_sla,
+                item['availability'],
+                item.get('availability_status', 'Meets SLA'),
+                item['planned_downtime'],
+                item['unplanned_downtime'],
+                item['total_incidents'],
+                item['sla_breach_count'],
+                item['mttr_mins'],
+                item['backup_success'],
+                item['restore_success'],
+                item['replication_status']
             ]
-            ws.append(headers)
-            ws.row_dimensions[row_num].height = 25
-            
-            for col_num, header in enumerate(headers, 1):
+            ws.append(row_data)
+            ws.row_dimensions[row_num].height = 20
+
+            for col_num in range(1, len(headers) + 1):
                 cell = ws.cell(row=row_num, column=col_num)
-                cell.font = font_header
-                cell.fill = fill_header
-                cell.alignment = align_center
-                cell.border = border_thin
-                
-            row_num += 1
-            # Add Data rows
-            for item in dashboard_data:
-                row_data = [
-                    item['database'],
-                    item['availability'],
-                    item['planned_downtime'],
-                    item['unplanned_downtime'],
-                    item['total_incidents'],
-                    item['sla_breach_count'],
-                    item['mttr_mins'],
-                    item['backup_success'],
-                    item['restore_success'],
-                    item['replication_status']
-                ]
-                ws.append(row_data)
-                ws.row_dimensions[row_num].height = 20
-                
-                # Apply body styles
-                for col_num in range(1, 11):
-                    cell = ws.cell(row=row_num, column=col_num)
-                    cell.font = font_body
-                    cell.border = border_thin
-                    if row_num % 2 == 0:
-                        cell.fill = fill_even
-                    
-                    if col_num == 1:
-                        cell.alignment = align_left
-                    else:
-                        cell.alignment = align_center
-                row_num += 1
-                
-        # Add Database Detail Table if requested
-        if database_detail:
-            if selected_db == 'All Databases':
-                ws.append([]) # empty
-                ws.append([]) # empty
-                row_num += 2
-                
-            detail_title_row = row_num
-            ws.cell(row=detail_title_row, column=1, value=f"Database Detail - {database_detail['database']}").font = Font(name='Segoe UI', size=12, bold=True, color='002569')
-            ws.row_dimensions[detail_title_row].height = 25
-            row_num += 1
-            
-            # Detail headers (16 columns)
-            detail_headers = [
-                "Type", "Overall Uptime", "Planned Downtime", "Unplanned Downtime",
-                "Incidents", "SLA Breaches", "MTTR (Mins)", "Backup Success %",
-                "Restore Success %", "Replication Status", "Last Full", "Last Inc",
-                "Last DR Test", "Failed Backups", "Failed Restores", "Replication Lag"
-            ]
-            ws.append(detail_headers)
-            ws.row_dimensions[row_num].height = 25
-            
-            for col_idx, header in enumerate(detail_headers, 1):
-                cell = ws.cell(row=row_num, column=col_idx)
-                cell.font = font_header
-                cell.fill = fill_header
-                cell.alignment = align_center
-                cell.border = border_thin
-            row_num += 1
-            
-            # Current Row
-            current = database_detail['current']
-            row_current = [
-                "Current",
-                current['availability'],
-                f"{current['planned_downtime']} hrs" if current['planned_downtime'] != 'No Data' else 'No Data',
-                f"{current['unplanned_downtime']} hrs" if current['unplanned_downtime'] != 'No Data' else 'No Data',
-                current['total_incidents'],
-                current['sla_breach_count'],
-                f"{current['mttr_mins']} mins" if current['mttr_mins'] != 'No Data' else 'No Data',
-                current['backup_success'],
-                current['restore_success'],
-                current['replication_status'],
-                current['last_full'],
-                current['last_inc'],
-                current['last_dr'],
-                current['failed_backups'],
-                current['failed_restores'],
-                current['replication_lag']
-            ]
-            ws.append(row_current)
-            ws.row_dimensions[row_num].height = 20
-            for col_idx in range(1, 17):
-                cell = ws.cell(row=row_num, column=col_idx)
                 cell.font = font_body
                 cell.border = border_thin
-                if col_idx == 1:
-                    cell.alignment = align_left
-                else:
-                    cell.alignment = align_center
+                if row_num % 2 == 0:
+                    cell.fill = fill_even
+                cell.alignment = align_left if col_num in (1, 2) else align_center
+                if col_num == 5:
+                    if str(cell.value) == 'Meets SLA':
+                        cell.fill = fill_meets
+                        cell.font = font_meets
+                    elif str(cell.value) in ('Below SLA', 'Misses SLA'):
+                        cell.fill = fill_below
+                        cell.font = font_below
             row_num += 1
-            
-            # Status Row
-            status = database_detail['status']
-            row_status = [
-                "Status",
-                status['availability'],
-                status['planned_downtime'],
-                status['unplanned_downtime'],
-                status['total_incidents'],
-                "—",
-                status['mttr_mins'],
-                status['backup_success'],
-                status['restore_success'],
-                status['replication_status'],
-                status['last_full'],
-                status['last_inc'],
-                status['last_dr'],
-                status['failed_backups'],
-                status['failed_restores'],
-                status['replication_lag']
+
+        ws.append([])
+        row_num += 1
+
+        # Section 3: Detailed Backup, DR & Storage Capacity Breakdown (for all scoped databases)
+        ws.cell(row=row_num, column=1, value="3. Operational Backup Schedule, DR Readiness & Storage Capacity Breakdown").font = font_section
+        ws.row_dimensions[row_num].height = 22
+        row_num += 1
+
+        cap_headers = [
+            "Database Engine", "DB Size (GB)", "Available Free (GB)", "Disk Used %", "Tablespace Used %",
+            "Last Full Backup", "Last Inc / WAL Backup", "Last DR / Restore Test",
+            "Failed Backups", "Failed Restores", "Replication Lag"
+        ]
+        ws.append(cap_headers)
+        ws.row_dimensions[row_num].height = 24
+        for col_num in range(1, len(cap_headers) + 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            cell.border = border_thin
+        row_num += 1
+
+        for item in scoped_data:
+            db_name = item['database']
+            det = _get_database_detail(db_name, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
+            cur = det['current'] if det else {}
+            db_size = f"{item['database_size_gb']} GB" if isinstance(item.get('database_size_gb'), (int, float)) else item.get('database_size_gb', 'No Data')
+            avail_cap = f"{item['available_capacity_gb']} GB" if isinstance(item.get('available_capacity_gb'), (int, float)) else item.get('available_capacity_gb', 'No Data')
+            disk_pct = f"{item['disk_used_percent']}%" if isinstance(item.get('disk_used_percent'), (int, float)) else item.get('disk_used_percent', 'No Data')
+            ts_pct = f"{item['tablespace_used_percent']}%" if isinstance(item.get('tablespace_used_percent'), (int, float)) else item.get('tablespace_used_percent', 'No Data')
+
+            cap_row = [
+                db_name,
+                db_size,
+                avail_cap,
+                disk_pct,
+                ts_pct,
+                cur.get('last_full', '—'),
+                cur.get('last_inc', '—'),
+                cur.get('last_dr', '—'),
+                cur.get('failed_backups', 0),
+                cur.get('failed_restores', 0),
+                cur.get('replication_lag', '—'),
             ]
-            ws.append(row_status)
+            ws.append(cap_row)
             ws.row_dimensions[row_num].height = 20
-            
-            # Colors for Meets/Below SLA
-            fill_meets = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid') # soft green
-            fill_below = PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid') # soft red
-            font_meets = Font(name='Segoe UI', size=10, color='2E7D32', bold=True)
-            font_below = Font(name='Segoe UI', size=10, color='C62828', bold=True)
-            
-            for col_idx in range(1, 17):
-                cell = ws.cell(row=row_num, column=col_idx)
+            for col_num in range(1, len(cap_headers) + 1):
+                cell = ws.cell(row=row_num, column=col_num)
                 cell.font = font_body
                 cell.border = border_thin
-                
-                if col_idx == 1:
-                    cell.alignment = align_left
-                else:
-                    cell.alignment = align_center
-                    
-                val = str(cell.value)
-                if val == 'Meets SLA':
-                    cell.fill = fill_meets
-                    cell.font = font_meets
-                elif val == 'Below SLA':
-                    cell.fill = fill_below
-                    cell.font = font_below
+                if row_num % 2 == 0:
+                    cell.fill = fill_even
+                cell.alignment = align_left if col_num == 1 else align_center
             row_num += 1
 
         # Add Legend / Key below table
-        ws.append([]) # empty
-        ws.append([]) # empty
-        legend_start = row_num + 2
+        ws.append([])
+        row_num += 1
+        legend_start = row_num
         
         ws.cell(row=legend_start, column=1, value="Database Key & Host Systems:").font = font_bold
         ws.cell(row=legend_start+1, column=1, value="• Oracle: nmsinfra.nms.go.ug (DB) & nmsebs.nms.go.ug (App) - Powers the core NMS ERP suite supporting finance, procurement, stores, and order management.").font = font_body
         ws.cell(row=legend_start+2, column=1, value="• MySQL: nickledbnew (replicated live to nickeldbdr) - Hosts vital collaboration and support systems including the NMS360 suite, IT ServiceDesk, DMT, and other in-house applications.").font = font_body
         ws.cell(row=legend_start+3, column=1, value="• MS SQL Server: Windows Server host - Hosts MKInsight, which runs Pentana Audit, the system used by internal auditors.").font = font_body
         ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform.").font = font_body
+        ws.cell(row=legend_start+5, column=1, value=f"Extracted by {user_display} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')} EAT").font = Font(name='Segoe UI', size=9, italic=True, color='64748B')
         
         # Adjust Column Widths
         import io
@@ -1648,11 +1681,11 @@ def dashboard_excel(request):
             max_len = 0
             col_letter = get_column_letter(col_idx)
             for cell in col:
-                if cell.row == 1 or cell.row > legend_start:
+                if cell.row in (1, 2) or cell.row >= legend_start:
                     continue
                 if cell.value is not None:
                     max_len = max(max_len, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 14)
             
         filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
         buf = io.BytesIO()
@@ -5320,6 +5353,7 @@ def capacity_print(request):
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
+    download_mode = request.GET.get('download', '').lower() == 'true'
     if current_db:
         queryset = queryset.filter(database=current_db)
     if start_date:
@@ -5327,6 +5361,75 @@ def capacity_print(request):
     if end_date:
         queryset = queryset.filter(month__lte=end_date)
     queryset = _annotate_cumulative_growth(queryset)
+
+    dbs = ['Oracle', 'MySQL', 'MS SQL Server', 'PostgreSQL']
+    latest_records = {}
+    for db in dbs:
+        if current_db and db != current_db:
+            continue
+        rec_qs = CapacityPlanning.objects.filter(database=db)
+        if start_date:
+            rec_qs = rec_qs.filter(month__gte=start_date)
+        if end_date:
+            rec_qs = rec_qs.filter(month__lte=end_date)
+        rec = rec_qs.order_by('-month', '-updated_at').first()
+        if rec:
+            latest_records[db] = rec
+
+    kpi_capacity = 0.0
+    kpi_used = 0.0
+    kpi_free = 0.0
+    kpi_growth = 0.0
+    kpi_size = 0.0
+    health_panels = []
+
+    for db, rec in latest_records.items():
+        cap = float(rec.disk_capacity_gb)
+        used_pct = float(rec.disk_used_percent)
+        free = float(rec.available_capacity_gb)
+        growth = float(rec.growth_gb)
+        size = float(rec.database_size_gb)
+
+        if cap == 0.0 and free == 0.0 and used_pct > 0:
+            cap = size * 5.0 if used_pct == 20 else size / (used_pct / 100.0)
+            free = cap - size
+
+        used_gb = round(cap * used_pct / 100.0, 2)
+        kpi_capacity += cap
+        kpi_used += used_gb
+        kpi_free += free
+        kpi_growth += growth
+        kpi_size += size
+
+        if used_pct < 70.0:
+            status = 'Healthy'
+            status_class = 'healthy'
+        elif used_pct < 85.0:
+            status = 'Monitor'
+            status_class = 'warning'
+        else:
+            status = 'Critical'
+            status_class = 'critical'
+
+        health_panels.append({
+            'database': db,
+            'host': 'nmsinfra' if db == 'Oracle' else ('nickledbnew' if db == 'MySQL' else ('ccisprod_db' if db == 'PostgreSQL' else 'Pentana')),
+            'month_str': rec.month.strftime('%b %Y'),
+            'database_size_gb': round(size, 2),
+            'disk_capacity_gb': round(cap, 2),
+            'disk_used_gb': used_gb,
+            'available_capacity_gb': round(free, 2),
+            'disk_used_percent': round(used_pct, 2),
+            'tablespace_used_percent': f"{rec.tablespace_used_percent}%" if db != 'MS SQL Server' else 'N/A',
+            'growth_gb': round(growth, 2),
+            'growth_percent': round(float(rec.growth_percent), 2),
+            'largest_table': rec.largest_table,
+            'status': status,
+            'status_class': status_class,
+        })
+
+    kpi_used_percent = round((kpi_used / kpi_capacity * 100.0), 1) if kpi_capacity > 0 else 0.0
+    kpi_growth_percent = round((kpi_growth / kpi_capacity * 100.0), 2) if kpi_capacity > 0 else 0.0
 
     # Format user extracted name
     user = request.user
@@ -5345,8 +5448,17 @@ def capacity_print(request):
         'start_date': start_date,
         'end_date': end_date,
         'extracted_by': full_name,
-        'extracted_at': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S'),
-        'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time"
+        'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
+        'reporting_period_str': f"{start_date} to {end_date}" if (start_date or end_date) else "All Time",
+        'kpi_size': round(kpi_size, 2),
+        'kpi_capacity': round(kpi_capacity, 2),
+        'kpi_used': round(kpi_used, 2),
+        'kpi_free': round(kpi_free, 2),
+        'kpi_growth': round(kpi_growth, 2),
+        'kpi_used_percent': kpi_used_percent,
+        'kpi_growth_percent': kpi_growth_percent,
+        'health_panels': health_panels,
+        'download_mode': download_mode,
     }
     return render(request, 'capacity/print.html', context)
 
