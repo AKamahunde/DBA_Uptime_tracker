@@ -91,7 +91,7 @@
     min-height: 297mm;
     margin: 12px auto;
     background: #ffffff;
-    padding: 10mm 10mm 8mm 10mm;
+    padding: 12mm 12mm 10mm 12mm;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   }
 
@@ -156,6 +156,7 @@
   .summary-box {
     margin: 0 0 10px 0;
     padding: 0;
+    border: none !important;
   }
   .summary-box-label {
     font-size: 8px;
@@ -175,7 +176,7 @@
   .plain-metrics-strip {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2.5px;
     padding: 5px 0;
     margin: 4px 0 9px 0;
     border-top: 1px solid var(--border-mist);
@@ -186,6 +187,7 @@
     align-items: baseline;
     gap: 10px;
     padding: 1.5px 0;
+    border: none !important;
   }
   .plain-metric-label {
     font-size: 7.8px;
@@ -222,7 +224,7 @@
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    padding: 6mm 7mm 5mm 7mm !important;
+    padding: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
   }
@@ -236,6 +238,8 @@
     margin: 10px 0 5px 0;
     padding-bottom: 2px;
     border-bottom: 1.5px solid var(--border-mist);
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   table.report-table {
@@ -245,6 +249,13 @@
     font-size: 7.8px;
     table-layout: fixed;
   }
+  table.report-table thead {
+    display: table-header-group;
+  }
+  table.report-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
   table.report-table th {
     background: #f1f5f9;
     color: var(--primary-navy);
@@ -252,17 +263,16 @@
     font-size: 6.8px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    padding: 4.5px 4px;
+    padding: 4px 3px;
     border-top: 1px solid var(--border-mist);
     border-bottom: 1.5px solid var(--primary-navy);
     text-align: center;
-    white-space: nowrap;
   }
   table.report-table th.text-left {
     text-align: left;
   }
   table.report-table td {
-    padding: 4.5px 4px;
+    padding: 4px 3px;
     border-bottom: 1px solid var(--border-mist);
     text-align: center;
     vertical-align: middle;
@@ -314,6 +324,8 @@
     border-radius: 4px;
     padding: 7px 9px;
     background: #ffffff;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .signoff-header {
     font-size: 7.5px;
@@ -358,7 +370,7 @@
     flex-shrink: 0;
   }
   .signoff-line {
-    border-bottom: 1px dotted #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
     flex-grow: 1;
     margin-left: 2px;
     height: 0;
@@ -376,7 +388,7 @@
     .no-print { display: none !important; }
     @page {
       size: A4 portrait;
-      margin: 0 !important;
+      margin: 12mm 10mm 12mm 10mm !important;
     }
     html, body {
       margin: 0 !important;
@@ -387,12 +399,19 @@
     .page {
       box-shadow: none !important;
       border: none !important;
-      padding: 10mm 9mm 8mm 9mm !important;
+      padding: 0 !important;
       margin: 0 !important;
       width: 100% !important;
       max-width: 100% !important;
     }
-    .signoff-grid {
+    thead {
+      display: table-header-group !important;
+    }
+    tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    .signoff-grid, .signoff-box, .plain-metrics-strip, .summary-box {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -455,7 +474,7 @@
   </div>
 
   <div class="summary-box">
-    <div class="summary-box-label">Executive Capacity &amp; Storage Summary</div>
+    <div class="summary-box-label">Capacity &amp; Storage Summary</div>
     <p class="summary-box-text">
       Total provisioned database storage across <strong>{% if current_db == 'All Databases' %}all monitored enterprise database engines{% else %}the {{ current_db }} database environment{% endif %}</strong> stands at <strong>{{ kpi_capacity }} GB</strong>, with <strong>{{ kpi_used }} GB</strong> utilized (<strong>{{ kpi_used_percent }}%</strong> aggregate disk consumption), an active database footprint of <strong>{{ kpi_size }} GB</strong>, and <strong>{{ kpi_free }} GB</strong> of available free headroom. Net latest monthly data growth across the scoped environment is <strong>{% if kpi_growth > 0 %}+{% endif %}{{ kpi_growth }} GB</strong> ({{ kpi_growth_percent }}% of total capacity).
     </p>
@@ -489,16 +508,16 @@
   <table class="report-table">
     <thead>
       <tr>
-        <th class="text-left" style="width: 18%;">Database Engine</th>
-        <th style="width: 9%;">Snapshot</th>
-        <th style="width: 10%;">DB Size</th>
-        <th style="width: 10%;">Capacity</th>
-        <th style="width: 10%;">Disk Used</th>
-        <th style="width: 10%;">Free Space</th>
-        <th style="width: 8%;">Disk %</th>
-        <th style="width: 9%;">Tablespace %</th>
-        <th style="width: 8%;">Status</th>
-        <th class="text-left" style="width: 8%;">Top Object</th>
+        <th class="text-left" style="width: 16%;">Database Engine</th>
+        <th style="width: 8%;">Snapshot</th>
+        <th style="width: 9%;">DB Size</th>
+        <th style="width: 9%;">Capacity</th>
+        <th style="width: 9%;">Disk Used</th>
+        <th style="width: 9%;">Free Space</th>
+        <th style="width: 7%;">Disk %</th>
+        <th style="width: 8%;">Tablespace %</th>
+        <th style="width: 7%;">Status</th>
+        <th class="text-left" style="width: 18%;">Top Object</th>
       </tr>
     </thead>
     <tbody>
@@ -520,7 +539,7 @@
         <td class="nowrap">
           <span class="status-pill {{ p.status_class }}">{{ p.status }}</span>
         </td>
-        <td class="text-left" style="font-size: 6.8px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <td class="text-left" style="font-size: 7.2px; color: #334155; word-break: break-all; white-space: normal;">
           {{ p.largest_table|default:"—" }}
         </td>
       </tr>
@@ -533,16 +552,16 @@
   <table class="report-table">
     <thead>
       <tr>
-        <th class="text-left" style="width: 9%;">Month</th>
-        <th class="text-left" style="width: 16%;">Database Engine</th>
-        <th style="width: 9%;">DB Size</th>
-        <th style="width: 9.5%;">Capacity</th>
-        <th style="width: 9%;">Used</th>
-        <th style="width: 9%;">Free</th>
-        <th style="width: 7.5%;">Util %</th>
-        <th style="width: 11%;">Monthly Growth</th>
-        <th style="width: 12%;">Cumulative Growth</th>
-        <th class="text-left" style="width: 8%;">Largest Table</th>
+        <th class="text-left" style="width: 8%;">Month</th>
+        <th class="text-left" style="width: 15%;">Database Engine</th>
+        <th style="width: 8%;">DB Size</th>
+        <th style="width: 9%;">Capacity</th>
+        <th style="width: 8%;">Used</th>
+        <th style="width: 8%;">Free</th>
+        <th style="width: 7%;">Util %</th>
+        <th style="width: 9%;">Monthly Growth</th>
+        <th style="width: 10%;">Cumulative Growth</th>
+        <th class="text-left" style="width: 18%;">Largest Table</th>
       </tr>
     </thead>
     <tbody>
@@ -592,24 +611,26 @@
         <td class="nowrap">
           {% if item.growth_gb > 0 %}
             <span class="growth-positive">+{{ item.growth_gb }} GB</span>
-            <span style="color: #64748b; font-size: 7px;">({{ item.growth_percent }}%)</span>
+            <div style="color: #64748b; font-size: 6.8px;">({{ item.growth_percent }}%)</div>
           {% else %}
             <span class="growth-neutral">{{ item.growth_gb }} GB</span>
-            <span style="color: #64748b; font-size: 7px;">({{ item.growth_percent }}%)</span>
+            <div style="color: #64748b; font-size: 6.8px;">({{ item.growth_percent }}%)</div>
           {% endif %}
         </td>
         <td class="nowrap">
           {% if item.is_baseline_month %}
-            <span style="color: #64748b;">Baseline (0.00%)</span>
+            <span style="color: #64748b; font-size: 7px;">Baseline</span>
           {% elif item.cumulative_growth_gb > 0 %}
-            <strong>+{{ item.cumulative_growth_percent }}%</strong> <span style="color: #475569; font-size: 7px;">(+{{ item.cumulative_growth_gb }} GB)</span>
+            <span style="font-weight: 700; color: #b91c1c;">+{{ item.cumulative_growth_gb }} GB</span>
+            <div style="color: #475569; font-size: 6.8px;">(+{{ item.cumulative_growth_percent }}%)</div>
           {% elif item.cumulative_growth_gb < 0 %}
-            <strong>{{ item.cumulative_growth_percent }}%</strong> <span style="color: #475569; font-size: 7px;">({{ item.cumulative_growth_gb }} GB)</span>
+            <span style="font-weight: 700; color: #15803d;">{{ item.cumulative_growth_gb }} GB</span>
+            <div style="color: #475569; font-size: 6.8px;">({{ item.cumulative_growth_percent }}%)</div>
           {% else %}
-            0.00% <span style="color: #64748b; font-size: 7px;">(0.00 GB)</span>
+            <span style="color: #64748b; font-size: 7px;">0.00 GB</span>
           {% endif %}
         </td>
-        <td class="text-left" style="font-size: 6.9px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ item.largest_table }}">
+        <td class="text-left" style="font-size: 7.2px; color: #334155; word-break: break-all; white-space: normal;" title="{{ item.largest_table }}">
           {{ item.largest_table|default:"—" }}
         </td>
       </tr>
@@ -640,7 +661,7 @@
     </div>
 
     <div class="signoff-box">
-      <div class="signoff-header">Reviewed By (SDBA / SSA)</div>
+      <div class="signoff-header">Reviewed By (SDBA)</div>
       <div class="signoff-sig-field">
         <span class="signoff-sig-label">Signature:</span>
         <div class="signoff-sig-line"></div>
@@ -698,12 +719,12 @@
     const filename = `NMS_Database_Capacity_Report_${rawScope}_${rawPeriod}.pdf`;
 
     const opt = {
-      margin:       [4, 4, 4, 4],
+      margin:       [12, 10, 12, 10],
       filename:     filename,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak:    { mode: ['css', 'legacy'], avoid: ['tr', 'thead', '.signoff-grid', '.signoff-box', '.plain-metrics-strip', '.summary-box', '.section-heading', '.masthead-center'] }
     };
 
     html2pdf().set(opt).from(pageEl).save().then(function() {

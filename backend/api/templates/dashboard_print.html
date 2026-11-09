@@ -241,9 +241,22 @@
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
-    padding: 6mm 8mm 5mm 8mm !important;
+    padding: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
+  }
+  table.report-table tr,
+  table.spec-table tr,
+  .signoff-grid,
+  .signoff-box,
+  .plain-metrics-strip,
+  .summary-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .section-heading {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   /* Section Titles */
@@ -412,7 +425,7 @@
     flex-shrink: 0;
   }
   .signoff-line {
-    border-bottom: 1px dotted #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
     flex-grow: 1;
     margin-left: 2px;
     height: 0;
@@ -433,7 +446,7 @@
     }
     @page {
       size: A4 portrait;
-      margin: 0 !important;
+      margin: 12mm 12mm 12mm 12mm !important;
     }
     html, body {
       margin: 0 !important;
@@ -444,10 +457,13 @@
     .page {
       box-shadow: none !important;
       border: none !important;
-      padding: 10mm 10mm 8mm 10mm !important;
+      padding: 0 !important;
       margin: 0 !important;
       max-width: 100% !important;
       width: 100% !important;
+    }
+    thead {
+      display: table-header-group;
     }
     table.report-table th, table.report-table td {
       padding: 4px 6px !important;
@@ -756,12 +772,12 @@
     }
     document.body.classList.add('pdf-exporting');
     const opt = {
-      margin: [0, 0, 0, 0],
+      margin: [12, 12, 12, 12],
       filename: 'DBITRAC_Database_Performance_SLA_Report_{{ selected_db|slugify }}_{{ reporting_month_str|slugify }}.pdf',
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'thead', '.signoff-grid', '.signoff-box', '.plain-metrics-strip', '.summary-box', '.section-heading', '.masthead-center'] }
     };
     html2pdf().set(opt).from(pageEl).save().then(function() {
       document.body.classList.remove('pdf-exporting');
