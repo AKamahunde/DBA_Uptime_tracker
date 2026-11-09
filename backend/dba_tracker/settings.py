@@ -173,6 +173,12 @@ CSRF_TRUSTED_ORIGINS = [
     'http://nms360.nms.go.ug:91',
     'http://nms360.nms.go.ug',
     'https://nms360.nms.go.ug',
+    'http://dbtrac.nms.go.ug',
+    'https://dbtrac.nms.go.ug',
+    'http://dbtrac.nms.go.ug:90',
+    'http://dbtractest.nms.go.ug',
+    'https://dbtractest.nms.go.ug',
+    'http://dbtractest.nms.go.ug:91',
 ]
 
 # Distinct cookie names so Port 90 (v1) and Port 91 (v2 Test) never collide in the same browser
