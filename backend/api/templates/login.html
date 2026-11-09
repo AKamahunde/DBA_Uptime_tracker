@@ -170,7 +170,7 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
             </div>
-            <button type="submit" class="btn-signin" id="loginBtn">Sign In</button>
+            <button type="submit" class="btn-signin" id="loginBtn">Login</button>
         </form>
     </div>
 </div>
@@ -179,7 +179,7 @@
     document.getElementById('loginForm').addEventListener('submit', function() {
         document.getElementById('loginSpinner').classList.add('active');
         document.getElementById('loginBtn').disabled = true;
-        document.getElementById('loginBtn').textContent = 'Signing in…';
+        document.getElementById('loginBtn').textContent = 'Logging in…';
     });
 </script>
 {% endblock %}
