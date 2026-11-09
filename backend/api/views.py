@@ -639,6 +639,141 @@ def _get_database_detail(selected_db, reporting_month, dashboard_data, start_dat
             }
     return database_detail
 
+def _build_db_summary_narrative(filtered_data, selected_db, period_display, start_date, end_date):
+    """
+    Builds the executive Summary (lede_text) and Watch Item narrative for the
+    Database Operations Overview modal and PDF printout, incorporating Uptime SLA,
+    Incidents/MTTR, DR Replication failures/degradations, and Backup failures.
+    """
+    all_within_sla = True
+    total_incidents_all = 0
+    max_incidents_db = None
+    max_incidents_val = -1
+    mttr_values = []
+    operational_alerts = []
+
+    for item in filtered_data:
+        db_name = item['database']
+        if item.get('availability_status') != 'Meets SLA':
+            all_within_sla = False
+
+        inc_count = item.get('total_incidents')
+        if isinstance(inc_count, int):
+            total_incidents_all += inc_count
+            if inc_count > max_incidents_val:
+                max_incidents_val = inc_count
+                max_incidents_db = db_name
+
+        mttr_min = item.get('mttr_mins')
+        if isinstance(mttr_min, (int, float)):
+            mttr_values.append(mttr_min)
+
+        # Check DR Replication status & failures in the reporting period
+        if db_name in ['MySQL', 'Oracle']:
+            latest_rep = ReplicationMonitor.objects.filter(
+                database__iexact=db_name,
+                date__range=(start_date, end_date)
+            ).order_by('-date', '-created_at').first()
+            if not latest_rep:
+                latest_rep = ReplicationMonitor.objects.filter(
+                    database__iexact=db_name,
+                    date__lte=end_date
+                ).order_by('-date', '-created_at').first()
+
+            failed_rep_count = ReplicationMonitor.objects.filter(
+                database__iexact=db_name,
+                date__range=(start_date, end_date)
+            ).exclude(status='Healthy').count()
+
+            rep_stat = item.get('replication_status')
+            is_rep_unhealthy = (
+                (rep_stat not in ['Healthy', 'No Data', 'N/A', None, '—'])
+                or (latest_rep and (latest_rep.status != 'Healthy' or latest_rep.severity in ['Critical', 'High'] or latest_rep.io_thread != 'Yes' or latest_rep.sql_thread != 'Yes'))
+            )
+            if is_rep_unhealthy:
+                stream_str = f" ({latest_rep.master} → {latest_rep.replica})" if (latest_rep and latest_rep.master and latest_rep.replica) else ""
+                status_str = latest_rep.status if (latest_rep and latest_rep.status) else (rep_stat or 'Failed')
+                thread_str = f" (IO: {latest_rep.io_thread}, SQL: {latest_rep.sql_thread})" if latest_rep else ""
+                err_str = ""
+                if latest_rep and latest_rep.last_error:
+                    short_err = latest_rep.last_error.split('|')[0].strip()
+                    if len(short_err) > 130:
+                        short_err = short_err[:127] + "..."
+                    err_str = f" — {short_err}"
+                operational_alerts.append(
+                    f"{db_name} disaster recovery replication{stream_str} recorded a {status_str} status{thread_str}{err_str} and requires DBA attention"
+                )
+            elif failed_rep_count > 0:
+                operational_alerts.append(
+                    f"{db_name} disaster recovery replication logged {failed_rep_count} failure/degradation event(s) during this period before recovering to Healthy"
+                )
+
+        # Check Backup failures in the reporting period
+        failed_bks = item.get('failed_backups')
+        if isinstance(failed_bks, int) and failed_bks > 0:
+            operational_alerts.append(
+                f"{db_name} recorded {failed_bks} failed backup(s) during this period"
+            )
+
+    avg_mttr = f"{round((sum(mttr_values)/len(mttr_values))/60, 2)} hrs" if mttr_values else '—'
+
+    if selected_db != 'All Databases':
+        if all_within_sla:
+            lede_prefix = f"The {selected_db} production database held within SLA during {period_display}."
+        else:
+            lede_prefix = f"The {selected_db} production database did not meet the SLA target during {period_display}."
+
+        if total_incidents_all > 0:
+            lede_suffix = f"A total of {total_incidents_all} incident(s) were logged, with a mean time to resolution of {avg_mttr}."
+            if operational_alerts:
+                lede_suffix += " Additionally, " + "; ".join(operational_alerts) + "."
+        else:
+            if operational_alerts:
+                lede_suffix = "While no primary database outage incidents were logged during this period, " + "; ".join(operational_alerts) + "."
+            else:
+                lede_suffix = "No incidents or service interruptions were logged during this period."
+    else:
+        db_count_word = 'four' if len(filtered_data) == 4 else ('three' if len(filtered_data) == 3 else str(len(filtered_data)))
+        if all_within_sla:
+            lede_prefix = f"All {db_count_word} production databases held within SLA during {period_display}."
+        else:
+            lede_prefix = f"Not all production databases met the SLA target during {period_display}."
+
+        if max_incidents_db and max_incidents_val > 0:
+            others_combined = total_incidents_all - max_incidents_val
+            if max_incidents_val > others_combined:
+                compare_str = "more than the other systems combined"
+            else:
+                compare_str = "more than any other system"
+            lede_suffix = f"The one thing worth a second look: {max_incidents_db} logged {max_incidents_val} incidents — {compare_str} — even though its uptime never slipped."
+            if operational_alerts:
+                lede_suffix += " Additionally, " + "; ".join(operational_alerts) + "."
+        else:
+            if operational_alerts:
+                lede_suffix = "While no primary database outage incidents were logged during this period, " + "; ".join(operational_alerts) + "."
+            else:
+                lede_suffix = "No significant incident trends were logged during this period."
+
+    lede_text = f"{lede_prefix} {lede_suffix}"
+
+    if selected_db != 'All Databases':
+        if operational_alerts:
+            watch_item_text = f"<strong>Watch item —</strong> {'; '.join(operational_alerts)}."
+        elif total_incidents_all > 0:
+            watch_item_text = f"<strong>Watch item —</strong> {selected_db} logged {total_incidents_all} incident(s) during this period. Mean time to resolution was {avg_mttr}."
+        else:
+            watch_item_text = f"<strong>Watch item —</strong> No major watch items logged for {selected_db}. Performance is within baseline thresholds."
+    else:
+        if operational_alerts:
+            watch_item_text = f"<strong>Watch item —</strong> {'; '.join(operational_alerts)}."
+        elif max_incidents_db and max_incidents_val > 0:
+            watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this period. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
+        else:
+            watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
+
+    return lede_text, watch_item_text, avg_mttr
+
+
 @login_required
 def dashboard(request):
     can_view_db_dashboard = (
@@ -1013,59 +1148,10 @@ def dashboard(request):
     activities.sort(key=lambda x: x['sort_time'], reverse=True)
     recent_activity = activities[:8]
 
-    # Calculate Default Lede narrative for modal preview
-    all_within_sla_dashboard = True
-    total_incidents_all_dashboard = 0
-    max_incidents_db_dashboard = None
-    max_incidents_val_dashboard = -1
-    
-    mttr_values_dashboard = []
-    
-    for item in filtered_dashboard_data:
-        if item['availability_status'] != 'Meets SLA':
-            all_within_sla_dashboard = False
-            
-        inc_count = item['total_incidents']
-        if isinstance(inc_count, int):
-            total_incidents_all_dashboard += inc_count
-            if inc_count > max_incidents_val_dashboard:
-                max_incidents_val_dashboard = inc_count
-                max_incidents_db_dashboard = item['database']
-                
-        mttr_min = item['mttr_mins']
-        if isinstance(mttr_min, (int, float)):
-            mttr_values_dashboard.append(mttr_min)
-            
-    avg_mttr_dashboard = f"{round((sum(mttr_values_dashboard)/len(mttr_values_dashboard))/60, 2)} hrs" if mttr_values_dashboard else '—'
-
-    if selected_db != 'All Databases':
-        if all_within_sla_dashboard:
-            lede_prefix = f"The {selected_db} production database held within SLA during {period_display}."
-        else:
-            lede_prefix = f"The {selected_db} production database did not meet the SLA target during {period_display}."
-
-        if total_incidents_all_dashboard > 0:
-            lede_suffix = f"A total of {total_incidents_all_dashboard} incident(s) were logged, with a mean time to resolution of {avg_mttr_dashboard}."
-        else:
-            lede_suffix = "No incidents or service interruptions were logged during this period."
-    else:
-        db_count_word = 'four' if len(filtered_dashboard_data) == 4 else ('three' if len(filtered_dashboard_data) == 3 else str(len(filtered_dashboard_data)))
-        if all_within_sla_dashboard:
-            lede_prefix = f"All {db_count_word} production databases held within SLA during {period_display}."
-        else:
-            lede_prefix = f"Not all production databases met the SLA target during {period_display}."
-
-        if max_incidents_db_dashboard and max_incidents_val_dashboard > 0:
-            others_combined = total_incidents_all_dashboard - max_incidents_val_dashboard
-            if max_incidents_val_dashboard > others_combined:
-                compare_str = "more than the other systems combined"
-            else:
-                compare_str = "more than any other system"
-            lede_suffix = f"The one thing worth a second look: {max_incidents_db_dashboard} logged {max_incidents_val_dashboard} incidents — {compare_str} — even though its uptime never slipped."
-        else:
-            lede_suffix = "No significant incident trends were logged during this period."
-            
-    default_lede_text = f"{lede_prefix} {lede_suffix}"
+    # Calculate Default Lede narrative for modal preview (including Replication & Backup failures)
+    default_lede_text, _, _ = _build_db_summary_narrative(
+        filtered_dashboard_data, selected_db, period_display, start_date, end_date
+    )
 
     can_view_db_dashboard = (
         request.user.is_admin
@@ -1258,50 +1344,14 @@ def dashboard_print(request):
     avg_uptime = f"{round(sum(uptimes)/len(uptimes), 2)}%" if uptimes else 'No Data'
     avg_mttr = f"{round((sum(mttr_values)/len(mttr_values))/60, 2)} hrs" if mttr_values else '—'
 
-    # Build Lede Text
-    if selected_db != 'All Databases':
-        if all_within_sla:
-            lede_prefix = f"The {selected_db} production database held within SLA during {period_display}."
-        else:
-            lede_prefix = f"The {selected_db} production database did not meet the SLA target during {period_display}."
-
-        if total_incidents_all > 0:
-            lede_suffix = f"A total of {total_incidents_all} incident(s) were logged, with a mean time to resolution of {avg_mttr}."
-        else:
-            lede_suffix = "No incidents or service interruptions were logged during this period."
-    else:
-        db_count_word = 'four' if len(dashboard_data) == 4 else ('three' if len(dashboard_data) == 3 else str(len(dashboard_data)))
-        if all_within_sla:
-            lede_prefix = f"All {db_count_word} production databases held within SLA during {period_display}."
-        else:
-            lede_prefix = f"Not all production databases met the SLA target during {period_display}."
-
-        if max_incidents_db and max_incidents_val > 0:
-            others_combined = total_incidents_all - max_incidents_val
-            if max_incidents_val > others_combined:
-                compare_str = "more than the other systems combined"
-            else:
-                compare_str = "more than any other system"
-            lede_suffix = f"The one thing worth a second look: <em>{max_incidents_db} logged {max_incidents_val} incidents</em> — {compare_str} — even though its uptime never slipped."
-        else:
-            lede_suffix = "No significant incident trends were logged during this period."
-    
+    # Build Lede & Watch Item Text (including Replication & Backup failures)
+    auto_lede_text, watch_item_text, _ = _build_db_summary_narrative(
+        dashboard_data, selected_db, period_display, start_date, end_date
+    )
     if summary_narrative:
         lede_text = summary_narrative
     else:
-        lede_text = f"{lede_prefix} {lede_suffix}"
-
-    # Build Watch Item Text
-    if selected_db != 'All Databases':
-        if total_incidents_all > 0:
-            watch_item_text = f"<strong>Watch item —</strong> {selected_db} logged {total_incidents_all} incident(s) during this period. Mean time to resolution was {avg_mttr}."
-        else:
-            watch_item_text = f"<strong>Watch item —</strong> No major watch items logged for {selected_db}. Performance is within baseline thresholds."
-    else:
-        if max_incidents_db and max_incidents_val > 0:
-            watch_item_text = f"<strong>Watch item —</strong> {max_incidents_db}'s incident count is the outlier this period. Uptime and MTTR were both within range, so this didn't threaten SLA, but the volume is worth a root-cause review before it trends upward."
-        else:
-            watch_item_text = "<strong>Watch item —</strong> No major watch items logged for this period. All systems are performing within baseline thresholds."
+        lede_text = auto_lede_text
 
     context = {
         'dashboard_data': formatted_data,
