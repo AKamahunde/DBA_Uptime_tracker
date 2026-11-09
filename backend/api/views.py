@@ -785,6 +785,27 @@ def dashboard(request):
             'type': 'danger',
             'message': f"Open Incident: {inc.ticket or 'INC-'+str(inc.id)} ({inc.database}) &mdash; {inc.severity} priority."
         })
+
+    # Replication failures / issues (Database scope)
+    rep_alert_dbs = ['MySQL', 'Oracle'] if selected_db == 'All Databases' else ([selected_db] if selected_db in ['MySQL', 'Oracle'] else [])
+    for r_db in rep_alert_dbs:
+        latest_rep_alert = ReplicationMonitor.objects.filter(
+            database__iexact=r_db,
+            date__year=reporting_month.year,
+            date__month=reporting_month.month
+        ).order_by('-date', '-created_at').first()
+        if latest_rep_alert and (latest_rep_alert.status != 'Healthy' or latest_rep_alert.severity in ['Critical', 'High']):
+            lag_txt = f"{latest_rep_alert.seconds_behind}s lag" if latest_rep_alert.seconds_behind is not None else "NULL lag"
+            err_snippet = ""
+            if latest_rep_alert.last_error:
+                short_err = latest_rep_alert.last_error.split('|')[0].strip()
+                if len(short_err) > 110:
+                    short_err = short_err[:107] + "..."
+                err_snippet = f" &mdash; {short_err}"
+            attention_items.append({
+                'type': 'danger' if (latest_rep_alert.status == 'Failed' or latest_rep_alert.severity == 'Critical') else 'warning',
+                'message': f"Replication ({r_db}): {latest_rep_alert.master} &rarr; {latest_rep_alert.replica} is <strong>{latest_rep_alert.status}</strong> (IO: {latest_rep_alert.io_thread}, SQL: {latest_rep_alert.sql_thread}, {lag_txt}){err_snippet}"
+            })
         
     # 8. Combined Recent Activity
     activities = []
