@@ -2438,7 +2438,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'parent_node_key': 'OLKVM',
             'cluster': 'OLKVM',
             'role': 'Oracle EBS Applications (Production)',
-            'database': 'Oracle',
+            'database': '—',
             'ip_address': '192.168.30.25',
             'vmid': 'N/A (OLKVM)',
             'filter_q': Q(server__icontains='ebs') | Q(hosted_systems__icontains='nmsebs'),
@@ -2469,7 +2469,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'parent_node_key': 'pvenode1',
             'cluster': 'Proxmox',
             'role': 'Internal Web Applications & Services',
-            'database': 'Internal Apps',
+            'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/102',
             'filter_q': Q(server__icontains='tomcat') | Q(hosted_systems__icontains='tomcat'),
@@ -2485,7 +2485,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'parent_node_key': 'pvenode2',
             'cluster': 'Proxmox',
             'role': 'Secure Bastion & Gateway Access',
-            'database': 'Infrastructure',
+            'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/100',
             'filter_q': Q(server__icontains='jumphost') | Q(hosted_systems__icontains='jumphost'),
@@ -2501,7 +2501,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'parent_node_key': 'pvenode2',
             'cluster': 'Proxmox',
             'role': 'Prometheus, Grafana & Ops Telemetry',
-            'database': 'Monitoring',
+            'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/101',
             'filter_q': Q(server__icontains='monitoring') | Q(hosted_systems__icontains='monitoring'),
@@ -4279,7 +4279,7 @@ def dashboard_node_excel(request):
         row_num += 1
 
         vm_headers = [
-            "Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Database", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"
+            "Virtual Machine", "Host Hypervisor", "Cluster", "Workload / Role", "Uptime SLA (%)", "Unplanned Down (Hrs)", "CPU Util (%)", "Memory (Used / Total GB)", "Memory Util (%)", "Status"
         ]
         ws.append(vm_headers)
         ws.row_dimensions[row_num].height = 24
@@ -4297,7 +4297,6 @@ def dashboard_node_excel(request):
                 vm['host_node'],
                 vm['cluster'],
                 vm['role'],
-                vm['database'],
                 f"{vm['uptime_percent']}%",
                 f"{vm.get('unplanned_down_hrs', 0.0)} hrs" if vm.get('unplanned_down_hrs', 0.0) > 0 else "0.00 hrs",
                 f"{vm['cpu_percent']}%",

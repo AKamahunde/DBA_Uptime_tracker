@@ -525,11 +525,10 @@
   <table class="report-table">
     <thead>
       <tr>
-        <th style="width: 19%;">Virtual Machine</th>
-        <th style="text-align: left; width: 15%;">Host Hypervisor</th>
-        <th style="text-align: left; width: 23%;">Workload / Role</th>
-        <th style="text-align: center; width: 11%;">Database</th>
-        <th style="text-align: center; width: 9%;">Uptime SLA</th>
+        <th style="width: 22%;">Virtual Machine</th>
+        <th style="text-align: left; width: 17%;">Host Hypervisor</th>
+        <th style="text-align: left; width: 28%;">Workload / Role</th>
+        <th style="text-align: center; width: 10%;">Uptime SLA</th>
         <th style="text-align: center; width: 7%;">CPU Util %</th>
         <th style="text-align: center; width: 9%;">Memory (RAM)</th>
         <th style="text-align: center; width: 7%;">Status</th>
@@ -548,8 +547,7 @@
           <strong style="color: var(--text-dark); font-size: 8.5px;">{{ vm.host_node }}</strong>
           <div style="font-size: 7.2px; color: #64748b; line-height: 1.25; margin-top: 1px;">{{ vm.cluster }}</div>
         </td>
-        <td style="text-align: left; font-size: 8px; color: #475569;">{{ vm.role }}</td>
-        <td style="text-align: center; font-weight: 600; font-size: 8.5px; color: var(--text-dark);">{{ vm.database }}</td>
+        <td style="text-align: left; font-size: 8.2px; color: #334155;">{{ vm.role }}</td>
         <td style="text-align: center; font-size: 8.5px; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}var(--green-text){% elif vm.uptime_percent >= 99.0 %}#d97706{% else %}var(--red-text){% endif %};">
           {{ vm.uptime_str }}
           {% if vm.unplanned_down_hrs > 0 %}
@@ -569,7 +567,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" style="text-align: center; padding: 10px; font-size: 8.5px; color: var(--text-soft); font-style: italic;">No virtual machines found for the selected scope.</td>
+        <td colspan="7" style="text-align: center; padding: 10px; font-size: 8.5px; color: var(--text-soft); font-style: italic;">No virtual machines found for the selected scope.</td>
       </tr>
       {% endfor %}
     </tbody>

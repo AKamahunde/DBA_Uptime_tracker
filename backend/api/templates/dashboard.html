@@ -1099,7 +1099,11 @@
                         <div style="font-weight: 500; color: #334155; font-size: 0.82rem;">{{ vm.role }}</div>
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        {% if vm.database and vm.database != '—' %}
                         <span style="font-weight: 600; color: var(--primary-navy); font-size: 0.82rem;">{{ vm.database }}</span>
+                        {% else %}
+                        <span style="color: #94a3b8; font-size: 0.82rem;">—</span>
+                        {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 700; color: {% if vm.uptime_percent >= target_node_sla %}#137333{% elif vm.uptime_percent >= 99.0 %}#b06000{% else %}#c5221f{% endif %}; white-space: nowrap; vertical-align: middle;">
                         {{ vm.uptime_str }}
