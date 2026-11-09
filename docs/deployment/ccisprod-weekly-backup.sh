@@ -33,8 +33,13 @@ STAMP="$(date +%Y%m%d_%H%M)"
 DEST="$BACKUP_ROOT/$STAMP"
 LOG="$BACKUP_ROOT/backup.log"
 
-# DBTRAC Reporting Configuration
-DBTRAC_API_URL="${DBTRAC_API_URL:-http://192.168.35.38:90/api/backup/ingest/}"
+# DBITRAC Reporting Configuration (IP with DNS fallback for migration resilience)
+DBTRAC_API_URL="${DBTRAC_API_URL:-http://192.168.35.38:91/api/backup/ingest/}"
+DBTRAC_FALLBACK_URLS=(
+  "$DBTRAC_API_URL"
+  "http://dbtractest.nms.go.ug/api/backup/ingest/"
+  "http://dbtractest.nms.go.ug:91/api/backup/ingest/"
+)
 DBTRAC_API_KEY="${DBTRAC_API_KEY:-uptimetracker_api_9f2c1d8e45x9}"
 START_EPOCH="$(date +%s)"
 START_ISO="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -60,10 +65,7 @@ report_to_dbtrac() {
   local clean_reason
   clean_reason="$(printf '%s' "$raw_reason" | tr '\n\r"' "  '")"
 
-  curl -fsS -m 15 -X POST "$DBTRAC_API_URL" \
-    -H "Content-Type: application/json" \
-    -H "X-API-KEY: $DBTRAC_API_KEY" \
-    -d "{
+  local payload="{
       \"database\": \"PostgreSQL\",
       \"database_instance\": \"ccisprod_db\",
       \"backup_type\": \"Full\",
@@ -76,7 +78,21 @@ report_to_dbtrac() {
       \"location\": \"${dump_file}\",
       \"verified\": ${is_verified},
       \"compression\": true
-    }" >/dev/null 2>&1 || echo "WARN: Could not notify DBTRAC API at $DBTRAC_API_URL"
+    }"
+
+  local sent=0
+  for api_url in "${DBTRAC_FALLBACK_URLS[@]}"; do
+    if curl -fsS --connect-timeout 6 -m 15 -X POST "$api_url" \
+      -H "Content-Type: application/json" \
+      -H "X-API-KEY: $DBTRAC_API_KEY" \
+      -d "$payload" >/dev/null 2>&1; then
+      sent=1
+      break
+    fi
+  done
+  if [ "$sent" -eq 0 ]; then
+    echo "WARN: Could not notify DBITRAC API via IP or DNS fallback (${DBTRAC_FALLBACK_URLS[*]})"
+  fi
 }
 
 fail() {

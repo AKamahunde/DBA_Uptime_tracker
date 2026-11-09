@@ -28,7 +28,13 @@ from datetime import datetime, timezone
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:90")
+DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:91")
+FALLBACK_BASE_URLS = [
+    DBTRAC_BASE_URL,
+    "http://192.168.35.38:91",
+    "http://dbtractest.nms.go.ug",
+    "http://dbtractest.nms.go.ug:91",
+]
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 
 PG_CONTAINER_FILTER = os.environ.get("PG_CONTAINER_FILTER", "ccisprod_db")
@@ -53,19 +59,33 @@ def _run_cmd(cmd, timeout=15):
 
 
 def _post_json(endpoint, payload):
-    url = f"{DBTRAC_BASE_URL.rstrip('/')}/{endpoint.lstrip('/')}"
     body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "X-API-KEY": API_KEY,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return resp.status, resp.read().decode("utf-8", errors="replace")
+    seen = set()
+    last_exc = None
+    for base in FALLBACK_BASE_URLS:
+        base_clean = base.rstrip("/")
+        if not base_clean or base_clean in seen:
+            continue
+        seen.add(base_clean)
+        url = f"{base_clean}/{endpoint.lstrip('/')}"
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-KEY": API_KEY,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status, resp.read().decode("utf-8", errors="replace")
+        except Exception as exc:
+            last_exc = exc
+            continue
+    if last_exc:
+        raise last_exc
+    return 500, "No valid endpoint configured"
 
 
 # ==============================================================================

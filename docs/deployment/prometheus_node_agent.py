@@ -317,17 +317,36 @@ def build_proxmox_payload(cfg):
 
 def push_to_dbtrac(payload):
     body = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
+    fallback_urls = [
         INGEST_API_URL,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "X-API-KEY": API_KEY,
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        "http://192.168.35.38:91/api/health/ingest/",
+        "http://dbtractest.nms.go.ug/api/health/ingest/",
+        "http://dbtractest.nms.go.ug:91/api/health/ingest/",
+    ]
+    seen = set()
+    last_err = None
+    for url in fallback_urls:
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-API-KEY": API_KEY,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as err:
+            last_err = err
+            continue
+    if last_err:
+        raise last_err
+    return {}
 
 
 if __name__ == "__main__":
