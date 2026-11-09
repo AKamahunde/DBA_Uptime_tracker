@@ -1643,21 +1643,24 @@ def dashboard_excel(request):
         ws.cell(row=legend_start+4, column=1, value="• PostgreSQL: ccisprod_db (PostGIS 17-3.5 on Docker Swarm) - Hosts the Cold Chain Information System (CCIS / ODK-X) national cold-chain equipment & telemetry platform.").font = font_body
         
         # Adjust Column Widths
-        for col in ws.columns:
+        import io
+        for col_idx, col in enumerate(ws.columns, 1):
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col_idx)
             for cell in col:
                 if cell.row == 1 or cell.row > legend_start:
                     continue
-                if cell.value:
+                if cell.value is not None:
                     max_len = max(max_len, len(str(cell.value)))
             ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
             
         filename_prefix = f"DB_Performance_Summary_{selected_db.replace(' ', '_')}_{month_str}" if selected_db and selected_db != 'All Databases' else f"DB_Performance_Summary_{month_str}"
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        buf = io.BytesIO()
+        wb.save(buf)
+        xlsx_bytes = buf.getvalue()
+        response = HttpResponse(xlsx_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.xlsx"'
-        wb.save(response)
+        response['Content-Length'] = str(len(xlsx_bytes))
         return response
         
     except Exception:
@@ -4284,10 +4287,10 @@ def dashboard_node_excel(request):
         row_num += 1
         ws.cell(row=row_num, column=1, value=f"Extracted by {user_display} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}").font = Font(name='Segoe UI', size=9, italic=True)
 
-        for col in ws.columns:
+        import io
+        for col_idx, col in enumerate(ws.columns, 1):
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col_idx)
             for cell in col:
                 if cell.row == 1 or cell.row >= row_num:
                     continue
@@ -4295,11 +4298,14 @@ def dashboard_node_excel(request):
                     max_len = max(max_len, len(str(cell.value)))
             ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
 
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         safe_scope = selected_node.replace(' ', '_').replace('.', '_')
         filename = f"Node_Performance_SLA_{safe_scope}_{reporting_month.strftime('%Y_%m')}.xlsx"
+        buf = io.BytesIO()
+        wb.save(buf)
+        xlsx_bytes = buf.getvalue()
+        response = HttpResponse(xlsx_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
+        response['Content-Length'] = str(len(xlsx_bytes))
         return response
     except Exception:
         import csv
@@ -5471,21 +5477,24 @@ def capacity_excel(request):
         ws.cell(row=row_num, column=1, value=f"Extracted by {full_name} on {timezone.now().strftime('%d/%m/%Y')}").font = Font(name='Segoe UI', size=9, italic=True)
         
         # Adjust Column Widths
-        for col in ws.columns:
+        import io
+        for col_idx, col in enumerate(ws.columns, 1):
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col_idx)
             for cell in col:
                 if cell.row == 1 or cell.row > row_num:
                     continue
-                if cell.value:
+                if cell.value is not None:
                     max_len = max(max_len, len(str(cell.value)))
             ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
             
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         filename = f"Capacity_Report_{db_display.replace(' ', '_')}_{period_display}.xlsx"
+        buf = io.BytesIO()
+        wb.save(buf)
+        xlsx_bytes = buf.getvalue()
+        response = HttpResponse(xlsx_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
+        response['Content-Length'] = str(len(xlsx_bytes))
         return response
         
     except Exception:
@@ -5774,22 +5783,25 @@ def capacity_infra_excel(request):
         row_num += 1
         ws.cell(row=row_num, column=1, value=f"Extracted by {full_name} on {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')} EAT").font = Font(name='Segoe UI', size=9, italic=True)
 
-        for col in ws.columns:
+        import io
+        for col_idx, col in enumerate(ws.columns, 1):
             max_len = 0
-            col_val = col[0].column
-            col_letter = get_column_letter(col_val) if isinstance(col_val, int) else str(col_val)
+            col_letter = get_column_letter(col_idx)
             for cell in col:
                 if cell.row in (1, 3, 4) or cell.row > row_num:
                     continue
-                if cell.value:
+                if cell.value is not None:
                     max_len = max(max_len, len(str(cell.value)))
             ws.column_dimensions[col_letter].width = max(max_len + 3, 13)
 
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         clean_scope = node_scope_display.replace(' ', '_')
         filename = f"Infra_Storage_Capacity_Tracking_Report_{clean_scope}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        buf = io.BytesIO()
+        wb.save(buf)
+        xlsx_bytes = buf.getvalue()
+        response = HttpResponse(xlsx_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        wb.save(response)
+        response['Content-Length'] = str(len(xlsx_bytes))
         return response
 
     except Exception:

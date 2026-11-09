@@ -173,7 +173,7 @@
                     <a href="{% url 'capacity_infra_print' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
                         Export PDF
                     </a>
-                    <a href="{% url 'capacity_infra_excel' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
+                    <a href="{% url 'capacity_infra_excel' %}?node_select={{ selected_node }}&start_date={{ start_date }}&end_date={{ end_date }}">
                         Export Excel
                     </a>
                 </div>
@@ -217,7 +217,7 @@
                     <a href="{% url 'capacity_print' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}&download=true" target="_blank">
                         Export PDF
                     </a>
-                    <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}" download>
+                    <a href="{% url 'capacity_excel' %}?database={{ current_db }}&start_date={{ start_date }}&end_date={{ end_date }}">
                         Export Excel
                     </a>
                 </div>

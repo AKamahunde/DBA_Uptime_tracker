@@ -250,7 +250,7 @@
                     <a href="javascript:void(0)" onclick="openExportModal()">
                         Export PDF Report
                     </a>
-                    <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&period_mode={{ period_mode }}&start_date={{ start_date }}&end_date={{ end_date }}&database_select={{ selected_db }}" download>
+                    <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&period_mode={{ period_mode }}&start_date={{ start_date }}&end_date={{ end_date }}&database_select={{ selected_db }}">
                         Export Excel Summary
                     </a>
                 </div>
@@ -898,7 +898,7 @@
                     <a href="javascript:void(0)" onclick="openNodeExportModal()">
                         Export PDF Report
                     </a>
-                    <a href="{% url 'dashboard_node_excel' %}?node_month={{ node_reporting_month }}&node_period_mode={{ node_period_mode }}&node_start_date={{ node_start_date }}&node_end_date={{ node_end_date }}&node_select={{ selected_node }}" download>
+                    <a href="{% url 'dashboard_node_excel' %}?node_month={{ node_reporting_month }}&node_period_mode={{ node_period_mode }}&node_start_date={{ node_start_date }}&node_end_date={{ node_end_date }}&node_select={{ selected_node }}">
                         Export Excel Summary
                     </a>
                 </div>
@@ -1342,7 +1342,7 @@
             <!-- Action Buttons -->
             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
                 <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&period_mode={{ period_mode }}&start_date={{ start_date }}&end_date={{ end_date }}&database_select={{ selected_db }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
+                <a href="{% url 'dashboard_excel' %}?month={{ reporting_month }}&period_mode={{ period_mode }}&start_date={{ start_date }}&end_date={{ end_date }}&database_select={{ selected_db }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" onclick="closeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
                     Excel Summary (.xlsx)
                 </a>
@@ -1471,7 +1471,7 @@
             <!-- Action Buttons -->
             <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 1.1rem; margin-top: 0.25rem;">
                 <!-- Secondary Excel Action -->
-                <a href="{% url 'dashboard_node_excel' %}?node_month={{ node_reporting_month }}&node_period_mode={{ node_period_mode }}&node_start_date={{ node_start_date }}&node_end_date={{ node_end_date }}&node_select={{ selected_node }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" download onclick="closeNodeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
+                <a href="{% url 'dashboard_node_excel' %}?node_month={{ node_reporting_month }}&node_period_mode={{ node_period_mode }}&node_start_date={{ node_start_date }}&node_end_date={{ node_end_date }}&node_select={{ selected_node }}" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.48rem 0.8rem; border-radius: 6px; font-size: 0.76rem; font-weight: 600; color: #047857; background: #ecfdf5; text-decoration: none; border: 1px solid #a7f3d0; transition: all 0.15s; font-family: inherit;" onclick="closeNodeExportModal()" onmouseover="this.style.backgroundColor='#d1fae5'" onmouseout="this.style.backgroundColor='#ecfdf5'">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
                     Excel Summary (.xlsx)
                 </a>
