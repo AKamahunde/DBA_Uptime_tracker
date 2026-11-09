@@ -72,23 +72,29 @@ function Send-IncidentToApi {
         "X-API-KEY"    = $ApiKey
     }
 
-    try {
-        $response = Invoke-RestMethod -Uri $endpoint -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 15
-        if ($response.status -eq 'success') {
-            Write-Host "[OK] Logged to DBTRAC Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
-            return $true
-        } elseif ($response.status -eq 'ignored') {
-            Write-Host "[INFO] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
-            return $true
-        } else {
-            Write-Host "API Response: $($response | ConvertTo-Json -Compress)" -ForegroundColor Yellow
-            return $true
+    $fallbackEndpoints = @(
+        "http://192.168.35.38:91/api/incident/ingest/",
+        "http://dbtractest.nms.go.ug/api/incident/ingest/",
+        "$($ApiBaseUrl.TrimEnd('/'))/incident/ingest/",
+        "http://dbtrac.nms.go.ug/api/incident/ingest/"
+    )
+    $anySuccess = $false
+    foreach ($epUrl in $fallbackEndpoints) {
+        try {
+            $response = Invoke-RestMethod -Uri $epUrl -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
+            if ($response.status -eq 'success') {
+                Write-Host "[OK] [$epUrl] Logged to Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
+                $anySuccess = $true
+            } elseif ($response.status -eq 'ignored') {
+                Write-Host "[INFO] [$epUrl] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
+                $anySuccess = $true
+            }
+        }
+        catch {
+            Write-Warning "[$epUrl] Unreachable: $($_.Exception.Message)"
         }
     }
-    catch {
-        Write-Error "Failed to POST incident starting at $($Payload.start): $_"
-        return $false
-    }
+    return $anySuccess
 }
 
 # ============================================================

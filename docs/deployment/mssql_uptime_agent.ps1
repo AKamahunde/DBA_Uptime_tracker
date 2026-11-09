@@ -28,25 +28,27 @@ function Send-PayloadToApi {
         [hashtable]$Payload
     )
     
-    $url = "$ApiBaseUrl/$Endpoint"
     $json = ConvertTo-Json $Payload -Depth 10
-    
     $headers = @{
         "Content-Type" = "application/json"
         "X-API-KEY"    = $ApiKey
     }
-    
-    Write-Host "Sending payload to $url..."
-    try {
-        $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing
-        Write-Host "Success: $($response | ConvertTo-Json -Compress)"
-    }
-    catch {
-        Write-Error "Failed to send data to $url. Error: $_"
-        if ($_.Exception.Response) {
-            $stream = $_.Exception.Response.GetResponseStream()
-            $reader = New-Object System.IO.StreamReader($stream)
-            Write-Error "Response body: $($reader.ReadToEnd())"
+    $targetGroups = @(
+        @("http://192.168.35.38:91/api", "http://dbtractest.nms.go.ug/api", "http://dbtractest.nms.go.ug:91/api"),
+        @($ApiBaseUrl, "http://dbtrac.nms.go.ug/api", "http://dbtrac.nms.go.ug:90/api")
+    )
+    foreach ($group in $targetGroups) {
+        foreach ($base in $group) {
+            $url = "$($base.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
+            Write-Host "Sending payload to $url..."
+            try {
+                $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
+                Write-Host "[$url] Success: $($response | ConvertTo-Json -Compress)"
+                break
+            }
+            catch {
+                Write-Warning "[$url] Unreachable ($($_.Exception.Message)), trying DNS fallback..."
+            }
         }
     }
 }

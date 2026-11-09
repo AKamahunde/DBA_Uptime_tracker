@@ -83,19 +83,34 @@ def collect_health_data():
     }
 
 def send_to_tracker(payload):
-    """Sends the JSON payload to the Uptime Tracker API."""
+    """Sends the JSON payload to DBITRAC/DBTRAC with IP -> DNS fallback."""
+    target_groups = [
+        [
+            "http://192.168.35.38:91/api/health/ingest/",
+            "http://dbtractest.nms.go.ug/api/health/ingest/",
+            "http://dbtractest.nms.go.ug:91/api/health/ingest/",
+        ],
+        [
+            UPTIME_TRACKER_API_URL,
+            "http://dbtrac.nms.go.ug/api/health/ingest/",
+            "http://dbtrac.nms.go.ug:90/api/health/ingest/",
+        ],
+    ]
     data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(UPTIME_TRACKER_API_URL, data=data)
-    req.add_header('Content-Type', 'application/json')
-    req.add_header('X-API-KEY', API_KEY)
-    
-    try:
-        response = urllib.request.urlopen(req)
-        print(f"Successfully ingested health data: {response.read().decode('utf-8')}")
-    except urllib.error.HTTPError as e:
-        print(f"HTTP Error {e.code}: {e.read().decode('utf-8')}")
-    except urllib.error.URLError as e:
-        print(f"Connection Error: {e.reason}")
+    for group in target_groups:
+        for url in group:
+            req = urllib.request.Request(url, data=data)
+            req.add_header('Content-Type', 'application/json')
+            req.add_header('X-API-KEY', API_KEY)
+            try:
+                response = urllib.request.urlopen(req, timeout=8)
+                print(f"[{url}] Successfully ingested health data: {response.read().decode('utf-8')}")
+                break
+            except urllib.error.HTTPError as e:
+                print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8')}")
+                break
+            except urllib.error.URLError as e:
+                print(f"[{url}] Unreachable ({e.reason}), trying DNS fallback...")
 
 if __name__ == "__main__":
     print(f"Collecting server health metrics for {SERVER_NAME}...")
