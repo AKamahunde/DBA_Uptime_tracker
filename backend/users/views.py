@@ -70,12 +70,12 @@ def password_change_required(request):
         if form.is_valid():
             form.save()
             update_session_auth_hash(request, request.user)
-            messages.success(request, "Your password has been updated successfully. Welcome to DBTRAC!")
+            messages.success(request, "Your password has been updated successfully. Welcome to DBITRAC!")
             return redirect('dashboard')
     else:
         form = ForcedPasswordChangeForm(user=request.user)
 
     return render(request, 'password_change_required.html', {
         'form': form,
-        'title': 'Change Password Required - DBTRAC'
+        'title': 'Change Password Required - DBITRAC'
     })

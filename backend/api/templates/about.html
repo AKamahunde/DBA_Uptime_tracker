@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}About - DBTRAC{% endblock %}
+{% block title %}About - DBITRAC{% endblock %}
 
 {% block content %}
 <style>
@@ -105,12 +105,12 @@
     }
 </style>
 
-<h2 style="margin-bottom: 0.25rem;">About DBTRAC</h2>
+<h2 style="margin-bottom: 0.25rem;">About DBITRAC</h2>
 <div style="font-size: 1.1rem; color: #64748b; font-style: italic; font-family: 'Georgia', serif; margin-bottom: 1.5rem;">
-    Database Tracking for Reliability, Administration and Compliance
+    Database and Infrastructure Tracking for Reliability, Administration and Compliance
 </div>
 <p class="about-lead">
-    <strong>DBTRAC</strong> (<em>Database Tracking for Reliability, Administration and Compliance</em>) was developed to assist Database Administrators (DBAs) in reporting on key database performance metrics like uptime, for compliance and auditing purposes, and general improved reporting across Oracle, MySQL, and Microsoft SQL Server environments.
+    <strong>DBITRAC</strong> (<em>Database and Infrastructure Tracking for Reliability, Administration and Compliance</em>) was developed to assist Database Administrators (DBAs) and System Administrators in reporting on key database and infrastructure performance metrics like uptime, for compliance and auditing purposes, and general improved reporting across Oracle, MySQL, Microsoft SQL Server, PostgreSQL (CCIS), and OLKVM/Proxmox virtualization environments.
 </p>
 
 <div class="about-grid-two-col">
@@ -144,7 +144,7 @@
             </div>
             <div class="module-item">
                 <h5>Replication & Health</h5>
-                <p>Monitors lag times and CPU/Memory/Disk performance stats across the Oracle, MySQL, and MS SQL environment fleets.</p>
+                <p>Monitors lag times and CPU/Memory/Disk performance stats across the Oracle, MySQL, MS SQL Server, PostgreSQL (CCIS), and OLKVM/Proxmox virtualization fleets.</p>
             </div>
         </div>
     </div>
@@ -183,7 +183,7 @@
             <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.95rem;">
                 <p><strong>Version:</strong> 2.3.0</p>
                 <p><strong>Architecture:</strong> Django 6.0.7 / MySQL</p>
-                <p><strong>Integrations:</strong> Built with an extensible ETL pipeline for Kafka and REST APIs.</p>
+                <p><strong>Integrations:</strong> Built with an extensible ETL pipeline for Prometheus Node Exporter and authenticated REST APIs.</p>
             </div>
         </div>
     </div>

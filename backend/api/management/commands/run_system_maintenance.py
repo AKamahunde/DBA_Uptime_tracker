@@ -5,10 +5,10 @@ from api.models import IncidentRegister, IncidentChangeLog, MaintenanceRegister,
 from etl.services.rest_client import sync_all_nodes_from_prometheus
 
 class Command(BaseCommand):
-    help = 'Executes periodic DBTRAC maintenance tasks: auto-closes resolved incidents, updates maintenance statuses, seeds holidays, and syncs Prometheus telemetry'
+    help = 'Executes periodic DBITRAC maintenance tasks: auto-closes resolved incidents, updates maintenance statuses, seeds holidays, and syncs Prometheus telemetry'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE(f"[{timezone.now()}] Starting DBTRAC system maintenance..."))
+        self.stdout.write(self.style.NOTICE(f"[{timezone.now()}] Starting DBITRAC system maintenance..."))
         
         # 1. Auto-close resolved incidents older than 24 hours
         cutoff = timezone.now() - timedelta(days=1)
@@ -81,4 +81,4 @@ class Command(BaseCommand):
         except Exception as exc:
             self.stdout.write(self.style.WARNING(f"Prometheus sync skipped/failed: {exc}"))
 
-        self.stdout.write(self.style.SUCCESS(f"[{timezone.now()}] DBTRAC system maintenance finished successfully."))
+        self.stdout.write(self.style.SUCCESS(f"[{timezone.now()}] DBITRAC system maintenance finished successfully."))

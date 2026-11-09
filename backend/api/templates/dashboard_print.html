@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{% if selected_db == 'All Databases' %}Overall Database{% else %}{{ selected_db }}{% endif %} Performance Report — {{ reporting_month_str }} — DBTRAC</title>
+<title>{% if selected_db == 'All Databases' %}Overall Database{% else %}{{ selected_db }}{% endif %} Performance Report — {{ reporting_month_str }} — DBITRAC</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=3">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=3">
 <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=3">
@@ -491,7 +491,7 @@
         {{ selected_db|upper }} PERFORMANCE &amp; SLA REPORT
       {% endif %}
     </h1>
-    <div class="report-org-subtitle">National Medical Stores • Database Tracking for Reliability, Administration and Compliance (DBTRAC)</div>
+    <div class="report-org-subtitle">National Medical Stores • Database and Infrastructure Tracking for Reliability, Administration and Compliance (DBITRAC)</div>
 
     <!-- 3. Period, Scope, and Extraction Metadata Strip -->
     <div class="report-meta-strip">

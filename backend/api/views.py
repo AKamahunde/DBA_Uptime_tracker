@@ -6765,7 +6765,7 @@ def password_change_required(request):
             update_session_auth_hash(request, request.user)
             messages.success(
                 request,
-                "Your password has been updated successfully. Welcome to DBTRAC!" if is_forced else "Your password has been changed successfully."
+                "Your password has been updated successfully. Welcome to DBITRAC!" if is_forced else "Your password has been changed successfully."
             )
             return redirect('dashboard')
     else:
@@ -6773,7 +6773,7 @@ def password_change_required(request):
 
     return render(request, 'password_change_required.html', {
         'form': form,
-        'title': 'Change Password Required - DBTRAC' if is_forced else 'Change Password - DBTRAC',
+        'title': 'Change Password Required - DBITRAC' if is_forced else 'Change Password - DBITRAC',
         'is_forced': is_forced,
     })
 
