@@ -5773,24 +5773,38 @@ def replication_ingest(request):
     try:
         data = json.loads(request.body)
         
-        # Determine severity based on threads and delay
+        raw_lag = data.get('seconds_behind')
+        if raw_lag in (None, '', 'NULL'):
+            seconds_behind = None
+        else:
+            try:
+                seconds_behind = int(raw_lag)
+            except (ValueError, TypeError):
+                seconds_behind = None
+
+        io_thread = data.get('io_thread', 'No')
+        sql_thread = data.get('sql_thread', 'No')
+        binlog_stalled = bool(data.get('binlog_stalled', False))
+        last_error = data.get('last_error', '') or ''
+
+        # Determine severity based on threads, NULL lag, binlog stall, and delay
         severity = 'Low'
-        if data.get('io_thread') != 'Yes' or data.get('sql_thread') != 'Yes':
+        if io_thread != 'Yes' or sql_thread != 'Yes' or seconds_behind is None or binlog_stalled:
             severity = 'Critical'
-        elif data.get('seconds_behind', 0) > 300:
+        elif seconds_behind > 300:
             severity = 'High'
-        elif data.get('seconds_behind', 0) > 60:
+        elif seconds_behind > 60:
             severity = 'Medium'
             
         replication = ReplicationMonitor.objects.create(
             date=timezone.now().date(),
             master=data.get('master', 'Unknown'),
             replica=data.get('replica', 'Unknown'),
-            io_thread=data.get('io_thread', 'No'),
-            sql_thread=data.get('sql_thread', 'No'),
-            seconds_behind=data.get('seconds_behind', 0),
-            last_error=data.get('last_error', ''),
-            database='MySQL',
+            io_thread=io_thread,
+            sql_thread=sql_thread,
+            seconds_behind=seconds_behind,
+            last_error=last_error,
+            database=data.get('database', 'MySQL'),
             severity=severity
         )
         return JsonResponse({'status': 'success', 'id': replication.id})

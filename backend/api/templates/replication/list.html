@@ -173,6 +173,11 @@
                         <div style="font-size: 0.72rem; color: #0f172a; margin-top: 0.15rem;">
                             <span style="color: #64748b;">R:</span> {{ replication.replica }}
                         </div>
+                        {% if replication.last_error %}
+                        <div style="font-size: 0.7rem; margin-top: 0.25rem; font-family: monospace; color: {% if replication.status == 'Failed' %}#c5221f{% else %}#475569{% endif %}; max-width: 360px; word-break: break-word;">
+                            {{ replication.last_error }}
+                        </div>
+                        {% endif %}
                     </td>
 
                     <!-- Threads (IO/SQL) -->
@@ -188,8 +193,8 @@
                     </td>
 
                     <!-- Sync Lag -->
-                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: {% if replication.seconds_behind > 30 %}#c5221f{% elif replication.seconds_behind > 0 %}#b06000{% else %}#0f172a{% endif %};">
-                        {% if replication.seconds_behind is not None %}{{ replication.seconds_behind }}s{% else %}—{% endif %}
+                    <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center; font-weight: 600; color: {% if replication.seconds_behind is None %}#c5221f{% elif replication.seconds_behind > 30 %}#c5221f{% elif replication.seconds_behind > 0 %}#b06000{% else %}#0f172a{% endif %};">
+                        {% if replication.seconds_behind is not None %}{{ replication.seconds_behind }}s{% else %}NULL{% endif %}
                     </td>
 
                     <!-- Severity -->

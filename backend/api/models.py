@@ -255,7 +255,8 @@ class ReplicationMonitor(models.Model):
         if (self.io_thread == 'Yes' and 
             self.sql_thread == 'Yes' and 
             self.seconds_behind is not None and 
-            self.seconds_behind <= 120):
+            self.seconds_behind <= 120 and
+            self.severity != 'Critical'):
             self.status = 'Healthy'
         else:
             self.status = 'Failed'
