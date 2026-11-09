@@ -135,14 +135,26 @@ def get_status(current, target_val, operator, warning_val=None):
         return 'N/A'
     return 'N/A'
 
-def _resolve_reporting_period(params):
+def _resolve_reporting_period(params, prefix=''):
     import calendar
     from datetime import date as _date
     today_dt = timezone.now().date()
-    period_mode = (params.get('period_mode') or '').strip().lower()
-    month_str = (params.get('month') or '').strip()
-    start_str = (params.get('start_date') or '').strip()
-    end_str = (params.get('end_date') or '').strip()
+    if prefix:
+        period_mode = (params.get(f'{prefix}period_mode') or '').strip().lower()
+        month_str = (params.get(f'{prefix}month') or '').strip()
+        start_str = (params.get(f'{prefix}start_date') or '').strip()
+        end_str = (params.get(f'{prefix}end_date') or '').strip()
+        if not (period_mode or month_str or start_str or end_str):
+            # Fallback when called from direct export endpoints using unprefixed keys
+            period_mode = (params.get('period_mode') or '').strip().lower()
+            month_str = (params.get('month') or '').strip()
+            start_str = (params.get('start_date') or '').strip()
+            end_str = (params.get('end_date') or '').strip()
+    else:
+        period_mode = (params.get('period_mode') or '').strip().lower()
+        month_str = (params.get('month') or '').strip()
+        start_str = (params.get('start_date') or '').strip()
+        end_str = (params.get('end_date') or '').strip()
 
     if not period_mode:
         if start_str or end_str:
@@ -1206,7 +1218,33 @@ def dashboard(request):
         'recent_activity': recent_activity,
     }
     selected_node = request.GET.get('node_select', 'All Nodes')
-    context.update(_build_node_dashboard_context(selected_node=selected_node, reporting_month=reporting_month, start_date=start_date, end_date=end_date, period_display=period_display))
+    if any(k in request.GET for k in ('node_period_mode', 'node_month', 'node_start_date', 'node_end_date')):
+        node_period_info = _resolve_reporting_period(request.GET, prefix='node_')
+    else:
+        # Default to current month independently so DB filter changes don't overwrite Node period
+        node_period_info = _resolve_reporting_period({}, prefix='node_')
+    node_reporting_month = node_period_info['reporting_month']
+    node_period_mode = node_period_info['period_mode']
+    node_start_date = node_period_info['start_date']
+    node_end_date = node_period_info['end_date']
+    node_is_custom_period = node_period_info['is_custom_period']
+    node_period_display = node_period_info['period_display']
+
+    context.update({
+        'node_reporting_month': node_reporting_month.strftime('%Y-%m'),
+        'node_period_mode': node_period_mode,
+        'node_start_date': node_start_date.strftime('%Y-%m-%d'),
+        'node_end_date': node_end_date.strftime('%Y-%m-%d'),
+        'node_is_custom_period': node_is_custom_period,
+        'node_period_display': node_period_display,
+    })
+    context.update(_build_node_dashboard_context(
+        selected_node=selected_node,
+        reporting_month=node_reporting_month,
+        start_date=node_start_date,
+        end_date=node_end_date,
+        period_display=node_period_display,
+    ))
     return render(request, 'dashboard.html', context)
 
 @login_required
@@ -4056,7 +4094,7 @@ def dashboard_node_print(request):
         return redirect('dashboard')
 
     params = request.POST if request.method == 'POST' else request.GET
-    period_info = _resolve_reporting_period(params)
+    period_info = _resolve_reporting_period(params, prefix='node_')
     reporting_month = period_info['reporting_month']
     start_date = period_info['start_date']
     end_date = period_info['end_date']
@@ -4064,6 +4102,7 @@ def dashboard_node_print(request):
 
     selected_node = params.get('node_select', 'All Nodes')
     summary_narrative = params.get('summary_narrative', '').strip()
+    download_mode = params.get('download', 'false')
 
     node_ctx = _build_node_dashboard_context(
         selected_node=selected_node,
@@ -4084,6 +4123,7 @@ def dashboard_node_print(request):
         'extracted_by': user_display,
         'extracted_at': timezone.localtime(timezone.now()).strftime('%d %b %Y, %H:%M'),
         'lede_text': lede_text,
+        'download_mode': download_mode,
     }
     ctx.update(node_ctx)
     return render(request, 'dashboard_node_print.html', ctx)
@@ -4095,7 +4135,7 @@ def dashboard_node_excel(request):
         messages.error(request, 'You do not have permission to export the Node Infrastructure report.')
         return redirect('dashboard')
 
-    period_info = _resolve_reporting_period(request.GET)
+    period_info = _resolve_reporting_period(request.GET, prefix='node_')
     reporting_month = period_info['reporting_month']
     start_date = period_info['start_date']
     end_date = period_info['end_date']
@@ -5535,6 +5575,7 @@ def capacity_infra_print(request):
         'kpi_used_storage_gb': node_ctx['kpi_used_storage_gb'],
         'kpi_free_storage_gb': node_ctx['kpi_free_storage_gb'],
         'kpi_storage_used_pct': node_ctx['kpi_storage_used_pct'],
+        'download_mode': request.GET.get('download', 'false'),
     }
     return render(request, 'capacity/infra_print.html', context)
 

@@ -179,41 +179,62 @@
   }
 
   .plain-metrics-strip {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    padding: 6px 0 8px 0;
-    margin: 4px 0 10px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 0;
+    margin: 4px 0 9px 0;
     border-top: 1px solid var(--border-mist);
     border-bottom: 1px solid var(--border-mist);
   }
   .plain-metric {
-    padding: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 2px 0;
+    border-bottom: 1px dashed #e2e8f0;
+  }
+  .plain-metric:last-child {
+    border-bottom: none;
   }
   .plain-metric-label {
-    font-size: 7px;
+    font-size: 7.8px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     color: var(--text-soft);
-    margin: 0 0 2px 0;
+    min-width: 165px;
+    margin: 0;
   }
   .plain-metric-value {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 800;
-    margin: 0 0 1px 0;
+    margin: 0;
     color: var(--primary-navy);
-    line-height: 1.15;
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    min-width: 72px;
   }
   .plain-metric-value.green {
     color: var(--primary-green);
   }
   .plain-metric-subtext {
-    font-size: 7px;
-    color: #94a3b8;
+    font-size: 7.5px;
+    color: #64748b;
     margin: 0;
     font-variant-numeric: tabular-nums;
+  }
+
+  body.pdf-exporting {
+    background: #ffffff !important;
+  }
+  body.pdf-exporting .page {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 6mm 8mm 5mm 8mm !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .section-heading {
@@ -365,9 +386,12 @@
       <strong>Report Ready:</strong> {{ reporting_period_str }} Infrastructure Storage Capacity Report
     </div>
     <div class="toolbar-actions">
-      <button type="button" onclick="window.print()" class="btn-print">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-        Print / Save as PDF
+      <button type="button" onclick="downloadPdfReport()" class="btn-print" id="btnDownloadPdf">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download PDF
+      </button>
+      <button type="button" onclick="window.print()" class="btn-close">
+        Print
       </button>
       <button type="button" onclick="window.close()" class="btn-close">Close</button>
     </div>
@@ -551,15 +575,58 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
   const _origTitle = document.title;
   window.addEventListener('beforeprint', function() { document.title = '\u200B'; });
   window.addEventListener('afterprint', function() { document.title = _origTitle; });
-  window.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
+
+  function downloadPdfReport() {
+    const pageEl = document.querySelector('.page');
+    if (!pageEl || typeof html2pdf === 'undefined') {
       document.title = '\u200B';
       window.print();
-    }, 400);
+      return;
+    }
+    const btn = document.getElementById('btnDownloadPdf');
+    const origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Generating PDF...';
+    }
+    document.body.classList.add('pdf-exporting');
+    const opt = {
+      margin: [0, 0, 0, 0],
+      filename: 'DBITRAC_Infrastructure_Capacity_Report_{{ selected_node|slugify }}_{{ reporting_period_str|slugify }}.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    html2pdf().set(opt).from(pageEl).save().then(function() {
+      document.body.classList.remove('pdf-exporting');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+      }
+    }).catch(function(err) {
+      console.error('PDF generation error:', err);
+      document.body.classList.remove('pdf-exporting');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+      }
+      document.title = '\u200B';
+      window.print();
+    });
+  }
+
+  window.addEventListener('load', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldDownload = ('{{ download_mode|default:"false"|escapejs }}'.toLowerCase() === 'true') || (urlParams.get('download') === 'true');
+    if (shouldDownload) {
+      setTimeout(downloadPdfReport, 350);
+    }
   });
 </script>
 </body>
