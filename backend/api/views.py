@@ -24,7 +24,11 @@ from .forms import (
 )
 from users.models import User
 from django.db.models import Sum, Count, Avg, Q, F
-from .sla_utils import calculate_operational_downtime
+from .sla_utils import (
+    calculate_operational_downtime,
+    calculate_service_desk_resolution_hours,
+    calculate_merged_operational_downtime,
+)
 from .context_processors import is_sysadmin_user
 
 try:
@@ -253,6 +257,7 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
     tz = timezone.get_current_timezone()
     period_start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), tz)
     period_end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()), tz)
+    all_holiday_dates = set(UgandaHoliday.objects.values_list('holiday_date', flat=True))
 
     for db_type in db_types:
         # Planned Downtime
@@ -276,6 +281,8 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
         unplanned_incidents = incidents.filter(planned=False)
 
         # IT Service Desk Policy §20.4.5.2 — resolution targets per severity (in hours)
+        # Q-005: Service Desk resolution SLAs (SLA-005 to SLA-012) are measured strictly
+        # on the 08:00-17:00 Mon-Fri business clock (excl. Uganda public holidays) for all platforms.
         SLA_RESOLUTION_TARGETS = {
             'Critical': 9,    # 1 working day
             'High': 9,        # 1 working day
@@ -291,7 +298,9 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
             if not inc.end and inc.status not in ['Resolved', 'Closed'] and inc.start:
                 eff_start = max(inc.start, period_start_dt)
                 eff_end = min(now, period_end_dt)
-                inc_dt = float(calculate_operational_downtime(eff_start, eff_end, inc.database)) if eff_end > eff_start else 0.0
+                inc_dt = float(calculate_operational_downtime(
+                    eff_start, eff_end, inc.database, holiday_dates_override=all_holiday_dates
+                )) if eff_end > eff_start else 0.0
                 if inc_dt >= (5.0 / 60.0):
                     unplanned += inc_dt
                     total_unplanned += 1
@@ -299,14 +308,22 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
                 if inc.start and inc.end and (inc.start < period_start_dt or inc.end > period_end_dt):
                     eff_start = max(inc.start, period_start_dt)
                     eff_end = min(inc.end, period_end_dt)
-                    inc_dt = float(calculate_operational_downtime(eff_start, eff_end, inc.database)) if eff_end > eff_start else 0.0
+                    inc_dt = float(calculate_operational_downtime(
+                        eff_start, eff_end, inc.database, holiday_dates_override=all_holiday_dates
+                    )) if eff_end > eff_start else 0.0
                 else:
                     inc_dt = float(inc.duration_hrs or 0.0)
                 if inc_dt >= (5.0 / 60.0):
                     unplanned += inc_dt
                     total_unplanned += 1
                     target_hrs = SLA_RESOLUTION_TARGETS.get(inc.severity, 9)
-                    if inc_dt > target_hrs:
+                    if inc.start and inc.end:
+                        res_dt = float(calculate_service_desk_resolution_hours(
+                            inc.start, inc.end, holiday_dates_override=all_holiday_dates
+                        ))
+                    else:
+                        res_dt = inc_dt
+                    if res_dt > target_hrs:
                         sla_breach_count += 1
 
         mttr_hrs = (unplanned / total_unplanned) if total_unplanned > 0 else 0
@@ -339,7 +356,7 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
                             calc_th += 9
                 if calc_th > 0:
                     try:
-                        target_pct_default = 99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95)
+                        target_pct_default = 99.95
                         first_of_month = reporting_month.replace(day=1)
                         sla_config_record, _ = SLAConfig.objects.get_or_create(
                             database=db_type,
@@ -458,7 +475,7 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
         if last_backup:
             last_backup_str = f"{last_backup.outcome} - {last_backup.date.strftime('%d %b')}"
 
-        target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else (99.50 if db_type == 'MySQL' else (99.90 if db_type == 'PostgreSQL' else 99.95))
+        target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else 99.95
 
         dashboard_data.append({
             'database': db_type,
@@ -988,7 +1005,7 @@ def dashboard(request):
             'value': avg_avail,
         })
         
-    # Calculate dynamic target SLA based on database configurations
+    # Calculate dynamic target SLA based on database configurations (flat >= 99.95% default across all DB engines)
     target_sla_val = 99.95
     if selected_db != 'All Databases':
         sla_conf = SLAConfig.objects.filter(
@@ -996,10 +1013,6 @@ def dashboard(request):
         ).first()
         if sla_conf:
             target_sla_val = float(sla_conf.sla_percent)
-        elif selected_db.lower() == 'mysql':
-            target_sla_val = 99.50
-        elif selected_db.lower() == 'postgresql':
-            target_sla_val = 99.90
 
     valid_trend_vals = [m['value'] for m in trend_months if m['value'] > 0.0]
     trend_recent_avg = round(sum(valid_trend_vals) / len(valid_trend_vals), 2) if valid_trend_vals else 100.0
@@ -1277,7 +1290,7 @@ def dashboard_print(request):
 
     database_detail = _get_database_detail(selected_db, reporting_month, dashboard_data, start_date=start_date, end_date=end_date)
     
-    # Calculate target SLA dynamically for print view
+    # Calculate target SLA dynamically for print view (flat >= 99.95% default across all DB engines)
     target_sla_val = 99.95
     if selected_db != 'All Databases':
         sla_conf = SLAConfig.objects.filter(
@@ -1285,10 +1298,6 @@ def dashboard_print(request):
         ).first()
         if sla_conf:
             target_sla_val = float(sla_conf.sla_percent)
-        elif selected_db.lower() == 'mysql':
-            target_sla_val = 99.50
-        elif selected_db.lower() == 'postgresql':
-            target_sla_val = 99.90
     
     user_display = request.user.get_full_name()
     if not user_display:
@@ -2520,28 +2529,35 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
             is_fallback = True
 
-        # Determine any unplanned outages affecting this VM directly or via its host hypervisor
+        # Determine any unplanned outages affecting this VM directly or via its active host hypervisor.
+        # Overlap unioning ensures simultaneous host + VM outage intervals are never double-counted (Q-006).
         parent_k = defn.get('parent_node_key', '')
+        if rec and rec.node_name and rec.node_name.strip().lower().startswith('pvenode'):
+            parent_k = rec.node_name.strip()
         short_k = defn.get('short_name', '')
 
         if parent_k == 'OLKVM':
             vm_inc_q = (
                 Q(node_name__iexact='OLKVM') |
-                Q(node_name__in=['nmsinfra', 'nmsebs', 'nmsinfra.nms.go.ug', 'nmsebs.nms.go.ug', 'OLKVM Cluster']) |
+                Q(node_name__iexact='OLKVM Cluster') |
+                Q(node_name__icontains=short_k) |
                 Q(system__icontains='olkvm') |
-                Q(system__icontains='nmsinfra') |
-                Q(system__icontains='nmsebs') |
-                (Q(database__iexact='Oracle') & (Q(category__iexact='Infrastructure') | Q(category__iexact='Database')))
+                Q(system__icontains=short_k)
             )
+            if short_k == 'nmsinfra':
+                vm_inc_q = vm_inc_q | (Q(database__iexact='Oracle') & Q(category__iexact='Database'))
         else:
             vm_inc_q = (
                 Q(node_name__iexact=parent_k) |
+                Q(node_name__iexact='Proxmox') |
+                Q(node_name__iexact='Proxmox Cluster') |
                 Q(node_name__icontains=short_k) |
                 Q(system__icontains=short_k)
             )
 
-        vm_inc_qs = IncidentRegister.objects.filter(month_inc_filter, planned=False).filter(vm_inc_q)
-        vm_unplanned_hrs = 0.0
+        vm_inc_qs = IncidentRegister.objects.filter(month_inc_filter, planned=False).filter(vm_inc_q).distinct()
+        vm_timed_intervals = []
+        vm_untimed_hrs = 0.0
         for inc in vm_inc_qs:
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
             if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
@@ -2552,10 +2568,14 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
                 if eff_end > eff_start:
                     active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
                     if float(active_dt) >= (5.0 / 60.0):
-                        vm_unplanned_hrs += float(active_dt)
+                        vm_timed_intervals.append((eff_start, eff_end))
             elif inc.duration_hrs:
-                vm_unplanned_hrs += float(inc.duration_hrs)
-        vm_unplanned_hrs = round(vm_unplanned_hrs, 2)
+                vm_untimed_hrs += float(inc.duration_hrs)
+        vm_unplanned_hrs = calculate_merged_operational_downtime(
+            vm_timed_intervals,
+            untimed_hours=vm_untimed_hrs,
+            database='Infrastructure',
+        )
 
         if rec:
             if not is_fallback:
@@ -3032,7 +3052,9 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 pve_vm_q
             )
 
-        node_unplanned_hrs = 0.0
+        node_inc_qs = node_inc_qs.distinct()
+        node_timed_intervals = []
+        node_untimed_hrs = 0.0
         now_dt = timezone.now()
         for inc in node_inc_qs:
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
@@ -3044,11 +3066,15 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 if eff_end > eff_start:
                     active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
                     if float(active_dt) >= (5.0 / 60.0):
-                        node_unplanned_hrs += float(active_dt)
+                        node_timed_intervals.append((eff_start, eff_end))
             elif inc.duration_hrs:
-                node_unplanned_hrs += float(inc.duration_hrs)
+                node_untimed_hrs += float(inc.duration_hrs)
 
-        node_unplanned_hrs = round(node_unplanned_hrs, 2)
+        node_unplanned_hrs = calculate_merged_operational_downtime(
+            node_timed_intervals,
+            untimed_hours=node_untimed_hrs,
+            database='Infrastructure',
+        )
         node_inc_count = node_inc_qs.count()
 
         if latest_rec:
@@ -3395,7 +3421,9 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             Q(system__icontains='nmsinfra') |
             Q(system__icontains='nmsebs')
         )
-        olkvm_unplanned_hrs = 0.0
+        olkvm_inc_qs = olkvm_inc_qs.distinct()
+        olkvm_timed_intervals = []
+        olkvm_untimed_hrs = 0.0
         for inc in olkvm_inc_qs:
             # Events under 5 minutes (< 0.0833h) are classified as intermittent network alerts
             if inc.duration_hrs and float(inc.duration_hrs) < (5.0 / 60.0):
@@ -3406,10 +3434,14 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 if eff_end > eff_start:
                     active_dt = calculate_operational_downtime(eff_start, eff_end, 'Infrastructure')
                     if float(active_dt) >= (5.0 / 60.0):
-                        olkvm_unplanned_hrs += float(active_dt)
+                        olkvm_timed_intervals.append((eff_start, eff_end))
             elif inc.duration_hrs:
-                olkvm_unplanned_hrs += float(inc.duration_hrs)
-        olkvm_unplanned_hrs = round(olkvm_unplanned_hrs, 2)
+                olkvm_untimed_hrs += float(inc.duration_hrs)
+        olkvm_unplanned_hrs = calculate_merged_operational_downtime(
+            olkvm_timed_intervals,
+            untimed_hours=olkvm_untimed_hrs,
+            database='Infrastructure',
+        )
         olkvm_inc_count = olkvm_inc_qs.count()
 
         olkvm_telemetry_ups = [w['uptime_percent'] for w in olkvm_workloads if w['has_data'] and w['uptime_percent'] > 0]

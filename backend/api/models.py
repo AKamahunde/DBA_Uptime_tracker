@@ -198,6 +198,33 @@ class IncidentRegister(models.Model):
         """Clean human-readable total wall-clock elapsed duration (e.g., '5h 58m', '18 mins')."""
         return format_human_duration(self.elapsed_duration_hrs)
 
+    @property
+    def resolution_duration_hrs(self):
+        """Service Desk SLA resolution hours evaluated strictly on 08:00-17:00 Mon-Fri excl. Uganda holidays."""
+        if self.start:
+            end_dt = self.end if self.end else (timezone.now() if self.status not in ['Resolved', 'Closed'] else None)
+            if end_dt:
+                from api.sla_utils import calculate_service_desk_resolution_hours
+                return float(calculate_service_desk_resolution_hours(self.start, end_dt))
+        return float(self.duration_hrs or 0.0)
+
+    @property
+    def resolution_sla_target_hrs(self):
+        """IT Service Desk Policy §20.4.5.2 resolution targets (hours on 08:00-17:00 weekday clock)."""
+        return {
+            'Critical': 9,
+            'High': 9,
+            'Medium': 18,
+            'Low': 180,
+        }.get(self.severity, 9)
+
+    @property
+    def is_resolution_sla_breached(self):
+        """Returns True if a closed/resolved unplanned incident exceeded its Service Desk SLA resolution target."""
+        if self.planned or self.status in ['Open', 'In Progress']:
+            return False
+        return self.resolution_duration_hrs > self.resolution_sla_target_hrs
+
 class IncidentChangeLog(models.Model):
     incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
     changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)

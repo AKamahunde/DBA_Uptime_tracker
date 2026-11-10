@@ -2,6 +2,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from django.utils import timezone
 
+
 def calculate_operational_downtime(start_dt, end_dt, database='MySQL', holiday_dates_override=None):
     """
     Intelligently calculates the exact operational downtime hours between start_dt and end_dt
@@ -53,14 +54,22 @@ def calculate_operational_downtime(start_dt, end_dt, database='MySQL', holiday_d
             holiday_dates = set()
     
     db_name = (database or '').strip().lower()
-    is_infra = any(kw in db_name for kw in ['infra', 'infrastructure', 'host', 'node', 'server', 'olkvm', 'proxmox', '24/7', '24x7'])
+    is_service_desk = db_name in ('servicedesk', 'service desk', 'service_desk')
+    is_explicit_db = (
+        is_service_desk
+        or db_name in ('mysql', 'ms sql server', 'mssql', 'sql server', 'postgresql', 'postgres', 'oracle')
+        or ('sql' in db_name)
+    )
+    is_infra = (not is_explicit_db) and any(
+        kw in db_name for kw in ['infra', 'infrastructure', 'host', 'node', 'server', 'olkvm', 'proxmox', '24/7', '24x7']
+    )
     if is_infra:
         # Infrastructure host nodes operate 24/7 (24 hours/day, 7 days/week) with no holiday exclusions
         total_seconds = Decimal(str((end_local - start_local).total_seconds()))
         hours = total_seconds / Decimal('3600.0')
         return round(hours, 2)
 
-    is_oracle = any(kw in db_name for kw in ['oracle', 'nmsinfra', 'nmsebs'])
+    is_oracle = (not is_service_desk) and any(kw in db_name for kw in ['oracle', 'nmsinfra', 'nmsebs'])
     
     total_seconds = Decimal('0.0')
     cur_date = start_date
@@ -92,3 +101,81 @@ def calculate_operational_downtime(start_dt, end_dt, database='MySQL', holiday_d
         
     hours = total_seconds / Decimal('3600.0')
     return round(hours, 2)
+
+
+def calculate_service_desk_resolution_hours(start_dt, end_dt, holiday_dates_override=None):
+    """
+    Calculates Service Desk incident resolution duration strictly against the
+    08:00:00 to 17:00:00 (9 hours/day), Monday to Friday business clock,
+    excluding Uganda statutory public holidays (IT Service Desk Policy §20.4.5.2).
+    Applied uniformly to SLA-005 through SLA-012 across all database and
+    infrastructure platforms.
+    """
+    if not start_dt or not end_dt:
+        return Decimal('0.00')
+    return calculate_operational_downtime(
+        start_dt,
+        end_dt,
+        database='ServiceDesk',
+        holiday_dates_override=holiday_dates_override,
+    )
+
+
+def merge_time_intervals(intervals):
+    """
+    Merges (unions) overlapping or adjacent (start_dt, end_dt) intervals into a
+    sorted list of disjoint timezone-aware intervals so simultaneous host hypervisor
+    and guest VM outages are never double-counted.
+    """
+    if not intervals:
+        return []
+
+    tz = timezone.get_current_timezone()
+    normalized = []
+    for item in intervals:
+        if not item or len(item) != 2:
+            continue
+        start_dt, end_dt = item
+        if not start_dt or not end_dt:
+            continue
+        start_local = timezone.make_aware(start_dt, tz) if timezone.is_naive(start_dt) else timezone.localtime(start_dt, tz)
+        end_local = timezone.make_aware(end_dt, tz) if timezone.is_naive(end_dt) else timezone.localtime(end_dt, tz)
+        if end_local > start_local:
+            normalized.append((start_local, end_local))
+
+    if not normalized:
+        return []
+
+    normalized.sort(key=lambda pair: (pair[0], pair[1]))
+    merged = [normalized[0]]
+    for cur_start, cur_end in normalized[1:]:
+        prev_start, prev_end = merged[-1]
+        if cur_start <= prev_end:
+            merged[-1] = (prev_start, max(prev_end, cur_end))
+        else:
+            merged.append((cur_start, cur_end))
+    return merged
+
+
+def calculate_merged_operational_downtime(
+    timed_intervals,
+    untimed_hours=0.0,
+    database='Infrastructure',
+    holiday_dates_override=None,
+):
+    """
+    Sums operational downtime over the union of timed_intervals plus any legacy
+    untimed duration_hrs values, returning total hours rounded to 2 decimal places.
+    """
+    merged = merge_time_intervals(timed_intervals)
+    total_hours = float(untimed_hours or 0.0)
+    for m_start, m_end in merged:
+        total_hours += float(
+            calculate_operational_downtime(
+                m_start,
+                m_end,
+                database=database,
+                holiday_dates_override=holiday_dates_override,
+            )
+        )
+    return round(total_hours, 2)

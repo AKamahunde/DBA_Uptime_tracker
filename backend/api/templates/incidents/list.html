@@ -361,24 +361,10 @@
                                         Running
                                     </span>
                                 {% else %}
-                                    {% if incident.severity == 'Critical' or incident.severity == 'High' %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 9 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
-                                        {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
-                                        {% endif %}
-                                    {% elif incident.severity == 'Medium' %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 18 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
-                                        {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
-                                        {% endif %}
+                                    {% if incident.is_resolution_sla_breached %}
+                                        <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;" title="Service Desk resolution time: {{ incident.resolution_duration_hrs }}h (Target &le; {{ incident.resolution_sla_target_hrs }}h Mon-Fri 08:00-17:00)">Breached</span>
                                     {% else %}
-                                        {% if incident.duration_hrs and incident.duration_hrs <= 180 %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;">Met</span>
-                                        {% else %}
-                                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;">Breached</span>
-                                        {% endif %}
+                                        <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #16a34a;" title="Service Desk resolution time: {{ incident.resolution_duration_hrs }}h (Target &le; {{ incident.resolution_sla_target_hrs }}h Mon-Fri 08:00-17:00)">Met</span>
                                     {% endif %}
                                 {% endif %}
                             </td>
