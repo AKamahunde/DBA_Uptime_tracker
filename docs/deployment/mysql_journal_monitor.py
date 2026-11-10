@@ -14,6 +14,7 @@ import re
 import json
 import socket
 import subprocess
+import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -239,7 +240,8 @@ def detect_boot_and_power_outages(lookback_hours=48, db_type="MySQL", system_nam
 
 
 def main():
-    api_url = "http://192.168.35.38:90/api/incident/ingest/"
+    default_v1_url = "http://192.168.35.38:90/api/incident/ingest/"
+    custom_cli_url = None
     api_key = "uptimetracker_api_9f2c1d8e45x9"
     timeframe = "48 hours ago"
     db_type = "MySQL"
@@ -247,11 +249,27 @@ def main():
 
     # CLI Overrides
     if len(sys.argv) > 1:
-        api_url = sys.argv[1]
+        custom_cli_url = sys.argv[1]
     if len(sys.argv) > 2:
         api_key = sys.argv[2]
     if len(sys.argv) > 3:
         timeframe = sys.argv[3]
+
+    if not custom_cli_url or custom_cli_url.rstrip('/') == default_v1_url.rstrip('/'):
+        target_groups = [
+            [
+                "http://192.168.35.38:91/api/incident/ingest/",
+                "http://dbtractest.nms.go.ug:91/api/incident/ingest/",
+                "http://dbtractest.nms.go.ug/api/incident/ingest/",
+            ],
+            [
+                default_v1_url,
+                "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
+                "http://dbtrac.nms.go.ug/api/incident/ingest/",
+            ],
+        ]
+    else:
+        target_groups = [[custom_cli_url]]
 
     if not api_key:
         api_key = os.environ.get('REPLICATION_API_KEY', '')
@@ -332,34 +350,45 @@ def main():
         print(f"No service or power outages detected in logs for the last {lookback_hours} hours.")
         return
 
-    print(f"Detected {len(incidents_detected)} outage incident(s). Ingesting to DBTRAC API...")
+    print(f"Detected {len(incidents_detected)} outage incident(s). Ingesting to DBITRAC/DBTRAC API...")
 
     success_count = 0
     for payload in incidents_detected:
-        try:
-            data = json.dumps(payload).encode('utf-8')
-            req = urllib.request.Request(
-                api_url,
-                data=data,
-                headers={
-                    'Content-Type': 'application/json',
-                    'X-API-KEY': api_key
-                },
-                method='POST'
-            )
+        data = json.dumps(payload).encode('utf-8')
+        delivered = False
+        for group in target_groups:
+            for url in group:
+                try:
+                    req = urllib.request.Request(
+                        url,
+                        data=data,
+                        headers={
+                            'Content-Type': 'application/json',
+                            'X-API-KEY': api_key
+                        },
+                        method='POST'
+                    )
 
-            with urllib.request.urlopen(req, timeout=10) as response:
-                res_body = json.loads(response.read().decode('utf-8'))
-                if res_body.get('status') == 'success':
-                    print(f"✓ Successfully Logged Incident to Staging: ID {res_body.get('id')} ({payload['start']} to {payload['end']})")
-                    success_count += 1
-                elif res_body.get('status') == 'ignored':
-                    print(f"✓ Already Registered / Staged ({payload['start']})")
-                    success_count += 1
-                else:
-                    print(f"API Response: {res_body}")
-        except Exception as e:
-            print(f"Failed to ingest incident starting at {payload['start']}: {e}", file=sys.stderr)
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        res_body = json.loads(response.read().decode('utf-8'))
+                        if res_body.get('status') == 'success':
+                            print(f"✓ [{url}] Successfully Logged Incident to Staging: ID {res_body.get('id')} ({payload['start']} to {payload['end']})")
+                            delivered = True
+                        elif res_body.get('status') == 'ignored':
+                            print(f"✓ [{url}] Already Registered / Staged ({payload['start']})")
+                            delivered = True
+                        else:
+                            print(f"[{url}] API Response: {res_body}")
+                            delivered = True
+                        break
+                except urllib.error.HTTPError as e:
+                    print(f"[{url}] HTTP Error {e.code} starting at {payload['start']}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
+                    if e.code in (400, 401, 403):
+                        break
+                except Exception as e:
+                    print(f"[{url}] Unreachable for incident starting at {payload['start']}: {e}", file=sys.stderr)
+        if delivered:
+            success_count += 1
 
     print(f"Completed. Successfully processed {success_count} outage incident(s).")
 

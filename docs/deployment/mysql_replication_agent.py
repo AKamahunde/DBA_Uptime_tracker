@@ -27,13 +27,13 @@ import urllib.request
 DEFAULT_TARGET_GROUPS = [
     [
         "http://192.168.35.38:91/api/replication/ingest/",
-        "http://dbtractest.nms.go.ug/api/replication/ingest/",
         "http://dbtractest.nms.go.ug:91/api/replication/ingest/",
+        "http://dbtractest.nms.go.ug/api/replication/ingest/",
     ],
     [
         "http://192.168.35.38:90/api/replication/ingest/",
-        "http://dbtrac.nms.go.ug/api/replication/ingest/",
         "http://dbtrac.nms.go.ug:90/api/replication/ingest/",
+        "http://dbtrac.nms.go.ug/api/replication/ingest/",
     ],
 ]
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
@@ -163,7 +163,8 @@ def send_to_tracker(payload):
                 break  # Succeeded for this target environment; move to next group
             except urllib.error.HTTPError as e:
                 print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
-                break
+                if e.code in (400, 401, 403):
+                    break
             except urllib.error.URLError as e:
                 print(f"[{url}] Unreachable ({e.reason}), trying fallback...", file=sys.stderr)
 

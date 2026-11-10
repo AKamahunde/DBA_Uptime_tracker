@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
@@ -32,8 +33,8 @@ DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:91")
 FALLBACK_BASE_URLS = [
     DBTRAC_BASE_URL,
     "http://192.168.35.38:91",
-    "http://dbtractest.nms.go.ug",
     "http://dbtractest.nms.go.ug:91",
+    "http://dbtractest.nms.go.ug",
 ]
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 
@@ -80,6 +81,11 @@ def _post_json(endpoint, payload):
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 return resp.status, resp.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            last_exc = exc
+            if exc.code in (400, 401, 403):
+                raise
+            continue
         except Exception as exc:
             last_exc = exc
             continue

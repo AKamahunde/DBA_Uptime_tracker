@@ -34,8 +34,8 @@ function Send-PayloadToApi {
         "X-API-KEY"    = $ApiKey
     }
     $targetGroups = @(
-        @("http://192.168.35.38:91/api", "http://dbtractest.nms.go.ug/api", "http://dbtractest.nms.go.ug:91/api"),
-        @($ApiBaseUrl, "http://dbtrac.nms.go.ug/api", "http://dbtrac.nms.go.ug:90/api")
+        @("http://192.168.35.38:91/api", "http://dbtractest.nms.go.ug:91/api", "http://dbtractest.nms.go.ug/api"),
+        @($ApiBaseUrl, "http://dbtrac.nms.go.ug:90/api", "http://dbtrac.nms.go.ug/api")
     )
     foreach ($group in $targetGroups) {
         foreach ($base in $group) {

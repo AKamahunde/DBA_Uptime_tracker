@@ -72,26 +72,36 @@ function Send-IncidentToApi {
         "X-API-KEY"    = $ApiKey
     }
 
-    $fallbackEndpoints = @(
-        "http://192.168.35.38:91/api/incident/ingest/",
-        "http://dbtractest.nms.go.ug/api/incident/ingest/",
-        "$($ApiBaseUrl.TrimEnd('/'))/incident/ingest/",
-        "http://dbtrac.nms.go.ug/api/incident/ingest/"
+    $targetGroups = @(
+        @(
+            "http://192.168.35.38:91/api/incident/ingest/",
+            "http://dbtractest.nms.go.ug:91/api/incident/ingest/",
+            "http://dbtractest.nms.go.ug/api/incident/ingest/"
+        ),
+        @(
+            "$($ApiBaseUrl.TrimEnd('/'))/incident/ingest/",
+            "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
+            "http://dbtrac.nms.go.ug/api/incident/ingest/"
+        )
     )
     $anySuccess = $false
-    foreach ($epUrl in $fallbackEndpoints) {
-        try {
-            $response = Invoke-RestMethod -Uri $epUrl -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
-            if ($response.status -eq 'success') {
-                Write-Host "[OK] [$epUrl] Logged to Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
-                $anySuccess = $true
-            } elseif ($response.status -eq 'ignored') {
-                Write-Host "[INFO] [$epUrl] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
-                $anySuccess = $true
+    foreach ($group in $targetGroups) {
+        foreach ($epUrl in $group) {
+            try {
+                $response = Invoke-RestMethod -Uri $epUrl -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
+                if ($response.status -eq 'success') {
+                    Write-Host "[OK] [$epUrl] Logged to Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
+                    $anySuccess = $true
+                    break
+                } elseif ($response.status -eq 'ignored') {
+                    Write-Host "[INFO] [$epUrl] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
+                    $anySuccess = $true
+                    break
+                }
             }
-        }
-        catch {
-            Write-Warning "[$epUrl] Unreachable: $($_.Exception.Message)"
+            catch {
+                Write-Warning "[$epUrl] Unreachable: $($_.Exception.Message)"
+            }
         }
     }
     return $anySuccess

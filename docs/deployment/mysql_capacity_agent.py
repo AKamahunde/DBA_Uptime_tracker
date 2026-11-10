@@ -95,13 +95,13 @@ def main():
     target_groups = [
         [
             "http://192.168.35.38:91/api/capacity/ingest/",
-            "http://dbtractest.nms.go.ug/api/capacity/ingest/",
             "http://dbtractest.nms.go.ug:91/api/capacity/ingest/",
+            "http://dbtractest.nms.go.ug/api/capacity/ingest/",
         ],
         [
             UPTIME_TRACKER_API_URL,
-            "http://dbtrac.nms.go.ug/api/capacity/ingest/",
             "http://dbtrac.nms.go.ug:90/api/capacity/ingest/",
+            "http://dbtrac.nms.go.ug/api/capacity/ingest/",
         ],
     ]
     data = json.dumps(payload).encode('utf-8')
@@ -116,9 +116,10 @@ def main():
                     print(f"[{url}] Successfully ingested capacity data: {result}")
                     break
             except urllib.error.HTTPError as e:
-                error_body = e.read().decode('utf-8')
+                error_body = e.read().decode('utf-8', errors='ignore')
                 print(f"[{url}] HTTP Error {e.code}: {error_body}")
-                break
+                if e.code in (400, 401, 403):
+                    break
             except Exception as e:
                 print(f"[{url}] Unreachable ({e}), trying DNS fallback...")
 

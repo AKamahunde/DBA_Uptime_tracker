@@ -37,8 +37,8 @@ LOG="$BACKUP_ROOT/backup.log"
 DBTRAC_API_URL="${DBTRAC_API_URL:-http://192.168.35.38:91/api/backup/ingest/}"
 DBTRAC_FALLBACK_URLS=(
   "$DBTRAC_API_URL"
-  "http://dbtractest.nms.go.ug/api/backup/ingest/"
   "http://dbtractest.nms.go.ug:91/api/backup/ingest/"
+  "http://dbtractest.nms.go.ug/api/backup/ingest/"
 )
 DBTRAC_API_KEY="${DBTRAC_API_KEY:-uptimetracker_api_9f2c1d8e45x9}"
 START_EPOCH="$(date +%s)"

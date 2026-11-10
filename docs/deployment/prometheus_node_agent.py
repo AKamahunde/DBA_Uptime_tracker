@@ -16,11 +16,12 @@ and pushes node-level CPU, Memory, Uptime, and 3-Disk breakdown to DBTRAC's
 import datetime
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 
 PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://grafana.nms.go.ug:9090").rstrip("/")
-INGEST_API_URL = os.environ.get("INGEST_API_URL", "http://192.168.35.38:90/api/health/ingest/")
+INGEST_API_URL = os.environ.get("INGEST_API_URL", "http://192.168.35.38:91/api/health/ingest/")
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 
 OLKVM_NODES = [
@@ -320,8 +321,8 @@ def push_to_dbtrac(payload):
     fallback_urls = [
         INGEST_API_URL,
         "http://192.168.35.38:91/api/health/ingest/",
-        "http://dbtractest.nms.go.ug/api/health/ingest/",
         "http://dbtractest.nms.go.ug:91/api/health/ingest/",
+        "http://dbtractest.nms.go.ug/api/health/ingest/",
     ]
     seen = set()
     last_err = None
@@ -341,6 +342,11 @@ def push_to_dbtrac(payload):
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as err:
+            last_err = err
+            if err.code in (400, 401, 403):
+                raise
+            continue
         except Exception as err:
             last_err = err
             continue

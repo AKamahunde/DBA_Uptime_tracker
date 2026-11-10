@@ -116,13 +116,13 @@ def send_to_tracker(payload):
     target_groups = [
         [
             "http://192.168.35.38:91/api/backup/ingest/",
-            "http://dbtractest.nms.go.ug/api/backup/ingest/",
             "http://dbtractest.nms.go.ug:91/api/backup/ingest/",
+            "http://dbtractest.nms.go.ug/api/backup/ingest/",
         ],
         [
             UPTIME_TRACKER_API_URL,
-            "http://dbtrac.nms.go.ug/api/backup/ingest/",
             "http://dbtrac.nms.go.ug:90/api/backup/ingest/",
+            "http://dbtrac.nms.go.ug/api/backup/ingest/",
         ],
     ]
     data = json.dumps(payload).encode('utf-8')
@@ -136,8 +136,9 @@ def send_to_tracker(payload):
                 print(f"[{url}] Success: {response.read().decode('utf-8')}")
                 break
             except urllib.error.HTTPError as e:
-                print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8')}")
-                break
+                print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}")
+                if e.code in (400, 401, 403):
+                    break
             except urllib.error.URLError as e:
                 print(f"[{url}] Unreachable ({e.reason}), trying DNS fallback...")
 
