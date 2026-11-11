@@ -632,10 +632,9 @@ Execute these steps in order during the scheduled cutover window:
 5. **Cut Over DNS:**
    Update the internal/authoritative DNS **`A` record** for `dbtrac.nms.go.ug` from `192.168.35.38` to **`192.168.35.49`**.
    Verify resolution across DB hosts (`nslookup dbtrac.nms.go.ug` / `getent hosts dbtrac.nms.go.ug`).
-6. **Verify Automated Fallback & Update Monitoring Agents:**
+6. **Verify Automated Fallback & Pull Updated Monitoring Agents (`git` Sparse Checkout):**
    - **13 MySQL / Oracle / MSSQL Agents (`a80d7c6`):** Because `192.168.35.38:90` (`uptime_tracker`) is stopped (returning fast `502`/refused) and `192.168.35.49` fast-rejects `90/tcp` (`ufw reject 90/tcp`), the updated scripts automatically fall through to `https://dbtrac.nms.go.ug` / `http://dbtrac.nms.go.ug`.
-     Next, clean up each DB host so it posts directly to `https://dbtrac.nms.go.ug` / `http://dbtrac.nms.go.ug` (or `http://192.168.35.49`) without trying legacy `192.168.35.38:90` first (and disable `:90` on `nms360` Nginx cleanly):
-     Hosts to update cleanly:
+     Use **Single-Script Sparse `git pull`** (see [Appendix A](#appendix-a--pull-only-a-given-script-into-each-server-git-sparse-checkout)) on each DB server so it pulls **only** its assigned script(s), then clean up its primary URL if desired (and disable `:90` on `nms360` Nginx cleanly):
      - `nickledbnew`: `mysql_backup_agent.py`, `mysql_backup_historical_agent.py`, `mysql_capacity_agent.py`, `mysql_health_agent.py`, `mysql_journal_monitor.py`
      - `nickeldbdr`: `mysql_replication_agent.py`
      - Oracle (`nmsinfra` / `nmsebs` / OEM host): `oracle_uptime_agent.py`, `oracle_direct_agent.py`, `oracle_backfill_agent.py`, `oracle_journal_monitor.py`
