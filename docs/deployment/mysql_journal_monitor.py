@@ -256,20 +256,14 @@ def main():
         timeframe = sys.argv[3]
 
     if not custom_cli_url or custom_cli_url.rstrip('/') == default_v1_url.rstrip('/'):
-        target_groups = [
-            [
-                "http://192.168.35.38:91/api/incident/ingest/",
-                "http://dbtractest.nms.go.ug:91/api/incident/ingest/",
-                "http://dbtractest.nms.go.ug/api/incident/ingest/",
-            ],
-            [
-                default_v1_url,
-                "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
-                "http://dbtrac.nms.go.ug/api/incident/ingest/",
-            ],
-        ]
+        target_urls = list(dict.fromkeys([
+            default_v1_url,
+            "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
+            "https://dbtrac.nms.go.ug/api/incident/ingest/",
+            "http://dbtrac.nms.go.ug/api/incident/ingest/",
+        ]))
     else:
-        target_groups = [[custom_cli_url]]
+        target_urls = [custom_cli_url]
 
     if not api_key:
         api_key = os.environ.get('REPLICATION_API_KEY', '')
@@ -350,43 +344,42 @@ def main():
         print(f"No service or power outages detected in logs for the last {lookback_hours} hours.")
         return
 
-    print(f"Detected {len(incidents_detected)} outage incident(s). Ingesting to DBITRAC/DBTRAC API...")
+    print(f"Detected {len(incidents_detected)} outage incident(s). Ingesting to Prod DBTRAC API...")
 
     success_count = 0
     for payload in incidents_detected:
         data = json.dumps(payload).encode('utf-8')
         delivered = False
-        for group in target_groups:
-            for url in group:
-                try:
-                    req = urllib.request.Request(
-                        url,
-                        data=data,
-                        headers={
-                            'Content-Type': 'application/json',
-                            'X-API-KEY': api_key
-                        },
-                        method='POST'
-                    )
+        for url in target_urls:
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=data,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': api_key
+                    },
+                    method='POST'
+                )
 
-                    with urllib.request.urlopen(req, timeout=10) as response:
-                        res_body = json.loads(response.read().decode('utf-8'))
-                        if res_body.get('status') == 'success':
-                            print(f"✓ [{url}] Successfully Logged Incident to Staging: ID {res_body.get('id')} ({payload['start']} to {payload['end']})")
-                            delivered = True
-                        elif res_body.get('status') == 'ignored':
-                            print(f"✓ [{url}] Already Registered / Staged ({payload['start']})")
-                            delivered = True
-                        else:
-                            print(f"[{url}] API Response: {res_body}")
-                            delivered = True
-                        break
-                except urllib.error.HTTPError as e:
-                    print(f"[{url}] HTTP Error {e.code} starting at {payload['start']}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
-                    if e.code in (400, 401, 403):
-                        break
-                except Exception as e:
-                    print(f"[{url}] Unreachable for incident starting at {payload['start']}: {e}", file=sys.stderr)
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    res_body = json.loads(response.read().decode('utf-8'))
+                    if res_body.get('status') == 'success':
+                        print(f"✓ [{url}] Successfully Logged Incident to Staging: ID {res_body.get('id')} ({payload['start']} to {payload['end']})")
+                        delivered = True
+                    elif res_body.get('status') == 'ignored':
+                        print(f"✓ [{url}] Already Registered / Staged ({payload['start']})")
+                        delivered = True
+                    else:
+                        print(f"[{url}] API Response: {res_body}")
+                        delivered = True
+                    break
+            except urllib.error.HTTPError as e:
+                print(f"[{url}] HTTP Error {e.code} starting at {payload['start']}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
+                if e.code in (400, 401, 403):
+                    break
+            except Exception as e:
+                print(f"[{url}] Unreachable for incident starting at {payload['start']}: {e}", file=sys.stderr)
         if delivered:
             success_count += 1
 

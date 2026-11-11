@@ -128,19 +128,28 @@ def parse_session_block(session_lines, time_pattern):
     }
 
 def send_to_tracker(payload):
-    """Sends the JSON payload to the Uptime Tracker API."""
+    """Sends the JSON payload to Prod DBTRAC with :90 -> domain (HTTPS/HTTP) fallback."""
+    target_urls = list(dict.fromkeys([
+        UPTIME_TRACKER_API_URL,
+        "http://dbtrac.nms.go.ug:90/api/backup/ingest/",
+        "https://dbtrac.nms.go.ug/api/backup/ingest/",
+        "http://dbtrac.nms.go.ug/api/backup/ingest/",
+    ]))
     data = json.dumps(payload).encode('utf-8')
-    req = urllib.request.Request(UPTIME_TRACKER_API_URL, data=data)
-    req.add_header('Content-Type', 'application/json')
-    req.add_header('X-API-KEY', API_KEY)
-    
-    try:
-        response = urllib.request.urlopen(req)
-        print(f"Success for {payload['start']}: {response.read().decode('utf-8')}")
-    except urllib.error.HTTPError as e:
-        print(f"HTTP Error {e.code} for {payload['start']}: {e.read().decode('utf-8')}")
-    except urllib.error.URLError as e:
-        print(f"Connection Error: {e.reason}")
+    for url in target_urls:
+        req = urllib.request.Request(url, data=data)
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('X-API-KEY', API_KEY)
+        try:
+            response = urllib.request.urlopen(req, timeout=15)
+            print(f"[{url}] Success for {payload['start']}: {response.read().decode('utf-8')}")
+            break
+        except urllib.error.HTTPError as e:
+            print(f"[{url}] HTTP Error {e.code} for {payload['start']}: {e.read().decode('utf-8', errors='ignore')}")
+            if e.code in (400, 401, 403):
+                break
+        except Exception as e:
+            print(f"[{url}] Unreachable ({e}), trying fallback...")
 
 if __name__ == "__main__":
     print("Parsing ALL historical MySQL backups for this month...")

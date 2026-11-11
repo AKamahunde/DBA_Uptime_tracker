@@ -62,36 +62,29 @@ def query_oem_repository():
 # Helper: Send payload to API
 # ============================================================
 def send_to_api(endpoint, payload):
-    target_base_groups = [
-        [
-            "http://192.168.35.38:91/api",
-            "http://dbtractest.nms.go.ug:91/api",
-            "http://dbtractest.nms.go.ug/api",
-        ],
-        [
-            API_BASE_URL.rstrip('/'),
-            "http://dbtrac.nms.go.ug:90/api",
-            "http://dbtrac.nms.go.ug/api",
-        ],
-    ]
+    target_bases = list(dict.fromkeys([
+        API_BASE_URL.rstrip('/'),
+        "http://dbtrac.nms.go.ug:90/api",
+        "https://dbtrac.nms.go.ug/api",
+        "http://dbtrac.nms.go.ug/api",
+    ]))
     data = json.dumps(payload).encode('utf-8')
     ep_clean = endpoint.lstrip('/')
-    for group in target_base_groups:
-        for base_url in group:
-            url = f"{base_url}/{ep_clean}"
-            req = urllib.request.Request(url, data=data)
-            req.add_header('Content-Type', 'application/json')
-            req.add_header('X-API-KEY', API_KEY)
-            try:
-                response = urllib.request.urlopen(req, timeout=8)
-                print(f"[{url}] Success sending to {endpoint}: {response.read().decode('utf-8')}")
+    for base_url in target_bases:
+        url = f"{base_url}/{ep_clean}"
+        req = urllib.request.Request(url, data=data)
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('X-API-KEY', API_KEY)
+        try:
+            response = urllib.request.urlopen(req, timeout=8)
+            print(f"[{url}] Success sending to {endpoint}: {response.read().decode('utf-8')}")
+            break
+        except urllib.error.HTTPError as e:
+            print(f"[{url}] HTTP Error {e.code} on {endpoint}: {e.read().decode('utf-8', errors='ignore')}")
+            if e.code in (400, 401, 403):
                 break
-            except urllib.error.HTTPError as e:
-                print(f"[{url}] HTTP Error {e.code} on {endpoint}: {e.read().decode('utf-8', errors='ignore')}")
-                if e.code in (400, 401, 403):
-                    break
-            except urllib.error.URLError as e:
-                print(f"[{url}] Unreachable ({e.reason}), trying DNS fallback...")
+        except Exception as e:
+            print(f"[{url}] Unreachable ({e}), trying fallback...")
 
 def format_size(bytes_val):
     if not bytes_val:

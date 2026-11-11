@@ -22,19 +22,13 @@ import sys
 import urllib.error
 import urllib.request
 
-# Prioritized API target groups (pushes to both DBITRAC :91 and DBTRAC :90,
-# automatically falling back from IP to DNS domain names if IP is unreachable after migration)
-DEFAULT_TARGET_GROUPS = [
-    [
-        "http://192.168.35.38:91/api/replication/ingest/",
-        "http://dbtractest.nms.go.ug:91/api/replication/ingest/",
-        "http://dbtractest.nms.go.ug/api/replication/ingest/",
-    ],
-    [
-        "http://192.168.35.38:90/api/replication/ingest/",
-        "http://dbtrac.nms.go.ug:90/api/replication/ingest/",
-        "http://dbtrac.nms.go.ug/api/replication/ingest/",
-    ],
+# Prioritized Prod API targets (IP:90 and domain:90 first,
+# automatically falling back to HTTPS/HTTP domain URLs after Prod VM cutover)
+DEFAULT_TARGET_URLS = [
+    "http://192.168.35.38:90/api/replication/ingest/",
+    "http://dbtrac.nms.go.ug:90/api/replication/ingest/",
+    "https://dbtrac.nms.go.ug/api/replication/ingest/",
+    "http://dbtrac.nms.go.ug/api/replication/ingest/",
 ]
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 STATE_FILE = "/var/tmp/dbitrac_mysql_repl_state.json"
@@ -146,27 +140,26 @@ def check_binlog_progression(source_file, read_pos, relay_source_file, exec_pos,
 
 
 def send_to_tracker(payload):
-    """Sends the JSON payload to configured DBITRAC/DBTRAC endpoints with IP -> DNS fallback."""
+    """Sends the JSON payload to Prod DBTRAC endpoints with :90 -> domain (HTTPS/HTTP) fallback."""
     custom_url = os.environ.get("DBITRAC_API_URL") or os.environ.get("DBTRAC_API_URL")
-    target_groups = [[custom_url]] if custom_url else DEFAULT_TARGET_GROUPS
+    target_urls = [custom_url] if custom_url else list(dict.fromkeys(DEFAULT_TARGET_URLS))
 
     data = json.dumps(payload).encode("utf-8")
-    for group in target_groups:
-        for url in group:
-            req = urllib.request.Request(url, data=data)
-            req.add_header("Content-Type", "application/json")
-            req.add_header("X-API-KEY", API_KEY)
-            try:
-                response = urllib.request.urlopen(req, timeout=8)
-                resp_data = response.read().decode("utf-8")
-                print(f"[{url}] Success: {resp_data}")
-                break  # Succeeded for this target environment; move to next group
-            except urllib.error.HTTPError as e:
-                print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
-                if e.code in (400, 401, 403):
-                    break
-            except urllib.error.URLError as e:
-                print(f"[{url}] Unreachable ({e.reason}), trying fallback...", file=sys.stderr)
+    for url in target_urls:
+        req = urllib.request.Request(url, data=data)
+        req.add_header("Content-Type", "application/json")
+        req.add_header("X-API-KEY", API_KEY)
+        try:
+            response = urllib.request.urlopen(req, timeout=8)
+            resp_data = response.read().decode("utf-8")
+            print(f"[{url}] Success: {resp_data}")
+            break  # Succeeded; stop trying fallbacks
+        except urllib.error.HTTPError as e:
+            print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
+            if e.code in (400, 401, 403):
+                break
+        except Exception as e:
+            print(f"[{url}] Unreachable ({e}), trying fallback...", file=sys.stderr)
 
 
 if __name__ == "__main__":

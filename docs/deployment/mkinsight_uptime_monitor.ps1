@@ -29,8 +29,8 @@ param (
     [string]$StateDirectory    = "C:\Monitoring"
 )
 
-# Ensure TLS 1.2
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+# Ensure TLS 1.2 without disabling newer protocols
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 # Create State Directory if missing
 if (-not (Test-Path $StateDirectory)) {
@@ -72,35 +72,34 @@ function Send-IncidentToApi {
         "X-API-KEY"    = $ApiKey
     }
 
-    $targetGroups = @(
-        @(
-            "http://192.168.35.38:91/api/incident/ingest/",
-            "http://dbtractest.nms.go.ug:91/api/incident/ingest/",
-            "http://dbtractest.nms.go.ug/api/incident/ingest/"
-        ),
-        @(
-            "$($ApiBaseUrl.TrimEnd('/'))/incident/ingest/",
-            "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
-            "http://dbtrac.nms.go.ug/api/incident/ingest/"
-        )
-    )
+    $targetUrls = @(
+        "$($ApiBaseUrl.TrimEnd('/'))/incident/ingest/",
+        "http://dbtrac.nms.go.ug:90/api/incident/ingest/",
+        "https://dbtrac.nms.go.ug/api/incident/ingest/",
+        "http://dbtrac.nms.go.ug/api/incident/ingest/"
+    ) | Select-Object -Unique
     $anySuccess = $false
-    foreach ($group in $targetGroups) {
-        foreach ($epUrl in $group) {
-            try {
-                $response = Invoke-RestMethod -Uri $epUrl -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
-                if ($response.status -eq 'success') {
-                    Write-Host "[OK] [$epUrl] Logged to Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
-                    $anySuccess = $true
-                    break
-                } elseif ($response.status -eq 'ignored') {
-                    Write-Host "[INFO] [$epUrl] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
-                    $anySuccess = $true
-                    break
-                }
+    foreach ($epUrl in $targetUrls) {
+        try {
+            $response = Invoke-RestMethod -Uri $epUrl -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
+            if ($response.status -eq 'success') {
+                Write-Host "[OK] [$epUrl] Logged to Staging: ID $($response.id) ($($Payload.start) to $($Payload.end))" -ForegroundColor Green
+                $anySuccess = $true
+                break
+            } elseif ($response.status -eq 'ignored') {
+                Write-Host "[INFO] [$epUrl] Already Staged / Deduplicated: $($Payload.start)" -ForegroundColor Cyan
+                $anySuccess = $true
+                break
             }
-            catch {
-                Write-Warning "[$epUrl] Unreachable: $($_.Exception.Message)"
+        }
+        catch {
+            $statusCode = $null
+            if ($_.Exception.Response) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+            Write-Warning "[$epUrl] Unreachable: $($_.Exception.Message)"
+            if ($statusCode -in @(400, 401, 403)) {
+                break
             }
         }
     }

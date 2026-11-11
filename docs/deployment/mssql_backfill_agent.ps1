@@ -20,27 +20,45 @@ $DbNameFilter   = "%Live%"                              # SQL LIKE pattern to fi
 # ============================================================
 # Helper: Send Data to API
 # ============================================================
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 function Send-PayloadToApi {
     param (
         [string]$Endpoint,
         [hashtable]$Payload
     )
     
-    $url = "$ApiBaseUrl/$Endpoint"
     $json = ConvertTo-Json $Payload -Depth 10
     
     $headers = @{
         "Content-Type" = "application/json"
         "X-API-KEY"    = $ApiKey
     }
-    
-    Write-Host "Sending payload to $url..."
-    try {
-        $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing
-        Write-Host "Success: $($response | ConvertTo-Json -Compress)"
-    }
-    catch {
-        Write-Error "Failed to send data to $url. Error: $_"
+    $targetBases = @(
+        $ApiBaseUrl,
+        "http://dbtrac.nms.go.ug:90/api",
+        "https://dbtrac.nms.go.ug/api",
+        "http://dbtrac.nms.go.ug/api"
+    ) | Select-Object -Unique
+
+    foreach ($base in $targetBases) {
+        $url = "$($base.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
+        Write-Host "Sending payload to $url..."
+        try {
+            $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 15
+            Write-Host "[$url] Success: $($response | ConvertTo-Json -Compress)"
+            break
+        }
+        catch {
+            $statusCode = $null
+            if ($_.Exception.Response) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+            Write-Warning "[$url] Unreachable ($($_.Exception.Message))"
+            if ($statusCode -in @(400, 401, 403)) {
+                break
+            }
+        }
     }
 }
 

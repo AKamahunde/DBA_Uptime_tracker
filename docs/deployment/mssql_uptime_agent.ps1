@@ -22,6 +22,8 @@ $DbNameFilter   = "%Live%"                              # SQL LIKE filter to onl
 # ============================================================
 # Helper: Send Data to API
 # ============================================================
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 function Send-PayloadToApi {
     param (
         [string]$Endpoint,
@@ -33,21 +35,28 @@ function Send-PayloadToApi {
         "Content-Type" = "application/json"
         "X-API-KEY"    = $ApiKey
     }
-    $targetGroups = @(
-        @("http://192.168.35.38:91/api", "http://dbtractest.nms.go.ug:91/api", "http://dbtractest.nms.go.ug/api"),
-        @($ApiBaseUrl, "http://dbtrac.nms.go.ug:90/api", "http://dbtrac.nms.go.ug/api")
-    )
-    foreach ($group in $targetGroups) {
-        foreach ($base in $group) {
-            $url = "$($base.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
-            Write-Host "Sending payload to $url..."
-            try {
-                $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
-                Write-Host "[$url] Success: $($response | ConvertTo-Json -Compress)"
-                break
+    $targetBases = @(
+        $ApiBaseUrl,
+        "http://dbtrac.nms.go.ug:90/api",
+        "https://dbtrac.nms.go.ug/api",
+        "http://dbtrac.nms.go.ug/api"
+    ) | Select-Object -Unique
+    foreach ($base in $targetBases) {
+        $url = "$($base.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
+        Write-Host "Sending payload to $url..."
+        try {
+            $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $json -UseBasicParsing -TimeoutSec 10
+            Write-Host "[$url] Success: $($response | ConvertTo-Json -Compress)"
+            break
+        }
+        catch {
+            $statusCode = $null
+            if ($_.Exception.Response) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
             }
-            catch {
-                Write-Warning "[$url] Unreachable ($($_.Exception.Message)), trying DNS fallback..."
+            Write-Warning "[$url] Unreachable ($($_.Exception.Message))"
+            if ($statusCode -in @(400, 401, 403)) {
+                break
             }
         }
     }
