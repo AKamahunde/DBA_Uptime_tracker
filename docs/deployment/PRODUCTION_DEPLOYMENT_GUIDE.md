@@ -693,3 +693,110 @@ Keep `nms360` (`/opt/Uptime_tracker` + MySQL `dba_tracker`) intact in read-only 
    sudo systemctl start uptime_tracker
    ```
 3. All 13 MySQL/Oracle/MSSQL agents prioritize `192.168.35.38:90` first, so ingestion resumes to `nms360` automatically within the next cron run.
+
+---
+
+## Appendix A — Pull Only a Given Script into Each Server (`git` Sparse Checkout)
+
+To pull **only** the specific agent script(s) a DB host needs (without checking out the Django backend, templates, or unrelated server scripts), initialize a lightweight sparse-checkout folder once on each server. Future updates are then just a single `git pull`.
+
+*(Note: Use `BRANCH=feature/infrastructure-prometheus` right now, or `BRANCH=main` once merged into `main`.)*
+
+### A.1 Linux Hosts (`nickledbnew`, `nickeldbdr`, Oracle Hosts, `ccisuganda`)
+
+**One-time setup (replace script filename(s) in `sparse-checkout` as needed for the host):**
+
+- **`nickledbnew` (MySQL Primary):**
+  ```bash
+  BRANCH=feature/infrastructure-prometheus
+  sudo mkdir -p /opt/dbtrac-agents && sudo chown "$USER":"$USER" /opt/dbtrac-agents
+  git clone --depth 1 --no-checkout --branch "$BRANCH" https://github.com/AKamahunde/DBA_Uptime_tracker.git /opt/dbtrac-agents
+  cd /opt/dbtrac-agents && git config core.sparseCheckout true
+  printf '%s\n' \
+    docs/deployment/mysql_backup_agent.py \
+    docs/deployment/mysql_backup_historical_agent.py \
+    docs/deployment/mysql_capacity_agent.py \
+    docs/deployment/mysql_health_agent.py \
+    docs/deployment/mysql_journal_monitor.py \
+    > .git/info/sparse-checkout
+  git checkout "$BRANCH"
+  ```
+- **`nickeldbdr` (MySQL Replica):**
+  ```bash
+  BRANCH=feature/infrastructure-prometheus
+  sudo mkdir -p /opt/dbtrac-agents && sudo chown "$USER":"$USER" /opt/dbtrac-agents
+  git clone --depth 1 --no-checkout --branch "$BRANCH" https://github.com/AKamahunde/DBA_Uptime_tracker.git /opt/dbtrac-agents
+  cd /opt/dbtrac-agents && git config core.sparseCheckout true
+  printf '%s\n' docs/deployment/mysql_replication_agent.py > .git/info/sparse-checkout
+  git checkout "$BRANCH"
+  ```
+- **Oracle Hosts (`nmsinfra` / `nmsebs` / OEM host — keep only the script(s) that host runs):**
+  ```bash
+  BRANCH=feature/infrastructure-prometheus
+  sudo mkdir -p /opt/dbtrac-agents && sudo chown "$USER":"$USER" /opt/dbtrac-agents
+  git clone --depth 1 --no-checkout --branch "$BRANCH" https://github.com/AKamahunde/DBA_Uptime_tracker.git /opt/dbtrac-agents
+  cd /opt/dbtrac-agents && git config core.sparseCheckout true
+  printf '%s\n' \
+    docs/deployment/oracle_uptime_agent.py \
+    docs/deployment/oracle_direct_agent.py \
+    docs/deployment/oracle_backfill_agent.py \
+    docs/deployment/oracle_journal_monitor.py \
+    > .git/info/sparse-checkout
+  git checkout "$BRANCH"
+  ```
+- **`ccisuganda` (CCIS PostgreSQL Host):**
+  ```bash
+  BRANCH=feature/infrastructure-prometheus
+  sudo mkdir -p /opt/dbtrac-agents && sudo chown "$USER":"$USER" /opt/dbtrac-agents
+  git clone --depth 1 --no-checkout --branch "$BRANCH" https://github.com/AKamahunde/DBA_Uptime_tracker.git /opt/dbtrac-agents
+  cd /opt/dbtrac-agents && git config core.sparseCheckout true
+  printf '%s\n' \
+    docs/deployment/postgres_ccis_agent.py \
+    docs/deployment/ccisprod-weekly-backup.sh \
+    > .git/info/sparse-checkout
+  git checkout "$BRANCH"
+  chmod 750 /opt/dbtrac-agents/docs/deployment/ccisprod-weekly-backup.sh
+  ```
+
+**Optional symlink so existing cron paths update automatically on `git pull`:**
+```bash
+# Example (replace target path with the existing cron path on that server):
+ln -sf /opt/dbtrac-agents/docs/deployment/ccisprod-weekly-backup.sh /home/techsupport/odkx-prod/scripts/ccisprod-weekly-backup.sh
+```
+
+**Every future update on that Linux server:**
+```bash
+cd /opt/dbtrac-agents && git pull origin feature/infrastructure-prometheus
+```
+
+### A.2 Windows Server (`Pentana` — MSSQL / MKInsight)
+
+- **If Git for Windows is installed (PowerShell):**
+  ```powershell
+  $branch = "feature/infrastructure-prometheus"
+  $repoDir = "C:\Monitoring\dbtrac-repo"
+  git clone --depth 1 --no-checkout --branch $branch https://github.com/AKamahunde/DBA_Uptime_tracker.git $repoDir
+  Set-Location $repoDir
+  git config core.sparseCheckout true
+  @(
+      "docs/deployment/mssql_uptime_agent.ps1",
+      "docs/deployment/mssql_backfill_agent.ps1",
+      "docs/deployment/mkinsight_uptime_monitor.ps1"
+  ) | Set-Content ".git\info\sparse-checkout" -Encoding ascii
+  git checkout $branch
+  Copy-Item "$repoDir\docs\deployment\*.ps1" "C:\Monitoring\" -Force
+  ```
+  Future updates:
+  ```powershell
+  Set-Location C:\Monitoring\dbtrac-repo; git pull origin feature/infrastructure-prometheus; Copy-Item ".\docs\deployment\*.ps1" "C:\Monitoring\" -Force
+  ```
+
+- **If Git is NOT installed on `Pentana` (PowerShell direct pull per file):**
+  ```powershell
+  [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+  $branch = "feature/infrastructure-prometheus"
+  $headers = @{ Authorization = "token <YOUR_GITHUB_PAT>" }   # Omit -Headers if repo is public
+  foreach ($f in @("mssql_uptime_agent.ps1", "mssql_backfill_agent.ps1", "mkinsight_uptime_monitor.ps1")) {
+      Invoke-RestMethod -Uri "https://raw.githubusercontent.com/AKamahunde/DBA_Uptime_tracker/$branch/docs/deployment/$f" -Headers $headers -OutFile "C:\Monitoring\$f"
+  }
+  ```
