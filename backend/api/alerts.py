@@ -101,136 +101,82 @@ def _send_email_alert(title, details, severity, target, now_str):
 
     color_accent = "#dc2626" if str(severity).lower() in ("critical", "failed") else "#d97706"
 
-    # Styled Modern Enterprise HTML Email Body
+    # Clean, Minimalist Corporate HTML Email Body
     is_crit = str(severity).lower() in ("critical", "failed")
     badge_bg = "#fee2e2" if is_crit else "#fef3c7"
     badge_color = "#991b1b" if is_crit else "#92400e"
     badge_border = "#fca5a5" if is_crit else "#fcd34d"
-    badge_icon = "●" if is_crit else "▲"
-    severity_label = f"{badge_icon} {str(severity).upper()} ALERT"
 
     html_content = f"""<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    /* Prevent email clients from re-styling links */
     a[x-apple-data-detectors] {{ color: inherit !important; text-decoration: none !important; }}
-    .no-link a {{ color: inherit !important; text-decoration: none !important; }}
   </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 24px 10px; margin: 0; -webkit-font-smoothing: antialiased;">
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 20px 10px; margin: 0;">
   
-  <!-- Main Email Canvas Table -->
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1; overflow: hidden; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
     
-    <!-- 1. Branded Header Banner -->
+    <!-- Header -->
     <tr>
-      <td style="background-color: #00205B; padding: 20px 26px; border-bottom: 3px solid {color_accent};">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-          <tr>
-            <td style="vertical-align: middle;">
-              <div style="display: inline-block; background: rgba(255, 255, 255, 0.14); color: #ffffff; font-weight: 800; font-size: 0.88rem; padding: 4px 10px; border-radius: 4px; letter-spacing: 0.8px; border: 1px solid rgba(255, 255, 255, 0.2);">
-                DBTRAC
-              </div>
-              <span style="color: #cbd5e1; font-size: 0.85rem; font-weight: 600; margin-left: 8px; vertical-align: middle;">
-                Operational Monitoring
-              </span>
-            </td>
-            <td style="vertical-align: middle; text-align: right;">
-              <span style="color: #94a3b8; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                NMS Uganda
-              </span>
-            </td>
-          </tr>
-        </table>
+      <td style="background: #00205B; padding: 18px 24px; border-bottom: 3px solid {color_accent};">
+        <div style="color: #ffffff; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;">DBTRAC Operational Alert</div>
+        <div style="color: #94a3b8; font-size: 0.78rem; margin-top: 3px;">National Medical Stores · Database &amp; Infrastructure Monitoring</div>
       </td>
     </tr>
 
-    <!-- 2. Email Body Container -->
+    <!-- Body -->
     <tr>
-      <td style="padding: 26px 28px;">
+      <td style="padding: 24px;">
         
-        <!-- Severity Pill & Status -->
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 12px;">
-          <tr>
-            <td>
-              <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_border}; font-size: 0.72rem; font-weight: 800; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                {severity_label}
-              </span>
-            </td>
-          </tr>
-        </table>
+        <!-- Severity Badge -->
+        <div style="margin-bottom: 10px;">
+          <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_border}; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+            {severity}
+          </span>
+        </div>
 
-        <!-- Main Alert Title -->
-        <h1 style="margin: 0 0 18px 0; color: #0f172a; font-size: 1.25rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em;">
+        <!-- Title -->
+        <div style="color: #0f172a; font-size: 1.18rem; font-weight: 700; line-height: 1.35; margin-bottom: 18px;">
           {title}
-        </h1>
+        </div>
 
-        <!-- 3. Key Metrics Deck (2x2 Outlook-friendly Grid) -->
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 22px;">
-          <tr>
-            <!-- Metric 1: Target Workload -->
-            <td width="48%" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; vertical-align: top;">
-              <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                Target Workload / Host
-              </div>
-              <div style="font-size: 0.92rem; font-weight: 700; color: #00205B;">
-                {target or 'System'}
-              </div>
+        <!-- Details Table -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size: 0.85rem; margin-bottom: 22px;">
+          <tr style="border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600; width: 24%; vertical-align: top;">Target</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 700; vertical-align: top;">{target or 'System'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600; vertical-align: top;">Detected At</td>
+            <td style="padding: 10px 0; color: #0f172a; font-weight: 600; vertical-align: top;">
+              <span style="color: #0f172a; text-decoration: none;">{now_str} EAT</span>
             </td>
-            <td width="4%">&nbsp;</td>
-            <!-- Metric 2: Detection Timestamp -->
-            <td width="48%" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; vertical-align: top;">
-              <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
-                Detected At (EAT)
-              </div>
-              <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; font-family: monospace;">
-                <span style="color: #0f172a; text-decoration: none;">{now_str}</span>
-              </div>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 0; color: #64748b; font-weight: 600; vertical-align: top;">Details</td>
+            <td style="padding: 10px 0; vertical-align: top;">
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; color: #334155; font-size: 0.82rem; line-height: 1.5; white-space: pre-wrap;">{details}</div>
             </td>
           </tr>
         </table>
 
-        <!-- 4. Diagnostic Details & Telemetry Logs Card -->
-        <div style="font-size: 0.72rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px;">
-          Diagnostic Telemetry &amp; Error Logs
+        <!-- Action Button -->
+        <div style="text-align: center; margin-top: 20px; margin-bottom: 6px;">
+          <a href="{tracker_url}" style="background: #00205B; color: #ffffff; text-decoration: none; padding: 11px 26px; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-block;">
+            Open DBTRAC Dashboard &rarr;
+          </a>
         </div>
-        <div style="background: #0f172a; border-radius: 6px; padding: 14px 18px; margin-bottom: 24px; border: 1px solid #1e293b;">
-          <pre style="margin: 0; color: #f8fafc; font-family: 'JetBrains Mono', 'Segoe UI Mono', Consolas, 'Courier New', monospace; font-size: 0.82rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word;">{details}</pre>
-        </div>
-
-        <!-- 5. Primary Action Button -->
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top: 10px; margin-bottom: 8px;">
-          <tr>
-            <td align="center">
-              <a href="{tracker_url}" style="background-color: #00205B; color: #ffffff; text-decoration: none; padding: 12px 28px; font-size: 0.88rem; font-weight: 700; border-radius: 6px; display: inline-block; letter-spacing: 0.2px; box-shadow: 0 2px 4px rgba(0, 32, 91, 0.25);">
-                Open DBTRAC Dashboard &rarr;
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding-top: 8px;">
-              <span style="font-size: 0.74rem; color: #94a3b8;">
-                Direct link: <a href="{tracker_url}" style="color: #64748b; text-decoration: underline;">{tracker_url}</a>
-              </span>
-            </td>
-          </tr>
-        </table>
 
       </td>
     </tr>
 
-    <!-- 6. Professional Clean Footer -->
+    <!-- Footer -->
     <tr>
-      <td style="background-color: #f8fafc; padding: 16px 28px; border-top: 1px solid #e2e8f0; text-align: center;">
-        <div style="font-size: 0.74rem; font-weight: 600; color: #475569; margin-bottom: 4px;">
-          National Medical Stores · Database Administration &amp; Infrastructure
-        </div>
-        <div style="font-size: 0.7rem; color: #94a3b8;">
-          Automated operational telemetry dispatch generated by DBTRAC.
-        </div>
+      <td style="background: #f8fafc; padding: 14px 24px; font-size: 0.72rem; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0;">
+        National Medical Stores · Automated operational telemetry alert from DBTRAC.
       </td>
     </tr>
 
