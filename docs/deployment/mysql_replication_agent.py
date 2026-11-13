@@ -210,7 +210,7 @@ if __name__ == "__main__":
         error_parts.append(f"[IO Errno {io_errno}] {io_error}" if io_errno != "0" else f"[IO Error] {io_error}")
     if sql_error:
         error_parts.append(f"[SQL Errno {sql_errno}] {sql_error}" if sql_errno != "0" else f"[SQL Error] {sql_error}")
-    if binlog_note:
+    if binlog_stalled and binlog_note:
         error_parts.append(f"[{binlog_note}]")
 
     last_error = " | ".join(error_parts)
