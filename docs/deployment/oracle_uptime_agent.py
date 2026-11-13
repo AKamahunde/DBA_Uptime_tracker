@@ -22,7 +22,7 @@ OEM_HOST        = "192.168.30.77"   # OEM Repository DB host
 OEM_PORT        = "1521"
 OEM_SERVICE     = "ebs.nms.go.ug"   # OEM Repository SID or Service Name
 OEM_USER        = "sysman"
-OEM_PASSWORD    = "F0rtEBBnms"
+OEM_PASSWORD    = os.environ.get("OEM_PASSWORD") or os.environ.get("ORACLE_PASSWORD") or os.environ.get("DB_PASS", "")
 
 API_KEY         = "uptimetracker_api_9f2c1d8e45x9"
 API_BASE_URL    = "http://192.168.35.38:90/api"

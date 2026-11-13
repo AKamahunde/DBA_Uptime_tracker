@@ -1811,9 +1811,15 @@ def incident_list(request):
         messages.error(request, 'You do not have permission to view incident records.')
         return redirect('dashboard')
         
-    from django.db.models import Sum, Q
+    from django.db.models import Sum, Q, Case, When, Value, IntegerField
     
-    base_qs = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().order_by('-date', '-start')
+    base_qs = IncidentRegister.objects.prefetch_related('change_logs', 'change_logs__changed_by').all().annotate(
+        priority_order=Case(
+            When(status__in=['Open', 'In Progress'], then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField()
+        )
+    ).order_by('priority_order', '-date', '-start')
     
     # Tabs: 'all', 'database', 'infrastructure' with granular permissions enforcement
     requested_tab = request.GET.get('tab', '').lower()
@@ -2169,7 +2175,15 @@ def replication_list(request):
     if not (request.user.is_admin or request.user.has_perm('api.view_replicationmonitor')):
         messages.error(request, 'You do not have permission to view replication records.')
         return redirect('dashboard')
-    queryset = ReplicationMonitor.objects.all().order_by('-date', '-created_at')
+    from django.db.models import Case, When, Value, IntegerField
+    queryset = ReplicationMonitor.objects.all().annotate(
+        priority_order=Case(
+            When(status='Failed', then=Value(0)),
+            When(status='Warning', then=Value(1)),
+            default=Value(2),
+            output_field=IntegerField()
+        )
+    ).order_by('priority_order', '-date', '-created_at')
     
     current_db = request.GET.get('database', '')
     start_date = request.GET.get('start_date', '')
@@ -4626,6 +4640,16 @@ def server_health_list(request):
                         'created_by': p_rec.created_by,
                     })
 
+        def _node_priority_key(n):
+            st = n.get('status', 'Healthy')
+            if st in ('Outage', 'Critical', 'Offline', 'Failed'):
+                return 0
+            elif st in ('Below SLA', 'Warning'):
+                return 1
+            return 2
+
+        consolidated_nodes.sort(key=lambda n: (_node_priority_key(n), -n.get('date').toordinal() if hasattr(n.get('date'), 'toordinal') else 0))
+
         total_node_health_count = len(consolidated_nodes)
         paginator = Paginator(consolidated_nodes, 10)
         page_number = request.GET.get('page')
@@ -4640,7 +4664,14 @@ def server_health_list(request):
         # Virtual Machines (VM-level)
         queryset = ServerHealth.objects.filter(
             Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
-        ).order_by('-date', '-updated_at')
+        ).annotate(
+            priority_order=Case(
+                When(status__in=['Outage', 'Critical', 'Offline'], then=Value(0)),
+                When(status__in=['Below SLA', 'Warning'], then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField()
+            )
+        ).order_by('priority_order', '-date', '-updated_at')
 
         if selected_vm:
             queryset = queryset.filter(server__iexact=selected_vm)
@@ -6260,6 +6291,18 @@ def replication_ingest(request):
             database=data.get('database', 'MySQL'),
             severity=severity
         )
+        if severity in ['Critical', 'High']:
+            try:
+                from api.alerts import dispatch_alert_async
+                dispatch_alert_async(
+                    title=f"Replication Alert: {data.get('database', 'MySQL')}",
+                    details=f"Master: {replication.master} -> Replica: {replication.replica}\nIO: {io_thread} | SQL: {sql_thread} | Lag: {seconds_behind}s\nError: {last_error or 'Threads stopped'}",
+                    severity=severity,
+                    target=f"{data.get('database', 'MySQL')} ({replication.replica})"
+                )
+            except Exception:
+                pass
+
         return JsonResponse({'status': 'success', 'id': replication.id})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -6703,6 +6746,17 @@ def incident_ingest(request):
             maintenance_record=maint_record,
             processed_at=processed_at
         )
+        if not maint_record:
+            try:
+                from api.alerts import dispatch_alert_async
+                dispatch_alert_async(
+                    title=f"Unplanned Outage: {system or db_type}",
+                    details=f"Target: {system or db_type}\nWindow: {start_str} to {end_str}\nDuration: {duration_hrs}h",
+                    severity="Critical",
+                    target=system or db_type
+                )
+            except Exception:
+                pass
         
         return JsonResponse({
             'status': 'success',

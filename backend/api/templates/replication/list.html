@@ -143,7 +143,7 @@
             </thead>
             <tbody>
                 {% for replication in page_obj %}
-                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;">
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1); transition: background-color 0.2s;{% if replication.status == 'Failed' %} background: #fff5f5; border-left: 4px solid #dc2626;{% elif replication.status == 'Warning' or replication.seconds_behind > 30 %} background: #fffdf5; border-left: 4px solid #f59e0b;{% endif %}">
                     <!-- Timestamp -->
                     <td style="padding: 0.65rem 0.75rem; vertical-align: top;">
                         <div style="font-weight: 600; color: #0f172a;">{{ replication.date|date:"d M Y" }}</div>
@@ -195,13 +195,17 @@
 
                     <!-- Severity -->
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; text-align: center;">
+                        {% if replication.status != 'Healthy' %}
                         <span style="display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; text-align: center;
                                     {% if replication.severity == 'Critical' %}background: #fce8e6; color: #c5221f; font-weight: 700;
                                     {% elif replication.severity == 'High' %}background: #fee2e2; color: #ef4444;
                                     {% elif replication.severity == 'Medium' %}background: #fef7e0; color: #b06000;
-                                    {% else %}background: #e2e8f0; color: #475569;{% endif %}">
+                                    {% else %}background: #fee2e2; color: #c5221f;{% endif %}">
                             {{ replication.severity }}
                         </span>
+                        {% else %}
+                        <span style="color: #94a3b8; font-size: 0.85rem;" title="Healthy — no severity needed">&mdash;</span>
+                        {% endif %}
                     </td>
 
                     <!-- Outcome -->
@@ -216,7 +220,16 @@
 
                     <!-- Last Error -->
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-size: 0.74rem; max-width: 340px; word-break: break-word; color: {% if replication.status == 'Failed' and replication.last_error %}#c5221f{% else %}#64748b{% endif %};">
-                        {% if replication.last_error %}{{ replication.last_error }}{% else %}—{% endif %}
+                        {% if replication.last_error %}
+                            <div>{{ replication.last_error }}</div>
+                            {% if replication.status == 'Failed' %}
+                            <div style="margin-top: 0.35rem; font-family: monospace; font-size: 0.68rem; background: #fee2e2; color: #991b1b; padding: 0.2rem 0.4rem; border-radius: 3px; border: 1px solid #fca5a5; display: inline-block;">
+                                <strong>Triage:</strong> <code>SHOW REPLICA STATUS\G; START REPLICA;</code>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <span style="color: #94a3b8;">&mdash;</span>
+                        {% endif %}
                     </td>
 
 

@@ -5,7 +5,7 @@ DB_HOST        = "nmsinfra.nms.go.ug"
 DB_PORT        = 1530
 DB_SID         = "INFRA"
 DB_SERVICE     = "NMS"
-DB_PASS        = "F0rtEBBnms"
+DB_PASS         = os.environ.get("DB_PASS") or os.environ.get("ORACLE_PASSWORD") or os.environ.get("OEM_PASSWORD", "")
 
 oracledb_mode = True
 try:

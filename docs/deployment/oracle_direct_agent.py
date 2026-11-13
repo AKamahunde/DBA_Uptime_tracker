@@ -22,7 +22,7 @@ DB_PORT         = 1530
 DB_SID          = "INFRA"                # CDB Container SID (where RMAN backups live)
 DB_SERVICE_NAME = ""                     # Service Name (blank connects directly to CDB SID INFRA)
 DB_USER         = "sys"                  # Database admin user
-DB_PASS         = "F0rtEBBnms"
+DB_PASS         = os.environ.get("DB_PASS") or os.environ.get("ORACLE_PASSWORD") or os.environ.get("OEM_PASSWORD", "")
 
 API_KEY         = "uptimetracker_api_9f2c1d8e45x9"
 API_BASE_URL    = "http://192.168.35.38:90/api"

@@ -233,7 +233,7 @@
                     <tbody>
                         {% for incident in page_obj %}
                         <tr class="incident-row" id="row-{{ incident.pk }}" 
-                            style="cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid rgba(90, 123, 156, 0.1);"
+                            style="cursor: pointer; transition: background-color 0.2s; border-bottom: 1px solid rgba(90, 123, 156, 0.1);{% if incident.status == 'Open' %} background: #fff5f5; border-left: 4px solid #dc2626;{% elif incident.status == 'In Progress' %} background: #fffdf5; border-left: 4px solid #f59e0b;{% endif %}"
                             onclick="selectIncidentRow('row-{{ incident.pk }}')"
                             data-pk="{{ incident.pk }}"
                             data-ticket="{{ incident.ticket|escape }}"
@@ -357,9 +357,19 @@
                                         Excluded
                                     </span>
                                 {% elif incident.status == 'Open' or incident.status == 'In Progress' %}
-                                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7;">
-                                        Running
-                                    </span>
+                                    {% if incident.is_running_sla_breached %}
+                                        <span style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: #dc2626; background: #fee2e2; padding: 0.15rem 0.4rem; border-radius: 3px; border: 1px solid #fca5a5;" title="Breached Service Desk SLA: {{ incident.resolution_duration_hrs }}h vs Target {{ incident.resolution_sla_target_hrs }}h">
+                                            BREACHED ({{ incident.resolution_duration_hrs }}h)
+                                        </span>
+                                    {% elif incident.is_running_sla_warning %}
+                                        <span style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: #b45309; background: #fef3c7; padding: 0.15rem 0.4rem; border-radius: 3px; border: 1px solid #fde68a;" title="Approaching SLA limit: {{ incident.resolution_duration_hrs }}h of {{ incident.resolution_sla_target_hrs }}h">
+                                            AT RISK ({{ incident.resolution_duration_hrs }}h / {{ incident.resolution_sla_target_hrs }}h)
+                                        </span>
+                                    {% else %}
+                                        <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7;" title="Target &le; {{ incident.resolution_sla_target_hrs }}h Mon-Fri 08:00-17:00">
+                                            Running ({{ incident.resolution_duration_hrs }}h / {{ incident.resolution_sla_target_hrs }}h)
+                                        </span>
+                                    {% endif %}
                                 {% else %}
                                     {% if incident.is_resolution_sla_breached %}
                                         <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #dc2626;" title="Service Desk resolution time: {{ incident.resolution_duration_hrs }}h (Target &le; {{ incident.resolution_sla_target_hrs }}h Mon-Fri 08:00-17:00)">Breached</span>

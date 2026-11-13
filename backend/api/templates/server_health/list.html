@@ -388,7 +388,7 @@
             </thead>
             <tbody>
                 {% for health in page_obj %}
-                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);">
+                <tr style="border-bottom: 1px solid rgba(90, 123, 156, 0.1);{% if health.status == 'Critical' or health.status == 'Outage' or health.status == 'Offline' %} background: #fff5f5; border-left: 4px solid #dc2626;{% elif health.status == 'Warning' or health.status == 'Below SLA' %} background: #fffdf5; border-left: 4px solid #f59e0b;{% endif %}">
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle;">
                         <div style="font-weight: 600; color: #0f172a;">{{ health.date|date:"d M Y" }}</div>
                         <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.1rem;">{{ health.updated_at|time:"H:i" }}</div>

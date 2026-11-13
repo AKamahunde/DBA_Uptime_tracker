@@ -5,7 +5,7 @@ OEM_HOST        = "192.168.30.77"
 OEM_PORT        = "1521"
 OEM_SERVICE     = "ebs.nms.go.ug"
 OEM_USER        = "sysman"
-OEM_PASSWORD    = "F0rtEBBnms"
+OEM_PASSWORD    = os.environ.get("OEM_PASSWORD") or os.environ.get("ORACLE_PASSWORD") or os.environ.get("DB_PASS", "")
 
 oracledb_mode = True
 try:

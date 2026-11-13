@@ -225,6 +225,20 @@ class IncidentRegister(models.Model):
             return False
         return self.resolution_duration_hrs > self.resolution_sla_target_hrs
 
+    @property
+    def is_running_sla_warning(self):
+        """Returns True if an open/in-progress incident has consumed >= 75% of its resolution SLA target."""
+        if self.planned or self.status not in ['Open', 'In Progress']:
+            return False
+        return self.resolution_duration_hrs >= (0.75 * self.resolution_sla_target_hrs)
+
+    @property
+    def is_running_sla_breached(self):
+        """Returns True if an active incident has already blown past its Service Desk SLA target."""
+        if self.planned or self.status not in ['Open', 'In Progress']:
+            return False
+        return self.resolution_duration_hrs > self.resolution_sla_target_hrs
+
 class IncidentChangeLog(models.Model):
     incident = models.ForeignKey(IncidentRegister, on_delete=models.CASCADE, related_name='change_logs')
     changed_by = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True)
