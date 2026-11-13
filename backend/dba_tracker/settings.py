@@ -14,10 +14,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load .env from project root or backend directory
+for _env_path in [BASE_DIR.parent / '.env', BASE_DIR / '.env']:
+    if _env_path.exists():
+        load_dotenv(_env_path)
+load_dotenv()  # Fallback to current working directory
 
 
 # Quick-start development settings - unsuitable for production

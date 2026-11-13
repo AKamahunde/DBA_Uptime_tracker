@@ -44,3 +44,7 @@ Thumbs.db
 .gemini/
 powershell.cmd
 **/powershell.cmd
+
+# Environment files
+.env
+.env.local
