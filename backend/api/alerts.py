@@ -188,6 +188,24 @@ def _send_email_alert(title, details, severity, target, now_str):
         logger.warning(f"[DBTRAC Alert] SMTP delivery failed to {recipients} via {host}:{port}: {e}")
 
 
+def _load_env_fallback():
+    """Fallback standard-library loader for .env when python-dotenv is absent."""
+    for path in [".env", "backend/.env", "../.env", "/opt/Uptime_tracker/.env"]:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+
 def dispatch_alert_async(title, details, severity="Critical", target=None):
     """
     Fires operational alert notifications across all configured channels
@@ -195,6 +213,7 @@ def dispatch_alert_async(title, details, severity="Critical", target=None):
     Never blocks caller execution or web request cycles.
     Silently no-ops if no alerting channels are configured.
     """
+    _load_env_fallback()
     enabled = os.environ.get("ALERT_ENABLED", "true").lower() in ("true", "1", "yes")
     if not enabled:
         return
