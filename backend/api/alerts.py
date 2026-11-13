@@ -101,7 +101,7 @@ def _send_email_alert(title, details, severity, target, now_str):
 
     color_accent = "#dc2626" if str(severity).lower() in ("critical", "failed") else "#d97706"
 
-    # Clean, Minimalist Corporate HTML Email Body
+    # Clean White Executive HTML Email Body (Zero Header Color / Crisp Modern Typography)
     is_crit = str(severity).lower() in ("critical", "failed")
     badge_bg = "#fee2e2" if is_crit else "#fef3c7"
     badge_color = "#991b1b" if is_crit else "#92400e"
@@ -115,31 +115,37 @@ def _send_email_alert(title, details, severity, target, now_str):
     a[x-apple-data-detectors] {{ color: inherit !important; text-decoration: none !important; }}
   </style>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 20px 10px; margin: 0;">
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 24px 10px; margin: 0;">
   
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
     
-    <!-- Header -->
+    <!-- Clean White Header (No solid colored banner) -->
     <tr>
-      <td style="background: #00205B; padding: 18px 24px; border-bottom: 3px solid {color_accent};">
-        <div style="color: #ffffff; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;">DBTRAC Operational Alert</div>
-        <div style="color: #94a3b8; font-size: 0.78rem; margin-top: 3px;">National Medical Stores · Database &amp; Infrastructure Monitoring</div>
+      <td style="padding: 24px 28px 18px 28px; border-bottom: 1px solid #f1f5f9; background: #ffffff;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td style="vertical-align: middle;">
+              <span style="font-weight: 800; font-size: 1.05rem; color: #0f172a; letter-spacing: 0.5px;">DBTRAC</span>
+              <span style="color: #cbd5e1; margin: 0 6px;">|</span>
+              <span style="color: #475569; font-size: 0.85rem; font-weight: 600;">Operational Alert</span>
+              <div style="color: #94a3b8; font-size: 0.74rem; margin-top: 3px;">National Medical Stores · Database &amp; Infrastructure Monitoring</div>
+            </td>
+            <td style="vertical-align: middle; text-align: right;">
+              <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_border}; font-size: 0.7rem; font-weight: 700; padding: 3px 9px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+                {severity}
+              </span>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
 
     <!-- Body -->
     <tr>
-      <td style="padding: 24px;">
+      <td style="padding: 24px 28px;">
         
-        <!-- Severity Badge -->
-        <div style="margin-bottom: 10px;">
-          <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_border}; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
-            {severity}
-          </span>
-        </div>
-
         <!-- Title -->
-        <div style="color: #0f172a; font-size: 1.18rem; font-weight: 700; line-height: 1.35; margin-bottom: 18px;">
+        <div style="color: #0f172a; font-size: 1.2rem; font-weight: 700; line-height: 1.35; margin-bottom: 20px;">
           {title}
         </div>
 
@@ -164,7 +170,7 @@ def _send_email_alert(title, details, severity, target, now_str):
         </table>
 
         <!-- Action Button -->
-        <div style="text-align: center; margin-top: 20px; margin-bottom: 6px;">
+        <div style="text-align: center; margin-top: 22px; margin-bottom: 6px;">
           <a href="{tracker_url}" style="background: #00205B; color: #ffffff; text-decoration: none; padding: 11px 26px; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-block;">
             Open DBTRAC Dashboard &rarr;
           </a>
@@ -175,7 +181,7 @@ def _send_email_alert(title, details, severity, target, now_str):
 
     <!-- Footer -->
     <tr>
-      <td style="background: #f8fafc; padding: 14px 24px; font-size: 0.72rem; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0;">
+      <td style="background: #ffffff; padding: 16px 28px; font-size: 0.72rem; color: #94a3b8; text-align: center; border-top: 1px solid #f1f5f9;">
         National Medical Stores · Automated operational telemetry alert from DBTRAC.
       </td>
     </tr>
