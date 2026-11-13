@@ -220,16 +220,7 @@
 
                     <!-- Last Error -->
                     <td style="padding: 0.65rem 0.75rem; vertical-align: middle; font-size: 0.74rem; max-width: 340px; word-break: break-word; color: {% if replication.status == 'Failed' and replication.last_error %}#c5221f{% else %}#64748b{% endif %};">
-                        {% if replication.last_error %}
-                            <div>{{ replication.last_error }}</div>
-                            {% if replication.status == 'Failed' %}
-                            <div style="margin-top: 0.35rem; font-family: monospace; font-size: 0.68rem; background: #fee2e2; color: #991b1b; padding: 0.2rem 0.4rem; border-radius: 3px; border: 1px solid #fca5a5; display: inline-block;">
-                                <strong>Triage:</strong> <code>SHOW REPLICA STATUS\G; START REPLICA;</code>
-                            </div>
-                            {% endif %}
-                        {% else %}
-                            <span style="color: #94a3b8;">&mdash;</span>
-                        {% endif %}
+                        {% if replication.last_error %}{{ replication.last_error }}{% else %}<span style="color: #94a3b8;">&mdash;</span>{% endif %}
                     </td>
 
 
