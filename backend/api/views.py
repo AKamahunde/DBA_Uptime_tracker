@@ -2739,9 +2739,21 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         vm_low = selected_vm.lower()
         filtered_fleet = [v for v in filtered_fleet if vm_low in v['vm_key'].lower() or vm_low in v['display_name'].lower()]
 
+    # Bubble outages, critical states, and warnings to the top of the table (Row 1)
+    def _vm_priority_key(v):
+        st = v.get('status', 'Healthy')
+        if st in ('Outage', 'Critical', 'Offline'):
+            return (0, v.get('display_name', ''))
+        elif st in ('Below SLA', 'Warning'):
+            return (1, v.get('display_name', ''))
+        return (2, v.get('display_name', ''))
+
+    filtered_fleet.sort(key=_vm_priority_key)
+
     total_count = len(filtered_fleet)
     healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
-    outage_count = sum(1 for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline'])
+    outage_vms = [v for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline']]
+    outage_count = len(outage_vms)
     online_count = total_count - outage_count
     below_sla_count = sum(1 for v in filtered_fleet if v['status'] == 'Below SLA')
     warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
@@ -2751,7 +2763,9 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         vms_healthy_display = "0 Virtual Machines"
         vms_status_color = "#64748b"
     elif outage_count > 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({outage_count} Outage)"
+        outage_names = [v.get('short_name') or v.get('display_name') for v in outage_vms]
+        names_str = f": {', '.join(outage_names)}" if outage_names else ""
+        vms_healthy_display = f"{online_count}/{total_count} Online ({outage_count} Outage{names_str})"
         vms_status_color = "#dc2626"
     elif warning_count > 0 and healthy_count > 0:
         vms_healthy_display = f"{online_count}/{total_count} Online ({healthy_count} Healthy, {warning_count} Warning)"
