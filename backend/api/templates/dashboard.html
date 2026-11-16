@@ -379,6 +379,16 @@
                             </strong>
                             <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">Replication</span>
                         </div>
+                        {% if row.max_connections > 0 %}
+                        <div>
+                            <strong style="font-size: 1.45rem; font-weight: 800; color: {% if row.conn_util_pct >= 90 %}#c5221f{% elif row.conn_util_pct >= 70 %}#b06000{% else %}#0f172a{% endif %}; display: block; line-height: 1.1;">
+                                {{ row.connections }} <span style="font-size: 0.85rem; font-weight: 600; color: #64748b;">/ {{ row.max_connections }}</span>
+                            </strong>
+                            <span style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-top: 0.35rem;">
+                                Connections ({{ row.conn_util_pct }}%)
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             {% endif %}

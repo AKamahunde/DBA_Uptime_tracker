@@ -207,7 +207,7 @@ class ServerHealthForm(forms.ModelForm):
             'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
             'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
             'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
-            'tablespace_percent', 'connections', 'slow_queries', 'threads', 'status'
+            'tablespace_percent', 'connections', 'max_connections', 'slow_queries', 'threads', 'status'
         ]
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
@@ -221,7 +221,7 @@ class ServerHealthForm(forms.ModelForm):
             'disk_1_type', 'disk_1_size_gb', 'disk_1_used_gb', 'disk_1_percent',
             'disk_2_type', 'disk_2_size_gb', 'disk_2_used_gb', 'disk_2_percent',
             'disk_3_type', 'disk_3_size_gb', 'disk_3_used_gb', 'disk_3_percent',
-            'tablespace_percent', 'connections', 'slow_queries', 'threads'
+            'tablespace_percent', 'connections', 'max_connections', 'slow_queries', 'threads'
         ]
         for fname in optional_fields:
             if fname in self.fields:

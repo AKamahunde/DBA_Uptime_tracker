@@ -131,8 +131,12 @@
                 {{ form.tablespace_percent }}
             </div>
             <div class="form-group">
-                <label for="{{ form.connections.id_for_label }}">Connections:</label>
+                <label for="{{ form.connections.id_for_label }}">Active Connections:</label>
                 {{ form.connections }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.max_connections.id_for_label }}">Max Connections (Pool):</label>
+                {{ form.max_connections }}
             </div>
             <div class="form-group">
                 <label for="{{ form.slow_queries.id_for_label }}">Slow Queries:</label>

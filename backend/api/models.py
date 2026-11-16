@@ -433,6 +433,7 @@ class ServerHealth(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     connections = models.IntegerField(default=0)
+    max_connections = models.IntegerField(default=0, help_text="Configured max_connections limit")
     slow_queries = models.IntegerField(default=0)
     threads = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=[
@@ -503,6 +504,22 @@ class ServerHealth(models.Model):
         sz = float(self.disk_3_size_gb or 0)
         us = self.safe_disk_3_used_gb
         return round(max(0.0, sz - us), 2)
+
+    @property
+    def connection_utilization_percent(self):
+        mc = int(self.max_connections or 0)
+        c = int(self.connections or 0)
+        if mc > 0:
+            return round((c / mc) * 100.0, 2)
+        return 0.0
+
+    @property
+    def is_connection_warning(self):
+        return self.connection_utilization_percent >= 70.0
+
+    @property
+    def is_connection_critical(self):
+        return self.connection_utilization_percent >= 90.0
 
     @property
     def display_server(self):

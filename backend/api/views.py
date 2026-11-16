@@ -1,3 +1,4 @@
+_LAST_CONN_ALERT = {}
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
@@ -477,6 +478,10 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
 
         target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else 99.95
 
+        latest_sh = ServerHealth.objects.filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
+        if not latest_sh and db_type == 'MySQL':
+            latest_sh = ServerHealth.objects.filter(server__icontains='nickledb').order_by('-date', '-updated_at', '-id').first()
+
         dashboard_data.append({
             'database': db_type,
             'availability': avail_str,
@@ -502,6 +507,11 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
             'active_incidents': active_incidents,
             'last_backup_detail': last_backup_str,
             
+            # Latest Server Health & Connection Pool Metrics
+            'connections': int(latest_sh.connections or 0) if latest_sh else 0,
+            'max_connections': int(latest_sh.max_connections or 0) if latest_sh else 0,
+            'conn_util_pct': latest_sh.connection_utilization_percent if latest_sh else 0.0,
+
             # Disk space and tablespace capacity planning values
             'database_size_gb': float(capacity_record.database_size_gb) if (capacity_record and capacity_record.database_size_gb is not None) else 'No Data',
             'available_capacity_gb': float(capacity_record.available_capacity_gb) if (capacity_record and capacity_record.available_capacity_gb is not None) else 'No Data',
@@ -2643,6 +2653,16 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         else:
             status = 'Healthy'
 
+        conn_val = int(rec.connections or 0) if rec else 0
+        max_conn_val = int(rec.max_connections or 0) if rec else 0
+        conn_util = rec.connection_utilization_percent if rec else 0.0
+
+        if rec and max_conn_val > 0:
+            if conn_util >= 90.0 and status in ('Healthy', 'Warning'):
+                status = 'Critical'
+            elif conn_util >= 70.0 and status == 'Healthy':
+                status = 'Warning'
+
         fleet_vms.append({
             'pk': rec.pk if rec else None,
             'vm_key': defn['vm_key'],
@@ -2667,6 +2687,9 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'disk_percent': round(disk_pct, 2),
             'disk_size_gb': round(disk_sz, 2),
             'disk_used_gb': round(disk_us, 2),
+            'connections': conn_val,
+            'max_connections': max_conn_val,
+            'conn_util_pct': conn_util,
             'status': status,
             'has_data': has_data,
             'is_fallback': is_fallback,
@@ -6388,10 +6411,14 @@ def server_health_ingest(request):
         disk = max(float(data.get('disk_percent', 0)), d1_pct, d2_pct, d3_pct)
         uptime_pct = float(data.get('uptime_percent', 100.0))
         
+        max_connections = int(data.get('max_connections', 0))
+        connections = int(data.get('connections', 0))
+        conn_util_pct = round((connections / max_connections * 100.0), 2) if max_connections > 0 else 0.0
+
         status = 'Healthy'
-        if cpu > 90 or memory > 90 or disk > 90 or uptime_pct < 99.0:
+        if cpu > 90 or memory > 90 or disk > 90 or uptime_pct < 99.0 or conn_util_pct >= 90.0:
             status = 'Critical'
-        elif cpu > 75 or memory > 80 or disk > 80 or uptime_pct < 99.9:
+        elif cpu > 75 or memory > 80 or disk > 80 or uptime_pct < 99.9 or conn_util_pct >= 70.0:
             status = 'Warning'
             
         # Check for optional custom date override (for backfilling)
@@ -6462,7 +6489,8 @@ def server_health_ingest(request):
             'disk_3_used_gb': float(data.get('disk_3_used_gb', 0)),
             'disk_3_percent': d3_pct,
             'tablespace_percent': float(data.get('tablespace_percent', disk)),
-            'connections': int(data.get('connections', 0)),
+            'connections': connections,
+            'max_connections': max_connections,
             'slow_queries': int(data.get('slow_queries', 0)),
             'threads': int(data.get('threads', 0)),
             'status': status,
@@ -6479,6 +6507,40 @@ def server_health_ingest(request):
                 database=db_name,
                 **fields_map
             )
+
+        # Proactive Connection Pool Saturation Alerting (>= 70% of max_connections)
+        if conn_util_pct >= 70.0:
+            now_ts = datetime.now()
+            should_alert = True
+            conn_sev = "Critical" if conn_util_pct >= 90.0 else "High"
+            last_info = _LAST_CONN_ALERT.get(server_name)
+            if last_info:
+                last_ts, last_sev = last_info
+                # Throttle: re-alert after 30 minutes (1800s) unless status escalated to Critical
+                if (now_ts - last_ts).total_seconds() < 1800 and not (conn_sev == 'Critical' and last_sev != 'Critical'):
+                    should_alert = False
+
+            if should_alert:
+                try:
+                    from api.alerts import dispatch_alert_async
+                    _LAST_CONN_ALERT[server_name] = (now_ts, conn_sev)
+                    thresh_70 = int(round(max_connections * 0.70))
+                    dispatch_alert_async(
+                        title=f"MySQL Connection Pool Saturation: {server_name}",
+                        details=(
+                            f"Host / Server: {server_name}\n"
+                            f"Database Engine: {db_name}\n"
+                            f"Active Connections: {connections} / {max_connections} ({conn_util_pct}%)\n"
+                            f"Alert Threshold: 70% (~{thresh_70} connections)\n"
+                            f"Severity: {'CRITICAL (>= 90% Pool Exhaustion Risk)' if conn_util_pct >= 90.0 else 'WARNING (>= 70% Saturation)'}\n\n"
+                            f"Immediate DBA Action: Inspect active MySQL client threads, application connection pooling, or query locking immediately before max_connections ({max_connections}) is exhausted."
+                        ),
+                        severity=conn_sev,
+                        target=f"{db_name} ({server_name})"
+                    )
+                except Exception:
+                    pass
+
         return JsonResponse({'status': 'success', 'id': health.id, 'node_name': health.node_name})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
