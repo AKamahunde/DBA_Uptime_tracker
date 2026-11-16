@@ -6578,7 +6578,8 @@ def server_health_ingest(request):
                             f"Immediate DBA Action: Inspect active MySQL client threads, application connection pooling, or query locking immediately before max_connections ({max_connections}) is exhausted."
                         ),
                         severity=conn_sev,
-                        target=f"{db_name} ({server_name})"
+                        target=f"{db_name} ({server_name})",
+                        action_url=f"/?database_select={db_name}"
                     )
                 except Exception:
                     pass

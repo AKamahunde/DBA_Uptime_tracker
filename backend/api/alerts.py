@@ -80,7 +80,7 @@ def _send_telegram(bot_token, chat_id, text, timeout=4):
         return None
 
 
-def _send_email_alert(title, details, severity, target, now_str):
+def _send_email_alert(title, details, severity, target, now_str, action_url=None):
     """Sends a structured HTML and plaintext alert email via corporate SMTP."""
     host = os.environ.get("EMAIL_HOST")
     recipients_str = os.environ.get("ALERT_EMAIL_RECIPIENTS", "")
@@ -97,7 +97,11 @@ def _send_email_alert(title, details, severity, target, now_str):
     use_tls = os.environ.get("EMAIL_USE_TLS", "false").lower() in ("true", "1", "yes")
     use_ssl = os.environ.get("EMAIL_USE_SSL", "false").lower() in ("true", "1", "yes")
     from_email = os.environ.get("EMAIL_FROM") or user or "dbtrac-alerts@nms.go.ug"
-    tracker_url = os.environ.get("DBTRAC_WEB_URL", "http://192.168.35.38:90")
+    tracker_url = os.environ.get("DBTRAC_WEB_URL", "http://192.168.35.38:90").rstrip("/")
+    if action_url:
+        link_url = action_url if action_url.startswith(("http://", "https://")) else f"{tracker_url}/{action_url.lstrip('/')}"
+    else:
+        link_url = tracker_url
 
     color_accent = "#dc2626" if str(severity).lower() in ("critical", "failed") else "#d97706"
 
@@ -166,7 +170,7 @@ def _send_email_alert(title, details, severity, target, now_str):
 
         <!-- Action Button -->
         <div style="text-align: center; margin-top: 22px; margin-bottom: 6px;">
-          <a href="{tracker_url}" style="background: #00205B; color: #ffffff; text-decoration: none; padding: 11px 26px; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-block;">
+          <a href="{link_url}" style="background: #00205B; color: #ffffff; text-decoration: none; padding: 11px 26px; font-size: 0.85rem; font-weight: 700; border-radius: 6px; display: inline-block;">
             Open DBTRAC Dashboard &rarr;
           </a>
         </div>
@@ -191,7 +195,7 @@ def _send_email_alert(title, details, severity, target, now_str):
         f"Target: {target or 'System'}\n"
         f"Time: {now_str}\n\n"
         f"Details:\n{details}\n\n"
-        f"Open Dashboard: {tracker_url}\n"
+        f"Open Dashboard: {link_url}\n"
     )
 
     msg = MIMEMultipart("alternative")
@@ -240,7 +244,7 @@ def _load_env_fallback():
                 pass
 
 
-def dispatch_alert_async(title, details, severity="Critical", target=None):
+def dispatch_alert_async(title, details, severity="Critical", target=None, action_url=None):
     """
     Fires operational alert notifications across all configured channels
     (Email, Telegram, Webhook) in an isolated background daemon thread.
@@ -270,7 +274,7 @@ def dispatch_alert_async(title, details, severity="Critical", target=None):
 
         # 1. Dispatch Email Alert
         if has_email:
-            _send_email_alert(title, details, severity, target, now_str)
+            _send_email_alert(title, details, severity, target, now_str, action_url=action_url)
 
         # 2. Dispatch Telegram Alert
         if has_telegram:
