@@ -24,7 +24,7 @@ from .forms import (
     SLAConfigForm, UgandaHolidayForm
 )
 from users.models import User
-from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models import Sum, Count, Avg, Q, F, Case, When, Value, IntegerField
 from .sla_utils import (
     calculate_operational_downtime,
     calculate_service_desk_resolution_hours,
@@ -4503,7 +4503,7 @@ def server_health_list(request):
         messages.error(request, 'You do not have permission to view server health records.')
         return redirect('dashboard')
 
-    from django.db.models import Avg, Q
+    from django.db.models import Avg, Q, Case, When, Value, IntegerField
 
     current_tab = request.GET.get('tab', 'nodes').lower()
     if current_tab not in ['nodes', 'vms']:
