@@ -174,6 +174,7 @@ def collect_health_data():
     return {
         "server": SERVER_NAME,
         "database": DATABASE_TYPE,
+        "node_name": "Proxmox",
         "cpu_percent": get_cpu_percent(),
         "memory_percent": get_memory_percent(),
         "disk_percent": disk_percent,
