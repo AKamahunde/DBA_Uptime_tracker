@@ -101,11 +101,6 @@ def _send_email_alert(title, details, severity, target, now_str):
 
     color_accent = "#dc2626" if str(severity).lower() in ("critical", "failed") else "#d97706"
 
-    # Clean White Executive HTML Email Body (Zero Header Color / Crisp Modern Typography)
-    is_crit = str(severity).lower() in ("critical", "failed")
-    badge_bg = "#fee2e2" if is_crit else "#fef3c7"
-    badge_color = "#991b1b" if is_crit else "#92400e"
-    badge_border = "#fca5a5" if is_crit else "#fcd34d"
 
     html_content = f"""<!DOCTYPE html>
 <html>
@@ -131,7 +126,7 @@ def _send_email_alert(title, details, severity, target, now_str):
               <div style="color: #94a3b8; font-size: 0.74rem; margin-top: 3px;">National Medical Stores · Database &amp; Infrastructure Monitoring</div>
             </td>
             <td style="vertical-align: middle; text-align: right;">
-              <span style="display: inline-block; background: {badge_bg}; color: {badge_color}; border: 1px solid {badge_border}; font-size: 0.7rem; font-weight: 700; padding: 3px 9px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+              <span style="color: {color_accent}; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
                 {severity}
               </span>
             </td>
