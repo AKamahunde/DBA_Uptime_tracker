@@ -463,7 +463,7 @@
                                 {{ item.connections }} <span style="font-size: 0.72rem; font-weight: 500; color: #64748b;">/ {{ item.max_connections }}</span>
                             </div>
                             <div style="font-size: 0.68rem; font-weight: 700; color: {% if item.conn_util_pct >= 90 %}#c5221f{% elif item.conn_util_pct >= 70 %}#b06000{% else %}#137333{% endif %};">
-                                {{ item.conn_util_pct }}% pool
+                                {{ item.conn_util_pct }}%
                             </div>
                         {% else %}
                             <span style="color: #94a3b8;">—</span>
@@ -763,125 +763,55 @@
 {% if selected_db != 'All Databases' %}
 {% for row in dashboard_data %}
     {% if row.database == selected_db and row.max_connections > 0 %}
-    <!-- Dedicated Real-Time Database Concurrency & Connection Pool Panel -->
-    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 2rem; border-left: 5px solid {% if row.conn_util_pct >= 90 %}#dc2626{% elif row.conn_util_pct >= 70 %}#f59e0b{% else %}#0284c7{% endif %};">
-        
-        <!-- Panel Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
-            <div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--primary-navy);">
-                        Database Concurrency &amp; Connection Pool
-                    </h3>
-                    <span style="font-size: 0.72rem; font-weight: 600; color: #0284c7; background: #f0f9ff; padding: 0.15rem 0.5rem; border-radius: 4px; border: 1px solid #bae6fd;">Live Telemetry</span>
-                </div>
-                <p style="margin: 0.25rem 0 0 0; color: #64748b; font-size: 0.78rem;">
-                    Monitors active MySQL client connections against configured <code>@@GLOBAL.max_connections</code> capacity to prevent undetected connection exhaustion outages.
-                </p>
-            </div>
-            
-            <!-- Live Status Pill -->
-            <div>
-                {% if row.conn_util_pct >= 90 %}
-                    <span style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 0.35rem 0.85rem; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></span>
-                        Critical Pool Exhaustion ({{ row.conn_util_pct }}%)
-                    </span>
-                {% elif row.conn_util_pct >= 70 %}
-                    <span style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 0.35rem 0.85rem; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
-                        Warning Saturation ({{ row.conn_util_pct }}%)
-                    </span>
-                {% else %}
-                    <span style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 0.35rem 0.85rem; border-radius: 9999px; font-weight: 700; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
-                        Pool Healthy &bull; {{ row.conn_util_pct }}% Utilized
-                    </span>
+    <!-- Connection Pool Panel -->
+    <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
+                Connection Pool
+            </h3>
+            <div style="font-size: 0.78rem; color: #64748b;">
+                <span style="font-weight: 700; color: {% if row.conn_util_pct >= 90 %}#c5221f{% elif row.conn_util_pct >= 70 %}#b06000{% else %}#137333{% endif %};">
+                    {% if row.conn_util_pct >= 90 %}Critical{% elif row.conn_util_pct >= 70 %}Warning{% else %}Healthy{% endif %}
+                </span>
+                {% if row.conn_updated_at %}
+                <span style="margin: 0 0.35rem; color: #cbd5e1;">&bull;</span>
+                <span>Updated {{ row.conn_updated_at|date:"d M Y H:i" }}</span>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Visual Concurrency Progress Bar Gauge -->
-        <div style="margin-bottom: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.45rem; font-size: 0.78rem;">
-                <div>
-                    <strong style="font-size: 1.15rem; color: #0f172a;">{{ row.connections }}</strong>
-                    <span style="color: #64748b; font-weight: 600;"> active client connections</span>
-                </div>
-                <div style="color: #475569; font-weight: 500;">
-                    <span>Headroom: <strong style="color: {% if row.conn_headroom < 200 %}#dc2626{% else %}#137333{% endif %};">{{ row.conn_headroom }} free</strong></span>
-                    <span style="color: #94a3b8; margin: 0 0.4rem;">|</span>
-                    <span>Max Limit: <strong>{{ row.max_connections }}</strong></span>
-                </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Active Connections</div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.conn_util_pct >= 90 %}#c5221f{% elif row.conn_util_pct >= 70 %}#b06000{% else %}#0f172a{% endif %}; margin-top: 0.25rem;">{{ row.connections }}</div>
             </div>
-
-            <!-- Segmented Gauge Track -->
-            <div style="position: relative; width: 100%; height: 16px; background: #f1f5f9; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
-                <!-- 70% Alert Marker Line -->
-                <div style="position: absolute; left: 70%; top: 0; bottom: 0; width: 2px; background: #f59e0b; z-index: 10;" title="70% Warning Alert Threshold (~{{ row.conn_threshold_val }} connections)"></div>
-                <!-- 90% Critical Marker Line -->
-                <div style="position: absolute; left: 90%; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 10;" title="90% Critical Alert Threshold"></div>
-                <!-- Filled Bar -->
-                <div style="width: {{ row.conn_util_pct }}%; height: 100%; background: {% if row.conn_util_pct >= 90 %}#dc2626{% elif row.conn_util_pct >= 70 %}#f59e0b{% else %}#10b981{% endif %}; border-radius: 8px 0 0 8px; transition: width 0.4s ease;"></div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Max Connections</div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ row.max_connections }}</div>
             </div>
-
-            <!-- Gauge Scale Legend -->
-            <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: #94a3b8; margin-top: 0.35rem; font-weight: 600;">
-                <span>0 connections (0%)</span>
-                <span style="color: #b45309;">▲ 70% Alert Threshold (~{{ row.conn_threshold_val }} conn)</span>
-                <span style="color: #b91c1c;">▲ 90% Critical</span>
-                <span>{{ row.max_connections }} connections (100%)</span>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Headroom</div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.conn_headroom < 200 %}#c5221f{% else %}#1e293b{% endif %}; margin-top: 0.25rem;">{{ row.conn_headroom }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Running Threads</div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ row.threads_running }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Slow Queries</div>
+                <div style="font-size: 1.45rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ row.slow_queries }}</div>
             </div>
         </div>
 
-        <!-- 4-Column Concurrency Metrics Card Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
-            
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem 1rem;">
-                <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Active Connections</span>
-                <strong style="font-size: 1.35rem; color: {% if row.conn_util_pct >= 70 %}#b45309{% else %}#0f172a{% endif %}; font-weight: 800; display: block; margin-top: 0.2rem;">
-                    {{ row.connections }}
-                </strong>
-                <span style="font-size: 0.7rem; color: #64748b; font-family: monospace; display: block; margin-top: 0.2rem;">Threads_connected</span>
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.4rem; font-size: 0.75rem;">
+                <span style="color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Pool Utilization</span>
+                <span style="font-weight: 700; color: {% if row.conn_util_pct >= 90 %}#c5221f{% elif row.conn_util_pct >= 70 %}#b06000{% else %}#137333{% endif %};">{{ row.conn_util_pct }}%</span>
             </div>
-
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem 1rem;">
-                <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Configured Pool Limit</span>
-                <strong style="font-size: 1.35rem; color: #00205B; font-weight: 800; display: block; margin-top: 0.2rem;">
-                    {{ row.max_connections }}
-                </strong>
-                <span style="font-size: 0.7rem; color: #64748b; font-family: monospace; display: block; margin-top: 0.2rem;">@@GLOBAL.max_connections</span>
+            <div style="width: 100%; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden;">
+                <div style="width: {{ row.conn_util_pct }}%; height: 100%; background: {% if row.conn_util_pct >= 90 %}#c5221f{% elif row.conn_util_pct >= 70 %}#b06000{% else %}#137333{% endif %}; border-radius: 4px;"></div>
             </div>
-
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem 1rem;">
-                <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Alert Saturation Threshold</span>
-                <strong style="font-size: 1.35rem; color: #b45309; font-weight: 800; display: block; margin-top: 0.2rem;">
-                    {{ row.conn_threshold_val }} <span style="font-size: 0.85rem; font-weight: 600;">(70%)</span>
-                </strong>
-                <span style="font-size: 0.7rem; color: #64748b; display: block; margin-top: 0.2rem;">Email dispatch to DBA</span>
-            </div>
-
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem 1rem;">
-                <span style="font-size: 0.68rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; display: block;">Running Threads &amp; Slow Queries</span>
-                <strong style="font-size: 1.35rem; color: #0f172a; font-weight: 800; display: block; margin-top: 0.2rem;">
-                    {{ row.threads_running }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">threads</span> &bull; {{ row.slow_queries }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748b;">slow</span>
-                </strong>
-                <span style="font-size: 0.7rem; color: #64748b; font-family: monospace; display: block; margin-top: 0.2rem;">Threads_running</span>
-            </div>
-
         </div>
-
-        <!-- Proactive Alerting Footer Note -->
-        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.65rem 0.85rem; font-size: 0.75rem; color: #166534; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                <span><strong>Proactive Outage Protection:</strong> Automated SMTP email alert configured to notify <code>ashley.atim@nms.go.ug</code> at &ge; 70% (~{{ row.conn_threshold_val }} connections), preventing client pool exhaustion.</span>
-            </div>
-            {% if row.conn_updated_at %}
-            <span style="font-size: 0.7rem; color: #15803d; font-weight: 600;">Last Ingest: {{ row.conn_updated_at|date:"d M Y H:i" }}</span>
-            {% endif %}
-        </div>
-
     </div>
     {% endif %}
 {% endfor %}
