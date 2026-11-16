@@ -478,9 +478,17 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
 
         target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else 99.95
 
-        latest_sh = ServerHealth.objects.filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
-        if not latest_sh and db_type == 'MySQL':
-            latest_sh = ServerHealth.objects.filter(server__icontains='nickledb').order_by('-date', '-updated_at', '-id').first()
+        try:
+            latest_sh = ServerHealth.objects.filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
+            if not latest_sh and db_type == 'MySQL':
+                latest_sh = ServerHealth.objects.filter(server__icontains='nickledb').order_by('-date', '-updated_at', '-id').first()
+        except Exception:
+            try:
+                latest_sh = ServerHealth.objects.defer('max_connections').filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
+                if not latest_sh and db_type == 'MySQL':
+                    latest_sh = ServerHealth.objects.defer('max_connections').filter(server__icontains='nickledb').order_by('-date', '-updated_at', '-id').first()
+            except Exception:
+                latest_sh = None
 
         dashboard_data.append({
             'database': db_type,
@@ -508,13 +516,13 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
             'last_backup_detail': last_backup_str,
             
             # Latest Server Health & Connection Pool Metrics
-            'connections': int(latest_sh.connections or 0) if latest_sh else 0,
-            'max_connections': int(latest_sh.max_connections or 0) if latest_sh else 0,
+            'connections': int(getattr(latest_sh, 'connections', 0) or 0) if latest_sh else 0,
+            'max_connections': int(getattr(latest_sh, 'max_connections', 0) or 0) if latest_sh else 0,
             'conn_util_pct': latest_sh.connection_utilization_percent if latest_sh else 0.0,
-            'slow_queries': int(latest_sh.slow_queries or 0) if latest_sh else 0,
-            'threads_running': int(latest_sh.threads or 0) if latest_sh else 0,
-            'conn_headroom': max(0, int(latest_sh.max_connections or 0) - int(latest_sh.connections or 0)) if latest_sh else 0,
-            'conn_threshold_val': int(round(int(latest_sh.max_connections or 0) * 0.70)) if latest_sh else 0,
+            'slow_queries': int(getattr(latest_sh, 'slow_queries', 0) or 0) if latest_sh else 0,
+            'threads_running': int(getattr(latest_sh, 'threads', 0) or 0) if latest_sh else 0,
+            'conn_headroom': max(0, int(getattr(latest_sh, 'max_connections', 0) or 0) - int(getattr(latest_sh, 'connections', 0) or 0)) if latest_sh else 0,
+            'conn_threshold_val': int(round(int(getattr(latest_sh, 'max_connections', 0) or 0) * 0.70)) if latest_sh else 0,
             'conn_updated_at': latest_sh.updated_at if latest_sh else None,
 
             # Disk space and tablespace capacity planning values
@@ -2552,11 +2560,22 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     fleet_vms = []
     seen_canonical_servers = set()
     for defn in canonical_vms:
-        rec = ServerHealth.objects.filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
-        is_fallback = False
-        if not rec and defn.get('fallback_host_q'):
-            rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
-            is_fallback = True
+        try:
+            rec = ServerHealth.objects.filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
+            is_fallback = False
+            if not rec and defn.get('fallback_host_q'):
+                rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
+                is_fallback = True
+        except Exception:
+            try:
+                rec = ServerHealth.objects.defer('max_connections').filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
+                is_fallback = False
+                if not rec and defn.get('fallback_host_q'):
+                    rec = ServerHealth.objects.defer('max_connections').filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
+                    is_fallback = True
+            except Exception:
+                rec = None
+                is_fallback = False
 
         # Determine any unplanned outages affecting this VM directly or via its active host hypervisor.
         # Overlap unioning ensures simultaneous host + VM outage intervals are never double-counted (Q-006).
@@ -2658,8 +2677,8 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         else:
             status = 'Healthy'
 
-        conn_val = int(rec.connections or 0) if rec else 0
-        max_conn_val = int(rec.max_connections or 0) if rec else 0
+        conn_val = int(getattr(rec, 'connections', 0) or 0) if rec else 0
+        max_conn_val = int(getattr(rec, 'max_connections', 0) or 0) if rec else 0
         conn_util = rec.connection_utilization_percent if rec else 0.0
 
         if rec and max_conn_val > 0:
@@ -6501,17 +6520,34 @@ def server_health_ingest(request):
             'status': status,
         }
 
-        if health:
-            for k, v in fields_map.items():
-                setattr(health, k, v)
-            health.save()
-        else:
-            health = ServerHealth.objects.create(
-                date=health_date,
-                server=server_name,
-                database=db_name,
-                **fields_map
-            )
+        try:
+            if health:
+                for k, v in fields_map.items():
+                    setattr(health, k, v)
+                health.save()
+            else:
+                health = ServerHealth.objects.create(
+                    date=health_date,
+                    server=server_name,
+                    database=db_name,
+                    **fields_map
+                )
+        except Exception as e:
+            if 'max_connections' in fields_map:
+                fields_map_fallback = {k: v for k, v in fields_map.items() if k != 'max_connections'}
+                if health:
+                    for k, v in fields_map_fallback.items():
+                        setattr(health, k, v)
+                    health.save()
+                else:
+                    health = ServerHealth.objects.create(
+                        date=health_date,
+                        server=server_name,
+                        database=db_name,
+                        **fields_map_fallback
+                    )
+            else:
+                raise e
 
         # Proactive Connection Pool Saturation Alerting (>= 70% of max_connections)
         if conn_util_pct >= 70.0:

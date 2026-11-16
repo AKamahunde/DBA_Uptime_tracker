@@ -507,8 +507,14 @@ class ServerHealth(models.Model):
 
     @property
     def connection_utilization_percent(self):
-        mc = int(self.max_connections or 0)
-        c = int(self.connections or 0)
+        try:
+            mc = int(getattr(self, 'max_connections', 0) or 0)
+        except Exception:
+            mc = 0
+        try:
+            c = int(getattr(self, 'connections', 0) or 0)
+        except Exception:
+            c = 0
         if mc > 0:
             return round((c / mc) * 100.0, 2)
         return 0.0
