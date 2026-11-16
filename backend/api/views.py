@@ -1,4 +1,5 @@
 _LAST_CONN_ALERT = {}
+_LAST_CONN_PRUNE = {}
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
@@ -6579,6 +6580,22 @@ def server_health_ingest(request):
                         severity=conn_sev,
                         target=f"{db_name} ({server_name})"
                     )
+                except Exception:
+                    pass
+
+        # Enforce 6-month (180-day) retention policy for ingested telemetry (throttled once per day per server)
+        if max_connections > 0 or 'connections' in data:
+            now_prune = datetime.now()
+            last_prune = _LAST_CONN_PRUNE.get(server_name)
+            if not last_prune or (now_prune - last_prune).total_seconds() >= 86400:
+                _LAST_CONN_PRUNE[server_name] = now_prune
+                cutoff_date = health_date - timedelta(days=180)
+                try:
+                    ServerHealth.objects.filter(
+                        server=server_name,
+                        database=db_name,
+                        date__lt=cutoff_date,
+                    ).delete()
                 except Exception:
                     pass
 
