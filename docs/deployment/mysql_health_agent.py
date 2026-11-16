@@ -9,20 +9,47 @@ and running threads.
 Computes connection pool utilization percentage against @@GLOBAL.max_connections
 and alerts when utilization reaches or exceeds 70% (e.g., 1400 / 2000 connections).
 
-Deploy to:
-  Host: 192.168.35.46 (nickledbnew)
-  Target Ingest: http://dbtractest.nms.go.ug:91/api/health/ingest/
+Environments & Targets:
+  Production (Default):  http://192.168.35.38:90/api/health/ingest/  (dbtrac.nms.go.ug:90)
+  Test / Validation:     http://dbtractest.nms.go.ug:91/api/health/ingest/ (192.168.35.38:91)
+
+Usage:
+  # Normal Production Run (Default - targets Prod Port 90):
+  python3 mysql_health_agent.py
+
+  # Test Run (Targets Test Port 91 for validation):
+  python3 mysql_health_agent.py --test
+
+  # Dual Run (Sends to BOTH Test and Prod simultaneously during validation):
+  python3 mysql_health_agent.py --both
+
+  # Custom Ingest URL:
+  python3 mysql_health_agent.py --url http://192.168.35.38:91/api/health/ingest/
 """
 
 import os
+import sys
 import json
+import argparse
 import urllib.request
 import urllib.error
 import subprocess
 from datetime import datetime
 
-# Configuration
-UPTIME_TRACKER_API_URL = os.environ.get("UPTIME_TRACKER_API_URL", "http://192.168.35.38:91/api/health/ingest/")
+# Production Endpoints (Port 90 on nms360)
+DEFAULT_PROD_URLS = [
+    "http://192.168.35.38:90/api/health/ingest/",
+    "http://dbtrac.nms.go.ug:90/api/health/ingest/",
+    "https://dbtrac.nms.go.ug/api/health/ingest/",
+    "http://dbtrac.nms.go.ug/api/health/ingest/",
+]
+
+# Test Endpoints (Port 91 on dbtractest)
+DEFAULT_TEST_URLS = [
+    "http://dbtractest.nms.go.ug:91/api/health/ingest/",
+    "http://192.168.35.38:91/api/health/ingest/",
+]
+
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 SERVER_NAME = os.environ.get("SERVER_NAME", "nickledbnew")
 DATABASE_TYPE = "MySQL"
@@ -39,7 +66,7 @@ def get_cpu_percent():
             idle_val = float(idle_part.replace('id', '').replace('%', '').strip())
             return round(100.0 - idle_val, 2)
     except Exception as e:
-        print(f"Error getting CPU: {e}")
+        print(f"Error getting CPU: {e}", file=sys.stderr)
     return 0.0
 
 
@@ -53,7 +80,7 @@ def get_memory_percent():
         if total > 0:
             return round((used / total) * 100.0, 2)
     except Exception as e:
-        print(f"Error getting Memory: {e}")
+        print(f"Error getting Memory: {e}", file=sys.stderr)
     return 0.0
 
 
@@ -65,7 +92,7 @@ def get_disk_percent():
         use_percent = parts[-2].replace('%', '')
         return round(float(use_percent), 2)
     except Exception as e:
-        print(f"Error getting Disk: {e}")
+        print(f"Error getting Disk: {e}", file=sys.stderr)
     return 0.0
 
 
@@ -77,7 +104,7 @@ def get_mysql_status(variable_name):
         if output:
             return int(output.split()[1])
     except Exception as e:
-        print(f"Error getting MySQL status {variable_name}: {e}")
+        print(f"Error getting MySQL status {variable_name}: {e}", file=sys.stderr)
     return 0
 
 
@@ -106,7 +133,7 @@ def get_mysql_connection_metrics():
                 max_connections = int(parts[0])
                 current_connections = int(parts[1])
     except Exception as e:
-        print(f"Warning: Primary connection query failed ({e}), trying fallback SHOW commands...")
+        print(f"Warning: Primary connection query failed ({e}), trying fallback SHOW commands...", file=sys.stderr)
 
     # Fallback if primary query failed or performance_schema is disabled
     if max_connections == 0:
@@ -116,7 +143,7 @@ def get_mysql_connection_metrics():
             if output:
                 max_connections = int(output.split()[1])
         except Exception as e:
-            print(f"Error getting max_connections: {e}")
+            print(f"Error getting max_connections: {e}", file=sys.stderr)
 
     if current_connections == 0 and max_connections > 0:
         try:
@@ -125,7 +152,7 @@ def get_mysql_connection_metrics():
             if output:
                 current_connections = int(output.split()[1])
         except Exception as e:
-            print(f"Error getting Threads_connected: {e}")
+            print(f"Error getting Threads_connected: {e}", file=sys.stderr)
 
     if max_connections > 0:
         alert_threshold = int(round(max_connections * 0.70))
@@ -159,35 +186,77 @@ def collect_health_data():
     }
 
 
-def send_to_tracker(payload):
-    """Sends the JSON payload to DBTRAC with test (:91) -> prod fallback."""
-    target_urls = list(dict.fromkeys([
-        UPTIME_TRACKER_API_URL,
-        "http://dbtractest.nms.go.ug:91/api/health/ingest/",
-        "http://192.168.35.38:91/api/health/ingest/",
-        "http://dbtrac.nms.go.ug:90/api/health/ingest/",
-        "http://192.168.35.38:90/api/health/ingest/",
-        "https://dbtrac.nms.go.ug/api/health/ingest/",
-        "http://dbtrac.nms.go.ug/api/health/ingest/",
-    ]))
+def _send_payload_to_urls(payload, urls, label="Target"):
+    """Helper to try a list of URLs with fallback until one succeeds."""
     data = json.dumps(payload).encode('utf-8')
-    for url in target_urls:
+    for url in urls:
         req = urllib.request.Request(url, data=data)
         req.add_header('Content-Type', 'application/json')
         req.add_header('X-API-KEY', API_KEY)
         try:
             response = urllib.request.urlopen(req, timeout=8)
-            print(f"[{url}] Successfully ingested health data: {response.read().decode('utf-8')}")
-            break
+            print(f"[{label} - {url}] Successfully ingested health data: {response.read().decode('utf-8')}")
+            return True
         except urllib.error.HTTPError as e:
-            print(f"[{url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}")
+            print(f"[{label} - {url}] HTTP Error {e.code}: {e.read().decode('utf-8', errors='ignore')}", file=sys.stderr)
             if e.code in (400, 401, 403):
-                break
+                return False
         except Exception as e:
-            print(f"[{url}] Unreachable ({e}), trying fallback...")
+            print(f"[{label} - {url}] Unreachable ({e}), trying next fallback...", file=sys.stderr)
+    return False
+
+
+def send_to_tracker(payload, mode='prod', custom_url=None):
+    """
+    Sends JSON payload to DBTRAC.
+    Modes:
+      'prod' (default): Sends to Prod DBTRAC (:90) with fallbacks.
+      'test':           Sends to Test DBTRAC (:91) with fallbacks.
+      'both':           Sends to BOTH Test (:91) and Prod (:90) simultaneously.
+    """
+    if custom_url:
+        _send_payload_to_urls(payload, [custom_url], label="Custom URL")
+        return
+
+    if mode == 'both':
+        print("\n--- Dual Ingestion Mode (Test + Prod) ---")
+        _send_payload_to_urls(payload, DEFAULT_TEST_URLS, label="TEST (:91)")
+        _send_payload_to_urls(payload, DEFAULT_PROD_URLS, label="PROD (:90)")
+    elif mode == 'test':
+        print("\n--- Test Ingestion Mode (:91) ---")
+        _send_payload_to_urls(payload, DEFAULT_TEST_URLS, label="TEST (:91)")
+    else:
+        # Default: Production
+        print("\n--- Production Ingestion Mode (:90) ---")
+        _send_payload_to_urls(payload, DEFAULT_PROD_URLS, label="PROD (:90)")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="DBTRAC MySQL Server Health & Connection Pool Telemetry Agent")
+    parser.add_argument("--test", action="store_true", help="Send metrics to Test DBTRAC (dbtractest:91)")
+    parser.add_argument("--prod", action="store_true", help="Send metrics to Prod DBTRAC (dbtrac:90) [Default]")
+    parser.add_argument("--both", action="store_true", help="Send metrics to BOTH Test (:91) and Prod (:90) simultaneously")
+    parser.add_argument("--url", default=None, help="Custom DBTRAC API ingest endpoint")
+    args = parser.parse_args()
+
+    # Determine mode: CLI flag takes precedence, then DBTRAC_ENV env var, defaulting to 'prod'
+    if args.url:
+        mode = 'custom'
+    elif args.both:
+        mode = 'both'
+    elif args.test:
+        mode = 'test'
+    elif args.prod:
+        mode = 'prod'
+    else:
+        env_mode = os.environ.get("DBTRAC_ENV", "").lower()
+        if env_mode in ("both", "dual"):
+            mode = 'both'
+        elif env_mode in ("test", "testing"):
+            mode = 'test'
+        else:
+            mode = 'prod'  # Always defaults to PROD for production safety
+
     print(f"Collecting server health metrics for {SERVER_NAME}...")
     payload = collect_health_data()
 
@@ -208,4 +277,4 @@ if __name__ == "__main__":
         else:
             print(f"[OK] Connection utilization is healthy ({util}%).")
 
-    send_to_tracker(payload)
+    send_to_tracker(payload, mode=mode, custom_url=args.url)
