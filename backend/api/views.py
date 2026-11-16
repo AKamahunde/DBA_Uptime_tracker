@@ -511,6 +511,11 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
             'connections': int(latest_sh.connections or 0) if latest_sh else 0,
             'max_connections': int(latest_sh.max_connections or 0) if latest_sh else 0,
             'conn_util_pct': latest_sh.connection_utilization_percent if latest_sh else 0.0,
+            'slow_queries': int(latest_sh.slow_queries or 0) if latest_sh else 0,
+            'threads_running': int(latest_sh.threads or 0) if latest_sh else 0,
+            'conn_headroom': max(0, int(latest_sh.max_connections or 0) - int(latest_sh.connections or 0)) if latest_sh else 0,
+            'conn_threshold_val': int(round(int(latest_sh.max_connections or 0) * 0.70)) if latest_sh else 0,
+            'conn_updated_at': latest_sh.updated_at if latest_sh else None,
 
             # Disk space and tablespace capacity planning values
             'database_size_gb': float(capacity_record.database_size_gb) if (capacity_record and capacity_record.database_size_gb is not None) else 'No Data',
