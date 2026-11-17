@@ -70,30 +70,58 @@ def get_cpu_percent():
     return 0.0
 
 
-def get_memory_percent():
-    """Extracts Memory utilization using free command."""
+def get_logical_cpus():
+    """Returns OS logical CPU count."""
     try:
-        output = subprocess.check_output("free -m | grep Mem", shell=True).decode('utf-8')
+        return int(os.cpu_count() or 0)
+    except Exception:
+        return 0
+
+
+def get_uptime_days():
+    """Reads host uptime in days from /proc/uptime."""
+    try:
+        with open("/proc/uptime", "r") as f:
+            secs = float(f.read().split()[0])
+            return round(secs / 86400.0, 2)
+    except Exception:
+        return 0.0
+
+
+def get_memory_metrics():
+    """Extracts total GB, used GB, and utilization % using free -b."""
+    try:
+        output = subprocess.check_output("free -b | grep Mem", shell=True).decode('utf-8')
         parts = output.split()
-        total = float(parts[1])
-        used = float(parts[2])
-        if total > 0:
-            return round((used / total) * 100.0, 2)
+        total_bytes = float(parts[1])
+        used_bytes = float(parts[2])
+        if total_bytes > 0:
+            return (
+                round(total_bytes / (1024 ** 3), 2),
+                round(used_bytes / (1024 ** 3), 2),
+                round((used_bytes / total_bytes) * 100.0, 2),
+            )
     except Exception as e:
         print(f"Error getting Memory: {e}", file=sys.stderr)
-    return 0.0
+    return 0.0, 0.0, 0.0
 
 
-def get_disk_percent():
-    """Extracts Disk utilization for the root drive (/)."""
+def get_disk_metrics():
+    """Extracts root (/) total GB, used GB, and utilization % using df -B1."""
     try:
-        output = subprocess.check_output("df -h / | tail -n 1", shell=True).decode('utf-8')
+        output = subprocess.check_output("df -B1 / | tail -n 1", shell=True).decode('utf-8')
         parts = output.split()
-        use_percent = parts[-2].replace('%', '')
-        return round(float(use_percent), 2)
+        total_bytes = float(parts[1])
+        used_bytes = float(parts[2])
+        use_percent = float(parts[-2].replace('%', ''))
+        return (
+            round(total_bytes / (1024 ** 3), 2),
+            round(used_bytes / (1024 ** 3), 2),
+            round(use_percent, 2),
+        )
     except Exception as e:
         print(f"Error getting Disk: {e}", file=sys.stderr)
-    return 0.0
+    return 0.0, 0.0, 0.0
 
 
 def get_mysql_status(variable_name):
@@ -168,16 +196,26 @@ def get_mysql_connection_metrics():
 
 def collect_health_data():
     """Collects all OS and database metrics."""
-    disk_percent = get_disk_percent()
+    mem_total_gb, mem_used_gb, mem_percent = get_memory_metrics()
+    disk_total_gb, disk_used_gb, disk_percent = get_disk_metrics()
     conn_metrics = get_mysql_connection_metrics()
 
     return {
         "server": SERVER_NAME,
         "database": DATABASE_TYPE,
         "node_name": "Proxmox",
+        "entered_by": "Script",
+        "uptime_days": get_uptime_days(),
+        "logical_cpus": get_logical_cpus(),
         "cpu_percent": get_cpu_percent(),
-        "memory_percent": get_memory_percent(),
+        "memory_percent": mem_percent,
+        "memory_total_gb": mem_total_gb,
+        "memory_used_gb": mem_used_gb,
         "disk_percent": disk_percent,
+        "disk_3_type": "OS Root (/)",
+        "disk_3_size_gb": disk_total_gb,
+        "disk_3_used_gb": disk_used_gb,
+        "disk_3_percent": disk_percent,
         "tablespace_percent": disk_percent,  # Mirrors root disk
         "connections": conn_metrics["connections"],
         "max_connections": conn_metrics["max_connections"],

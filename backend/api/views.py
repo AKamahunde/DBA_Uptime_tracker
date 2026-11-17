@@ -2473,9 +2473,9 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': 'Oracle',
             'ip_address': '192.168.30.26',
             'vmid': 'N/A (OLKVM)',
-            'filter_q': Q(server__icontains='infra') | Q(hosted_systems__icontains='nmsinfra'),
+            'filter_q': Q(server__iexact='nmsinfra.nms.go.ug') | Q(server__iexact='nmsinfra'),
             'default_cores': 64,
-            'default_ram_gb': 128.0,
+            'default_ram_gb': 315.74,
         },
         {
             'vm_key': 'nmsebs',
@@ -2488,9 +2488,9 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': '—',
             'ip_address': '192.168.30.25',
             'vmid': 'N/A (OLKVM)',
-            'filter_q': Q(server__icontains='ebs') | Q(hosted_systems__icontains='nmsebs'),
+            'filter_q': Q(server__iexact='nmsebs.nms.go.ug') | Q(server__iexact='nmsebs'),
             'default_cores': 16,
-            'default_ram_gb': 32.0,
+            'default_ram_gb': 62.51,
         },
         {
             'vm_key': 'databasevm',
@@ -2503,10 +2503,11 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': 'MySQL & MS SQL Server',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/103',
-            'filter_q': Q(server__icontains='databasevm') | Q(server__icontains='nickledb') | Q(hosted_systems__icontains='databasevm'),
+            'filter_q': Q(server__iexact='nickledbnew'),
+            'pve_vm_q': Q(server__iexact='databasevm'),
             'fallback_host_q': Q(server__iexact='pvenode3'),
-            'default_cores': 8,
-            'default_ram_gb': 16.0,
+            'default_cores': 32,
+            'default_ram_gb': 66.0,
         },
         {
             'vm_key': 'tomcatvm',
@@ -2519,10 +2520,10 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/102',
-            'filter_q': Q(server__icontains='tomcat') | Q(hosted_systems__icontains='tomcat'),
+            'filter_q': Q(server__iexact='tomcatvm'),
             'fallback_host_q': Q(server__iexact='pvenode1'),
-            'default_cores': 4,
-            'default_ram_gb': 8.0,
+            'default_cores': 32,
+            'default_ram_gb': 66.0,
         },
         {
             'vm_key': 'jumphostvm',
@@ -2535,10 +2536,10 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/100',
-            'filter_q': Q(server__icontains='jumphost') | Q(hosted_systems__icontains='jumphost'),
+            'filter_q': Q(server__iexact='jumphostvm'),
             'fallback_host_q': Q(server__iexact='pvenode2'),
             'default_cores': 2,
-            'default_ram_gb': 4.0,
+            'default_ram_gb': 3.0,
         },
         {
             'vm_key': 'monitoringvm',
@@ -2551,32 +2552,36 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': '—',
             'ip_address': '10.10.17.34',
             'vmid': 'qemu/101',
-            'filter_q': Q(server__icontains='monitoring') | Q(hosted_systems__icontains='monitoring'),
+            'filter_q': Q(server__iexact='monitoringvm'),
             'fallback_host_q': Q(server__iexact='pvenode2'),
-            'default_cores': 4,
-            'default_ram_gb': 8.0,
+            'default_cores': 12,
+            'default_ram_gb': 17.0,
         },
     ]
+
+    def _safe_sh_first(q_obj, prefer_prometheus=False):
+        for use_defer in (False, True):
+            try:
+                qs = ServerHealth.objects.defer('max_connections') if use_defer else ServerHealth.objects
+                qs = qs.filter(q_obj)
+                if prefer_prometheus:
+                    prom = qs.filter(entered_by='Prometheus').order_by('-date', '-updated_at', '-id').first()
+                    if prom:
+                        return prom
+                return qs.order_by('-date', '-updated_at', '-id').first()
+            except Exception:
+                continue
+        return None
 
     fleet_vms = []
     seen_canonical_servers = set()
     for defn in canonical_vms:
-        try:
-            rec = ServerHealth.objects.filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
-            is_fallback = False
-            if not rec and defn.get('fallback_host_q'):
-                rec = ServerHealth.objects.filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
-                is_fallback = True
-        except Exception:
-            try:
-                rec = ServerHealth.objects.defer('max_connections').filter(defn['filter_q']).order_by('-date', '-updated_at', '-id').first()
-                is_fallback = False
-                if not rec and defn.get('fallback_host_q'):
-                    rec = ServerHealth.objects.defer('max_connections').filter(defn['fallback_host_q']).order_by('-date', '-updated_at', '-id').first()
-                    is_fallback = True
-            except Exception:
-                rec = None
-                is_fallback = False
+        rec = _safe_sh_first(defn['filter_q'], prefer_prometheus=(defn['vm_key'] != 'databasevm'))
+        pve_vm_rec = _safe_sh_first(defn['pve_vm_q'], prefer_prometheus=True) if defn.get('pve_vm_q') else None
+        is_fallback = False
+        if not rec and defn.get('fallback_host_q'):
+            rec = _safe_sh_first(defn['fallback_host_q'], prefer_prometheus=True)
+            is_fallback = True
 
         # Determine any unplanned outages affecting this VM directly or via its active host hypervisor.
         # Overlap unioning ensures simultaneous host + VM outage intervals are never double-counted (Q-006).
@@ -2626,19 +2631,18 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             database='Infrastructure',
         )
 
-        if rec:
-            if not is_fallback:
-                seen_canonical_servers.add((rec.server or '').lower())
+        if rec and not is_fallback:
+            seen_canonical_servers.add((rec.server or '').lower())
             up_pct = float(rec.uptime_percent if rec.uptime_percent is not None else 100.0)
             cpu_pct = float(rec.cpu_percent or 0.0)
             mem_pct = float(rec.memory_percent or 0.0)
-            mem_tot = float(rec.memory_total_gb or defn['default_ram_gb'])
+            mem_tot = float(rec.memory_total_gb or (pve_vm_rec.memory_total_gb if pve_vm_rec and pve_vm_rec.memory_total_gb else defn['default_ram_gb']))
             mem_used = float(rec.memory_used_gb or (mem_tot * mem_pct / 100.0 if mem_tot > 0 else 0.0))
             if mem_used == 0.0 and mem_tot > 0 and mem_pct > 0:
                 mem_used = round(mem_tot * mem_pct / 100.0, 2)
 
             disk_pct = float(rec.disk_3_percent or rec.disk_percent or 0.0)
-            disk_sz = float(rec.disk_3_size_gb or 0.0)
+            disk_sz = float(rec.disk_3_size_gb or (pve_vm_rec.disk_3_size_gb if pve_vm_rec and pve_vm_rec.disk_3_size_gb else 0.0))
             disk_us = float(rec.disk_3_used_gb or (disk_sz * disk_pct / 100.0 if disk_sz > 0 else 0.0))
             if disk_us == 0.0 and disk_sz > 0 and disk_pct > 0:
                 disk_us = round(disk_sz * disk_pct / 100.0, 2)
@@ -2647,6 +2651,20 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             last_updated = rec.updated_at
             source = rec.entered_by or ('Prometheus' if is_fallback else 'System')
             has_data = True
+        elif rec and is_fallback:
+            # Parent host exists (for uptime SLA only), but VM-level Prometheus/OS telemetry hasn't synced yet
+            up_pct = float(rec.uptime_percent if rec.uptime_percent is not None else 100.0)
+            cpu_pct = 0.0
+            mem_pct = 0.0
+            mem_tot = defn['default_ram_gb']
+            mem_used = 0.0
+            disk_pct = 0.0
+            disk_sz = 0.0
+            disk_us = 0.0
+            last_date = rec.date
+            last_updated = rec.updated_at
+            source = 'Host Fallback'
+            has_data = False
         else:
             up_pct = 100.00
             cpu_pct = 0.0
@@ -2700,7 +2718,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'database': defn['database'],
             'ip_address': defn['ip_address'],
             'vmid': defn['vmid'],
-            'logical_cpus': int(rec.logical_cpus or defn['default_cores']) if rec else defn['default_cores'],
+            'logical_cpus': (int(pve_vm_rec.logical_cpus) if (pve_vm_rec and pve_vm_rec.logical_cpus) else (int(rec.logical_cpus or defn['default_cores']) if (rec and not is_fallback and (defn['vm_key'] != 'databasevm' or int(rec.logical_cpus or 0) >= 16)) else defn['default_cores'])),
             'uptime_percent': round(up_pct, 2),
             'uptime_str': f"{round(up_pct, 2)}%",
             'unplanned_down_hrs': vm_unplanned_hrs,
@@ -3587,11 +3605,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         olkvm_disks = [
             infra_w['disk_1'],
             infra_w['disk_2'],
+            infra_w['disk_3'],
         ]
-        if ebs_w:
-            olkvm_disks.append(ebs_w['disk_2'])
-        else:
-            olkvm_disks.append(infra_w['disk_3'])
 
         consolidated_olkvm = {
             'node_key': 'OLKVM',
@@ -3757,10 +3772,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'is_shared': True,
         }
 
-    # 3. Oracle Data volume (/u01) - nmsinfra
+    # 3. Oracle Local Data volumes (/data, /u01, /) - nmsinfra (disk_3)
     u01_rec = None
     if infra_w:
-        d2 = infra_w['disk_2']
+        d2 = infra_w['disk_3']
         u01_rec = {
             'month': infra_w.get('date') or latest_date,
             'date': infra_w.get('date') or latest_date,
@@ -3785,10 +3800,10 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'is_shared': False,
         }
 
-    # 4. Oracle Fast Recovery Area (/fra) - nmsinfra
+    # 4. Oracle Fast Recovery Area (/fra) - nmsinfra (disk_2)
     fra_rec = None
     if infra_w:
-        d3 = infra_w['disk_3']
+        d3 = infra_w['disk_2']
         fra_rec = {
             'month': infra_w.get('date') or latest_date,
             'date': infra_w.get('date') or latest_date,
@@ -4517,9 +4532,10 @@ def server_health_list(request):
     end_date = request.GET.get('end_date', '')
 
     # Distinct tab badge counts
+    node_server_q = Q(server__iregex=r'^(pvenode|nmsinfra|nmsebs|infra|ebs|olkvm|proxmox)') & ~Q(server__icontains='(DB)') & ~Q(server__icontains='(APP)')
     total_node_health_count = ServerHealth.objects.filter(
         Q(entered_by='Prometheus') | Q(entered_by='User')
-    ).count()
+    ).filter(node_server_q).count()
     total_vm_health_count = ServerHealth.objects.filter(
         Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
     ).count()
@@ -4532,7 +4548,7 @@ def server_health_list(request):
     if current_tab == 'nodes':
         base_qs = ServerHealth.objects.filter(
             Q(entered_by='Prometheus') | Q(entered_by='User')
-        ).order_by('-date', '-updated_at', '-id')
+        ).filter(node_server_q).order_by('-date', '-updated_at', '-id')
 
         if current_db:
             base_qs = base_qs.filter(database=current_db)
@@ -6462,7 +6478,7 @@ def server_health_ingest(request):
             else:
                 node_name = 'Proxmox'
 
-        source = data.get('entered_by', 'Prometheus' if ('disk_1_type' in data or 'node_name' in data) else 'Script')
+        source = data.get('entered_by') or ('Prometheus' if 'disk_1_type' in data else 'Script')
 
         if server_name.startswith('infra'):
             server_name = 'nms' + server_name

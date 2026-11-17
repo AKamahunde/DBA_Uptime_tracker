@@ -1098,7 +1098,10 @@
                         {% if node.has_data %}{{ node.memory_percent }}%{% else %}No Data{% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
-                        {{ node.logical_cpus }}
+                        <div>{{ node.logical_cpus }}</div>
+                        {% if node.node_name == 'OLKVM' %}
+                        <div style="font-size: 0.66rem; color: #94a3b8; font-weight: normal;">64 + 16 vCPUs</div>
+                        {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; font-weight: 600; color: #334155;">
                         {% if node.has_data %}{{ node.cpu_percent }}%{% else %}No Data{% endif %}

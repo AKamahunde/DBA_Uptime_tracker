@@ -262,7 +262,7 @@ def fetch_olkvm_node_from_prometheus(node_cfg, prometheus_url=None):
     logical_cpus = int(_extract_scalar(
         query_prometheus(f'count(node_cpu_seconds_total{{instance="{instance}",mode="idle"}})', prometheus_url), 0.0
     ))
-    cpu_q = f'100 - (avg(irate(node_cpu_seconds_total{{instance="{instance}",mode="idle"}}[5m])) * 100)'
+    cpu_q = f'100 - (avg(rate(node_cpu_seconds_total{{instance="{instance}",mode="idle"}}[5m])) * 100)'
     cpu_pct = round(min(100.0, max(0.0, _extract_scalar(query_prometheus(cpu_q, prometheus_url), 0.0))), 2)
 
     # Memory Utilization (GiB & %)
@@ -348,7 +348,7 @@ def fetch_olkvm_node_from_prometheus(node_cfg, prometheus_url=None):
         'disk_3_size_gb': d3['size_gb'],
         'disk_3_used_gb': d3['used_gb'],
         'disk_3_percent': d3['percent'],
-        'tablespace_percent': d2['percent'],  # /fra or /stagearea LVM volume
+        'tablespace_percent': d3['percent'] if d3['size_gb'] > 0 else d2['percent'],
         'connections': 0,
         'slow_queries': 0,
         'threads': logical_cpus,
@@ -500,6 +500,118 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
     }
 
 
+
+def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
+    """
+    Fetches live per-VM metrics from Proxmox VE Exporter (job="proxmox", id=~"qemu/.*")
+    for guest VMs (jumphostvm, monitoringvm, tomcatvm, databasevm) so VM rows reflect
+    their real allocated vCPUs, memory, CPU %, and uptime instead of host node fallbacks.
+    """
+    guest_info = query_prometheus('pve_guest_info{job="proxmox",id=~"qemu/.*"}', prometheus_url)
+    if not guest_info:
+        return []
+
+    def _to_id_map(promql):
+        out = {}
+        for item in query_prometheus(promql, prometheus_url):
+            gid = item.get('metric', {}).get('id', '')
+            if gid:
+                try:
+                    val = float(item['value'][1])
+                    if val == val:
+                        out[gid] = val
+                except (KeyError, IndexError, ValueError, TypeError):
+                    pass
+        return out
+
+    up_map = _to_id_map('pve_up{job="proxmox",id=~"qemu/.*"}')
+    cpu_limit_map = _to_id_map('pve_cpu_usage_limit{job="proxmox",id=~"qemu/.*"}')
+    cpu_ratio_map = _to_id_map('pve_cpu_usage_ratio{job="proxmox",id=~"qemu/.*"}')
+    mem_size_map = _to_id_map('pve_memory_size_bytes{job="proxmox",id=~"qemu/.*"}')
+    mem_used_map = _to_id_map('pve_memory_usage_bytes{job="proxmox",id=~"qemu/.*"}')
+    disk_size_map = _to_id_map('pve_disk_size_bytes{job="proxmox",id=~"qemu/.*"}')
+    disk_used_map = _to_id_map('pve_disk_usage_bytes{job="proxmox",id=~"qemu/.*"}')
+    uptime_map = _to_id_map('pve_uptime_seconds{job="proxmox",id=~"qemu/.*"}')
+    avail_map = _to_id_map('100 * avg_over_time(pve_up{job="proxmox",id=~"qemu/.*"}[30d])')
+
+    vm_payloads = []
+    for g in guest_info:
+        gm = g.get('metric', {})
+        if gm.get('template') == '1':
+            continue
+        vm_id = gm.get('id', '')
+        vm_name = gm.get('name', '').strip()
+        pve_node = gm.get('node', '').strip() or 'Proxmox'
+        if not vm_id or not vm_name:
+            continue
+
+        is_up = up_map.get(vm_id, 1.0) >= 1.0
+        logical_cpus = int(cpu_limit_map.get(vm_id, 0.0))
+        cpu_pct = round(min(100.0, max(0.0, cpu_ratio_map.get(vm_id, 0.0) * 100.0)), 2)
+
+        mem_tot_bytes = mem_size_map.get(vm_id, 0.0)
+        mem_used_bytes = mem_used_map.get(vm_id, 0.0)
+        if mem_tot_bytes > 0:
+            memory_total_gb = round(mem_tot_bytes / (1024 ** 3), 2)
+            memory_used_gb = round(mem_used_bytes / (1024 ** 3), 2)
+            memory_pct = round((mem_used_bytes / mem_tot_bytes) * 100.0, 2)
+        else:
+            memory_total_gb = 0.0
+            memory_used_gb = 0.0
+            memory_pct = 0.0
+
+        disk_tot_bytes = disk_size_map.get(vm_id, 0.0)
+        disk_used_bytes = disk_used_map.get(vm_id, 0.0)
+        disk_size_gb = round(disk_tot_bytes / (1024 ** 3), 2) if disk_tot_bytes > 0 else 0.0
+        disk_used_gb = round(disk_used_bytes / (1024 ** 3), 2) if disk_used_bytes > 0 else 0.0
+        disk_pct = round((disk_used_bytes / disk_tot_bytes) * 100.0, 2) if (disk_tot_bytes > 0 and disk_used_bytes > 0) else 0.0
+
+        uptime_days = round(max(0.0, uptime_map.get(vm_id, 0.0) / 86400.0), 2)
+        if vm_id in avail_map:
+            uptime_pct = round(min(100.0, max(0.0, avail_map[vm_id])), 2)
+        else:
+            uptime_pct = 100.0 if (is_up and uptime_days > 0) else 0.0
+
+        if not is_up or cpu_pct >= 90 or memory_pct >= 90 or uptime_pct < 95:
+            status = 'Critical'
+        elif cpu_pct >= 75 or memory_pct >= 80 or uptime_pct < 99.0:
+            status = 'Warning'
+        else:
+            status = 'Healthy'
+
+        db_name = 'MySQL' if 'database' in vm_name.lower() else 'Infrastructure'
+
+        vm_payloads.append({
+            'node_name': pve_node,
+            'server': vm_name,
+            'hosted_systems': f"{vm_name} ({vm_id})",
+            'database': db_name,
+            'entered_by': 'Prometheus',
+            'uptime_percent': uptime_pct,
+            'uptime_days': uptime_days,
+            'logical_cpus': logical_cpus,
+            'cpu_percent': cpu_pct,
+            'memory_percent': memory_pct,
+            'memory_total_gb': memory_total_gb,
+            'memory_used_gb': memory_used_gb,
+            'disk_percent': disk_pct,
+            'disk_1_type': 'Allocated Virtual Disk',
+            'disk_1_size_gb': disk_size_gb,
+            'disk_1_used_gb': disk_used_gb,
+            'disk_1_percent': disk_pct,
+            'disk_3_type': 'Allocated Virtual Disk',
+            'disk_3_size_gb': disk_size_gb,
+            'disk_3_used_gb': disk_used_gb,
+            'disk_3_percent': disk_pct,
+            'tablespace_percent': disk_pct,
+            'connections': 0,
+            'slow_queries': 0,
+            'threads': logical_cpus,
+            'status': status,
+        })
+
+    return vm_payloads
+
 def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_date=None):
     """
     Pulls metrics for all OLKVM nodes (nmsinfra.nms.go.ug, nmsebs.nms.go.ug)
@@ -535,6 +647,9 @@ def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_da
             errors.append(
                 f"Proxmox node {node_cfg['server']}: No pve_exporter metrics returned from Prometheus."
             )
+
+    # 3. Fetch Proxmox Guest VMs (jumphostvm, monitoringvm, tomcatvm, databasevm)
+    all_payloads.extend(fetch_proxmox_vms_from_prometheus(prometheus_url=effective_url))
 
     # Save/update records in ServerHealth
     for data in all_payloads:
