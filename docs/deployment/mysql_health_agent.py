@@ -34,6 +34,7 @@ import argparse
 import urllib.request
 import urllib.error
 import subprocess
+import tempfile
 from datetime import datetime
 
 # Production Endpoints (Port 90 on nms360)
@@ -124,81 +125,192 @@ def get_disk_metrics():
     return 0.0, 0.0, 0.0
 
 
+def _run_mysql_query(sql):
+    """Runs a MySQL query using ~/.my.cnf and returns stripped stdout lines."""
+    cmd = [
+        "mysql",
+        f"--defaults-extra-file={MYSQL_CNF_FILE}",
+        "-B",
+        "-N",
+        "-e",
+        sql,
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    if res.returncode != 0:
+        raise RuntimeError(res.stderr.strip() or f"mysql exited with {res.returncode}")
+    return [line for line in res.stdout.splitlines() if line.strip()]
+
+
 def get_mysql_status(variable_name):
     """Executes a MySQL query to get a specific global status variable."""
     try:
-        cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"SHOW GLOBAL STATUS LIKE '{variable_name}';\" -B -N"
-        output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-        if output:
-            return int(output.split()[1])
+        lines = _run_mysql_query(f"SHOW GLOBAL STATUS LIKE '{variable_name}';")
+        if lines:
+            return int(float(lines[0].split()[1]))
     except Exception as e:
         print(f"Error getting MySQL status {variable_name}: {e}", file=sys.stderr)
     return 0
 
 
-def get_mysql_connection_metrics():
+def _get_state_file_path():
+    safe_srv = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in SERVER_NAME)
+    return os.path.join(tempfile.gettempdir(), f"dbtrac_mysql_perf_{safe_srv}.json")
+
+
+def _load_perf_state():
+    path = _get_state_file_path()
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_perf_state(state):
+    path = _get_state_file_path()
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+
+
+def get_mysql_performance_metrics():
     """
-    Extracts max_connections and Threads_connected using @@GLOBAL and performance_schema.
-    Computes alert_threshold (70%) and utilization_percentage.
+    Collects comprehensive MySQL engine performance metrics:
+      - Connections & saturation (max_connections, Threads_connected, Threads_running)
+      - Slow query delta (since last check, avoiding misleading cumulative totals)
+      - Aborted connection delta
+      - Active long-running queries (> 10s)
+      - Blocked sessions (metadata/table locks + InnoDB LOCK WAIT transactions)
+      - InnoDB Buffer Pool Hit Ratio (%)
     """
+    status_vars = {}
+    try:
+        status_sql = (
+            "SHOW GLOBAL STATUS WHERE Variable_name IN ("
+            "'Threads_connected','Threads_running','Slow_queries','Aborted_connects',"
+            "'Innodb_buffer_pool_read_requests','Innodb_buffer_pool_reads'"
+            ");"
+        )
+        for line in _run_mysql_query(status_sql):
+            parts = line.split()
+            if len(parts) >= 2:
+                try:
+                    status_vars[parts[0]] = int(float(parts[1]))
+                except ValueError:
+                    pass
+    except Exception as e:
+        print(f"Warning: batch GLOBAL STATUS failed ({e}), trying fallback...", file=sys.stderr)
+
     max_connections = 0
-    current_connections = 0
-    alert_threshold = 0
-    utilization_percentage = 0.0
+    current_connections = status_vars.get("Threads_connected", 0)
+    threads_running = status_vars.get("Threads_running", 0)
 
     try:
-        # Verified DBA query against global system variable and performance_schema status
-        sql = (
-            "SELECT "
-            "@@GLOBAL.max_connections AS max_connections, "
-            "(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_NAME = 'Threads_connected') AS current_connections;"
-        )
-        cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"{sql}\" -B -N"
-        output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-        if output:
-            parts = output.split()
-            if len(parts) >= 2:
-                max_connections = int(parts[0])
-                current_connections = int(parts[1])
+        lines = _run_mysql_query("SELECT @@GLOBAL.max_connections;")
+        if lines:
+            max_connections = int(float(lines[0].split()[0]))
     except Exception as e:
-        print(f"Warning: Primary connection query failed ({e}), trying fallback SHOW commands...", file=sys.stderr)
-
-    # Fallback if primary query failed or performance_schema is disabled
-    if max_connections == 0:
+        print(f"Warning: @@GLOBAL.max_connections query failed ({e})", file=sys.stderr)
         try:
-            cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"SHOW GLOBAL VARIABLES LIKE 'max_connections';\" -B -N"
-            output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-            if output:
-                max_connections = int(output.split()[1])
-        except Exception as e:
-            print(f"Error getting max_connections: {e}", file=sys.stderr)
+            lines = _run_mysql_query("SHOW GLOBAL VARIABLES LIKE 'max_connections';")
+            if lines:
+                max_connections = int(float(lines[0].split()[1]))
+        except Exception:
+            pass
 
     if current_connections == 0 and max_connections > 0:
-        try:
-            cmd = f"mysql --defaults-extra-file={MYSQL_CNF_FILE} -e \"SHOW GLOBAL STATUS LIKE 'Threads_connected';\" -B -N"
-            output = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
-            if output:
-                current_connections = int(output.split()[1])
-        except Exception as e:
-            print(f"Error getting Threads_connected: {e}", file=sys.stderr)
+        current_connections = get_mysql_status("Threads_connected")
+    if threads_running == 0:
+        threads_running = get_mysql_status("Threads_running")
 
-    if max_connections > 0:
-        alert_threshold = int(round(max_connections * 0.70))
-        utilization_percentage = round((current_connections / max_connections) * 100.0, 2)
+    # Active long queries (> 10s) and metadata/table lock waits from PROCESSLIST
+    long_running_queries = 0
+    meta_lock_waits = 0
+    try:
+        proc_sql = (
+            "SELECT "
+            "COALESCE(SUM(CASE WHEN COMMAND <> 'Sleep' AND TIME > 10 AND USER NOT IN ('system user','event_scheduler') THEN 1 ELSE 0 END), 0), "
+            "COALESCE(SUM(CASE WHEN LOWER(COALESCE(STATE,'')) LIKE '%metadata lock%' OR LOWER(COALESCE(STATE,'')) LIKE '%table lock%' THEN 1 ELSE 0 END), 0) "
+            "FROM information_schema.PROCESSLIST;"
+        )
+        lines = _run_mysql_query(proc_sql)
+        if lines:
+            parts = lines[0].split()
+            if len(parts) >= 2:
+                long_running_queries = int(parts[0])
+                meta_lock_waits = int(parts[1])
+    except Exception as e:
+        print(f"Warning: PROCESSLIST inspection failed ({e})", file=sys.stderr)
+
+    # InnoDB row-lock wait transactions (works on MySQL 5.7 & 8.0)
+    innodb_lock_waits = 0
+    try:
+        lines = _run_mysql_query("SELECT COUNT(*) FROM information_schema.INNODB_TRX WHERE trx_state = 'LOCK WAIT';")
+        if lines:
+            innodb_lock_waits = int(lines[0].split()[0])
+    except Exception:
+        pass
+
+    blocked_queries = meta_lock_waits + innodb_lock_waits
+
+    # Compute counter deltas since previous agent run
+    prev_state = _load_perf_state()
+    curr_slow = status_vars.get("Slow_queries", get_mysql_status("Slow_queries"))
+    curr_aborted = status_vars.get("Aborted_connects", get_mysql_status("Aborted_connects"))
+    curr_bp_req = status_vars.get("Innodb_buffer_pool_read_requests", get_mysql_status("Innodb_buffer_pool_read_requests"))
+    curr_bp_reads = status_vars.get("Innodb_buffer_pool_reads", get_mysql_status("Innodb_buffer_pool_reads"))
+
+    def _calc_delta(curr_val, key):
+        if key not in prev_state:
+            return 0  # Baseline run: avoid dumping lifetime totals from before monitoring
+        prev_val = int(prev_state.get(key, 0))
+        return max(0, curr_val - prev_val) if curr_val >= prev_val else max(0, curr_val)
+
+    slow_queries_delta = _calc_delta(curr_slow, "Slow_queries")
+    aborted_delta = _calc_delta(curr_aborted, "Aborted_connects")
+
+    # Prefer interval InnoDB buffer pool hit ratio; fall back to cumulative if interval has no reads/requests
+    d_req = _calc_delta(curr_bp_req, "Innodb_buffer_pool_read_requests") if "Innodb_buffer_pool_read_requests" in prev_state else curr_bp_req
+    d_reads = _calc_delta(curr_bp_reads, "Innodb_buffer_pool_reads") if "Innodb_buffer_pool_reads" in prev_state else curr_bp_reads
+    if d_req > 0:
+        cache_hit_pct = round(max(0.0, min(100.0, (1.0 - (d_reads / float(d_req))) * 100.0)), 2)
+    elif curr_bp_req > 0:
+        cache_hit_pct = round(max(0.0, min(100.0, (1.0 - (curr_bp_reads / float(curr_bp_req))) * 100.0)), 2)
+    else:
+        cache_hit_pct = 100.00
+
+    _save_perf_state({
+        "Slow_queries": curr_slow,
+        "Aborted_connects": curr_aborted,
+        "Innodb_buffer_pool_read_requests": curr_bp_req,
+        "Innodb_buffer_pool_reads": curr_bp_reads,
+        "updated_at": datetime.now().isoformat(),
+    })
+
+    utilization_percentage = round((current_connections / max_connections) * 100.0, 2) if max_connections > 0 else 0.0
 
     return {
         "max_connections": max_connections,
         "connections": current_connections,
-        "alert_threshold": alert_threshold,
-        "utilization_percentage": utilization_percentage
+        "threads": threads_running,
+        "utilization_percentage": utilization_percentage,
+        "slow_queries": slow_queries_delta,
+        "long_running_queries": long_running_queries,
+        "blocked_queries": blocked_queries,
+        "cache_hit_percent": cache_hit_pct,
+        "aborted_connections": aborted_delta,
     }
 
 
 def collect_health_data():
-    """Collects all OS and database metrics."""
+    """Collects all OS and database engine performance metrics."""
     mem_total_gb, mem_used_gb, mem_percent = get_memory_metrics()
     disk_total_gb, disk_used_gb, disk_percent = get_disk_metrics()
-    conn_metrics = get_mysql_connection_metrics()
+    perf = get_mysql_performance_metrics()
 
     return {
         "server": SERVER_NAME,
@@ -216,12 +328,16 @@ def collect_health_data():
         "disk_3_size_gb": disk_total_gb,
         "disk_3_used_gb": disk_used_gb,
         "disk_3_percent": disk_percent,
-        "tablespace_percent": disk_percent,  # Mirrors root disk
-        "connections": conn_metrics["connections"],
-        "max_connections": conn_metrics["max_connections"],
-        "connection_utilization_percent": conn_metrics["utilization_percentage"],
-        "threads": get_mysql_status("Threads_running"),
-        "slow_queries": get_mysql_status("Slow_queries")
+        "tablespace_percent": disk_percent,
+        "connections": perf["connections"],
+        "max_connections": perf["max_connections"],
+        "connection_utilization_percent": perf["utilization_percentage"],
+        "threads": perf["threads"],
+        "slow_queries": perf["slow_queries"],
+        "blocked_queries": perf["blocked_queries"],
+        "long_running_queries": perf["long_running_queries"],
+        "cache_hit_percent": perf["cache_hit_percent"],
+        "aborted_connections": perf["aborted_connections"],
     }
 
 
@@ -315,5 +431,10 @@ if __name__ == "__main__":
             print(f"[WARNING] Connection utilization is {util}% (>= 70% threshold reached)!")
         else:
             print(f"[OK] Connection utilization is healthy ({util}%).")
+    print(
+        f"Performance: Running={payload.get('threads', 0)} | Blocked={payload.get('blocked_queries', 0)} | "
+        f"Long(>10s)={payload.get('long_running_queries', 0)} | SlowDelta={payload.get('slow_queries', 0)} | "
+        f"CacheHit={payload.get('cache_hit_percent', 100.0)}% | AbortedDelta={payload.get('aborted_connections', 0)}"
+    )
 
     send_to_tracker(payload, mode=mode, custom_url=args.url)

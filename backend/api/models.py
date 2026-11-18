@@ -436,6 +436,10 @@ class ServerHealth(models.Model):
     max_connections = models.IntegerField(default=0, help_text="Configured max_connections limit")
     slow_queries = models.IntegerField(default=0)
     threads = models.IntegerField(default=0)
+    blocked_queries = models.IntegerField(default=0, help_text="Currently blocked/lock-waiting DB sessions")
+    long_running_queries = models.IntegerField(default=0, help_text="Active DB queries exceeding latency threshold")
+    cache_hit_percent = models.DecimalField(max_digits=5, decimal_places=2, default=100.00, help_text="Engine buffer/cache hit ratio %")
+    aborted_connections = models.IntegerField(default=0, help_text="Aborted/refused DB connection attempts delta")
     status = models.CharField(max_length=20, choices=[
         ('Healthy', 'Healthy'),
         ('Warning', 'Warning'),
