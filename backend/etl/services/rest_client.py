@@ -504,6 +504,11 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
     else:
         status = 'Healthy'
 
+    not_backed_up_total = int(_extract_scalar(
+        query_prometheus(f'sum(pve_not_backed_up_total{{job="proxmox",instance="{pve_inst}"}})', prometheus_url),
+        0.0,
+    ))
+
     return {
         'node_name': node_cfg.get('node_name', 'Proxmox'),
         'server': node_cfg['server'],
@@ -534,7 +539,7 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
         'disk_3_percent': d3['percent'],
         'tablespace_percent': d1['percent'],
         'connections': len(guest_res) if guest_res else 0,
-        'slow_queries': 0,
+        'slow_queries': not_backed_up_total,
         'threads': logical_cpus,
         'status': status,
     }
@@ -711,8 +716,32 @@ def fetch_ceph_dr_from_prometheus(prometheus_url=None, instance=DR_CEPH_INSTANCE
     else:
         status = 'Healthy'
 
+    pool_meta = query_prometheus(f'ceph_pool_metadata{{job="ceph-dr",instance="{instance}"}}', prometheus_url)
+    pool_names = {p.get('metric', {}).get('pool_id', ''): p.get('metric', {}).get('name', '') for p in pool_meta}
+    pg_deg_res = query_prometheus(f'ceph_pg_degraded{{job="ceph-dr",instance="{instance}"}}', prometheus_url)
+    pg_tot_res = query_prometheus(f'ceph_pg_total{{job="ceph-dr",instance="{instance}"}}', prometheus_url)
+    pg_tot_map = {p.get('metric', {}).get('pool_id', ''): int(float(p['value'][1])) for p in pg_tot_res if p.get('value')}
+    degraded_pools = []
+    for p in pg_deg_res:
+        pid = p.get('metric', {}).get('pool_id', '')
+        try:
+            deg_cnt = int(float(p['value'][1]))
+        except (KeyError, IndexError, ValueError, TypeError):
+            deg_cnt = 0
+        if deg_cnt > 0:
+            pname = pool_names.get(pid) or f"pool_{pid}"
+            tot_cnt = pg_tot_map.get(pid, deg_cnt)
+            degraded_pools.append(f"{pname}: {deg_cnt}/{tot_cnt} PGs")
+
+    fmt_flags = []
+    for wf in warn_flags:
+        if wf == 'PG_DEGRADED' and degraded_pools:
+            fmt_flags.append(f"PG_DEGRADED ({'; '.join(degraded_pools)})")
+        else:
+            fmt_flags.append(wf)
+
     health_lbl = 'HEALTH_OK' if health_code == 0 else ('HEALTH_WARN' if health_code == 1 else 'HEALTH_ERR')
-    warn_str = f" [{', '.join(warn_flags)}]" if warn_flags else ""
+    warn_str = f" [{', '.join(fmt_flags)}]" if fmt_flags else ""
     summary = f"{cluster_name} | {health_lbl}{warn_str} | {osds_up}/{osds_total} OSDs · {mons_up} Mon"
 
     return {

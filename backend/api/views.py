@@ -2949,12 +2949,13 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     total_count = len(filtered_fleet)
     healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
     powered_off_count = sum(1 for v in filtered_fleet if v['status'] == 'Powered Off')
-    outage_vms = [v for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline']]
+    outage_vms = [v for v in filtered_fleet if v['status'] in ['Outage', 'Offline']]
+    critical_vms = [v for v in filtered_fleet if v['status'] == 'Critical']
     outage_count = len(outage_vms)
     online_count = total_count - outage_count - powered_off_count
     below_sla_count = sum(1 for v in filtered_fleet if v['status'] == 'Below SLA')
     warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
-    critical_count = outage_count
+    critical_count = outage_count + len(critical_vms)
 
     if total_count == 0:
         vms_healthy_display = "0 Virtual Machines"
@@ -2964,11 +2965,24 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         names_str = f": {', '.join(outage_names)}" if outage_names else ""
         vms_healthy_display = f"{online_count}/{total_count} Online ({outage_count} Outage{names_str})"
         vms_status_color = "#dc2626"
+    elif len(critical_vms) > 0:
+        crit_names = [v.get('short_name') or v.get('display_name') for v in critical_vms]
+        names_str = f": {', '.join(crit_names)}" if crit_names else ""
+        extra_parts = []
+        if warning_count > 0:
+            extra_parts.append(f"{warning_count} Warning")
+        if powered_off_count > 0:
+            extra_parts.append(f"{powered_off_count} Standby")
+        extra_str = f", {', '.join(extra_parts)}" if extra_parts else ""
+        vms_healthy_display = f"{online_count}/{total_count} Online ({len(critical_vms)} Critical{names_str}{extra_str})"
+        vms_status_color = "#dc2626"
     elif warning_count > 0 and healthy_count > 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({healthy_count} Healthy, {warning_count} Warning)"
+        suffix = f", {powered_off_count} Standby" if powered_off_count > 0 else ""
+        vms_healthy_display = f"{online_count}/{total_count} Online ({healthy_count} Healthy, {warning_count} Warning{suffix})"
         vms_status_color = "#d97706"
     elif warning_count > 0 and healthy_count == 0:
-        vms_healthy_display = f"{online_count}/{total_count} Online ({warning_count} Warning)"
+        suffix = f", {powered_off_count} Standby" if powered_off_count > 0 else ""
+        vms_healthy_display = f"{online_count}/{total_count} Online ({warning_count} Warning{suffix})"
         vms_status_color = "#d97706"
     elif below_sla_count > 0:
         vms_healthy_display = f"{online_count}/{total_count} Online ({below_sla_count} Below SLA)"
@@ -2982,7 +2996,11 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
     avg_up = round(sum(v['uptime_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 100.00
     avg_cpu = round(sum(v['cpu_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
     avg_mem = round(sum(v['memory_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
-    avg_disk = round(sum(v['disk_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
+    disk_reporting_vms = [
+        v for v in active_data_vms
+        if v.get('disk_used_gb', 0) > 0 or v.get('disk_percent', 0) > 0 or v.get('entered_by') != 'Prometheus'
+    ]
+    avg_disk = round(sum(v['disk_percent'] for v in disk_reporting_vms) / len(disk_reporting_vms), 2) if disk_reporting_vms else None
 
     kpis = {
         'total_vms_count': total_count,
@@ -2996,7 +3014,7 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         'fleet_avg_uptime': f"{avg_up}%",
         'fleet_avg_cpu': f"{avg_cpu}%",
         'fleet_avg_mem': f"{avg_mem}%",
-        'fleet_avg_disk': f"{avg_disk}%",
+        'fleet_avg_disk': f"{avg_disk}%" if avg_disk is not None else "Provisioned Only",
     }
 
     return {
@@ -3149,6 +3167,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             return 'local (Root / ISO)'
         if 'nmsddbkp' in low:
             return '/nmsddbkp (Shared NFS)'
+        if 'local xfs' in low:
+            return lbl
         if '/u01' in low:
             return '/u01 (Oracle Data)'
         if 'root' in low or lbl == '/':
@@ -3927,7 +3947,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'node_name': 'OLKVM',
             'display_name': 'Oracle DB (nmsinfra)',
             'hosted_systems': 'nmsinfra',
-            'storage_tier': d2['type'] or '/u01 (Oracle Data)',
+            'storage_tier': d2['type'] or 'Local XFS (/data, /u01, /)',
             'capacity_gb': d2['size_gb'],
             'used_gb': d2['used_gb'],
             'free_gb': d2['free_gb'],
@@ -4349,11 +4369,17 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'type': 'warning',
             'message': f"Resolved Outage: <strong>{inc.ticket or 'INC-'+str(inc.id)} ({inc_target})</strong> &mdash; {inc.duration_hrs or 0} hrs downtime on {inc.date.strftime('%d %b %Y')}."
         })
+    # Build Guest Virtual Machine Fleet status summary
+    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt, start_date=start_date, end_date=end_date)
+    guest_vms_summary = vm_fleet_info['vms']
+    guest_vm_kpis = vm_fleet_info['kpis']
+
     if ceph_dr_summary and ceph_dr_summary['status'] in ('Warning', 'Critical'):
         node_attention_items.append({
             'type': 'danger' if ceph_dr_summary['status'] == 'Critical' else 'warning',
             'message': f"<strong>Ceph DR ({ceph_dr_summary['cluster']}):</strong> {ceph_dr_summary['summary_text']}"
         })
+    seen_backup_clusters = set()
     for n in filtered_nodes:
         display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else (f"Proxmox DR ({n['display_name']})" if n['node_name'] == 'Proxmox DR' else f"Proxmox ({n['display_name']})")
         if not n['has_data']:
@@ -4362,6 +4388,14 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'message': f"<strong>{display_label}:</strong> No Prometheus telemetry synced yet."
             })
             continue
+
+        if n['node_name'] in ('Proxmox', 'Proxmox DR') and int(n.get('slow_queries') or 0) > 0:
+            if n['node_name'] not in seen_backup_clusters:
+                seen_backup_clusters.add(n['node_name'])
+                node_attention_items.append({
+                    'type': 'warning',
+                    'message': f"<strong>{n['node_name']} Backups:</strong> {int(n['slow_queries'])} guest VM(s) flagged without Proxmox backup coverage."
+                })
 
         if n['uptime_percent'] < target_node_sla:
             node_attention_items.append({
@@ -4404,6 +4438,25 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                     'message': f"<strong>{disk_lbl}:</strong> High disk usage at {d['percent']}% ({d['free_gb']} GB free of {d['size_gb']} GB)."
                 })
 
+    for vm in guest_vms_summary:
+        vm_st = vm.get('status')
+        if vm_st not in ('Critical', 'Warning') or vm_st == 'Powered Off':
+            continue
+        vm_lbl = vm.get('short_name') or vm.get('display_name')
+        vm_scope = vm.get('cluster') or vm.get('host_node')
+        if vm.get('memory_percent', 0) >= 80:
+            lvl = 'Critical' if vm.get('memory_percent', 0) >= 90 else 'High'
+            node_attention_items.append({
+                'type': 'danger' if vm_st == 'Critical' else 'warning',
+                'message': f"<strong>VM {vm_lbl} ({vm_scope}):</strong> {lvl} RAM usage at {vm['memory_percent']}% ({vm['memory_used_gb']}/{vm['memory_total_gb']} GB)."
+            })
+        elif vm.get('cpu_percent', 0) >= 75:
+            lvl = 'Critical' if vm.get('cpu_percent', 0) >= 90 else 'High'
+            node_attention_items.append({
+                'type': 'danger' if vm_st == 'Critical' else 'warning',
+                'message': f"<strong>VM {vm_lbl} ({vm_scope}):</strong> {lvl} CPU usage at {vm['cpu_percent']}%."
+            })
+
     eff_period_display = period_display or target_month_dt.strftime('%B %Y')
     all_nodes_healthy = all(n['status'] == 'Healthy' for n in active_nodes) if active_nodes else True
     scope_label = "all monitored OLKVM and Proxmox nodes" if selected_node == 'All Nodes' else f"the {selected_node} node scope"
@@ -4417,11 +4470,6 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             f"Infrastructure telemetry for {scope_label} during {eff_period_display} recorded {kpi_nodes_healthy} with an average availability of {kpi_node_uptime}. "
             f"Total provisioned storage stands at {kpi_total_storage_gb} GB ({kpi_used_storage_gb} GB used, {kpi_storage_used_pct}%)."
         )
-
-    # Build Guest Virtual Machine Fleet status summary
-    vm_fleet_info = _get_guest_vm_fleet_summary(selected_node=selected_node, target_month_dt=target_month_dt, start_date=start_date, end_date=end_date)
-    guest_vms_summary = vm_fleet_info['vms']
-    guest_vm_kpis = vm_fleet_info['kpis']
 
     return {
         'selected_node': selected_node,

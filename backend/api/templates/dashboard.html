@@ -1124,6 +1124,9 @@
         <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
             Ceph DR Storage Cluster ({{ ceph_dr_summary.cluster }})
         </h3>
+        {% if ceph_dr_summary.summary_text %}
+        <div style="font-size: 0.75rem; color: #64748b;">{{ ceph_dr_summary.summary_text }}</div>
+        {% endif %}
         <div style="font-size: 0.78rem; color: #64748b;">
             <span style="font-weight: 700; color: {% if ceph_dr_summary.status == 'Healthy' %}#137333{% elif ceph_dr_summary.status == 'Critical' %}#c5221f{% else %}#b06000{% endif %};">{{ ceph_dr_summary.status }}</span>
             {% if ceph_dr_summary.updated_at %}
@@ -1245,9 +1248,16 @@
                         {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
+                        {% if vm.disk_used_gb > 0 or vm.disk_percent > 0 %}
                         <div style="font-weight: 600; color: #0f172a;">{{ vm.disk_percent }}%</div>
                         {% if vm.disk_size_gb > 0 %}
                         <div style="font-size: 0.68rem; color: #64748b;">{{ vm.disk_used_gb }} / {{ vm.disk_size_gb }} GB</div>
+                        {% endif %}
+                        {% elif vm.disk_size_gb > 0 %}
+                        <div style="font-weight: 600; color: #475569;" title="Provisioned virtual disk size (OS usage not exposed by Proxmox exporter)">{{ vm.disk_size_gb }} GB</div>
+                        <div style="font-size: 0.68rem; color: #94a3b8;">Provisioned</div>
+                        {% else %}
+                        <span style="color: #94a3b8;">—</span>
                         {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; text-align: center; vertical-align: middle;">
