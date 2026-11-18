@@ -934,6 +934,7 @@
                     <option value="All Nodes" {% if selected_node == 'All Nodes' %}selected{% endif %}>All Nodes</option>
                     <option value="OLKVM" {% if selected_node == 'OLKVM' %}selected{% endif %}>OLKVM</option>
                     <option value="Proxmox" {% if selected_node == 'Proxmox' %}selected{% endif %}>Proxmox</option>
+                    <option value="Proxmox DR" {% if selected_node == 'Proxmox DR' %}selected{% endif %}>Proxmox DR</option>
                 </select>
             </div>
             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
@@ -1049,7 +1050,7 @@
                             <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Host Cluster</div>
                         {% else %}
                             <div style="font-size: 0.88rem; font-weight: 700; color: var(--primary-navy);">{{ node.display_name }}</div>
-                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">Proxmox VE Node</div>
+                            <div style="font-size: 0.7rem; color: #64748b; font-weight: 500;">{% if node.node_name == 'Proxmox DR' %}Proxmox VE DR Node{% else %}Proxmox VE Node{% endif %}</div>
                         {% endif %}
                     </td>
                     <td style="padding: 0.65rem 0.5rem; vertical-align: middle;">
@@ -1115,6 +1116,47 @@
         </table>
     </div>
 </div>
+
+<!-- Ceph DR Storage Cluster -->
+{% if ceph_dr_summary %}
+<div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1.5px solid rgba(90, 123, 156, 0.15); padding-bottom: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <h3 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--primary-navy);">
+            Ceph DR Storage Cluster ({{ ceph_dr_summary.cluster }})
+        </h3>
+        <div style="font-size: 0.78rem; color: #64748b;">
+            <span style="font-weight: 700; color: {% if ceph_dr_summary.status == 'Healthy' %}#137333{% elif ceph_dr_summary.status == 'Critical' %}#c5221f{% else %}#b06000{% endif %};">{{ ceph_dr_summary.status }}</span>
+            {% if ceph_dr_summary.updated_at %}
+            <span style="margin: 0 0.35rem; color: #cbd5e1;">&bull;</span>
+            <span>Updated {{ ceph_dr_summary.updated_at|date:"d M Y H:i" }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.25rem;">
+        <div>
+            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Raw Cluster Used / Total</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-top: 0.25rem;">{{ ceph_dr_summary.raw_used_gb }} / {{ ceph_dr_summary.raw_total_gb }} GB</div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ ceph_dr_summary.raw_percent }}% utilized</div>
+        </div>
+        <div>
+            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">HDD Class (Raw)</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ ceph_dr_summary.hdd_used_gb }} / {{ ceph_dr_summary.hdd_total_gb }} GB</div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ ceph_dr_summary.hdd_percent }}% utilized</div>
+        </div>
+        <div>
+            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">SSD Class (Raw)</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ ceph_dr_summary.ssd_used_gb }} / {{ ceph_dr_summary.ssd_total_gb }} GB</div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ ceph_dr_summary.ssd_percent }}% utilized</div>
+        </div>
+        <div>
+            <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">OSDs &amp; Monitors</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-top: 0.25rem;">{{ ceph_dr_summary.osds_up }} / {{ ceph_dr_summary.osds_total }} OSDs</div>
+            <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.15rem;">{{ ceph_dr_summary.mons_up }} Mon in quorum</div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Guest Virtual Machine Status Card -->
 <div style="background: var(--pure-white); border: 1px solid rgba(90, 123, 156, 0.15); border-radius: 6px; padding: 1.25rem 1.5rem; box-shadow: var(--shadow); margin-bottom: 2rem;">
@@ -1212,6 +1254,7 @@
                         <span style="font-size: 0.75rem; font-weight: 700;
                                     {% if vm.status == 'Healthy' %}color: #137333;
                                     {% elif vm.status == 'Critical' %}color: #c5221f;
+                                    {% elif vm.status == 'Powered Off' %}color: #64748b;
                                     {% else %}color: #b06000;{% endif %}">
                             {{ vm.status }}
                         </span>

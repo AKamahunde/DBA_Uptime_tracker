@@ -2557,6 +2557,118 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             'default_cores': 12,
             'default_ram_gb': 17.0,
         },
+        {
+            'vm_key': 'nickledbdr',
+            'display_name': 'nickledbdr',
+            'short_name': 'nickledbdr',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'MySQL DR Replica Server',
+            'database': 'MySQL',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/105',
+            'filter_q': Q(server__iexact='nickledbdr'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 4,
+            'default_ram_gb': 16.0,
+        },
+        {
+            'vm_key': 'nickledbdrclone',
+            'display_name': 'nickledbdrclone',
+            'short_name': 'nickledbdrclone',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'MySQL DR Clone / Test Node',
+            'database': 'MySQL',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/106',
+            'filter_q': Q(server__iexact='nickledbdrclone'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 4,
+            'default_ram_gb': 16.0,
+        },
+        {
+            'vm_key': 'nicklemysql',
+            'display_name': 'nicklemysql',
+            'short_name': 'nicklemysql',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'MySQL DR Instance',
+            'database': 'MySQL',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/107',
+            'filter_q': Q(server__iexact='nicklemysql'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 4,
+            'default_ram_gb': 16.0,
+        },
+        {
+            'vm_key': 'ebstest',
+            'display_name': 'ebstest',
+            'short_name': 'ebstest',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'Oracle EBS Test / DR Instance',
+            'database': 'Oracle',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/101',
+            'filter_q': Q(server__iexact='ebstest'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 8,
+            'default_ram_gb': 32.0,
+        },
+        {
+            'vm_key': 'pbs',
+            'display_name': 'PBS',
+            'short_name': 'PBS',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'Proxmox Backup Server (DR)',
+            'database': '—',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/100',
+            'filter_q': Q(server__iexact='PBS'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 32,
+            'default_ram_gb': 64.0,
+        },
+        {
+            'vm_key': 'freepbx',
+            'display_name': 'FREEPBX',
+            'short_name': 'FREEPBX',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'DR Telephony / FreePBX (Standby)',
+            'database': '—',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/102',
+            'filter_q': Q(server__iexact='FREEPBX'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 4,
+            'default_ram_gb': 8.0,
+        },
+        {
+            'vm_key': 'test-odkx',
+            'display_name': 'test-odkx',
+            'short_name': 'test-odkx',
+            'host_node': 'nmspvedr01',
+            'parent_node_key': 'nmspvedr01',
+            'cluster': 'Proxmox DR',
+            'role': 'ODK-X DR Test Server (Standby)',
+            'database': '—',
+            'ip_address': '192.168.81.51',
+            'vmid': 'qemu/103',
+            'filter_q': Q(server__iexact='test-odkx'),
+            'fallback_host_q': Q(server__iexact='nmspvedr01'),
+            'default_cores': 2,
+            'default_ram_gb': 16.0,
+        },
     ]
 
     def _safe_sh_first(q_obj, prefer_prometheus=False):
@@ -2743,13 +2855,13 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
 
     # Discover any additional unique guest VMs recorded in ServerHealth
     dynamic_vm_recs = (
-        ServerHealth.objects.filter(Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)'))
+        ServerHealth.objects.filter(Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|nmspvedr|ceph-dr|infra|ebs|olkvm|proxmox)'))
         .order_by('-date', '-updated_at', '-id')
     )
     seen_dynamic = set()
     for d_rec in dynamic_vm_recs:
         s_low = (d_rec.server or '').lower()
-        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight']
+        skip_keys = ['infra', 'ebs', 'databasevm', 'nickledb', 'nicklemysql', 'tomcat', 'jumphost', 'monitoring', 'pentana', 'mkinsight', 'pbs', 'freepbx', 'test-odkx', 'nmspvedr', 'ceph-dr']
         if any(c in s_low for c in skip_keys):
             continue
         if s_low in seen_dynamic:
@@ -2808,6 +2920,8 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'OLKVM']
     elif selected_node == 'Proxmox':
         filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'Proxmox']
+    elif selected_node == 'Proxmox DR':
+        filtered_fleet = [v for v in fleet_vms if v['cluster'] == 'Proxmox DR']
     elif selected_node != 'All Nodes':
         sel_low = selected_node.lower()
         filtered_fleet = [
@@ -2826,15 +2940,18 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
             return (0, v.get('display_name', ''))
         elif st in ('Below SLA', 'Warning'):
             return (1, v.get('display_name', ''))
+        elif st == 'Powered Off':
+            return (3, v.get('display_name', ''))
         return (2, v.get('display_name', ''))
 
     filtered_fleet.sort(key=_vm_priority_key)
 
     total_count = len(filtered_fleet)
     healthy_count = sum(1 for v in filtered_fleet if v['status'] == 'Healthy')
+    powered_off_count = sum(1 for v in filtered_fleet if v['status'] == 'Powered Off')
     outage_vms = [v for v in filtered_fleet if v['status'] in ['Outage', 'Critical', 'Offline']]
     outage_count = len(outage_vms)
-    online_count = total_count - outage_count
+    online_count = total_count - outage_count - powered_off_count
     below_sla_count = sum(1 for v in filtered_fleet if v['status'] == 'Below SLA')
     warning_count = sum(1 for v in filtered_fleet if v['status'] == 'Warning')
     critical_count = outage_count
@@ -2857,10 +2974,11 @@ def _get_guest_vm_fleet_summary(selected_node='All Nodes', target_month_dt=None,
         vms_healthy_display = f"{online_count}/{total_count} Online ({below_sla_count} Below SLA)"
         vms_status_color = "#dc2626"
     else:
-        vms_healthy_display = f"{online_count}/{total_count} Online & Healthy"
+        suffix = f" ({powered_off_count} Standby)" if powered_off_count > 0 else ""
+        vms_healthy_display = f"{online_count}/{total_count - powered_off_count} Active & Healthy{suffix}" if powered_off_count > 0 else f"{online_count}/{total_count} Online & Healthy"
         vms_status_color = "#16a34a"
 
-    active_data_vms = [v for v in filtered_fleet if v['has_data']]
+    active_data_vms = [v for v in filtered_fleet if v['has_data'] and v.get('status') != 'Powered Off']
     avg_up = round(sum(v['uptime_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 100.00
     avg_cpu = round(sum(v['cpu_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
     avg_mem = round(sum(v['memory_percent'] for v in active_data_vms) / len(active_data_vms), 2) if active_data_vms else 0.0
@@ -2931,7 +3049,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'role_title': 'OLKVM — Oracle Database Node',
             'hosted_systems': 'Oracle DB (nmsinfra)',
             'primary_db': 'Oracle',
-            'filter_q': Q(server__icontains='infra'),
+            'filter_q': Q(server__iexact='nmsinfra.nms.go.ug') | Q(server__iexact='nmsinfra'),
             'default_disks': [
                 '/nmsddbkp (Shared NFS)',
                 '/u01 (Oracle Data)',
@@ -2945,7 +3063,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'role_title': 'OLKVM — Oracle EBS App Node',
             'hosted_systems': 'Oracle EBS App (nmsebs)',
             'primary_db': 'Oracle',
-            'filter_q': Q(server__icontains='ebs'),
+            'filter_q': Q(server__iexact='nmsebs.nms.go.ug') | Q(server__iexact='nmsebs'),
             'default_disks': [
                 '/nmsddbkp (Shared NFS)',
                 '/stagearea (LVM XFS)',
@@ -2992,6 +3110,20 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'VMSAN (Shared)',
                 'local-lvm (LVM-Thin)',
                 'local (Root / ISO)',
+            ],
+        },
+        {
+            'node_key': 'nmspvedr01',
+            'node_name': 'Proxmox DR',
+            'display_name': 'nmspvedr01',
+            'role_title': 'Proxmox VE DR Node (nmspvedrcluster)',
+            'hosted_systems': 'PBS, ebstest, nickledbdr, nickledbdrclone, nicklemysql',
+            'primary_db': 'MySQL / Oracle DR',
+            'filter_q': Q(server__iexact='nmspvedr01'),
+            'default_disks': [
+                'PBS-Backup (Shared)',
+                'Ceph SSD (ssd_pool)',
+                'Ceph HDD Pools (large/small/local)',
             ],
         },
     ]
@@ -3192,7 +3324,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             else:
                 node_status_str = latest_rec.status if (latest_rec and latest_rec.status) else 'Healthy'
             up_days = float(latest_rec.uptime_days or 0.0)
-            logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)))
+            logical_cpus = int(latest_rec.logical_cpus or latest_rec.threads or (88 if nd['node_name'] == 'Proxmox DR' else (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16))))
             cpu_val = float(latest_rec.cpu_percent or 0.0)
             mem_val = float(latest_rec.memory_percent or 0.0)
             mem_tot = float(latest_rec.memory_total_gb or 0.0)
@@ -3443,7 +3575,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
                 'uptime_status': ('Meets SLA' if fallback_up_pct >= 99.90 else ('Warning' if fallback_up_pct >= 99.0 else 'Below SLA')) if has_node_inc else 'N/A',
                 'unplanned_down_hrs': node_unplanned_hrs,
                 'incident_count': node_inc_count,
-                'logical_cpus': 48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16),
+                'logical_cpus': 88 if nd['node_name'] == 'Proxmox DR' else (48 if nd['node_name'] == 'Proxmox' else (64 if 'nmsinfra' in nd['node_key'] else 16)),
                 'cpu_percent': 0.0,
                 'memory_percent': 0.0,
                 'memory_total_gb': 0.0,
@@ -3479,7 +3611,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
     # Consolidate OLKVM workloads (nmsinfra and nmsebs) into a single Node-level record
     olkvm_workloads = [n for n in node_overview_data if n['node_name'] == 'OLKVM']
-    proxmox_nodes = [n for n in node_overview_data if n['node_name'] == 'Proxmox']
+    proxmox_nodes = [n for n in node_overview_data if n['node_name'] in ('Proxmox', 'Proxmox DR')]
 
     # Map hosted VMs / Workloads for Proxmox physical nodes
     for p_node in proxmox_nodes:
@@ -3493,6 +3625,14 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             ]
         elif 'pvenode3' in pkey:
             p_node['hosted_vms'] = [{'name': 'databasevm', 'label': 'databasevm (qemu/103)', 'role': 'MySQL / Pentana'}]
+        elif 'nmspvedr01' in pkey:
+            p_node['hosted_vms'] = [
+                {'name': 'PBS', 'label': 'PBS (qemu/100)', 'role': 'Backup Server'},
+                {'name': 'ebstest', 'label': 'ebstest (qemu/101)', 'role': 'Oracle EBS DR'},
+                {'name': 'nickledbdr', 'label': 'nickledbdr (qemu/105)', 'role': 'MySQL DR'},
+                {'name': 'nickledbdrclone', 'label': 'nickledbdrclone (qemu/106)', 'role': 'MySQL Clone'},
+                {'name': 'nicklemysql', 'label': 'nicklemysql (qemu/107)', 'role': 'MySQL DR'},
+            ]
         else:
             p_node['hosted_vms'] = [{'name': p_node.get('display_name', 'VM'), 'label': p_node.get('hosted_systems', ''), 'role': ''}]
 
@@ -3666,7 +3806,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
     if selected_node == 'All Nodes':
         filtered_nodes = node_overview_data
-    elif selected_node in ('OLKVM', 'Proxmox'):
+    elif selected_node in ('OLKVM', 'Proxmox', 'Proxmox DR'):
         filtered_nodes = [n for n in node_overview_data if n['node_name'].lower() == selected_node.lower()]
     else:
         filtered_nodes = [n for n in node_overview_data if n['node_key'].lower() == selected_node.lower()]
@@ -3683,7 +3823,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         if d1['size_gb'] > 0:
             shared_storage_records.append({
                 'cluster': n['node_name'],
-                'storage_id': 'VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp',
+                'storage_id': 'PBS-Backup' if n['node_name'] == 'Proxmox DR' else ('VMSAN' if n['node_name'] == 'Proxmox' else '/nmsddbkp'),
                 'type_label': d1['type'],
                 'total_gb': d1['size_gb'],
                 'total_tb': round(d1['size_gb'] / 1024.0, 2),
@@ -3714,8 +3854,11 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         if n.get('updated_at') and (latest_updated is None or n['updated_at'] > latest_updated):
             latest_updated = n['updated_at']
 
+    prod_proxmox_nodes = [p for p in proxmox_nodes if p.get('node_name') == 'Proxmox']
+    dr_proxmox_node = next((p for p in proxmox_nodes if p.get('node_name') == 'Proxmox DR'), None)
+
     # 1. Proxmox Shared SAN pool (VMSAN)
-    pve_shared_src = next((p for p in proxmox_nodes if p.get('has_data') and p['disk_1']['size_gb'] > 0), proxmox_nodes[0] if proxmox_nodes else None)
+    pve_shared_src = next((p for p in prod_proxmox_nodes if p.get('has_data') and p['disk_1']['size_gb'] > 0), prod_proxmox_nodes[0] if prod_proxmox_nodes else None)
     vmsan_rec = None
     if pve_shared_src:
         d1 = pve_shared_src['disk_1']
@@ -3886,19 +4029,19 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
 
     # 7. Proxmox Host Local Pools summary (pvenode1, pvenode2, pvenode3 local-lvm & root)
     pve_local_summary_rec = None
-    if proxmox_nodes:
-        tot_pve_local_cap = round(sum(p['disk_2']['size_gb'] + p['disk_3']['size_gb'] for p in proxmox_nodes), 2)
-        tot_pve_local_used = round(sum(p['disk_2']['used_gb'] + p['disk_3']['used_gb'] for p in proxmox_nodes), 2)
+    if prod_proxmox_nodes:
+        tot_pve_local_cap = round(sum(p['disk_2']['size_gb'] + p['disk_3']['size_gb'] for p in prod_proxmox_nodes), 2)
+        tot_pve_local_used = round(sum(p['disk_2']['used_gb'] + p['disk_3']['used_gb'] for p in prod_proxmox_nodes), 2)
         tot_pve_local_free = round(max(0.0, tot_pve_local_cap - tot_pve_local_used), 2)
         tot_pve_local_pct = round((tot_pve_local_used / tot_pve_local_cap * 100.0), 2) if tot_pve_local_cap > 0 else 0.0
-        pve_deltas = [p.get('delta_24h_gb') for p in proxmox_nodes if p.get('delta_24h_gb') is not None]
+        pve_deltas = [p.get('delta_24h_gb') for p in prod_proxmox_nodes if p.get('delta_24h_gb') is not None]
         tot_pve_delta = round(sum(pve_deltas), 2) if pve_deltas else None
         tot_pve_delta_pct = round((tot_pve_delta / tot_pve_local_used) * 100.0, 2) if (tot_pve_delta is not None and tot_pve_local_used > 0) else None
         pve_rw = _calculate_runway(tot_pve_local_free, tot_pve_delta, tot_pve_local_pct)
         pve_local_summary_rec = {
-            'month': proxmox_nodes[0].get('date') or latest_date,
-            'date': proxmox_nodes[0].get('date') or latest_date,
-            'updated_at': proxmox_nodes[0].get('updated_at') or latest_updated,
+            'month': prod_proxmox_nodes[0].get('date') or latest_date,
+            'date': prod_proxmox_nodes[0].get('date') or latest_date,
+            'updated_at': prod_proxmox_nodes[0].get('updated_at') or latest_updated,
             'node_key': 'Proxmox',
             'node_name': 'Proxmox',
             'display_name': 'Proxmox Nodes 1–3 (Local)',
@@ -3915,13 +4058,69 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'runway_days': pve_rw['days'],
             'runway_text': pve_rw['text'],
             'runway_badge': pve_rw['badge'],
-            'has_data': any(p.get('has_data') for p in proxmox_nodes),
+            'has_data': any(p.get('has_data') for p in prod_proxmox_nodes),
             'is_shared': False,
+        }
+
+    # 8. Proxmox DR Pools (nmspvedr01: PBS-Backup, Ceph SSD, Ceph HDD)
+    dr_cap_records = []
+    if dr_proxmox_node and dr_proxmox_node.get('has_data'):
+        for idx_d, d in enumerate((dr_proxmox_node['disk_1'], dr_proxmox_node['disk_2'], dr_proxmox_node['disk_3'])):
+            if d['size_gb'] > 0:
+                dr_cap_records.append({
+                    'month': dr_proxmox_node.get('date') or latest_date,
+                    'date': dr_proxmox_node.get('date') or latest_date,
+                    'updated_at': dr_proxmox_node.get('updated_at') or latest_updated,
+                    'node_key': 'nmspvedr01',
+                    'node_name': 'Proxmox DR',
+                    'display_name': 'Proxmox DR (nmspvedr01)',
+                    'hosted_systems': 'nmspvedr01',
+                    'storage_tier': d['type'],
+                    'capacity_gb': d['size_gb'],
+                    'used_gb': d['used_gb'],
+                    'free_gb': d['free_gb'],
+                    'used_percent': d['percent'],
+                    'growth_gb': d.get('delta_24h_gb'),
+                    'growth_percent': d.get('delta_24h_pct'),
+                    'delta_24h_gb': d.get('delta_24h_gb'),
+                    'delta_24h_percent': d.get('delta_24h_pct'),
+                    'runway_days': d.get('runway_days', 9999),
+                    'runway_text': d.get('runway_text', 'Stable'),
+                    'runway_badge': d.get('runway_badge', 'stable'),
+                    'has_data': True,
+                    'is_shared': (idx_d == 0),
+                })
+
+    # 9. Ceph DR Cluster Summary (job="ceph-dr", nmspvedrcluster)
+    ceph_dr_rec = None
+    try:
+        ceph_dr_rec = ServerHealth.objects.filter(server__iexact='ceph-dr').order_by('-date', '-updated_at', '-id').first()
+    except Exception:
+        ceph_dr_rec = None
+    ceph_dr_summary = None
+    if ceph_dr_rec and selected_node in ('All Nodes', 'Proxmox DR', 'nmspvedr01'):
+        ceph_dr_summary = {
+            'cluster': 'nmspvedrcluster',
+            'status': ceph_dr_rec.status or 'Healthy',
+            'summary_text': ceph_dr_rec.hosted_systems or '',
+            'osds_up': int(ceph_dr_rec.connections or 0),
+            'osds_total': int(ceph_dr_rec.threads or 0),
+            'mons_up': int(ceph_dr_rec.slow_queries or 0),
+            'raw_total_gb': float(ceph_dr_rec.disk_1_size_gb or 0.0),
+            'raw_used_gb': float(ceph_dr_rec.disk_1_used_gb or 0.0),
+            'raw_percent': float(ceph_dr_rec.disk_1_percent or 0.0),
+            'hdd_total_gb': float(ceph_dr_rec.disk_2_size_gb or 0.0),
+            'hdd_used_gb': float(ceph_dr_rec.disk_2_used_gb or 0.0),
+            'hdd_percent': float(ceph_dr_rec.disk_2_percent or 0.0),
+            'ssd_total_gb': float(ceph_dr_rec.disk_3_size_gb or 0.0),
+            'ssd_used_gb': float(ceph_dr_rec.disk_3_used_gb or 0.0),
+            'ssd_percent': float(ceph_dr_rec.disk_3_percent or 0.0),
+            'updated_at': ceph_dr_rec.updated_at,
         }
 
     # Scope dispatch
     if selected_node == 'All Nodes':
-        for r in [vmsan_rec, nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec, pve_local_summary_rec]:
+        for r in [vmsan_rec, nmsddbkp_rec, u01_rec, fra_rec, stage_rec, fmw_rec, pve_local_summary_rec] + dr_cap_records:
             if r:
                 node_capacity_records.append(r)
     elif selected_node == 'OLKVM':
@@ -3932,6 +4131,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         for r in [vmsan_rec, pve_local_summary_rec]:
             if r:
                 node_capacity_records.append(r)
+    elif selected_node in ('Proxmox DR', 'nmspvedr01'):
+        node_capacity_records.extend(dr_cap_records)
     elif 'infra' in selected_node.lower():
         for r in [nmsddbkp_rec, u01_rec, fra_rec]:
             if r:
@@ -3989,6 +4190,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         kpi_compute_subtext = "OLKVM & Proxmox compute"
     elif selected_node == 'Proxmox':
         kpi_compute_subtext = "Proxmox cluster compute"
+    elif selected_node == 'Proxmox DR':
+        kpi_compute_subtext = "Proxmox DR compute"
     elif selected_node == 'OLKVM':
         kpi_compute_subtext = "OLKVM compute"
     else:
@@ -4039,6 +4242,8 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             )
         elif selected_node == 'Proxmox':
             month_qs = month_qs.filter(Q(node_name__iexact='Proxmox') | Q(server__icontains='pvenode'))
+        elif selected_node == 'Proxmox DR':
+            month_qs = month_qs.filter(Q(node_name__iexact='Proxmox DR') | Q(server__icontains='nmspvedr'))
         elif selected_node != 'All Nodes':
             month_qs = month_qs.filter(server__iexact=selected_node)
 
@@ -4144,8 +4349,13 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
             'type': 'warning',
             'message': f"Resolved Outage: <strong>{inc.ticket or 'INC-'+str(inc.id)} ({inc_target})</strong> &mdash; {inc.duration_hrs or 0} hrs downtime on {inc.date.strftime('%d %b %Y')}."
         })
+    if ceph_dr_summary and ceph_dr_summary['status'] in ('Warning', 'Critical'):
+        node_attention_items.append({
+            'type': 'danger' if ceph_dr_summary['status'] == 'Critical' else 'warning',
+            'message': f"<strong>Ceph DR ({ceph_dr_summary['cluster']}):</strong> {ceph_dr_summary['summary_text']}"
+        })
     for n in filtered_nodes:
-        display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else f"Proxmox ({n['display_name']})"
+        display_label = f"OLKVM ({n['hosted_systems']})" if n['node_name'] == 'OLKVM' else (f"Proxmox DR ({n['display_name']})" if n['node_name'] == 'Proxmox DR' else f"Proxmox ({n['display_name']})")
         if not n['has_data']:
             node_attention_items.append({
                 'type': 'warning',
@@ -4221,6 +4431,7 @@ def _build_node_dashboard_context(selected_node='All Nodes', reporting_month=Non
         'scoped_node_detail': scoped_node_detail,
         'guest_vms_summary': guest_vms_summary,
         'guest_vm_kpis': guest_vm_kpis,
+        'ceph_dr_summary': ceph_dr_summary,
         'shared_storage_records': shared_storage_records,
         'node_capacity_records': node_capacity_records,
         'kpi_node_uptime': kpi_node_uptime,
@@ -4532,17 +4743,17 @@ def server_health_list(request):
     end_date = request.GET.get('end_date', '')
 
     # Distinct tab badge counts
-    node_server_q = Q(server__iregex=r'^(pvenode|nmsinfra|nmsebs|infra|ebs|olkvm|proxmox)') & ~Q(server__icontains='(DB)') & ~Q(server__icontains='(APP)')
+    node_server_q = Q(server__iregex=r'^(pvenode|nmspvedr|ceph-dr|nmsinfra|nmsebs|infra\.|ebs\.|olkvm|proxmox)') & ~Q(server__icontains='(DB)') & ~Q(server__icontains='(APP)')
     total_node_health_count = ServerHealth.objects.filter(
         Q(entered_by='Prometheus') | Q(entered_by='User')
     ).filter(node_server_q).count()
     total_vm_health_count = ServerHealth.objects.filter(
-        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|nmspvedr|ceph-dr|infra|ebs|olkvm|proxmox)')
     ).count()
 
     # Distinct VM server names for filter dropdown
     vm_choices = list(ServerHealth.objects.filter(
-        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+        Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|nmspvedr|ceph-dr|infra|ebs|olkvm|proxmox)')
     ).values_list('server', flat=True).distinct().order_by('server'))
 
     if current_tab == 'nodes':
@@ -4567,7 +4778,7 @@ def server_health_list(request):
             # 1. Check for OLKVM workloads on this date
             olkvm_recs = [
                 r for r in recs 
-                if (r.node_name or '').upper() == 'OLKVM' or any(k in (r.server or '').lower() for k in ['infra', 'ebs', 'olkvm'])
+                if (r.node_name or '').upper() == 'OLKVM' or any(k in (r.server or '').lower() for k in ['nmsinfra', 'nmsebs', 'olkvm'])
             ]
             proxmox_recs = [r for r in recs if r not in olkvm_recs]
 
@@ -4654,9 +4865,13 @@ def server_health_list(request):
                 })
 
             # 2. Add Proxmox nodes
-            if selected_node in ['All Nodes', 'Proxmox'] or selected_node.startswith('pvenode'):
+            if selected_node in ['All Nodes', 'Proxmox', 'Proxmox DR'] or selected_node.startswith('pvenode') or selected_node.startswith('nmspvedr'):
                 for p_rec in proxmox_recs:
                     pserver = (p_rec.server or '').lower()
+                    if selected_node == 'Proxmox' and ('nmspvedr' in pserver or 'ceph-dr' in pserver):
+                        continue
+                    if selected_node == 'Proxmox DR' and 'nmspvedr' not in pserver and 'ceph-dr' not in pserver:
+                        continue
                     if selected_node.startswith('pvenode') and selected_node.lower() not in pserver:
                         continue
 
@@ -4727,7 +4942,7 @@ def server_health_list(request):
     else:
         # Virtual Machines (VM-level)
         queryset = ServerHealth.objects.filter(
-            Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|infra|ebs|olkvm|proxmox)')
+            Q(entered_by='Script') | ~Q(server__iregex=r'^(pvenode|nmspvedr|ceph-dr|infra|ebs|olkvm|proxmox)')
         ).annotate(
             priority_order=Case(
                 When(status__in=['Outage', 'Critical', 'Offline'], then=Value(0)),

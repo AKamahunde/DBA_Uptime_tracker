@@ -29,12 +29,17 @@ OLKVM_NODES = [
     },
 ]
 
+PROD_PROXMOX_INSTANCE = os.getenv('PROMETHEUS_PROXMOX_INSTANCE', '10.10.17.34')
+DR_PROXMOX_INSTANCE = os.getenv('PROMETHEUS_PROXMOX_DR_INSTANCE', '192.168.81.51')
+DR_CEPH_INSTANCE = os.getenv('PROMETHEUS_CEPH_DR_INSTANCE', '192.168.81.51:9283')
+
 # Proxmox Cluster Nodes monitored via pve_exporter (job="proxmox", instance="10.10.17.34")
 PROXMOX_NODES = [
     {
         'node_name': 'Proxmox',
         'server': 'pvenode1',
         'pve_node': 'pvenode1',
+        'instance': PROD_PROXMOX_INSTANCE,
         'hosted_systems': 'tomcatvm & Internal Systems',
         'database': 'MySQL',
     },
@@ -42,6 +47,7 @@ PROXMOX_NODES = [
         'node_name': 'Proxmox',
         'server': 'pvenode2',
         'pve_node': 'pvenode2',
+        'instance': PROD_PROXMOX_INSTANCE,
         'hosted_systems': 'jumphostvm & monitoringvm',
         'database': 'MySQL',
     },
@@ -49,8 +55,22 @@ PROXMOX_NODES = [
         'node_name': 'Proxmox',
         'server': 'pvenode3',
         'pve_node': 'pvenode3',
+        'instance': PROD_PROXMOX_INSTANCE,
         'hosted_systems': 'databasevm (MySQL / Pentana)',
         'database': 'MySQL',
+    },
+]
+
+# Proxmox DR Cluster Node monitored via pve_exporter (job="proxmox", module="dr", instance="192.168.81.51")
+PROXMOX_DR_NODES = [
+    {
+        'node_name': 'Proxmox DR',
+        'server': 'nmspvedr01',
+        'pve_node': 'nmspvedr01',
+        'instance': DR_PROXMOX_INSTANCE,
+        'hosted_systems': 'PBS, ebstest, nickledbdr, nickledbdrclone, nicklemysql',
+        'database': 'MySQL',
+        'is_dr': True,
     },
 ]
 
@@ -365,28 +385,30 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
       - Disk 3: local (Local Directory Storage - storage/pvenodeX/local)
     """
     pve_node = node_cfg['pve_node']
+    pve_inst = node_cfg.get('instance', PROD_PROXMOX_INSTANCE)
     node_id = f"node/{pve_node}"
+    is_dr = bool(node_cfg.get('is_dr', False))
 
     # Verify node exists in pve_up or pve_cpu_usage_ratio
-    cpu_res = query_prometheus(f'100 * pve_cpu_usage_ratio{{id="{node_id}",job="proxmox"}}', prometheus_url)
+    cpu_res = query_prometheus(f'100 * pve_cpu_usage_ratio{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url)
     if not cpu_res:
         return None
 
     cpu_pct = round(min(100.0, max(0.0, _extract_scalar(cpu_res, 0.0))), 2)
     logical_cpus = int(_extract_scalar(
-        query_prometheus(f'pve_cpu_usage_limit{{id="{node_id}",job="proxmox"}}', prometheus_url), 0.0
+        query_prometheus(f'pve_cpu_usage_limit{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
     ))
 
     # Check pve_up if present
-    up_res = query_prometheus(f'pve_up{{id="{node_id}",job="proxmox"}}', prometheus_url)
+    up_res = query_prometheus(f'pve_up{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url)
     is_up = (_extract_scalar(up_res, 1.0) >= 1.0) if up_res else True
 
     # Memory (GiB & %)
     mem_tot_bytes = _extract_scalar(
-        query_prometheus(f'pve_memory_size_bytes{{id="{node_id}",job="proxmox"}}', prometheus_url), 0.0
+        query_prometheus(f'pve_memory_size_bytes{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
     )
     mem_used_bytes = _extract_scalar(
-        query_prometheus(f'pve_memory_usage_bytes{{id="{node_id}",job="proxmox"}}', prometheus_url), 0.0
+        query_prometheus(f'pve_memory_usage_bytes{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
     )
     if mem_tot_bytes > 0:
         memory_total_gb = round(mem_tot_bytes / (1024 ** 3), 2)
@@ -399,31 +421,34 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
 
     # Uptime (days) & 30-day availability (%)
     uptime_sec = _extract_scalar(
-        query_prometheus(f'pve_uptime_seconds{{id="{node_id}",job="proxmox"}}', prometheus_url), 0.0
+        query_prometheus(f'pve_uptime_seconds{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
     )
     uptime_days = round(max(0.0, uptime_sec / 86400.0), 2)
 
-    avail_res = query_prometheus(f'100 * avg_over_time(pve_up{{id="{node_id}",job="proxmox"}}[30d])', prometheus_url)
+    avail_res = query_prometheus(f'100 * avg_over_time(pve_up{{id="{node_id}",job="proxmox",instance="{pve_inst}"}}[30d])', prometheus_url)
     if avail_res:
         uptime_pct = round(min(100.0, max(0.0, _extract_scalar(avail_res, 100.0))), 2)
     else:
         uptime_pct = 100.0 if (is_up and uptime_days > 0) else 0.0
 
     # Node-Local Storage Growth (GB & %) matching Grafana 'Storage Growth'
-    growth_gb_q = f'sum(delta(pve_disk_usage_bytes{{job="proxmox",id=~"storage/{pve_node}/(local|local-lvm)"}}[24h])) / (1024^3)'
+    growth_pool_regex = 'ssd_pool|largehdd_ppol|smallhdd_pool|local|local-lvm' if is_dr else 'local|local-lvm'
+    growth_gb_q = f'sum(delta(pve_disk_usage_bytes{{job="proxmox",instance="{pve_inst}",id=~"storage/{pve_node}/({growth_pool_regex})"}}[24h])) / (1024^3)'
     storage_growth_gb = round(_extract_scalar(query_prometheus(growth_gb_q, prometheus_url), 0.0), 2)
     growth_q = (
-        f'100 * sum(delta(pve_disk_usage_bytes{{job="proxmox",id=~"storage/{pve_node}/(local|local-lvm)"}}[24h])) '
-        f'/ sum(pve_disk_size_bytes{{job="proxmox",id=~"storage/{pve_node}/(local|local-lvm)"}})'
+        f'100 * sum(delta(pve_disk_usage_bytes{{job="proxmox",instance="{pve_inst}",id=~"storage/{pve_node}/({growth_pool_regex})"}}[24h])) '
+        f'/ sum(pve_disk_size_bytes{{job="proxmox",instance="{pve_inst}",id=~"storage/{pve_node}/({growth_pool_regex})"}})'
     )
     storage_growth_pct = round(_extract_scalar(query_prometheus(growth_q, prometheus_url), 0.0), 3)
 
     # Dynamically discover hosted guest VMs on this Proxmox node
-    guest_res = query_prometheus(f'pve_guest_info{{job="proxmox",node="{pve_node}"}}', prometheus_url)
+    guest_res = query_prometheus(f'pve_guest_info{{job="proxmox",instance="{pve_inst}",node="{pve_node}"}}', prometheus_url)
     if guest_res:
         guests = []
         for g in guest_res:
             gm = g.get('metric', {})
+            if gm.get('template') == '1':
+                continue
             gname = gm.get('name', '')
             gid = gm.get('id', '')
             if gname:
@@ -432,14 +457,14 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
     else:
         hosted_systems = node_cfg['hosted_systems']
 
-    # Fetch the 3 Proxmox storage pools for this node: VMSAN (NFS), local-lvm (LVM-Thin), local (Dir)
+    # Fetch Proxmox storage pools for this node
     def _get_pve_storage(storage_name, label):
         sid = f"storage/{pve_node}/{storage_name}"
         sz_bytes = _extract_scalar(
-            query_prometheus(f'pve_disk_size_bytes{{id="{sid}",job="proxmox"}}', prometheus_url), 0.0
+            query_prometheus(f'pve_disk_size_bytes{{id="{sid}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
         )
         us_bytes = _extract_scalar(
-            query_prometheus(f'pve_disk_usage_bytes{{id="{sid}",job="proxmox"}}', prometheus_url), 0.0
+            query_prometheus(f'pve_disk_usage_bytes{{id="{sid}",job="proxmox",instance="{pve_inst}"}}', prometheus_url), 0.0
         )
         sz_gb = round(sz_bytes / (1024 ** 3), 2)
         us_gb = round(us_bytes / (1024 ** 3), 2)
@@ -451,9 +476,24 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
             'percent': min(100.0, max(0.0, pct)),
         }
 
-    d1 = _get_pve_storage('VMSAN', 'VMSAN (Shared)')
-    d2 = _get_pve_storage('local-lvm', 'local-lvm (LVM-Thin)')
-    d3 = _get_pve_storage('local', 'local (Root / ISO)')
+    if is_dr:
+        d1 = _get_pve_storage('PBS-Backup', 'PBS-Backup (Shared)')
+        d2 = _get_pve_storage('ssd_pool', 'Ceph SSD (ssd_pool)')
+        hdd_large = _get_pve_storage('largehdd_ppol', 'largehdd')
+        hdd_small = _get_pve_storage('smallhdd_pool', 'smallhdd')
+        hdd_loc = _get_pve_storage('local', 'local')
+        d3_sz = round(hdd_large['size_gb'] + hdd_small['size_gb'] + hdd_loc['size_gb'], 2)
+        d3_us = round(hdd_large['used_gb'] + hdd_small['used_gb'] + hdd_loc['used_gb'], 2)
+        d3 = {
+            'type': 'Ceph HDD Pools (large/small/local)',
+            'size_gb': d3_sz,
+            'used_gb': d3_us,
+            'percent': round((d3_us / d3_sz) * 100.0, 2) if d3_sz > 0 else 0.0,
+        }
+    else:
+        d1 = _get_pve_storage('VMSAN', 'VMSAN (Shared)')
+        d2 = _get_pve_storage('local-lvm', 'local-lvm (LVM-Thin)')
+        d3 = _get_pve_storage('local', 'local (Root / ISO)')
 
     max_disk_pct = round(max(d1['percent'], d2['percent'], d3['percent']), 2)
 
@@ -465,7 +505,7 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
         status = 'Healthy'
 
     return {
-        'node_name': 'Proxmox',
+        'node_name': node_cfg.get('node_name', 'Proxmox'),
         'server': node_cfg['server'],
         'hosted_systems': hosted_systems,
         'database': node_cfg['database'],
@@ -501,13 +541,13 @@ def fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=None):
 
 
 
-def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
+def fetch_proxmox_vms_from_prometheus(prometheus_url=None, pve_instance=PROD_PROXMOX_INSTANCE, is_dr=False):
     """
-    Fetches live per-VM metrics from Proxmox VE Exporter (job="proxmox", id=~"qemu/.*")
-    for guest VMs (jumphostvm, monitoringvm, tomcatvm, databasevm) so VM rows reflect
-    their real allocated vCPUs, memory, CPU %, and uptime instead of host node fallbacks.
+    Fetches live per-VM metrics from Proxmox VE Exporter (job="proxmox", instance=pve_instance, id=~"qemu/.*")
+    so Prod (10.10.17.34) and DR (192.168.81.51) never collide on qemu/100..103 IDs.
     """
-    guest_info = query_prometheus('pve_guest_info{job="proxmox",id=~"qemu/.*"}', prometheus_url)
+    sel = f'job="proxmox",instance="{pve_instance}",id=~"qemu/.*"'
+    guest_info = query_prometheus(f'pve_guest_info{{{sel}}}', prometheus_url)
     if not guest_info:
         return []
 
@@ -524,15 +564,15 @@ def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
                     pass
         return out
 
-    up_map = _to_id_map('pve_up{job="proxmox",id=~"qemu/.*"}')
-    cpu_limit_map = _to_id_map('pve_cpu_usage_limit{job="proxmox",id=~"qemu/.*"}')
-    cpu_ratio_map = _to_id_map('pve_cpu_usage_ratio{job="proxmox",id=~"qemu/.*"}')
-    mem_size_map = _to_id_map('pve_memory_size_bytes{job="proxmox",id=~"qemu/.*"}')
-    mem_used_map = _to_id_map('pve_memory_usage_bytes{job="proxmox",id=~"qemu/.*"}')
-    disk_size_map = _to_id_map('pve_disk_size_bytes{job="proxmox",id=~"qemu/.*"}')
-    disk_used_map = _to_id_map('pve_disk_usage_bytes{job="proxmox",id=~"qemu/.*"}')
-    uptime_map = _to_id_map('pve_uptime_seconds{job="proxmox",id=~"qemu/.*"}')
-    avail_map = _to_id_map('100 * avg_over_time(pve_up{job="proxmox",id=~"qemu/.*"}[30d])')
+    up_map = _to_id_map(f'pve_up{{{sel}}}')
+    cpu_limit_map = _to_id_map(f'pve_cpu_usage_limit{{{sel}}}')
+    cpu_ratio_map = _to_id_map(f'pve_cpu_usage_ratio{{{sel}}}')
+    mem_size_map = _to_id_map(f'pve_memory_size_bytes{{{sel}}}')
+    mem_used_map = _to_id_map(f'pve_memory_usage_bytes{{{sel}}}')
+    disk_size_map = _to_id_map(f'pve_disk_size_bytes{{{sel}}}')
+    disk_used_map = _to_id_map(f'pve_disk_usage_bytes{{{sel}}}')
+    uptime_map = _to_id_map(f'pve_uptime_seconds{{{sel}}}')
+    avail_map = _to_id_map(f'100 * avg_over_time(pve_up{{{sel}}}[30d])')
 
     vm_payloads = []
     for g in guest_info:
@@ -541,7 +581,7 @@ def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
             continue
         vm_id = gm.get('id', '')
         vm_name = gm.get('name', '').strip()
-        pve_node = gm.get('node', '').strip() or 'Proxmox'
+        pve_node = gm.get('node', '').strip() or ('nmspvedr01' if is_dr else 'Proxmox')
         if not vm_id or not vm_name:
             continue
 
@@ -572,14 +612,23 @@ def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
         else:
             uptime_pct = 100.0 if (is_up and uptime_days > 0) else 0.0
 
-        if not is_up or cpu_pct >= 90 or memory_pct >= 90 or uptime_pct < 95:
+        if is_dr and not is_up:
+            status = 'Powered Off'
+            uptime_pct = 100.0
+        elif not is_up or cpu_pct >= 90 or memory_pct >= 90 or uptime_pct < 95:
             status = 'Critical'
         elif cpu_pct >= 75 or memory_pct >= 80 or uptime_pct < 99.0:
             status = 'Warning'
         else:
             status = 'Healthy'
 
-        db_name = 'MySQL' if 'database' in vm_name.lower() else 'Infrastructure'
+        vm_low = vm_name.lower()
+        if any(k in vm_low for k in ('database', 'nickledb', 'nicklemysql')):
+            db_name = 'MySQL'
+        elif 'ebs' in vm_low:
+            db_name = 'Oracle'
+        else:
+            db_name = 'Infrastructure'
 
         vm_payloads.append({
             'node_name': pve_node,
@@ -611,6 +660,95 @@ def fetch_proxmox_vms_from_prometheus(prometheus_url=None):
         })
 
     return vm_payloads
+
+
+def fetch_ceph_dr_from_prometheus(prometheus_url=None, instance=DR_CEPH_INSTANCE):
+    """
+    Fetches live Ceph DR cluster telemetry (job="ceph-dr", cluster="nmspvedrcluster")
+    including health status, active warnings (e.g. PG_DEGRADED), OSDs up, monitors in quorum,
+    total raw capacity, HDD device class raw capacity, and SSD device class raw capacity.
+    """
+    health_res = query_prometheus(f'ceph_health_status{{job="ceph-dr",instance="{instance}"}}', prometheus_url)
+    if not health_res:
+        return None
+
+    cluster_name = health_res[0].get('metric', {}).get('cluster', 'nmspvedrcluster')
+    health_code = int(_extract_scalar(health_res, 0.0))  # 0=OK, 1=WARN, 2=ERR
+
+    detail_res = query_prometheus(f'ceph_health_detail{{job="ceph-dr",instance="{instance}"}}', prometheus_url)
+    warn_flags = [d.get('metric', {}).get('name', '') for d in detail_res if d.get('metric', {}).get('name')]
+
+    osds_up = int(_extract_scalar(query_prometheus(f'sum(ceph_osd_up{{job="ceph-dr",instance="{instance}"}})', prometheus_url), 0.0))
+    osds_total = int(_extract_scalar(query_prometheus(f'count(ceph_osd_up{{job="ceph-dr",instance="{instance}"}})', prometheus_url), 0.0))
+    mons_up = int(_extract_scalar(query_prometheus(f'sum(ceph_mon_quorum_status{{job="ceph-dr",instance="{instance}"}})', prometheus_url), 0.0))
+
+    tot_bytes = _extract_scalar(query_prometheus(f'ceph_cluster_total_bytes{{job="ceph-dr",instance="{instance}"}}', prometheus_url), 0.0)
+    used_bytes = _extract_scalar(query_prometheus(f'ceph_cluster_total_used_bytes{{job="ceph-dr",instance="{instance}"}}', prometheus_url), 0.0)
+    hdd_tot = _extract_scalar(query_prometheus(f'ceph_cluster_by_class_total_bytes{{job="ceph-dr",instance="{instance}",device_class="hdd"}}', prometheus_url), 0.0)
+    hdd_used = _extract_scalar(query_prometheus(f'ceph_cluster_by_class_total_used_bytes{{job="ceph-dr",instance="{instance}",device_class="hdd"}}', prometheus_url), 0.0)
+    ssd_tot = _extract_scalar(query_prometheus(f'ceph_cluster_by_class_total_bytes{{job="ceph-dr",instance="{instance}",device_class="ssd"}}', prometheus_url), 0.0)
+    ssd_used = _extract_scalar(query_prometheus(f'ceph_cluster_by_class_total_used_bytes{{job="ceph-dr",instance="{instance}",device_class="ssd"}}', prometheus_url), 0.0)
+
+    def _gb(b):
+        return round(b / (1024 ** 3), 2)
+
+    def _pct(u, t):
+        return round((u / t) * 100.0, 2) if t > 0 else 0.0
+
+    d1_sz, d1_us = _gb(tot_bytes), _gb(used_bytes)
+    d2_sz, d2_us = _gb(hdd_tot), _gb(hdd_used)
+    d3_sz, d3_us = _gb(ssd_tot), _gb(ssd_used)
+    d1_pct, d2_pct, d3_pct = _pct(d1_us, d1_sz), _pct(d2_us, d2_sz), _pct(d3_us, d3_sz)
+
+    avail_pct = round(min(100.0, max(0.0, _extract_scalar(
+        query_prometheus(f'100 * avg_over_time(up{{job="ceph-dr",instance="{instance}"}}[30d])', prometheus_url), 100.0
+    ))), 2)
+
+    if health_code >= 2:
+        status = 'Critical'
+    elif health_code == 1 or max(d1_pct, d2_pct, d3_pct) >= 80:
+        status = 'Warning'
+    else:
+        status = 'Healthy'
+
+    health_lbl = 'HEALTH_OK' if health_code == 0 else ('HEALTH_WARN' if health_code == 1 else 'HEALTH_ERR')
+    warn_str = f" [{', '.join(warn_flags)}]" if warn_flags else ""
+    summary = f"{cluster_name} | {health_lbl}{warn_str} | {osds_up}/{osds_total} OSDs · {mons_up} Mon"
+
+    return {
+        'node_name': 'Ceph DR',
+        'server': 'ceph-dr',
+        'hosted_systems': summary[:255],
+        'database': 'Infrastructure',
+        'entered_by': 'Prometheus',
+        'uptime_percent': avail_pct,
+        'uptime_days': 0.0,
+        'logical_cpus': 0,
+        'cpu_percent': 0.0,
+        'memory_percent': 0.0,
+        'memory_total_gb': 0.0,
+        'memory_used_gb': 0.0,
+        'disk_percent': max(d1_pct, d2_pct, d3_pct),
+        'storage_growth_gb': 0.0,
+        'storage_growth_pct': 0.0,
+        'disk_1_type': f'Ceph Raw Cluster ({cluster_name})',
+        'disk_1_size_gb': d1_sz,
+        'disk_1_used_gb': d1_us,
+        'disk_1_percent': d1_pct,
+        'disk_2_type': 'Ceph HDD Class (Raw)',
+        'disk_2_size_gb': d2_sz,
+        'disk_2_used_gb': d2_us,
+        'disk_2_percent': d2_pct,
+        'disk_3_type': 'Ceph SSD Class (Raw)',
+        'disk_3_size_gb': d3_sz,
+        'disk_3_used_gb': d3_us,
+        'disk_3_percent': d3_pct,
+        'tablespace_percent': d1_pct,
+        'connections': osds_up,
+        'slow_queries': mons_up,
+        'threads': osds_total,
+        'status': status,
+    }
 
 def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_date=None):
     """
@@ -648,8 +786,24 @@ def sync_all_nodes_from_prometheus(prometheus_url=None, base_url=None, target_da
                 f"Proxmox node {node_cfg['server']}: No pve_exporter metrics returned from Prometheus."
             )
 
-    # 3. Fetch Proxmox Guest VMs (jumphostvm, monitoringvm, tomcatvm, databasevm)
-    all_payloads.extend(fetch_proxmox_vms_from_prometheus(prometheus_url=effective_url))
+    # 3. Fetch Prod Proxmox Guest VMs (instance="10.10.17.34")
+    all_payloads.extend(fetch_proxmox_vms_from_prometheus(prometheus_url=effective_url, pve_instance=PROD_PROXMOX_INSTANCE, is_dr=False))
+
+    # 4. Fetch DR Proxmox Node (nmspvedr01) & DR Guest VMs (instance="192.168.81.51")
+    for node_cfg in PROXMOX_DR_NODES:
+        data = fetch_proxmox_node_from_prometheus(node_cfg, prometheus_url=effective_url)
+        if data:
+            all_payloads.append(data)
+        else:
+            errors.append(
+                f"Proxmox DR node {node_cfg['server']}: No pve_exporter metrics returned from Prometheus."
+            )
+    all_payloads.extend(fetch_proxmox_vms_from_prometheus(prometheus_url=effective_url, pve_instance=DR_PROXMOX_INSTANCE, is_dr=True))
+
+    # 5. Fetch Ceph DR Cluster (job="ceph-dr", nmspvedrcluster)
+    ceph_data = fetch_ceph_dr_from_prometheus(prometheus_url=effective_url)
+    if ceph_data:
+        all_payloads.append(ceph_data)
 
     # Save/update records in ServerHealth
     for data in all_payloads:
@@ -921,13 +1075,13 @@ def scan_and_ingest_prometheus_outages(prometheus_url=None, lookback_hours=120):
     for cfg in PROXMOX_NODES:
         pnode = cfg['pve_node']
         try:
-            up_res = query_prometheus(f'pve_node_uptime{{id="node/{pnode}"}}', prometheus_url=effective_url)
+            up_res = query_prometheus(f'pve_node_uptime{{id="node/{pnode}",instance="{PROD_PROXMOX_INSTANCE}"}}', prometheus_url=effective_url)
             uptime_sec = _extract_scalar(up_res, 0.0)
             if 0 < uptime_sec < (lookback_hours * 3600):
                 boot_ts = now_ts - uptime_sec
                 range_url = f"{effective_url}/api/v1/query_range"
                 params = {
-                    'query': f'pve_up{{id="node/{pnode}"}}',
+                    'query': f'pve_up{{id="node/{pnode}",instance="{PROD_PROXMOX_INSTANCE}"}}',
                     'start': int(boot_ts - 86400),
                     'end': int(boot_ts),
                     'step': 30
