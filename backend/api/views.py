@@ -511,6 +511,7 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
         sh_long = int(getattr(latest_sh, 'long_running_queries', 0) or 0) if latest_sh else 0
         sh_cache = float(getattr(latest_sh, 'cache_hit_percent', 100.0) or 100.0) if latest_sh else 100.0
         sh_aborted = int(getattr(latest_sh, 'aborted_connections', 0) or 0) if latest_sh else 0
+        sh_txlog = float(getattr(latest_sh, 'tablespace_percent', 0.0) or 0.0) if (latest_sh and db_type == 'MS SQL Server') else 0.0
 
         if sh_conn_util >= 90.0 or sh_blocked >= 5 or sh_long >= 5 or (sh_max_conn > 0 and sh_cache < 90.0):
             perf_status = 'Critical'
@@ -554,6 +555,7 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
             'long_running_queries': sh_long,
             'cache_hit_percent': round(sh_cache, 2),
             'aborted_connections': sh_aborted,
+            'tx_log_percent': round(sh_txlog, 2),
             'perf_status': perf_status,
             'conn_headroom': max(0, sh_max_conn - sh_conn),
             'conn_threshold_val': int(round(sh_max_conn * 0.70)),
@@ -1200,6 +1202,16 @@ def dashboard(request):
             attention_items.append({
                 'type': 'danger' if item['slow_queries'] >= 5 else 'warning',
                 'message': f"PostgreSQL Transaction Bloat Risk: <strong>{item['slow_queries']}</strong> session(s) stuck idle-in-transaction &gt; 60s."
+            })
+        if p_db == 'MS SQL Server' and item.get('slow_queries', 0) > 0:
+            attention_items.append({
+                'type': 'danger' if item['slow_queries'] >= 5 else 'warning',
+                'message': f"MS SQL Server Deadlocks: <strong>{item['slow_queries']}</strong> deadlock(s) recorded since previous check."
+            })
+        if p_db == 'MS SQL Server' and item.get('tx_log_percent', 0.0) >= 80.0:
+            attention_items.append({
+                'type': 'danger' if item['tx_log_percent'] >= 90.0 else 'warning',
+                'message': f"MS SQL Server Transaction Log: Log space used at <strong>{item['tx_log_percent']}%</strong>."
             })
         
     # 8. Combined Recent Activity

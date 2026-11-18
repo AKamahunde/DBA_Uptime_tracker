@@ -806,7 +806,7 @@
                 <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.long_running_queries >= 5 %}#c5221f{% elif row.long_running_queries > 0 %}#b06000{% else %}#1e293b{% endif %}; margin-top: 0.25rem;">{{ row.long_running_queries }}</div>
             </div>
             <div>
-                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;" title="{% if selected_db == 'Oracle' %}Active non-RMAN long operations (&gt;10s){% elif selected_db == 'PostgreSQL' %}Sessions idle in transaction &gt; 60s (blocks vacuum &amp; holds locks){% else %}New slow queries since previous agent run{% endif %}">{% if selected_db == 'Oracle' %}Long Ops (&gt;10s){% elif selected_db == 'PostgreSQL' %}Idle in Tx (&gt;60s){% else %}Slow Queries (&Delta;){% endif %}</div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;" title="{% if selected_db == 'Oracle' %}Active non-RMAN long operations (&gt;10s){% elif selected_db == 'PostgreSQL' %}Sessions idle in transaction &gt; 60s (blocks vacuum &amp; holds locks){% elif selected_db == 'MS SQL Server' %}SQL Server deadlocks since previous check{% else %}New slow queries since previous agent run{% endif %}">{% if selected_db == 'Oracle' %}Long Ops (&gt;10s){% elif selected_db == 'PostgreSQL' %}Idle in Tx (&gt;60s){% elif selected_db == 'MS SQL Server' %}Deadlocks (&Delta;){% else %}Slow Queries (&Delta;){% endif %}</div>
                 <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.slow_queries > 0 %}#b06000{% else %}#1e293b{% endif %}; margin-top: 0.25rem;">{{ row.slow_queries }}</div>
             </div>
             <div>
@@ -814,7 +814,7 @@
                 <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.cache_hit_percent < 90 %}#c5221f{% elif row.cache_hit_percent < 95 %}#b06000{% else %}#137333{% endif %}; margin-top: 0.25rem;">{{ row.cache_hit_percent }}%</div>
             </div>
             <div>
-                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;" title="{% if selected_db == 'Oracle' %}User rollbacks since previous check{% elif selected_db == 'PostgreSQL' %}Transaction rollbacks + deadlocks since previous check{% else %}Failed/aborted connection attempts since previous check{% endif %}">{% if selected_db == 'Oracle' %}Rollbacks (&Delta;){% elif selected_db == 'PostgreSQL' %}Rollbacks / Deadlocks (&Delta;){% else %}Aborted Connects (&Delta;){% endif %}</div>
+                <div style="font-size: 0.72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;" title="{% if selected_db == 'Oracle' %}User rollbacks since previous check{% elif selected_db == 'PostgreSQL' %}Transaction rollbacks + deadlocks since previous check{% elif selected_db == 'MS SQL Server' %}SQL Server lock timeouts since previous check{% else %}Failed/aborted connection attempts since previous check{% endif %}">{% if selected_db == 'Oracle' %}Rollbacks (&Delta;){% elif selected_db == 'PostgreSQL' %}Rollbacks / Deadlocks (&Delta;){% elif selected_db == 'MS SQL Server' %}Lock Timeouts (&Delta;){% else %}Aborted Connects (&Delta;){% endif %}</div>
                 <div style="font-size: 1.45rem; font-weight: 700; color: {% if row.aborted_connections >= 20 %}#b06000{% else %}#1e293b{% endif %}; margin-top: 0.25rem;">{{ row.aborted_connections }}</div>
             </div>
         </div>

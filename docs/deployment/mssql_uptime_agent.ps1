@@ -10,14 +10,31 @@
     Uses Integrated Security to avoid hardcoding database passwords.
 #>
 
+param(
+    [switch]$Test,
+    [switch]$Prod,
+    [string]$Url = ""
+)
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
 $SqlServer      = "localhost"                           # SQL Server Instance Name (e.g. localhost or localhost\SQLEXPRESS)
-$ApiKey         = "uptimetracker_api_9f2c1d8e45x9"       # API Key configured in your web application env
+$ApiKey         = if ($env:REPLICATION_API_KEY) { $env:REPLICATION_API_KEY } else { "uptimetracker_api_9f2c1d8e45x9" }
 $ApiBaseUrl     = "http://192.168.35.38:90/api"         # Uptime Tracker base API URL
 $Hostname       = "Pentana"                             # Server name registered in dashboard
 $DbNameFilter   = "%Live%"                              # SQL LIKE filter to only track databases containing "Live"
+
+$TargetMode = "prod"
+if ($Url) {
+    $TargetMode = "custom"
+} elseif ($Test) {
+    $TargetMode = "test"
+} elseif ($Prod) {
+    $TargetMode = "prod"
+} elseif ($env:DBTRAC_ENV -and $env:DBTRAC_ENV.ToLower() -in @("test", "testing")) {
+    $TargetMode = "test"
+}
 
 # ============================================================
 # Helper: Send Data to API
@@ -35,12 +52,21 @@ function Send-PayloadToApi {
         "Content-Type" = "application/json"
         "X-API-KEY"    = $ApiKey
     }
-    $targetBases = @(
-        $ApiBaseUrl,
-        "http://dbtrac.nms.go.ug:90/api",
-        "https://dbtrac.nms.go.ug/api",
-        "http://dbtrac.nms.go.ug/api"
-    ) | Select-Object -Unique
+    if ($TargetMode -eq "custom") {
+        $targetBases = @($Url)
+    } elseif ($TargetMode -eq "test") {
+        $targetBases = @(
+            "http://dbtractest.nms.go.ug:91/api",
+            "http://192.168.35.38:91/api"
+        )
+    } else {
+        $targetBases = @(
+            $ApiBaseUrl,
+            "http://dbtrac.nms.go.ug:90/api",
+            "https://dbtrac.nms.go.ug/api",
+            "http://dbtrac.nms.go.ug/api"
+        ) | Select-Object -Unique
+    }
     foreach ($base in $targetBases) {
         $url = "$($base.TrimEnd('/'))/$($Endpoint.TrimStart('/'))"
         Write-Host "Sending payload to $url..."
@@ -106,23 +132,104 @@ WHERE bs.backup_finish_date > @LastBackupTime
 ORDER BY bs.backup_finish_date ASC;
 "@
 
-$connQuery = "SELECT COUNT(session_id) FROM sys.dm_exec_sessions WHERE is_user_process = 1;"
-$threadQuery = "SELECT COUNT(*) FROM sys.dm_os_threads;"
+$perfStateFile = Join-Path $ScriptDir "mssql_perf_state.json"
+
+$perfQuery = @"
+DECLARE @cfgMax INT = 0;
+SELECT @cfgMax = CAST(value_in_use AS INT) FROM sys.configurations WHERE name = 'user connections';
+DECLARE @maxConn INT = CASE WHEN @cfgMax > 0 THEN @cfgMax ELSE @@MAX_CONNECTIONS END;
+
+DECLARE @connCount INT = (SELECT COUNT(session_id) FROM sys.dm_exec_sessions WHERE is_user_process = 1);
+DECLARE @activeReq INT = (SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id > 50 AND status <> 'background');
+DECLARE @blockedReq INT = (SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id <> 0);
+DECLARE @longReq INT = (SELECT COUNT(*) FROM sys.dm_exec_requests WHERE session_id > 50 AND status <> 'background' AND total_elapsed_time > 10000);
+
+DECLARE @hitRatio DECIMAL(5,2) = 100.00;
+SELECT @hitRatio = COALESCE(CAST(
+    MAX(CASE WHEN counter_name = 'Buffer cache hit ratio' THEN CAST(cntr_value AS FLOAT) END) * 100.0 /
+    NULLIF(MAX(CASE WHEN counter_name = 'Buffer cache hit ratio base' THEN CAST(cntr_value AS FLOAT) END), 0)
+    AS DECIMAL(5,2)), 100.00)
+FROM sys.dm_os_performance_counters
+WHERE object_name LIKE '%Buffer Manager%'
+  AND counter_name IN ('Buffer cache hit ratio', 'Buffer cache hit ratio base');
+
+DECLARE @deadlocksTot BIGINT = 0;
+DECLARE @lockTimeoutsTot BIGINT = 0;
+SELECT @deadlocksTot = COALESCE(SUM(CAST(cntr_value AS BIGINT)), 0)
+FROM sys.dm_os_performance_counters
+WHERE counter_name = 'Number of Deadlocks/sec' AND instance_name = '_Total';
+SELECT @lockTimeoutsTot = COALESCE(SUM(CAST(cntr_value AS BIGINT)), 0)
+FROM sys.dm_os_performance_counters
+WHERE counter_name = 'Lock Timeouts/sec' AND instance_name = '_Total';
+
+DECLARE @logUsedPct DECIMAL(5,2) = 0.00;
+CREATE TABLE #LogSpace (DbName SYSNAME, LogSizeMB FLOAT, LogSpaceUsedPct FLOAT, Status INT);
+INSERT INTO #LogSpace EXEC('DBCC SQLPERF(LOGSPACE)');
+SELECT @logUsedPct = COALESCE(CAST(MAX(LogSpaceUsedPct) AS DECIMAL(5,2)), 0.00)
+FROM #LogSpace
+WHERE DbName LIKE @DbNameFilter;
+DROP TABLE #LogSpace;
+
+SELECT
+    @connCount AS conn_count,
+    @maxConn AS max_conn,
+    @activeReq AS active_req,
+    @blockedReq AS blocked_req,
+    @longReq AS long_req,
+    @hitRatio AS hit_ratio,
+    @deadlocksTot AS deadlocks_tot,
+    @lockTimeoutsTot AS lock_timeouts_tot,
+    @logUsedPct AS log_used_pct;
+"@
 
 $connectionsCount = 0
+$maxConnections = 0
 $threadsCount = 0
+$blockedCount = 0
+$longQueryCount = 0
+$cacheHitPct = 100.00
+$deadlocksDelta = 0
+$lockTimeoutsDelta = 0
+$logUsedPct = 0.00
 $maxBackupTime = [DateTime]$LastBackupTimeStr
 
 try {
     $connection.Open()
-    
-    # 1. Fetch Connection Stats
-    $cmdConn = New-Object System.Data.SqlClient.SqlCommand($connQuery, $connection)
-    $connectionsCount = [int]$cmdConn.ExecuteScalar()
 
-    # 2. Fetch OS Threads
-    $cmdThread = New-Object System.Data.SqlClient.SqlCommand($threadQuery, $connection)
-    $threadsCount = [int]$cmdThread.ExecuteScalar()
+    # 1. Fetch Real-Time SQL Server Performance & Saturation Stats
+    $cmdPerf = New-Object System.Data.SqlClient.SqlCommand($perfQuery, $connection)
+    $cmdPerf.Parameters.AddWithValue("@DbNameFilter", $DbNameFilter) | Out-Null
+    $perfReader = $cmdPerf.ExecuteReader()
+    if ($perfReader.Read()) {
+        $connectionsCount = [int]$perfReader["conn_count"]
+        $maxConnections = [int]$perfReader["max_conn"]
+        $threadsCount = [int]$perfReader["active_req"]
+        $blockedCount = [int]$perfReader["blocked_req"]
+        $longQueryCount = [int]$perfReader["long_req"]
+        $cacheHitPct = [Math]::Round([Math]::Min(100.0, [Math]::Max(0.0, [double]$perfReader["hit_ratio"])), 2)
+        $logUsedPct = [Math]::Round([Math]::Min(100.0, [Math]::Max(0.0, [double]$perfReader["log_used_pct"])), 2)
+
+        $currDeadlocks = [int64]$perfReader["deadlocks_tot"]
+        $currLockTimeouts = [int64]$perfReader["lock_timeouts_tot"]
+        $prevPerf = $null
+        if (Test-Path $perfStateFile) {
+            try { $prevPerf = Get-Content $perfStateFile -Raw | ConvertFrom-Json } catch { $prevPerf = $null }
+        }
+        if ($prevPerf) {
+            $pDl = [int64]$prevPerf.deadlocks_tot
+            $pLt = [int64]$prevPerf.lock_timeouts_tot
+            $deadlocksDelta = if ($currDeadlocks -ge $pDl) { [int]($currDeadlocks - $pDl) } else { [int]$currDeadlocks }
+            $lockTimeoutsDelta = if ($currLockTimeouts -ge $pLt) { [int]($currLockTimeouts - $pLt) } else { [int]$currLockTimeouts }
+        }
+        @{
+            deadlocks_tot = $currDeadlocks
+            lock_timeouts_tot = $currLockTimeouts
+            updated_at = (Get-Date).ToString("o")
+        } | ConvertTo-Json | Out-File $perfStateFile -Encoding utf8 -Force
+    }
+    $perfReader.Close()
+
+    Write-Host "[MSSQL PERF] Conn: $connectionsCount/$maxConnections | ActiveReq: $threadsCount | Blocked: $blockedCount | Long(>10s): $longQueryCount | Deadlocks(d): $deadlocksDelta | LockTimeouts(d): $lockTimeoutsDelta | CacheHit: $cacheHitPct% | TxLog: $logUsedPct%"
 
     # 3. Fetch Backup Sets
     $cmdBackup = New-Object System.Data.SqlClient.SqlCommand($backupQuery, $connection)
@@ -203,10 +310,16 @@ $cpuPercent = [Math]::Round($cpuLoad, 2)
 $os = Get-CimInstance Win32_OperatingSystem
 $totalRam = $os.TotalVisibleMemorySize
 $freeRam = $os.FreePhysicalMemory
+$ramTotalGb = [Math]::Round(($totalRam * 1024.0) / 1GB, 2)
+$ramUsedGb = [Math]::Round((($totalRam - $freeRam) * 1024.0) / 1GB, 2)
 $ramPercent = [Math]::Round((($totalRam - $freeRam) / $totalRam) * 100, 2)
+$logicalCpus = 0
+try { $logicalCpus = [int](Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors } catch { $logicalCpus = 0 }
 
 # 3. Disk Utilization (C:\ drive)
 $drive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+$diskTotalGb = [Math]::Round($drive.Size / 1GB, 2)
+$diskUsedGb = [Math]::Round(($drive.Size - $drive.FreeSpace) / 1GB, 2)
 $diskPercent = [Math]::Round((($drive.Size - $drive.FreeSpace) / $drive.Size) * 100, 2)
 
 # 4. OS Uptime (Days & Availability)
@@ -219,17 +332,30 @@ if ($bootTime) {
 
 # Create Server Health Payload
 $healthPayload = @{
-    server             = $Hostname
-    cpu_percent        = $cpuPercent
-    memory_percent     = $ramPercent
-    disk_percent       = $diskPercent
-    tablespace_percent = 0.00
-    connections        = $connectionsCount
-    slow_queries       = 0
-    threads            = $threadsCount
-    database           = "MS SQL Server"
-    uptime_days        = $uptimeDays
-    uptime_percent     = 100.00
+    server               = $Hostname
+    entered_by           = "Script"
+    logical_cpus         = $logicalCpus
+    cpu_percent          = $cpuPercent
+    memory_percent       = $ramPercent
+    memory_total_gb      = $ramTotalGb
+    memory_used_gb       = $ramUsedGb
+    disk_percent         = $diskPercent
+    disk_3_type          = "OS Volume (C:)"
+    disk_3_size_gb       = $diskTotalGb
+    disk_3_used_gb       = $diskUsedGb
+    disk_3_percent       = $diskPercent
+    tablespace_percent   = $logUsedPct
+    connections          = $connectionsCount
+    max_connections      = $maxConnections
+    slow_queries         = $deadlocksDelta
+    threads              = $threadsCount
+    blocked_queries      = $blockedCount
+    long_running_queries = $longQueryCount
+    cache_hit_percent    = $cacheHitPct
+    aborted_connections  = $lockTimeoutsDelta
+    database             = "MS SQL Server"
+    uptime_days          = $uptimeDays
+    uptime_percent       = 100.00
 }
 
 Write-Host "Sending Server Health Stats..."
@@ -306,7 +432,7 @@ END
                 database              = "MS SQL Server"
                 database_size_gb      = $dbSizeGb
                 disk_percent          = $diskPercent
-                tablespace_percent    = 0.00
+                tablespace_percent    = $logUsedPct
                 available_capacity_gb = $availableCapacityGb
                 largest_table         = $largestTable
             }
