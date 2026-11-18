@@ -31,13 +31,17 @@ Environment Variables:
 
   # Global Control
   - ALERT_ENABLED          : "true" / "false" (defaults to true)
+  - ALERT_COOLDOWN_MINUTES : Cross-worker alert deduplication cooldown in minutes (default: 240 = 4 hours)
+  - ALERT_MIN_SEVERITY     : Optional minimum severity filter: All (default), High, or Critical
   - DBTRAC_WEB_URL         : Base URL for dashboard links in emails (e.g. http://192.168.35.38:90)
 """
 
 import os
 import json
+import time
 import logging
 import smtplib
+import tempfile
 import threading
 import urllib.request
 import urllib.error
@@ -45,7 +49,14 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 logger = logging.getLogger(__name__)
+_ALERT_COOLDOWN_LOCK = threading.Lock()
+_SEVERITY_RANK = {"low": 1, "warning": 2, "high": 3, "critical": 4, "failed": 4}
 
 
 def _post_json(url, payload, headers=None, timeout=4):
@@ -244,17 +255,94 @@ def _load_env_fallback():
                 pass
 
 
-def dispatch_alert_async(title, details, severity="Critical", target=None, action_url=None):
+def _should_dispatch_with_cooldown(dedup_key, severity="Critical", cooldown_seconds=None):
+    """
+    Cross-worker alert gate backed by a shared temp JSON state file (+ fcntl lock on POSIX).
+    Prevents multi-worker Gunicorn duplicate emails and suppresses repeat firing within
+    ALERT_COOLDOWN_MINUTES (default 240 mins = 4 hours) unless severity escalates to Critical.
+    """
+    if not dedup_key:
+        return True
+
+    if cooldown_seconds is None:
+        try:
+            mins = float(os.environ.get("ALERT_COOLDOWN_MINUTES", "240"))
+        except ValueError:
+            mins = 240.0
+        cooldown_seconds = max(0.0, mins * 60.0)
+
+    state_path = os.path.join(tempfile.gettempdir(), "dbtrac_alert_cooldowns.json")
+    now_epoch = time.time()
+    new_rank = _SEVERITY_RANK.get(str(severity or "").lower(), 2)
+
+    with _ALERT_COOLDOWN_LOCK:
+        f_handle = None
+        try:
+            f_handle = open(state_path, "a+", encoding="utf-8")
+            if fcntl is not None:
+                fcntl.flock(f_handle.fileno(), fcntl.LOCK_EX)
+            f_handle.seek(0)
+            raw = f_handle.read().strip()
+            try:
+                state = json.loads(raw) if raw else {}
+            except Exception:
+                state = {}
+
+            entry = state.get(dedup_key)
+            if isinstance(entry, dict):
+                last_ts = float(entry.get("ts", 0))
+                last_rank = int(entry.get("rank", 2))
+                within_cooldown = (now_epoch - last_ts) < cooldown_seconds
+                escalated_to_critical = (new_rank >= 4 and last_rank < 4)
+                if within_cooldown and not escalated_to_critical:
+                    return False
+
+            # Prune stale entries older than 7 days to keep file tiny
+            cutoff = now_epoch - (7 * 86400)
+            state = {
+                k: v for k, v in state.items()
+                if isinstance(v, dict) and float(v.get("ts", 0)) >= cutoff
+            }
+            state[dedup_key] = {"ts": now_epoch, "rank": new_rank, "severity": str(severity)}
+
+            f_handle.seek(0)
+            f_handle.truncate()
+            json.dump(state, f_handle)
+            f_handle.flush()
+            return True
+        except Exception as exc:
+            logger.warning(f"[DBTRAC Alert] Cooldown store error ({exc}); allowing dispatch.")
+            return True
+        finally:
+            if f_handle is not None:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(f_handle.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                try:
+                    f_handle.close()
+                except Exception:
+                    pass
+
+
+def dispatch_alert_async(title, details, severity="Critical", target=None, action_url=None, dedup_key=None, cooldown_seconds=None):
     """
     Fires operational alert notifications across all configured channels
     (Email, Telegram, Webhook) in an isolated background daemon thread.
     Never blocks caller execution or web request cycles.
-    Silently no-ops if no alerting channels are configured.
+    Silently no-ops if no alerting channels are configured or alert is within cooldown.
     """
     _load_env_fallback()
     enabled = os.environ.get("ALERT_ENABLED", "true").lower() in ("true", "1", "yes")
     if not enabled:
         return
+
+    min_sev = os.environ.get("ALERT_MIN_SEVERITY", "All").strip().lower()
+    if min_sev in _SEVERITY_RANK:
+        cur_rank = _SEVERITY_RANK.get(str(severity or "").lower(), 2)
+        if cur_rank < _SEVERITY_RANK[min_sev]:
+            return
 
     email_host = os.environ.get("EMAIL_HOST")
     email_recipients = os.environ.get("ALERT_EMAIL_RECIPIENTS")
@@ -268,6 +356,9 @@ def dispatch_alert_async(title, details, severity="Critical", target=None, actio
 
     if not (has_email or has_telegram or has_webhook):
         return  # No alerting endpoints configured; dormant
+
+    if dedup_key and not _should_dispatch_with_cooldown(dedup_key, severity=severity, cooldown_seconds=cooldown_seconds):
+        return
 
     def _worker():
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

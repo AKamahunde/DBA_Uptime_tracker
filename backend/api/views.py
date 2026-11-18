@@ -1,5 +1,3 @@
-_LAST_CONN_ALERT = {}
-_LAST_PERF_ALERT = {}
 _LAST_CONN_PRUNE = {}
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
@@ -513,9 +511,9 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
         sh_aborted = int(getattr(latest_sh, 'aborted_connections', 0) or 0) if latest_sh else 0
         sh_txlog = float(getattr(latest_sh, 'tablespace_percent', 0.0) or 0.0) if (latest_sh and db_type == 'MS SQL Server') else 0.0
 
-        if sh_conn_util >= 90.0 or sh_blocked >= 5 or sh_long >= 5 or (sh_max_conn > 0 and sh_cache < 90.0):
+        if sh_conn_util >= 90.0 or sh_blocked >= 5 or sh_long >= 5 or (sh_max_conn > 0 and sh_cache < 85.0 and sh_threads >= 2):
             perf_status = 'Critical'
-        elif sh_conn_util >= 70.0 or sh_blocked > 0 or sh_long > 0 or (sh_max_conn > 0 and sh_cache < 95.0):
+        elif sh_conn_util >= 70.0 or sh_blocked >= 2 or sh_long >= 3 or (sh_max_conn > 0 and sh_cache < 92.0 and sh_threads >= 2):
             perf_status = 'Warning'
         else:
             perf_status = 'Healthy'
@@ -1183,22 +1181,22 @@ def dashboard(request):
                 'type': 'danger' if item['conn_util_pct'] >= 90.0 else 'warning',
                 'message': f"{p_db} Connection Pool: Active sessions at <strong>{item['connections']} / {item['max_connections']} ({item['conn_util_pct']}%)</strong>."
             })
-        if item.get('blocked_queries', 0) > 0:
+        if item.get('blocked_queries', 0) >= 2:
             attention_items.append({
                 'type': 'danger' if item['blocked_queries'] >= 5 else 'warning',
                 'message': f"{p_db} Lock Contention: <strong>{item['blocked_queries']}</strong> blocked session(s) waiting on locks."
             })
-        if item.get('long_running_queries', 0) > 0:
+        if item.get('long_running_queries', 0) >= 3:
             attention_items.append({
                 'type': 'danger' if item['long_running_queries'] >= 5 else 'warning',
                 'message': f"{p_db} Query Latency: <strong>{item['long_running_queries']}</strong> active query(ies) running &gt; 10s."
             })
-        if item.get('max_connections', 0) > 0 and item.get('cache_hit_percent', 100.0) < 95.0:
+        if item.get('max_connections', 0) > 0 and item.get('threads_running', 0) >= 2 and item.get('cache_hit_percent', 100.0) < 92.0:
             attention_items.append({
-                'type': 'danger' if item['cache_hit_percent'] < 90.0 else 'warning',
-                'message': f"{p_db} Buffer Cache: Hit ratio dropped to <strong>{item['cache_hit_percent']}%</strong> (&lt; 95% threshold)."
+                'type': 'danger' if item['cache_hit_percent'] < 85.0 else 'warning',
+                'message': f"{p_db} Buffer Cache: Hit ratio dropped to <strong>{item['cache_hit_percent']}%</strong> (&lt; 92% threshold)."
             })
-        if p_db == 'PostgreSQL' and item.get('slow_queries', 0) > 0:
+        if p_db == 'PostgreSQL' and item.get('slow_queries', 0) >= 2:
             attention_items.append({
                 'type': 'danger' if item['slow_queries'] >= 5 else 'warning',
                 'message': f"PostgreSQL Transaction Bloat Risk: <strong>{item['slow_queries']}</strong> session(s) stuck idle-in-transaction &gt; 60s."
@@ -6699,7 +6697,9 @@ def replication_ingest(request):
                     title=f"Replication Alert: {data.get('database', 'MySQL')}",
                     details=f"Master: {replication.master} -> Replica: {replication.replica}\nIO: {io_thread} | SQL: {sql_thread} | Lag: {seconds_behind}s\nError: {last_error or 'Threads stopped'}",
                     severity=severity,
-                    target=f"{data.get('database', 'MySQL')} ({replication.replica})"
+                    target=f"{data.get('database', 'MySQL')} ({replication.replica})",
+                    action_url=f"/?database_select={data.get('database', 'MySQL')}",
+                    dedup_key=f"replication:{data.get('database', 'MySQL')}:{replication.replica}"
                 )
             except Exception:
                 pass
@@ -6797,17 +6797,18 @@ def server_health_ingest(request):
         cache_hit_percent = round(min(100.0, max(0.0, float(data.get('cache_hit_percent', 100.0)))), 2)
         aborted_connections = int(data.get('aborted_connections', 0))
 
+        active_threads_val = int(data.get('threads', 0))
         status = 'Healthy'
         if (
             cpu > 90 or memory > 90 or disk > 90 or uptime_pct < 99.0 or conn_util_pct >= 90.0
             or blocked_queries >= 5 or long_running_queries >= 5
-            or (max_connections > 0 and cache_hit_percent < 90.0)
+            or (max_connections > 0 and active_threads_val >= 2 and cache_hit_percent < 85.0)
         ):
             status = 'Critical'
         elif (
             cpu > 75 or memory > 80 or disk > 80 or uptime_pct < 99.9 or conn_util_pct >= 70.0
-            or blocked_queries > 0 or long_running_queries > 0
-            or (max_connections > 0 and cache_hit_percent < 95.0)
+            or blocked_queries >= 2 or long_running_queries >= 3
+            or (max_connections > 0 and active_threads_val >= 2 and cache_hit_percent < 92.0)
         ):
             status = 'Warning'
             
@@ -6917,73 +6918,53 @@ def server_health_ingest(request):
                     **fields_map_fallback
                 )
 
-        def _throttled_dispatch(cache_dict, alert_sev, title, details):
-            now_ts = datetime.now()
-            last_info = cache_dict.get(server_name)
-            if last_info:
-                last_ts, last_sev = last_info
-                if (now_ts - last_ts).total_seconds() < 1800 and not (alert_sev == 'Critical' and last_sev != 'Critical'):
-                    return
-            try:
-                from api.alerts import dispatch_alert_async
-                cache_dict[server_name] = (now_ts, alert_sev)
-                dispatch_alert_async(
-                    title=title,
-                    details=details,
-                    severity=alert_sev,
-                    target=f"{db_name} ({server_name})",
-                    action_url=f"/?database_select={db_name}"
-                )
-            except Exception:
-                pass
+        # Consolidated DB Engine Health & Contention Alerting (cross-worker shared cooldown in api.alerts)
+        if not server_name.lower().startswith('ccis-vm'):
+            alert_lines = []
+            alert_sev = None
 
-        # Proactive Connection Pool Saturation Alerting (>= 70% of max_connections)
-        if conn_util_pct >= 70.0:
-            conn_sev = "Critical" if conn_util_pct >= 90.0 else "High"
-            thresh_70 = int(round(max_connections * 0.70))
-            _throttled_dispatch(
-                _LAST_CONN_ALERT,
-                conn_sev,
-                f"{db_name} Connection Pool Saturation: {server_name}",
-                (
-                    f"Host / Server: {server_name}\n"
-                    f"Database Engine: {db_name}\n"
-                    f"Active Connections: {connections} / {max_connections} ({conn_util_pct}%)\n"
-                    f"Alert Threshold: 70% (~{thresh_70} connections)\n"
-                    f"Severity: {'CRITICAL (>= 90% Pool Exhaustion Risk)' if conn_util_pct >= 90.0 else 'WARNING (>= 70% Saturation)'}\n\n"
-                    f"Immediate DBA Action: Inspect active client threads, application connection pooling, or query locking before max_connections ({max_connections}) is exhausted."
-                ),
-            )
+            def _escalate(sev):
+                nonlocal alert_sev
+                if sev == "Critical" or alert_sev is None:
+                    alert_sev = sev
 
-        # Proactive DB Engine Contention Alerting (Locks, Long Queries, Low Cache Hit)
-        perf_issues = []
-        perf_sev = None
-        if blocked_queries > 0:
-            perf_issues.append(f"Blocked / Lock-Waiting Sessions: {blocked_queries}")
-            perf_sev = "Critical" if blocked_queries >= 5 else "High"
-        if long_running_queries >= 3:
-            perf_issues.append(f"Active Long-Running Queries (>10s): {long_running_queries}")
-            if long_running_queries >= 5 or perf_sev != "Critical":
-                perf_sev = "Critical" if long_running_queries >= 5 else "High"
-        if max_connections > 0 and cache_hit_percent < 95.0:
-            perf_issues.append(f"Buffer Cache Hit Ratio: {cache_hit_percent}% (< 95% threshold)")
-            if cache_hit_percent < 90.0:
-                perf_sev = "Critical"
-            elif perf_sev is None:
-                perf_sev = "High"
-        if perf_issues and perf_sev:
-            _throttled_dispatch(
-                _LAST_PERF_ALERT,
-                perf_sev,
-                f"{db_name} Engine Performance Alert: {server_name}",
-                (
-                    f"Host / Server: {server_name}\n"
-                    f"Database Engine: {db_name}\n"
-                    + "\n".join(perf_issues)
-                    + f"\nRunning Threads: {fields_map['threads']} | Aborted Connects (delta): {aborted_connections}\n\n"
-                    f"Recommended DBA Action: Inspect SHOW PROCESSLIST / INNODB_TRX lock chains and buffer pool sizing."
-                ),
-            )
+            if conn_util_pct >= 70.0 and max_connections > 0:
+                thresh_70 = int(round(max_connections * 0.70))
+                alert_lines.append(f"Connection Pool Saturation: {connections} / {max_connections} ({conn_util_pct}%, 70% threshold ~{thresh_70})")
+                _escalate("Critical" if conn_util_pct >= 90.0 else "High")
+            if blocked_queries >= 2:
+                alert_lines.append(f"Blocked / Lock-Waiting Sessions: {blocked_queries}")
+                _escalate("Critical" if blocked_queries >= 5 else "High")
+            if long_running_queries >= 5:
+                alert_lines.append(f"Active Long-Running Queries (>10s): {long_running_queries}")
+                _escalate("Critical" if long_running_queries >= 10 else "High")
+            if max_connections > 0 and active_threads_val >= 2 and cache_hit_percent < 85.0:
+                alert_lines.append(f"Buffer Cache Hit Ratio: {cache_hit_percent}% (< 85% threshold)")
+                _escalate("Critical" if cache_hit_percent < 75.0 else "High")
+
+            if alert_lines and alert_sev:
+                try:
+                    from api.alerts import dispatch_alert_async
+                    if conn_util_pct >= 70.0 and len(alert_lines) == 1:
+                        alert_title = f"{db_name} Connection Pool Saturation: {server_name}"
+                    else:
+                        alert_title = f"{db_name} Engine Alert ({len(alert_lines)} issue{'s' if len(alert_lines) > 1 else ''}): {server_name}"
+                    dispatch_alert_async(
+                        title=alert_title,
+                        details=(
+                            f"Host / Server: {server_name}\n"
+                            f"Database Engine: {db_name}\n"
+                            + "\n".join(alert_lines)
+                            + f"\nRunning Threads: {fields_map['threads']} | Slow Queries/Deadlocks (d): {fields_map['slow_queries']} | Aborted/Rollbacks (d): {aborted_connections}\n\n"
+                            f"Recommended DBA Action: Inspect active sessions, lock chains, and connection pooling on {server_name}."
+                        ),
+                        severity=alert_sev,
+                        target=f"{db_name} ({server_name})",
+                        action_url=f"/?database_select={db_name}",
+                        dedup_key=f"dbhealth:{db_name}:{server_name}",
+                    )
+                except Exception:
+                    pass
 
         # Enforce 6-month (180-day) retention policy for ingested telemetry (throttled once per day per server)
         if max_connections > 0 or 'connections' in data:
@@ -7275,7 +7256,9 @@ def incident_ingest(request):
                     title=f"Unplanned Outage: {system or db_type}",
                     details=f"Target: {system or db_type}\nWindow: {start_str} to {end_str}\nDuration: {duration_hrs}h",
                     severity="Critical",
-                    target=system or db_type
+                    target=system or db_type,
+                    action_url=f"/?database_select={db_type}" if category == 'Database' else None,
+                    dedup_key=f"outage:{category}:{system or db_type}"
                 )
             except Exception:
                 pass

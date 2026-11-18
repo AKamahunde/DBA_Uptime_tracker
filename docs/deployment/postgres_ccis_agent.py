@@ -387,7 +387,7 @@ def collect_postgres_metrics(cid):
     sql_stat = (
         "SELECT COALESCE(SUM(blks_hit), 0), COALESCE(SUM(blks_read), 0), "
         "COALESCE(SUM(xact_rollback), 0), COALESCE(SUM(deadlocks), 0) "
-        "FROM pg_stat_database;"
+        "FROM pg_stat_database WHERE datname NOT IN ('template0', 'template1');"
     )
     rc_s, out_s, _ = _psql_exec(cid, sql_stat)
     if rc_s == 0 and "|" in out_s:
@@ -518,7 +518,7 @@ def main():
         status = "Critical"
     elif (
         host["disk_pct"] >= 75.0 or host["mem_pct"] >= 80.0
-        or conn_util >= 70.0 or pg["blocked_queries"] > 0 or pg["long_running_queries"] > 0 or pg["slow_queries"] > 0
+        or conn_util >= 70.0 or pg["blocked_queries"] >= 2 or pg["long_running_queries"] >= 3 or pg["slow_queries"] >= 2
     ):
         status = "Warning"
 
@@ -572,6 +572,7 @@ def main():
         "tablespace_percent": host["disk_pct"],
         **pg_perf_fields,
     }
+    vm_health_payload.update({"max_connections": 0, "blocked_queries": 0, "long_running_queries": 0, "slow_queries": 0, "cache_hit_percent": 100.0, "aborted_connections": 0, "threads": cont["pids"]})
     vm_code, vm_resp = _post_json("/api/health/ingest/", vm_health_payload)
     print(f"[OK] Host VM ServerHealth ingest: HTTP {vm_code} -> {vm_resp}")
 
