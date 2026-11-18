@@ -2,13 +2,16 @@
 """
 Oracle Direct Database Monitoring Agent for Uptime Tracker.
 Connects directly to the Oracle database instance (nmsinfra.nms.go.ug:1530 / INFRA) to collect:
+0. Live Oracle engine performance metrics (SESSIONS/PROCESSES, locks, long SQL, cache hit, rollbacks, FRA).
 1. Oracle RMAN Backup history (from v$rman_backup_job_details).
 2. Database capacity sizes & tablespace utilization (from dba_data_files/dba_free_space).
+Supports lightweight 1-hour health-only checks (--health-only via `0 * * * *` cron or `--watch --interval 3600`).
 Sends the JSON data to the Uptime Tracker web API.
 """
 
 import os
 import sys
+import time
 import json
 import tempfile
 import urllib.request
@@ -350,6 +353,8 @@ if __name__ == "__main__":
     parser.add_argument("--both", action="store_true", help="Send metrics to BOTH Test (:91) and Prod (:90)")
     parser.add_argument("--url", default=None, help="Custom DBTRAC API base URL")
     parser.add_argument("--health-only", action="store_true", help="Only send Oracle instance health/performance metrics (skip backups & capacity)")
+    parser.add_argument("--watch", action="store_true", help="Run continuously on --interval seconds (default: 3600s / 1 hour)")
+    parser.add_argument("--interval", type=int, default=3600, help="Polling interval in seconds when using --watch (default: 3600 = 1 hour)")
 
     args = parser.parse_args()
     lookback_days = args.days
@@ -367,6 +372,37 @@ if __name__ == "__main__":
         target_mode = 'both' if env_mode in ("both", "dual") else ('test' if env_mode in ("test", "testing") else 'prod')
 
     print(f"Starting Oracle Direct DB Agent (Mode: {target_mode}, Lookback: {lookback_days} days)...")
+
+    if args.watch:
+        poll_secs = max(60, int(args.interval or 3600))
+        print(f"Watch mode active: collecting Oracle health metrics every {poll_secs}s ({round(poll_secs / 3600.0, 2)}h). Press Ctrl+C to stop.")
+        while True:
+            w_conn = w_cur = None
+            try:
+                w_conn, w_cur = connect_to_database(args.user, args.password, args.host, args.port, db_sid=args.sid, db_service=args.service)
+                perf_payload = collect_oracle_performance_metrics(w_cur, sid_name=args.sid or args.service or "INFRA")
+                print(f"Oracle Performance Payload: {json.dumps(perf_payload, indent=2)}")
+                send_to_api("health/ingest/", perf_payload, mode=target_mode, custom_url=args.url)
+            except KeyboardInterrupt:
+                print("\nStopped by user.")
+                break
+            except Exception as watch_err:
+                print(f"Error in watch cycle: {watch_err}")
+            finally:
+                try:
+                    if w_cur:
+                        w_cur.close()
+                    if w_conn:
+                        w_conn.close()
+                except Exception:
+                    pass
+            try:
+                time.sleep(poll_secs)
+            except KeyboardInterrupt:
+                print("\nStopped by user.")
+                break
+        sys.exit(0)
+
     conn, cursor = connect_to_database(args.user, args.password, args.host, args.port, db_sid=args.sid, db_service=args.service)
 
     # --------------------------------------------------------
