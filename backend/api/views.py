@@ -481,7 +481,13 @@ def _get_dashboard_data(reporting_month, start_date=None, end_date=None):
         target_pct = float(sla_config_record.sla_percent) if (sla_config_record and sla_config_record.sla_percent) else 99.95
 
         try:
-            latest_sh = ServerHealth.objects.filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
+            latest_sh = (
+                ServerHealth.objects.filter(database__icontains=db_type, max_connections__gt=0)
+                .order_by('-date', '-updated_at', '-id')
+                .first()
+            )
+            if not latest_sh:
+                latest_sh = ServerHealth.objects.filter(database__icontains=db_type).order_by('-date', '-updated_at', '-id').first()
             if not latest_sh and db_type == 'MySQL':
                 latest_sh = ServerHealth.objects.filter(server__icontains='nickledb').order_by('-date', '-updated_at', '-id').first()
         except Exception:

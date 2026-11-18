@@ -10,6 +10,7 @@ Sends the JSON data to the Uptime Tracker web API.
 import os
 import sys
 import json
+import tempfile
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
@@ -24,8 +25,20 @@ DB_SERVICE_NAME = ""                     # Service Name (blank connects directly
 DB_USER         = "sys"                  # Database admin user
 DB_PASS         = os.environ.get("DB_PASS") or os.environ.get("ORACLE_PASSWORD") or os.environ.get("OEM_PASSWORD", "")
 
-API_KEY         = "uptimetracker_api_9f2c1d8e45x9"
+API_KEY         = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 API_BASE_URL    = "http://192.168.35.38:90/api"
+
+DEFAULT_PROD_URLS = [
+    API_BASE_URL.rstrip('/'),
+    "http://dbtrac.nms.go.ug:90/api",
+    "https://dbtrac.nms.go.ug/api",
+    "http://dbtrac.nms.go.ug/api",
+]
+
+DEFAULT_TEST_URLS = [
+    "http://dbtractest.nms.go.ug:91/api",
+    "http://192.168.35.38:91/api",
+]
 
 # ============================================================
 # Connect to Oracle DB Directly
@@ -95,30 +108,211 @@ def connect_to_database(db_user, db_pass, db_host, db_port, db_sid=None, db_serv
 # ============================================================
 # Helper: Send payload to API
 # ============================================================
-def send_to_api(endpoint, payload):
-    target_bases = list(dict.fromkeys([
-        API_BASE_URL.rstrip('/'),
-        "http://dbtrac.nms.go.ug:90/api",
-        "https://dbtrac.nms.go.ug/api",
-        "http://dbtrac.nms.go.ug/api",
-    ]))
+def _post_to_base_list(endpoint, payload, base_urls, label="Target"):
     data = json.dumps(payload).encode('utf-8')
     ep_clean = endpoint.lstrip('/')
-    for base_url in target_bases:
-        url = f"{base_url}/{ep_clean}"
+    seen = set()
+    for base_url in base_urls:
+        b = base_url.rstrip('/')
+        if not b or b in seen:
+            continue
+        seen.add(b)
+        url = f"{b}/{ep_clean}"
         req = urllib.request.Request(url, data=data)
         req.add_header('Content-Type', 'application/json')
         req.add_header('X-API-KEY', API_KEY)
         try:
             response = urllib.request.urlopen(req, timeout=8)
-            print(f"[{url}] Success sending to {endpoint}: {response.read().decode('utf-8')}")
-            break
+            print(f"[{label} - {url}] Success sending to {endpoint}: {response.read().decode('utf-8')}")
+            return True
         except urllib.error.HTTPError as e:
-            print(f"[{url}] HTTP Error {e.code} on {endpoint}: {e.read().decode('utf-8', errors='ignore')}")
+            print(f"[{label} - {url}] HTTP Error {e.code} on {endpoint}: {e.read().decode('utf-8', errors='ignore')}")
             if e.code in (400, 401, 403):
-                break
+                return False
         except Exception as e:
-            print(f"[{url}] Unreachable ({e}), trying fallback...")
+            print(f"[{label} - {url}] Unreachable ({e}), trying fallback...")
+    return False
+
+
+def send_to_api(endpoint, payload, mode='prod', custom_url=None):
+    if custom_url:
+        _post_to_base_list(endpoint, payload, [custom_url.rstrip('/')], label="Custom")
+        return
+    if mode == 'both':
+        _post_to_base_list(endpoint, payload, DEFAULT_TEST_URLS, label="TEST (:91)")
+        _post_to_base_list(endpoint, payload, DEFAULT_PROD_URLS, label="PROD (:90)")
+    elif mode == 'test':
+        _post_to_base_list(endpoint, payload, DEFAULT_TEST_URLS, label="TEST (:91)")
+    else:
+        _post_to_base_list(endpoint, payload, DEFAULT_PROD_URLS, label="PROD (:90)")
+
+
+def _get_oracle_state_path(sid_name):
+    safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in (sid_name or "INFRA"))
+    return os.path.join(tempfile.gettempdir(), f"dbtrac_oracle_perf_{safe_sid}.json")
+
+
+def _load_oracle_state(path):
+    try:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def _save_oracle_state(path, state):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+
+
+def collect_oracle_performance_metrics(cursor, sid_name="INFRA"):
+    """
+    Collects real-time Oracle instance performance telemetry (at CDB/root scope):
+      - v$resource_limit (SESSIONS & PROCESSES current vs limit)
+      - v$session (active user sessions, blocking lock chains, queries > 10s)
+      - v$session_longops (active long non-RMAN operations > 10s)
+      - v$sysstat (Buffer Cache Hit Ratio delta & user rollbacks delta)
+      - v$recovery_file_dest (Fast Recovery Area utilization %)
+    """
+    connections = 0
+    max_connections = 0
+    try:
+        cursor.execute("""
+            SELECT LOWER(resource_name), current_utilization, limit_value
+            FROM v$resource_limit
+            WHERE LOWER(resource_name) IN ('sessions', 'processes')
+        """)
+        best_pct = -1.0
+        for r_name, curr_u, lim_raw in cursor.fetchall():
+            try:
+                curr_i = int(curr_u or 0)
+                lim_str = str(lim_raw or "").strip()
+                if not lim_str.isdigit():
+                    continue
+                lim_i = int(lim_str)
+                pct = (curr_i / lim_i * 100.0) if lim_i > 0 else 0.0
+                if pct > best_pct or (pct == best_pct and r_name == 'sessions'):
+                    best_pct = pct
+                    connections = curr_i
+                    max_connections = lim_i
+            except (TypeError, ValueError):
+                pass
+    except Exception as e:
+        print(f"Warning: v$resource_limit query failed: {e}")
+
+    active_sessions = 0
+    blocked_queries = 0
+    long_running_queries = 0
+    try:
+        cursor.execute("""
+            SELECT
+                COUNT(CASE WHEN type = 'USER' AND status = 'ACTIVE' THEN 1 END),
+                COUNT(CASE WHEN blocking_session IS NOT NULL THEN 1 END),
+                COUNT(CASE WHEN type = 'USER' AND status = 'ACTIVE' AND wait_class <> 'Idle' AND last_call_et > 10 THEN 1 END)
+            FROM v$session
+        """)
+        s_row = cursor.fetchone()
+        if s_row:
+            active_sessions = int(s_row[0] or 0)
+            blocked_queries = int(s_row[1] or 0)
+            long_running_queries = int(s_row[2] or 0)
+    except Exception as e:
+        print(f"Warning: v$session query failed: {e}")
+
+    long_ops = 0
+    try:
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM v$session_longops
+            WHERE totalwork > 0 AND sofar < totalwork AND elapsed_seconds > 10
+              AND UPPER(opname) NOT LIKE 'RMAN%'
+        """)
+        l_row = cursor.fetchone()
+        if l_row:
+            long_ops = int(l_row[0] or 0)
+    except Exception as e:
+        print(f"Warning: v$session_longops query failed: {e}")
+
+    sysstat_vals = {}
+    try:
+        cursor.execute("""
+            SELECT name, value
+            FROM v$sysstat
+            WHERE name IN ('db block gets', 'consistent gets', 'physical reads', 'user rollbacks')
+        """)
+        for s_name, s_val in cursor.fetchall():
+            sysstat_vals[str(s_name)] = int(s_val or 0)
+    except Exception as e:
+        print(f"Warning: v$sysstat query failed: {e}")
+
+    state_path = _get_oracle_state_path(sid_name)
+    prev = _load_oracle_state(state_path)
+
+    def _delta(key):
+        curr_v = int(sysstat_vals.get(key, 0))
+        if key not in prev:
+            return None
+        prev_v = int(prev.get(key, 0))
+        return max(0, curr_v - prev_v) if curr_v >= prev_v else max(0, curr_v)
+
+    d_db_gets = _delta('db block gets')
+    d_cons_gets = _delta('consistent gets')
+    d_phys = _delta('physical reads')
+    d_rollbacks = _delta('user rollbacks')
+
+    if d_db_gets is not None and d_cons_gets is not None and d_phys is not None and (d_db_gets + d_cons_gets) > 0:
+        logical_reads = d_db_gets + d_cons_gets
+        cache_hit_pct = round(max(0.0, min(100.0, (1.0 - (d_phys / float(logical_reads))) * 100.0)), 2)
+    else:
+        tot_logical = int(sysstat_vals.get('db block gets', 0)) + int(sysstat_vals.get('consistent gets', 0))
+        tot_phys = int(sysstat_vals.get('physical reads', 0))
+        if tot_logical > 0:
+            cache_hit_pct = round(max(0.0, min(100.0, (1.0 - (tot_phys / float(tot_logical))) * 100.0)), 2)
+        else:
+            cache_hit_pct = 100.00
+
+    rollbacks_delta = int(d_rollbacks) if d_rollbacks is not None else 0
+
+    if sysstat_vals:
+        _save_oracle_state(state_path, {**sysstat_vals, "updated_at": datetime.now().isoformat()})
+
+    fra_used_pct = 0.0
+    try:
+        cursor.execute("""
+            SELECT ROUND(GREATEST(0, space_used - space_reclaimable) / NULLIF(space_limit, 0) * 100, 2)
+            FROM v$recovery_file_dest
+            WHERE ROWNUM = 1
+        """)
+        f_row = cursor.fetchone()
+        if f_row and f_row[0] is not None:
+            fra_used_pct = round(min(100.0, max(0.0, float(f_row[0]))), 2)
+    except Exception as e:
+        print(f"Warning: v$recovery_file_dest query failed: {e}")
+
+    return {
+        "server": "nmsinfra (DB)",
+        "database": "Oracle",
+        "node_name": "OLKVM",
+        "entered_by": "Script",
+        "uptime_percent": 100.0,
+        "cpu_percent": 0.0,
+        "memory_percent": 0.0,
+        "disk_percent": fra_used_pct,
+        "tablespace_percent": fra_used_pct,
+        "connections": connections,
+        "max_connections": max_connections,
+        "threads": active_sessions,
+        "slow_queries": long_ops,
+        "blocked_queries": blocked_queries,
+        "long_running_queries": long_running_queries,
+        "cache_hit_percent": cache_hit_pct,
+        "aborted_connections": rollbacks_delta,
+    }
 
 def format_size(bytes_val):
     if not bytes_val:
@@ -151,12 +345,46 @@ if __name__ == "__main__":
     parser.add_argument("-P", "--port", type=int, default=DB_PORT, help="Database port")
     parser.add_argument("-S", "--sid", default=DB_SID, help="Database SID")
     parser.add_argument("-s", "--service", default=DB_SERVICE_NAME, help="Database Service Name (PDB name)")
-    
+    parser.add_argument("--test", action="store_true", help="Send metrics to Test DBTRAC (dbtractest:91)")
+    parser.add_argument("--prod", action="store_true", help="Send metrics to Prod DBTRAC (dbtrac:90) [Default]")
+    parser.add_argument("--both", action="store_true", help="Send metrics to BOTH Test (:91) and Prod (:90)")
+    parser.add_argument("--url", default=None, help="Custom DBTRAC API base URL")
+    parser.add_argument("--health-only", action="store_true", help="Only send Oracle instance health/performance metrics (skip backups & capacity)")
+
     args = parser.parse_args()
     lookback_days = args.days
-    
-    print(f"Starting Oracle Direct DB Agent (Lookback: {lookback_days} days)...")
+
+    if args.url:
+        target_mode = 'custom'
+    elif args.both:
+        target_mode = 'both'
+    elif args.test:
+        target_mode = 'test'
+    elif args.prod:
+        target_mode = 'prod'
+    else:
+        env_mode = os.environ.get("DBTRAC_ENV", "").lower()
+        target_mode = 'both' if env_mode in ("both", "dual") else ('test' if env_mode in ("test", "testing") else 'prod')
+
+    print(f"Starting Oracle Direct DB Agent (Mode: {target_mode}, Lookback: {lookback_days} days)...")
     conn, cursor = connect_to_database(args.user, args.password, args.host, args.port, db_sid=args.sid, db_service=args.service)
+
+    # --------------------------------------------------------
+    # 0. Gather Live Oracle Engine Performance Telemetry
+    # --------------------------------------------------------
+    print("\nCollecting Oracle instance performance metrics (sessions, locks, long queries, cache hit, FRA)...")
+    try:
+        perf_payload = collect_oracle_performance_metrics(cursor, sid_name=args.sid or args.service or "INFRA")
+        print(f"Oracle Performance Payload: {json.dumps(perf_payload, indent=2)}")
+        send_to_api("health/ingest/", perf_payload, mode=target_mode, custom_url=args.url)
+    except Exception as perf_err:
+        print(f"Error collecting/sending Oracle performance metrics: {perf_err}")
+
+    if args.health_only:
+        cursor.close()
+        conn.close()
+        print("\nOracle Direct DB Health-Only run completed successfully.")
+        sys.exit(0)
     
     # --------------------------------------------------------
     # 1. Gather Direct RMAN Backup History
@@ -208,7 +436,7 @@ if __name__ == "__main__":
                 "verified": True if outcome == 'Success' else False,
                 "compression": True
             }
-            send_to_api("backup/ingest/", payload)
+            send_to_api("backup/ingest/", payload, mode=target_mode, custom_url=args.url)
     except Exception as e:
         print(f"Error querying backups: {e}")
 
@@ -362,7 +590,7 @@ if __name__ == "__main__":
                 "available_capacity_gb": available_capacity_gb
             }
             print(f"Sending Capacity Payload: {json.dumps(payload, indent=2)}")
-            send_to_api("capacity/ingest/", payload)
+            send_to_api("capacity/ingest/", payload, mode=target_mode, custom_url=args.url)
     except Exception as e:
         print(f"Error querying capacity: {e}")
 
