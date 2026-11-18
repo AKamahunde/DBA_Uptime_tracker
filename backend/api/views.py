@@ -1196,6 +1196,11 @@ def dashboard(request):
                 'type': 'danger' if item['cache_hit_percent'] < 90.0 else 'warning',
                 'message': f"{p_db} Buffer Cache: Hit ratio dropped to <strong>{item['cache_hit_percent']}%</strong> (&lt; 95% threshold)."
             })
+        if p_db == 'PostgreSQL' and item.get('slow_queries', 0) > 0:
+            attention_items.append({
+                'type': 'danger' if item['slow_queries'] >= 5 else 'warning',
+                'message': f"PostgreSQL Transaction Bloat Risk: <strong>{item['slow_queries']}</strong> session(s) stuck idle-in-transaction &gt; 60s."
+            })
         
     # 8. Combined Recent Activity
     activities = []

@@ -17,10 +17,12 @@ Architecture (Zero Container Modification):
      for weekly Sunday 02:00 EAT `pg_dump` completion and SHA256 verification.
 """
 
+import argparse
 import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -30,12 +32,19 @@ from datetime import datetime, timezone
 # CONFIGURATION
 # ==============================================================================
 DBTRAC_BASE_URL = os.environ.get("DBTRAC_BASE_URL", "http://192.168.35.38:91")
-FALLBACK_BASE_URLS = [
+PROD_BASE_URLS = [
+    "http://192.168.35.38:90",
+    "http://dbtrac.nms.go.ug:90",
+    "https://dbtrac.nms.go.ug",
+    "http://dbtrac.nms.go.ug",
+]
+TEST_BASE_URLS = [
     DBTRAC_BASE_URL,
     "http://192.168.35.38:91",
     "http://dbtractest.nms.go.ug:91",
     "http://dbtractest.nms.go.ug",
 ]
+FALLBACK_BASE_URLS = list(TEST_BASE_URLS)
 API_KEY = os.environ.get("REPLICATION_API_KEY", "uptimetracker_api_9f2c1d8e45x9")
 
 PG_CONTAINER_FILTER = os.environ.get("PG_CONTAINER_FILTER", "ccisprod_db")
@@ -328,12 +337,24 @@ def collect_postgres_metrics(cid):
     if rc == 0 and out.strip():
         largest_table = out.splitlines()[0].strip()
 
-    # 4. Active / total connections & slow queries (> 30s)
-    connections = 42
-    slow_queries = 0
+    # 4. Connection pool saturation, active queries, blocked locks, long queries (>10s), idle-in-tx (>60s)
+    max_connections = 100
+    rc_m, out_m, _ = _psql_exec(cid, "SHOW max_connections;")
+    if rc_m == 0 and out_m.strip().isdigit():
+        max_connections = int(out_m.strip())
+
+    connections = 0
+    active_queries = 0
+    blocked_queries = 0
+    long_running_queries = 0
+    idle_in_tx = 0
     sql_conn = (
-        "SELECT COUNT(*), "
-        "COALESCE(SUM(CASE WHEN state = 'active' AND now() - query_start > interval '30 seconds' THEN 1 ELSE 0 END), 0) "
+        "SELECT "
+        "COUNT(*), "
+        "COALESCE(SUM(CASE WHEN backend_type = 'client backend' AND state = 'active' AND pid <> pg_backend_pid() THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN cardinality(pg_blocking_pids(pid)) > 0 THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN backend_type = 'client backend' AND state = 'active' AND pid <> pg_backend_pid() AND now() - query_start > interval '10 seconds' THEN 1 ELSE 0 END), 0), "
+        "COALESCE(SUM(CASE WHEN state LIKE 'idle in transaction%' AND now() - state_change > interval '60 seconds' THEN 1 ELSE 0 END), 0) "
         "FROM pg_stat_activity WHERE datname IS NOT NULL;"
     )
     rc, out, _ = _psql_exec(cid, sql_conn)
@@ -341,16 +362,95 @@ def collect_postgres_metrics(cid):
         p = out.splitlines()[0].split("|")
         try:
             connections = int(p[0].strip())
-            slow_queries = int(p[1].strip())
-        except ValueError:
+            active_queries = int(p[1].strip())
+            blocked_queries = int(p[2].strip())
+            long_running_queries = int(p[3].strip())
+            idle_in_tx = int(p[4].strip())
+        except (ValueError, IndexError):
             pass
+
+    # 5. Buffer cache hit ratio & rollbacks/deadlocks deltas from pg_stat_database
+    safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in PG_CONTAINER_FILTER)
+    perf_state_file = os.path.join(tempfile.gettempdir(), f"dbtrac_pg_perf_{safe_name}.json")
+    prev_state = {}
+    try:
+        if os.path.exists(perf_state_file):
+            with open(perf_state_file, "r", encoding="utf-8") as f:
+                prev_state = json.load(f)
+    except Exception:
+        prev_state = {}
+
+    curr_hits = 0
+    curr_reads = 0
+    curr_rollbacks = 0
+    curr_deadlocks = 0
+    sql_stat = (
+        "SELECT COALESCE(SUM(blks_hit), 0), COALESCE(SUM(blks_read), 0), "
+        "COALESCE(SUM(xact_rollback), 0), COALESCE(SUM(deadlocks), 0) "
+        "FROM pg_stat_database;"
+    )
+    rc_s, out_s, _ = _psql_exec(cid, sql_stat)
+    if rc_s == 0 and "|" in out_s:
+        sp = out_s.splitlines()[0].split("|")
+        try:
+            curr_hits = int(sp[0].strip())
+            curr_reads = int(sp[1].strip())
+            curr_rollbacks = int(sp[2].strip())
+            curr_deadlocks = int(sp[3].strip())
+        except (ValueError, IndexError):
+            pass
+
+    def _pg_delta(curr_v, key):
+        if key not in prev_state:
+            return None
+        pv = int(prev_state.get(key, 0))
+        return max(0, curr_v - pv) if curr_v >= pv else max(0, curr_v)
+
+    d_hits = _pg_delta(curr_hits, "blks_hit")
+    d_reads = _pg_delta(curr_reads, "blks_read")
+    d_rb = _pg_delta(curr_rollbacks, "xact_rollback")
+    d_dl = _pg_delta(curr_deadlocks, "deadlocks")
+
+    if d_hits is not None and d_reads is not None and (d_hits + d_reads) > 0:
+        cache_hit_percent = round(max(0.0, min(100.0, (d_hits / float(d_hits + d_reads)) * 100.0)), 2)
+    elif (curr_hits + curr_reads) > 0:
+        cache_hit_percent = round(max(0.0, min(100.0, (curr_hits / float(curr_hits + curr_reads)) * 100.0)), 2)
+    else:
+        cache_hit_percent = 100.00
+
+    rollbacks_deadlocks_delta = (d_rb or 0) + (d_dl or 0)
+
+    try:
+        with open(perf_state_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "blks_hit": curr_hits,
+                "blks_read": curr_reads,
+                "xact_rollback": curr_rollbacks,
+                "deadlocks": curr_deadlocks,
+                "updated_at": datetime.now().isoformat(),
+            }, f)
+    except Exception:
+        pass
+
+    # 6. Highest dead-tuple count across user tables (autovacuum health)
+    max_dead_tuples = 0
+    rc_d, out_d, _ = _psql_exec(cid, "SELECT COALESCE(MAX(n_dead_tup), 0) FROM pg_stat_user_tables;")
+    if rc_d == 0 and out_d.strip().isdigit():
+        max_dead_tuples = int(out_d.strip())
 
     return {
         "reachable": True,
         "db_size_gb": db_size_gb,
         "largest_table": largest_table,
         "connections": connections,
-        "slow_queries": slow_queries,
+        "max_connections": max_connections,
+        "active_queries": active_queries,
+        "blocked_queries": blocked_queries,
+        "long_running_queries": long_running_queries,
+        "slow_queries": idle_in_tx,
+        "cache_hit_percent": cache_hit_percent,
+        "aborted_connections": rollbacks_deadlocks_delta,
+        "max_dead_tuples": max_dead_tuples,
         "error": None,
     }
 
@@ -409,11 +509,38 @@ def main():
     # Both container and PostgreSQL engine are healthy
     handle_outage_state(True)
 
+    conn_util = (pg["connections"] / pg["max_connections"] * 100.0) if pg["max_connections"] > 0 else 0.0
     status = "Healthy"
-    if host["disk_pct"] >= 85.0 or host["mem_pct"] >= 90.0 or cont["oom_killed"]:
+    if (
+        host["disk_pct"] >= 85.0 or host["mem_pct"] >= 90.0 or cont["oom_killed"]
+        or conn_util >= 90.0 or pg["blocked_queries"] >= 5 or pg["long_running_queries"] >= 5
+    ):
         status = "Critical"
-    elif host["disk_pct"] >= 75.0 or host["mem_pct"] >= 80.0 or pg["connections"] >= 80:
+    elif (
+        host["disk_pct"] >= 75.0 or host["mem_pct"] >= 80.0
+        or conn_util >= 70.0 or pg["blocked_queries"] > 0 or pg["long_running_queries"] > 0 or pg["slow_queries"] > 0
+    ):
         status = "Warning"
+
+    pg_perf_fields = {
+        "connections": pg["connections"],
+        "max_connections": pg["max_connections"],
+        "slow_queries": pg["slow_queries"],
+        "threads": pg["active_queries"],
+        "blocked_queries": pg["blocked_queries"],
+        "long_running_queries": pg["long_running_queries"],
+        "cache_hit_percent": pg["cache_hit_percent"],
+        "aborted_connections": pg["aborted_connections"],
+        "status": status,
+    }
+
+    print(
+        f"[PG PERF] Conn: {pg['connections']}/{pg['max_connections']} ({round(conn_util, 1)}%) | "
+        f"Active: {pg['active_queries']} | Blocked: {pg['blocked_queries']} | "
+        f"Long(>10s): {pg['long_running_queries']} | IdleInTx(>60s): {pg['slow_queries']} | "
+        f"CacheHit: {pg['cache_hit_percent']}% | Rollbacks/Deadlocks(d): {pg['aborted_connections']} | "
+        f"MaxDeadTup: {pg['max_dead_tuples']}"
+    )
 
     # 1A. Push Linux Host VM ServerHealth payload
     vm_health_payload = {
@@ -443,10 +570,7 @@ def main():
         "disk_3_used_gb": host["disk_used_gb"],
         "disk_3_percent": host["disk_pct"],
         "tablespace_percent": host["disk_pct"],
-        "connections": pg["connections"],
-        "slow_queries": pg["slow_queries"],
-        "threads": cont["pids"],
-        "status": status,
+        **pg_perf_fields,
     }
     vm_code, vm_resp = _post_json("/api/health/ingest/", vm_health_payload)
     print(f"[OK] Host VM ServerHealth ingest: HTTP {vm_code} -> {vm_resp}")
@@ -480,10 +604,7 @@ def main():
         "disk_3_used_gb": host["pg_vol_gb"],
         "disk_3_percent": pg_vol_pct,
         "tablespace_percent": host["disk_pct"],
-        "connections": pg["connections"],
-        "slow_queries": pg["slow_queries"],
-        "threads": cont["pids"],
-        "status": status,
+        **pg_perf_fields,
     }
     h_code, h_resp = _post_json("/api/health/ingest/", cont_health_payload)
     print(f"[OK] Container ServerHealth ingest: HTTP {h_code} -> {h_resp}")
@@ -503,4 +624,15 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="DBTRAC CCIS PostgreSQL 17 Monitoring Agent")
+    parser.add_argument("--test", action="store_true", help="Send metrics to Test DBTRAC (dbtractest:91) [Default]")
+    parser.add_argument("--prod", action="store_true", help="Send metrics to Prod DBTRAC (dbtrac:90)")
+    parser.add_argument("--url", default=None, help="Custom DBTRAC base URL")
+    args = parser.parse_args()
+    if args.url:
+        FALLBACK_BASE_URLS[:] = [args.url]
+    elif args.prod:
+        FALLBACK_BASE_URLS[:] = list(PROD_BASE_URLS)
+    else:
+        FALLBACK_BASE_URLS[:] = list(TEST_BASE_URLS)
     main()
